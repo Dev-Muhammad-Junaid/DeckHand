@@ -154,6 +154,15 @@ The investigation and the fix are written up in
 [DeckHand/MenuBarStatusItems-macOS26.md](DeckHand/MenuBarStatusItems-macOS26.md).
 Worth reading before you debug a missing status item.
 
+## iOS 27, iPadOS 27, and macOS 27
+
+Deck Hand compiles cleanly against the 27 SDKs and needs no source changes to
+support them. [DeckHand/AppleOS27-Support.md](DeckHand/AppleOS27-Support.md) has
+the audit behind that claim, the config changes still outstanding, and a phased
+plan for the new capabilities worth adopting — App Intents, onscreen awareness,
+Shortcuts as a remote command surface, ScreenCaptureKit's new APIs, and the
+Foundation Models work.
+
 ## Repository layout
 
 ```
