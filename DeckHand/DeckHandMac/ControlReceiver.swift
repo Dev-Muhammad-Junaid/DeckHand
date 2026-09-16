@@ -346,21 +346,54 @@ final class ControlReceiver {
     }
 
     /// Warps the pointer onto the mirrored display (Spaces follow pointer
-    /// focus), then fires Control-Left/Right or opens Mission Control.
+    /// focus), fires Control-Left/Right, then parks the cursor on the Space
+    /// that just became visible. macOS restores a per-Space cursor location
+    /// after the transition, which can yank the pointer onto another
+    /// display — the second warp, after `activeSpaceDidChange`, is what
+    /// actually leaves the mouse on the desktop the user switched to.
     private func handleSwitchSpace(direction: SpaceDirection, displayID: UInt32?) async {
-        if let displayID {
-            injector.moveCursorToCenter(ofDisplay: CGDirectDisplayID(displayID))
-            // Give WindowServer a beat to move keyboard/Space focus onto
-            // the mirrored display before Control-Left/Right fires.
-            try? await Task.sleep(for: .milliseconds(80))
-        }
+        let target = displayID.map { CGDirectDisplayID($0) }
+            ?? injector.displayIDUnderCursor()
+
+        injector.moveCursorToCenter(ofDisplay: target)
+        try? await Task.sleep(for: .milliseconds(80))
+
         switch direction {
-        case .previous:
-            injector.sendShortcut(keys: ["ctrl", "left"])
-        case .next:
-            injector.sendShortcut(keys: ["ctrl", "right"])
+        case .previous, .next:
+            // Observer first — a fast Space switch can finish before we
+            // return from posting the shortcut.
+            async let spaceChanged: Void = waitForActiveSpaceChange()
+            if direction == .previous {
+                injector.sendShortcut(keys: ["ctrl", "left"])
+            } else {
+                injector.sendShortcut(keys: ["ctrl", "right"])
+            }
+            await spaceChanged
+            injector.moveCursorToCenter(ofDisplay: target)
+            CursorLocator.shared.ping()
         case .missionControl:
             await dispatchMacro(id: "missioncontrol_trigger")
+        }
+    }
+
+    /// Resolves when Mission Control finishes switching Space, or after a
+    /// short timeout if we were already at the end of the strip.
+    private func waitForActiveSpaceChange(timeout: Duration = .milliseconds(450)) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let once = OnceResume(continuation)
+            let center = NSWorkspace.shared.notificationCenter
+            let token = center.addObserver(
+                forName: NSWorkspace.activeSpaceDidChangeNotification,
+                object: nil,
+                queue: .main
+            ) { _ in
+                once.resume()
+            }
+            once.setToken(token)
+            Task { @MainActor in
+                try? await Task.sleep(for: timeout)
+                once.resume()
+            }
         }
     }
 
@@ -458,5 +491,36 @@ final class ControlReceiver {
         case .momentumChanged: return .momentumChanged
         case .momentumEnd:     return .momentumEnd
         }
+    }
+}
+
+/// Resumes a continuation at most once and drops the matching workspace
+/// observer. Shared between the space-change notification and its timeout.
+private final class OnceResume: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var token: NSObjectProtocol?
+
+    init(_ continuation: CheckedContinuation<Void, Never>) {
+        self.continuation = continuation
+    }
+
+    func setToken(_ token: NSObjectProtocol) {
+        lock.lock()
+        self.token = token
+        lock.unlock()
+    }
+
+    func resume() {
+        lock.lock()
+        let pending = continuation
+        continuation = nil
+        let token = self.token
+        self.token = nil
+        lock.unlock()
+        if let token {
+            NSWorkspace.shared.notificationCenter.removeObserver(token)
+        }
+        pending?.resume()
     }
 }

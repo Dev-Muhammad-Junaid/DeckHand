@@ -325,6 +325,19 @@ final class InputInjector {
         noteInjectionActive("warpCursor")
     }
 
+    /// Display currently under the pointer, used when the iPad has not
+    /// yet named a monitor. Falls back to the main display.
+    func displayIDUnderCursor() -> CGDirectDisplayID {
+        let point = NSEvent.mouseLocation
+        for screen in NSScreen.screens {
+            guard screen.frame.contains(point),
+                  let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+            else { continue }
+            return CGDirectDisplayID(truncating: number)
+        }
+        return CGMainDisplayID()
+    }
+
     // MARK: - Helpers
 
     private func currentCGCursorPosition() -> CGPoint {

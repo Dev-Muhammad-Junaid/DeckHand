@@ -5,8 +5,9 @@
 //  Floating live-mirror thumbnail (WID-403). Renders the latest frame the
 //  Mac streamed, draggable anywhere over the control surface, pinchable
 //  from a corner tile up to nearly the whole screen, with a close
-//  affordance and a chrome bar for picking a physical display or
-//  switching Mission Control Spaces (next/previous, not simultaneous).
+//  affordance. Edge chevrons switch Mission Control Spaces; the current
+//  frame slides off in the direction of travel while the live stream
+//  comes in from the other side.
 //
 //  The view is intentionally dumb: frame decode, sequencing, and the
 //  start/stop protocol all live in `ControlView`, which owns the single
@@ -22,12 +23,7 @@ struct MirrorThumbnailView: View {
     /// are derived from it, so the mirror can't be pinched larger than the
     /// screen or dragged out of reach on any device.
     let containerSize: CGSize
-    /// Physical displays the host can stream. Chips hide when there is
-    /// only one (or none yet).
-    var displays: [DisplayInfo] = []
-    var selectedDisplayID: UInt32?
     let onClose: () -> Void
-    var onSelectDisplay: (UInt32) -> Void = { _ in }
     var onSwitchSpace: (SpaceDirection) -> Void = { _ in }
     /// Fired with the pixel width the host should stream, whenever the
     /// mirror settles into a different resolution tier.
@@ -50,6 +46,13 @@ struct MirrorThumbnailView: View {
     /// user pinched to, so once they've chosen a working size, tap becomes
     /// minimise/restore rather than a fixed two-step toggle.
     @State private var restoreWidth: CGFloat = Layout.expandedWidth
+
+    /// Snapshot of the frame that is sliding out during a Space switch.
+    @State private var outgoingSnapshot: UIImage?
+    /// `.next` slides the current desktop left; `.previous` slides it right.
+    @State private var spaceDirection: SpaceDirection?
+    /// 0 at tap, 1 when the slide has settled.
+    @State private var spaceProgress: CGFloat = 0
 
     private enum Layout {
         static let compactWidth: CGFloat = 200
@@ -170,27 +173,22 @@ struct MirrorThumbnailView: View {
     // MARK: - Body
 
     var body: some View {
-        Group {
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-            } else {
-                // First frame hasn't landed yet.
-                ZStack {
-                    Rectangle().fill(.black.opacity(0.85))
-                    ProgressView()
-                        .tint(.white)
-                }
-                .aspectRatio(16.0 / 10.0, contentMode: .fit)
+        ZStack {
+            frameStack
+                .onTapGesture { toggleSize() }
+
+            HStack {
+                spaceChevron(direction: .previous, symbol: "chevron.left", label: "Previous desktop")
+                Spacer(minLength: 0)
+                spaceChevron(direction: .next, symbol: "chevron.right", label: "Next desktop")
             }
+            .padding(.horizontal, 8)
         }
-        .onTapGesture { toggleSize() }
         .frame(width: width)
         .clipShape(RoundedRectangle(cornerRadius: Layout.cornerRadius, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: Layout.cornerRadius, style: .continuous)
-                .strokeBorder(.white.opacity(0.25), lineWidth: 1)
+                .strokeBorder(.white.opacity(0.22), lineWidth: 0.5)
         )
         .overlay(alignment: .topTrailing) {
             Button(action: onClose) {
@@ -199,12 +197,8 @@ struct MirrorThumbnailView: View {
                     .symbolRenderingMode(.palette)
                     .foregroundStyle(.white, .black.opacity(0.55))
             }
-            .padding(4)
+            .padding(6)
             .accessibilityLabel("Close live mirror")
-        }
-        .overlay(alignment: .bottom) {
-            mirrorChrome
-                .padding(6)
         }
         .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
         .padding(.trailing, Layout.trailingInset)
@@ -251,99 +245,110 @@ struct MirrorThumbnailView: View {
         }
         .animation(.snappy(duration: 0.2), value: committedWidth)
         .accessibilityLabel("Live mirror of the Mac screen")
-        .accessibilityHint("Drag to move. Pinch to resize. Tap to shrink or restore. Use the bar to pick a display or switch desktops.")
+        .accessibilityHint("Drag to move. Pinch to resize. Tap to shrink or restore. Chevrons switch desktops.")
     }
 
-    // MARK: - Chrome
+    // MARK: - Frame + Space transition
 
-    /// Display chips (only when there is more than one monitor) plus
-    /// previous / Mission Control / next. Lives in an overlay so taps hit
-    /// the buttons instead of the drag/pinch/size-toggle gestures.
-    private var mirrorChrome: some View {
-        HStack(spacing: 6) {
-            if displays.count > 1 {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(displays) { display in
-                            Button {
-                                GestureHaptic.selection.trigger()
-                                onSelectDisplay(display.displayID)
-                            } label: {
-                                Text(display.shortLabel)
-                                    .lineLimit(1)
-                            }
-                            .buttonStyle(
-                                MirrorChipStyle(isSelected: display.displayID == selectedDisplayID)
-                            )
-                            .accessibilityLabel(display.isMain ? "\(display.name), main display" : display.name)
-                        }
-                    }
-                }
-                chromeDivider
-            }
+    /// Live frame, with the outgoing snapshot sliding off when a Space
+    /// switch is in flight. Direction matches macOS: next desktop comes
+    /// from the right.
+    private var frameStack: some View {
+        ZStack {
+            liveFrame
+                .offset(x: incomingOffset)
+                .opacity(incomingOpacity)
 
-            chromeButton(
-                symbol: "chevron.left",
-                label: "Previous desktop"
-            ) {
-                onSwitchSpace(.previous)
-            }
-            chromeButton(
-                symbol: "square.grid.3x2",
-                label: "Mission Control"
-            ) {
-                onSwitchSpace(.missionControl)
-            }
-            chromeButton(
-                symbol: "chevron.right",
-                label: "Next desktop"
-            ) {
-                onSwitchSpace(.next)
+            if let outgoingSnapshot {
+                Image(uiImage: outgoingSnapshot)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .offset(x: outgoingOffset)
+                    .opacity(1 - spaceProgress * 0.35)
             }
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 5)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(.white.opacity(0.18), lineWidth: 0.5))
+        .clipped()
     }
 
-    private var chromeDivider: some View {
-        Capsule()
-            .fill(.white.opacity(0.28))
-            .frame(width: 1, height: 14)
+    @ViewBuilder
+    private var liveFrame: some View {
+        if let image {
+            Image(uiImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+        } else {
+            ZStack {
+                Rectangle().fill(.black.opacity(0.85))
+                ProgressView()
+                    .tint(.white)
+            }
+            .aspectRatio(16.0 / 10.0, contentMode: .fit)
+        }
     }
 
-    private func chromeButton(
+    /// Next = current Space exits left. Previous = exits right.
+    private var travelSign: CGFloat {
+        spaceDirection == .previous ? 1 : -1
+    }
+
+    private var outgoingOffset: CGFloat {
+        travelSign * width * spaceProgress
+    }
+
+    private var incomingOffset: CGFloat {
+        guard spaceProgress > 0, spaceProgress < 1 else { return 0 }
+        return -travelSign * width * (1 - spaceProgress) * 0.45
+    }
+
+    private var incomingOpacity: Double {
+        guard spaceProgress > 0 else { return 1 }
+        return 0.55 + 0.45 * Double(spaceProgress)
+    }
+
+    private func performSpaceSwitch(_ direction: SpaceDirection) {
+        GestureHaptic.medium.trigger()
+        outgoingSnapshot = image
+        spaceDirection = direction
+        spaceProgress = 0
+        onSwitchSpace(direction)
+        withAnimation(.spring(response: 0.38, dampingFraction: 0.88)) {
+            spaceProgress = 1
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(420))
+            outgoingSnapshot = nil
+            spaceDirection = nil
+            spaceProgress = 0
+        }
+    }
+
+    private func spaceChevron(
+        direction: SpaceDirection,
         symbol: String,
-        label: String,
-        action: @escaping () -> Void
+        label: String
     ) -> some View {
         Button {
-            GestureHaptic.light.trigger()
-            action()
+            performSpaceSwitch(direction)
         } label: {
             Image(systemName: symbol)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: 26, height: 22)
+                .frame(width: 34, height: 34)
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(
+                    Circle().strokeBorder(Color.white.opacity(0.22), lineWidth: 0.5)
+                )
+                .shadow(color: .black.opacity(0.28), radius: 8, y: 2)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScalePressStyle())
         .accessibilityLabel(label)
     }
 }
 
-private struct MirrorChipStyle: ButtonStyle {
-    let isSelected: Bool
-
+private struct ScalePressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 10, weight: .semibold, design: .rounded))
-            .foregroundStyle(isSelected ? Color.black : Color.white.opacity(0.92))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(
-                Capsule().fill(isSelected ? Color.white : Color.white.opacity(0.16))
-            )
-            .opacity(configuration.isPressed ? 0.7 : 1)
+            .scaleEffect(configuration.isPressed ? 0.9 : 1)
+            .animation(.spring(response: 0.28, dampingFraction: 0.72), value: configuration.isPressed)
     }
 }

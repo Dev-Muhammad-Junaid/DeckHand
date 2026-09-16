@@ -81,8 +81,6 @@ struct ControlView: View {
     /// Highest sequence number rendered; lower/equal arrivals are stale
     /// (shouldn't happen on an ordered transport, but cheap to guard).
     @State private var mirrorLastSeq: UInt64 = 0
-    /// Physical displays the host can stream, pushed with the mirror.
-    @State private var mirrorDisplays: [DisplayInfo] = []
     /// Display the current stream is pointed at. `nil` until the host says.
     @State private var selectedMirrorDisplayID: UInt32?
 
@@ -207,13 +205,7 @@ struct ControlView: View {
                         MirrorThumbnailView(
                             image: mirrorImage,
                             containerSize: proxy.size,
-                            displays: mirrorDisplays,
-                            selectedDisplayID: selectedMirrorDisplayID,
                             onClose: { toggleMirror() },
-                            onSelectDisplay: { displayID in
-                                selectedMirrorDisplayID = displayID
-                                renegotiateMirror()
-                            },
                             onSwitchSpace: { direction in
                                 Task {
                                     await sender?.switchSpace(
@@ -683,11 +675,8 @@ struct ControlView: View {
                         uiContext = snapshot
                     }
 
-                case let .displayListUpdate(displays, selectedDisplayID):
-                    withAnimation(.easeInOut(duration: 0.18)) {
-                        mirrorDisplays = displays
-                        selectedMirrorDisplayID = selectedDisplayID
-                    }
+                case let .displayListUpdate(_, selectedDisplayID):
+                    selectedMirrorDisplayID = selectedDisplayID
 
                 case let .appMenuShortcutsResponse(bundleID, shortcuts):
                     let added = ShortcutStore.shared.importBindings(shortcuts, for: bundleID)
@@ -739,7 +728,6 @@ struct ControlView: View {
             Task { await sender.startMirror(fps: fps, maxWidth: width, displayID: selectedMirrorDisplayID) }
         } else {
             mirrorImage = nil
-            mirrorDisplays = []
             Task { await sender.stopMirror() }
         }
     }
