@@ -5,7 +5,8 @@
 //  Floating live-mirror thumbnail (WID-403). Renders the latest frame the
 //  Mac streamed, draggable anywhere over the control surface, pinchable
 //  from a corner tile up to nearly the whole screen, with a close
-//  affordance.
+//  affordance and a chrome bar for picking a physical display or
+//  switching Mission Control Spaces (next/previous, not simultaneous).
 //
 //  The view is intentionally dumb: frame decode, sequencing, and the
 //  start/stop protocol all live in `ControlView`, which owns the single
@@ -21,7 +22,13 @@ struct MirrorThumbnailView: View {
     /// are derived from it, so the mirror can't be pinched larger than the
     /// screen or dragged out of reach on any device.
     let containerSize: CGSize
+    /// Physical displays the host can stream. Chips hide when there is
+    /// only one (or none yet).
+    var displays: [DisplayInfo] = []
+    var selectedDisplayID: UInt32?
     let onClose: () -> Void
+    var onSelectDisplay: (UInt32) -> Void = { _ in }
+    var onSwitchSpace: (SpaceDirection) -> Void = { _ in }
     /// Fired with the pixel width the host should stream, whenever the
     /// mirror settles into a different resolution tier.
     var onStreamWidthChanged: (Int) -> Void = { _ in }
@@ -178,6 +185,7 @@ struct MirrorThumbnailView: View {
                 .aspectRatio(16.0 / 10.0, contentMode: .fit)
             }
         }
+        .onTapGesture { toggleSize() }
         .frame(width: width)
         .clipShape(RoundedRectangle(cornerRadius: Layout.cornerRadius, style: .continuous))
         .overlay(
@@ -193,6 +201,10 @@ struct MirrorThumbnailView: View {
             }
             .padding(4)
             .accessibilityLabel("Close live mirror")
+        }
+        .overlay(alignment: .bottom) {
+            mirrorChrome
+                .padding(6)
         }
         .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
         .padding(.trailing, Layout.trailingInset)
@@ -228,7 +240,6 @@ struct MirrorThumbnailView: View {
                         }
                 )
         )
-        .onTapGesture { toggleSize() }
         .onAppear {
             guard let initialLayout else { return }
             committedWidth = CGFloat(initialLayout.width)
@@ -240,6 +251,99 @@ struct MirrorThumbnailView: View {
         }
         .animation(.snappy(duration: 0.2), value: committedWidth)
         .accessibilityLabel("Live mirror of the Mac screen")
-        .accessibilityHint("Drag to move. Pinch to resize. Tap to shrink or restore.")
+        .accessibilityHint("Drag to move. Pinch to resize. Tap to shrink or restore. Use the bar to pick a display or switch desktops.")
+    }
+
+    // MARK: - Chrome
+
+    /// Display chips (only when there is more than one monitor) plus
+    /// previous / Mission Control / next. Lives in an overlay so taps hit
+    /// the buttons instead of the drag/pinch/size-toggle gestures.
+    private var mirrorChrome: some View {
+        HStack(spacing: 6) {
+            if displays.count > 1 {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(displays) { display in
+                            Button {
+                                GestureHaptic.selection.trigger()
+                                onSelectDisplay(display.displayID)
+                            } label: {
+                                Text(display.shortLabel)
+                                    .lineLimit(1)
+                            }
+                            .buttonStyle(
+                                MirrorChipStyle(isSelected: display.displayID == selectedDisplayID)
+                            )
+                            .accessibilityLabel(display.isMain ? "\(display.name), main display" : display.name)
+                        }
+                    }
+                }
+                chromeDivider
+            }
+
+            chromeButton(
+                symbol: "chevron.left",
+                label: "Previous desktop"
+            ) {
+                onSwitchSpace(.previous)
+            }
+            chromeButton(
+                symbol: "square.grid.3x2",
+                label: "Mission Control"
+            ) {
+                onSwitchSpace(.missionControl)
+            }
+            chromeButton(
+                symbol: "chevron.right",
+                label: "Next desktop"
+            ) {
+                onSwitchSpace(.next)
+            }
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 5)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(.white.opacity(0.18), lineWidth: 0.5))
+    }
+
+    private var chromeDivider: some View {
+        Capsule()
+            .fill(.white.opacity(0.28))
+            .frame(width: 1, height: 14)
+    }
+
+    private func chromeButton(
+        symbol: String,
+        label: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            GestureHaptic.light.trigger()
+            action()
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 26, height: 22)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+}
+
+private struct MirrorChipStyle: ButtonStyle {
+    let isSelected: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 10, weight: .semibold, design: .rounded))
+            .foregroundStyle(isSelected ? Color.black : Color.white.opacity(0.92))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule().fill(isSelected ? Color.white : Color.white.opacity(0.16))
+            )
+            .opacity(configuration.isPressed ? 0.7 : 1)
     }
 }

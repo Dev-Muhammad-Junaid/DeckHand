@@ -54,6 +54,7 @@ targets:
         # ("-") signing cannot satisfy the build.
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: VCBDYB22D9
+    scheme: {}
 
   # ─────────────────────────────────────────────────────────────
   # iOS / iPadOS Client
@@ -88,6 +89,7 @@ targets:
         # never exercised this.
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: VCBDYB22D9
+    scheme: {}
 
   # ─────────────────────────────────────────────────────────────
   # Wire-format contract tests (WID-400)

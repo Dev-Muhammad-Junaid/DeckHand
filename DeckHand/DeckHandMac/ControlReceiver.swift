@@ -4,6 +4,7 @@
 //
 
 import AppKit
+import CoreGraphics
 import Foundation
 import LoomKit
 
@@ -209,7 +210,7 @@ final class ControlReceiver {
             // timeout (~6 s) on an unresponsive app — own task.
             Task { ContextObserver.shared.performAction(id: id) }
 
-        case let .startMirror(fps, maxWidth):
+        case let .startMirror(fps, maxWidth, displayID):
             // SCShareableContent inside — the #1 hang candidate. Own task.
             let subscriberID = handle.id
             Task {
@@ -217,13 +218,17 @@ final class ControlReceiver {
                     subscriberID: subscriberID,
                     handle: handle,
                     fps: fps,
-                    maxWidth: maxWidth
+                    maxWidth: maxWidth,
+                    displayID: displayID
                 )
             }
 
         case .stopMirror:
             let subscriberID = handle.id
             Task { await MirrorStreamService.shared.stop(subscriberID: subscriberID) }
+
+        case let .switchSpace(direction, displayID):
+            Task { await self.handleSwitchSpace(direction: direction, displayID: displayID) }
 
         case let .ping(seq):
             hasPinged.insert(handle.id)
@@ -253,7 +258,7 @@ final class ControlReceiver {
 
         case .authorizationStatus:
             break
-        case .screenshotData, .screenshotError, .activeAppUpdate, .appListResponse, .appMenuShortcutsResponse, .runningAppsUpdate, .uiContextUpdate, .windowListResponse, .mirrorFrame, .hostCapabilities:
+        case .screenshotData, .screenshotError, .activeAppUpdate, .appListResponse, .appMenuShortcutsResponse, .runningAppsUpdate, .uiContextUpdate, .windowListResponse, .mirrorFrame, .displayListUpdate, .hostCapabilities:
             // Client-bound messages; host doesn't process them locally
             break
         }
@@ -337,6 +342,25 @@ final class ControlReceiver {
                 to: handle,
                 message: "Couldn't read window list: \(error.localizedDescription)"
             )
+        }
+    }
+
+    /// Warps the pointer onto the mirrored display (Spaces follow pointer
+    /// focus), then fires Control-Left/Right or opens Mission Control.
+    private func handleSwitchSpace(direction: SpaceDirection, displayID: UInt32?) async {
+        if let displayID {
+            injector.moveCursorToCenter(ofDisplay: CGDirectDisplayID(displayID))
+            // Give WindowServer a beat to move keyboard/Space focus onto
+            // the mirrored display before Control-Left/Right fires.
+            try? await Task.sleep(for: .milliseconds(80))
+        }
+        switch direction {
+        case .previous:
+            injector.sendShortcut(keys: ["ctrl", "left"])
+        case .next:
+            injector.sendShortcut(keys: ["ctrl", "right"])
+        case .missionControl:
+            await dispatchMacro(id: "missioncontrol_trigger")
         }
     }
 

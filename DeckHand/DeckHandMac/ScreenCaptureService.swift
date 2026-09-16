@@ -113,6 +113,49 @@ final class ScreenCaptureService {
         return try Self.encodeJPEG(cgImage, quality: quality)
     }
 
+    /// Physical monitors ScreenCaptureKit can stream, matched to
+    /// `NSScreen` for a localized name. Main display first.
+    func enumerateDisplays() async throws -> [DisplayInfo] {
+        let content = try await loadContent(forceRefresh: true)
+        let screensByID: [CGDirectDisplayID: NSScreen] = Dictionary(
+            uniqueKeysWithValues: NSScreen.screens.compactMap { screen in
+                guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
+                    return nil
+                }
+                return (CGDirectDisplayID(truncating: number), screen)
+            }
+        )
+        let mainID = CGMainDisplayID()
+        return content.displays
+            .map { display in
+                DisplayInfo(
+                    displayID: display.displayID,
+                    name: screensByID[display.displayID]?.localizedName ?? "Display",
+                    isMain: display.displayID == mainID,
+                    width: display.width,
+                    height: display.height
+                )
+            }
+            .sorted { a, b in
+                if a.isMain != b.isMain { return a.isMain }
+                return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+            }
+    }
+
+    /// Resolves an `SCDisplay` by CoreGraphics id, falling back to the
+    /// main display, then to whatever ScreenCaptureKit lists first.
+    func display(matching id: CGDirectDisplayID?) async throws -> SCDisplay {
+        let content = try await loadContent()
+        if let id, let match = content.displays.first(where: { $0.displayID == id }) {
+            return match
+        }
+        let mainID = CGMainDisplayID()
+        if let match = content.displays.first(where: { $0.displayID == mainID }) {
+            return match
+        }
+        return try await primaryDisplay()
+    }
+
     /// Captures the main display at full native resolution, then crops it
     /// to `normalizedRect` (0…1, origin top-left) and returns lossless PNG
     /// data. Region capture is intentionally driven from the Mac so the

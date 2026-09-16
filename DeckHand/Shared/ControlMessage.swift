@@ -77,14 +77,26 @@ public enum ControlMessage: Codable, Sendable {
     /// iPad → Mac: start streaming low-res screen frames. `fps` caps the
     /// capture rate (the Mac may deliver fewer under load); `maxWidth`
     /// bounds the longest frame edge in pixels so the host downsamples
-    /// on the GPU before encoding.
-    case startMirror(fps: Int, maxWidth: Int)
+    /// on the GPU before encoding. `displayID` picks a physical monitor;
+    /// omitted (or unknown) means the host's main display.
+    case startMirror(fps: Int, maxWidth: Int, displayID: UInt32? = nil)
     /// iPad → Mac: stop the mirror stream. Also implied by disconnect.
     case stopMirror
     /// Mac → iPad: one JPEG frame. `seq` increases monotonically within a
     /// stream so the iPad can drop out-of-order/stale frames; frames are
     /// independent (no inter-frame state) so any frame may be dropped.
     case mirrorFrame(seq: UInt64, data: Data)
+    /// Mac → iPad: the physical displays the host can mirror, plus which
+    /// one the current stream is pointed at. Pushed when a mirror starts
+    /// and whenever screens are plugged or unplugged. `displayID` on
+    /// `startMirror` is how the iPad picks a different one.
+    case displayListUpdate(displays: [DisplayInfo], selectedDisplayID: UInt32)
+    /// iPad → Mac: switch Mission Control Space on a display. The host
+    /// warps the cursor onto `displayID` first so Control-Left/Right
+    /// lands on the mirrored monitor rather than whichever display last
+    /// had keyboard focus. There is no public API to capture an
+    /// off-screen Space, so this only changes *which* Space is live.
+    case switchSpace(direction: SpaceDirection, displayID: UInt32? = nil)
 
     /// iPad → Mac: "what's my authorization state?" Self-healing resync for
     /// the approval handshake. Status pushes ride best-effort sends — if the
@@ -119,7 +131,7 @@ public enum ControlMessage: Codable, Sendable {
     // MARK: Codable
 
     private enum CodingKeys: String, CodingKey {
-        case type, dx, dy, button, keys, bundleID, bundleIDs, id, status, action, data, name, message, apps, shortcuts, snapshot, requestID, mode, quality, windows, phase, fps, maxWidth, seq, accessibility, screenRecording
+        case type, dx, dy, button, keys, bundleID, bundleIDs, id, status, action, data, name, message, apps, shortcuts, snapshot, requestID, mode, quality, windows, phase, fps, maxWidth, seq, accessibility, screenRecording, displayID, displays, selectedDisplayID, direction
     }
 
     private enum MessageType: String, Codable {
@@ -133,6 +145,7 @@ public enum ControlMessage: Codable, Sendable {
         case runningAppsUpdate
         case uiContextUpdate, triggerContextAction
         case startMirror, stopMirror, mirrorFrame
+        case displayListUpdate, switchSpace
         case requestAuthorizationStatus
         case ping, pong
         case hostCapabilities
@@ -229,9 +242,12 @@ public enum ControlMessage: Codable, Sendable {
         case .triggerContextAction:
             self = .triggerContextAction(id: try c.decode(String.self, forKey: .id))
         case .startMirror:
+            // `displayID` is optional for back-compat; missing means the
+            // host picks the main display.
             self = .startMirror(
                 fps: try c.decode(Int.self, forKey: .fps),
-                maxWidth: try c.decode(Int.self, forKey: .maxWidth)
+                maxWidth: try c.decode(Int.self, forKey: .maxWidth),
+                displayID: try c.decodeIfPresent(UInt32.self, forKey: .displayID)
             )
         case .stopMirror:
             self = .stopMirror
@@ -239,6 +255,16 @@ public enum ControlMessage: Codable, Sendable {
             self = .mirrorFrame(
                 seq: try c.decode(UInt64.self, forKey: .seq),
                 data: try c.decode(Data.self, forKey: .data)
+            )
+        case .displayListUpdate:
+            self = .displayListUpdate(
+                displays: try c.decode([DisplayInfo].self, forKey: .displays),
+                selectedDisplayID: try c.decode(UInt32.self, forKey: .selectedDisplayID)
+            )
+        case .switchSpace:
+            self = .switchSpace(
+                direction: try c.decode(SpaceDirection.self, forKey: .direction),
+                displayID: try c.decodeIfPresent(UInt32.self, forKey: .displayID)
             )
         case .requestAuthorizationStatus:
             self = .requestAuthorizationStatus
@@ -335,16 +361,25 @@ public enum ControlMessage: Codable, Sendable {
         case let .triggerContextAction(id):
             try c.encode(MessageType.triggerContextAction, forKey: .type)
             try c.encode(id, forKey: .id)
-        case let .startMirror(fps, maxWidth):
+        case let .startMirror(fps, maxWidth, displayID):
             try c.encode(MessageType.startMirror, forKey: .type)
             try c.encode(fps, forKey: .fps)
             try c.encode(maxWidth, forKey: .maxWidth)
+            try c.encodeIfPresent(displayID, forKey: .displayID)
         case .stopMirror:
             try c.encode(MessageType.stopMirror, forKey: .type)
         case let .mirrorFrame(seq, data):
             try c.encode(MessageType.mirrorFrame, forKey: .type)
             try c.encode(seq, forKey: .seq)
             try c.encode(data, forKey: .data)
+        case let .displayListUpdate(displays, selectedDisplayID):
+            try c.encode(MessageType.displayListUpdate, forKey: .type)
+            try c.encode(displays, forKey: .displays)
+            try c.encode(selectedDisplayID, forKey: .selectedDisplayID)
+        case let .switchSpace(direction, displayID):
+            try c.encode(MessageType.switchSpace, forKey: .type)
+            try c.encode(direction, forKey: .direction)
+            try c.encodeIfPresent(displayID, forKey: .displayID)
         case .requestAuthorizationStatus:
             try c.encode(MessageType.requestAuthorizationStatus, forKey: .type)
         case let .ping(seq):
