@@ -1,6 +1,28 @@
 # Deck Hand on iOS 27, iPadOS 27, and macOS 27
 
-Status: research and plan. Nothing in this document has been implemented.
+Status: research and plan. No adoption work has been implemented.
+
+## Start here
+
+Verified on 16 September 2026, after the Xcode install was repaired:
+
+- ✅ Xcode 27 is healthy — simulator runtimes and `devicectl` enumerate correctly.
+- ✅ Deck Hand compiles against the macOS 27 SDK under Swift 6.4 with zero
+  warnings from its own sources.
+- ✅ **12/12 contract tests pass** under Xcode 27 / Swift 6.4.
+- ❌ **Signed builds are blocked on the developer account, not on code.**
+  `xcodebuild ... -allowProvisioningUpdates` fails with `Unable to log in with
+  account 'socialmedia@learn4d365.com'. The login details ... were rejected`,
+  followed by `No profiles for 'com.deckhand.mac' were found`. Re-authenticate
+  the Apple Developer account in Xcode → Settings → Accounts. Nothing can be
+  installed on a device or shipped until this is cleared.
+- ❌ **No iOS 27 simulator runtime installed** — only iOS 18.5 and 26.5. Install
+  it before claiming anything about iOS 27 behavior.
+
+Do those two things, then run the Phase 0 functional check below. The single most
+important unknown is not whether Deck Hand *builds* on 27 — it does — but whether
+Accessibility input injection and AX menu reading still *behave* on 27. That is
+the app's foundation and it is untested. See open question 2.
 
 iOS 27, iPadOS 27, and macOS 27 "Golden Gate" shipped on 14 September 2026. This
 document covers two separate questions that are easy to conflate:
@@ -154,8 +176,13 @@ Ordered by value to this specific app, not by how much Apple talked about them.
 
 ### 2.1 Expose Deck Hand's own actions as App Intents — highest value, lowest risk
 
-App Intents is the single framework that feeds Shortcuts, Spotlight, Widgets,
-Siri, and now Siri AI. One set of intents lights up all of them.
+**There is no separate "new Siri API" to adopt.** Siri AI is the headline feature
+of the 27 releases, but the developer surface for it is App Intents — the same
+framework that already feeds Shortcuts, Spotlight, and Widgets, plus the new
+App Schemas and onscreen awareness layered on top. So "support the improved Siri"
+and "adopt App Intents" are the same project, and one set of intents lights up
+every one of those surfaces at once. It is also the entry point for Visual
+Intelligence (2.4). That breadth is why this is first.
 
 For Deck Hand this means things like "connect to my Mac", "capture my Mac's
 screen", "start the mirror", "run this shortcut on the Mac", "lock my Mac" become
@@ -238,7 +265,7 @@ Also noted and explicitly speculative: third parties report native MCP support
 being built into App Intents, spotted in a macOS 26.1 beta. If that lands
 publicly it changes this section completely. Do not plan around it yet.
 
-### 2.4 Foundation Models — natural-language control and better text handling
+### 2.4 Foundation Models and image understanding
 
 The 27 release of Foundation Models is substantial, and several pieces map onto
 things Deck Hand already does badly or not at all:
@@ -273,6 +300,77 @@ a wrong click.
 Note: the on-device model **changes** when a user updates to 27, and Apple
 explicitly says to re-test prompts against it. Any prompt we ship needs a
 version-pinned evaluation, which is what the new evaluations framework is for.
+
+#### Image understanding — and why it fits this app specifically
+
+The 27 releases give the on-device model eyes, and this lands unusually well on
+an app whose whole job is looking at a Mac screen.
+
+- **Image input on the on-device model.** Attach an image to a prompt and ask
+  about it. Accepts `UIImage`, `NSImage`, `CGImage`, Core Image types, CoreVideo
+  pixel buffers, and file URLs, at any size or aspect ratio — no cropping or
+  padding. Cost scales with pixels: on-device context is 4K tokens, Private Cloud
+  Compute is 32K, so multi-image prompts want PCC.
+- **Image-based tool calling.** Tool arguments can now carry an `ImageReference`
+  rather than the whole image. The reference is only valid inside the transcript
+  that produced it, so a tool resolves it through `@SessionProperty(.history)`
+  before converting to a pixel buffer. Label attached images in the prompt so the
+  model knows which one to pass.
+- **Built-in Vision tools:** `OCRTool` (fine or dense text, 30+ languages) and
+  `BarcodeReaderTool`.
+- **Tap-to-segment** — `GenerateIterativeSegmentationRequest` segments *any*
+  object, not just people or preset categories, seeded by a point, box, lasso, or
+  scribble, and refined iteratively with included and excluded points. Returns a
+  pixel-buffer mask. Coordinates are normalized with a **lower-left origin**, and
+  lasso strokes want a width of at least 1% of image width. The model asset must
+  be downloaded first via `downloadAssets()` / `assetStatus`.
+- **Saliency** — `GenerateObjectnessBasedSaliencyImageRequest` returns salient
+  objects as normalized rects, which is a cheap auto-crop.
+
+Apple's routing rule, worth following rather than reinventing: **Vision for
+fixed, fast, real-time tasks** (segmentation, saliency, OCR, detection — fast
+enough for video frames); **Foundation Models for open-ended descriptive
+reasoning**; and when you need both, **call a Vision tool from inside a model
+session**.
+
+**The argument for doing this in Deck Hand is not novelty, it is coverage.** The
+app's context features — dialog buttons in the Quick Actions bar, per-app menu
+shortcuts — are built on Accessibility, and AX is excellent for native AppKit
+apps and patchy to useless for Electron apps and custom-rendered content. That
+gap is currently invisible to the user: the chips simply do not appear and
+nothing explains why. Image understanding is the natural fallback for exactly
+that case — when AX returns nothing useful, we already have a live frame of the
+screen, and a model can read the dialog that AX could not.
+
+That framing also sets the priority correctly. Image understanding is a
+**fallback for a known blind spot**, not a replacement for AX. AX is faster, more
+precise, gives real element references we can actually press, and does not
+hallucinate. Keep it as the primary path.
+
+Two candidate features, cheapest first:
+
+1. **"Ask about this capture."** The capture preview already exists and already
+   runs Vision OCR. Add a prompt field that sends the image plus the question to a
+   model session with `OCRTool` attached. Self-contained, no new permissions, no
+   protocol change, and it degrades to today's behavior if unavailable.
+2. **AX-fallback screen reading.** When `uiContextUpdate` comes back empty for a
+   frontmost app, capture a frame and ask the model what actions are on screen.
+   Higher value and considerably harder: it needs a confidence story, and it can
+   only *suggest* coordinates to click rather than press a real AX element, so it
+   should propose rather than act.
+
+#### Visual Intelligence is also worth knowing about
+
+Visual Intelligence takes app integration through App Intents, not a separate
+framework: an `IntentValueQuery` receives a `SemanticContentDescriptor` pixel
+buffer, and `GenerateImageFeaturePrintRequest` with precomputed feature prints
+and a distance threshold does on-device similarity matching. Notably it works on
+**macOS with screenshots** rather than only camera input, and Apple flags that Mac
+pixel buffers are much larger and may need resizing.
+
+This is a lower priority for Deck Hand — we are not a content-search app — but it
+is another reason App Intents comes first: it is the entry point for Siri, Siri
+AI, Spotlight, Widgets, Shortcuts, *and* Visual Intelligence.
 
 ### 2.5 Core AI — bring-your-own-model
 
@@ -370,11 +468,23 @@ the highest-risk item in the document and the easiest to check.
 
 Each phase is independently shippable and independently useful.
 
-**Phase 0 — unblock the toolchain.** Repair the Xcode install so simulator and
-device support work. Bump `xcodeVersion` in `project.yml`. Document the
-`-allowProvisioningUpdates` build. Confirm both targets build *signed* on 27, run
-the contract tests, and smoke-test the app on a 27 device. Fix the Loom warning.
-Acceptance: signed builds and green tests on 27, no source changes required.
+**Phase 0 — unblock, then prove it still works.** Partly done: the Xcode install
+is repaired and 12/12 contract tests pass under Xcode 27. Remaining:
+
+1. Re-authenticate the developer account so signed builds work at all.
+2. Install the iOS 27 simulator runtime.
+3. Bump `xcodeVersion` to `"27.0"` in `project.yml`; fix the Loom
+   `LoomCloudKitShareManager` warning; document the build recipe in the README.
+4. **The functional check, which is the actual point of this phase.** Pair an
+   iPad on 27 with the Mac on 27 and confirm, by hand: pointer and keyboard
+   injection still land; per-app menu shortcut discovery over AX still returns
+   shortcuts; dialog buttons still appear in Quick Actions; captures and the
+   mirror still work; and the menu bar status item still appears when launched
+   through LaunchServices.
+
+Acceptance: signed builds, green tests, and a written yes/no on each item in
+step 4. Nothing else in this document should start before step 4 is answered,
+because every phase assumes that foundation is intact.
 
 **Phase 1 — visual and behavioral audit on 27.** Menu images in the Mac menu bar
 UI, capture and coordinate mapping against the new external display modes, mirror
@@ -395,10 +505,18 @@ metadata, `SCContentSharingPicker` for the window picker; evaluate HDR and
 `SCRecordingOutput` behind a setting. Acceptance: no regression in mirror latency,
 plus at least one capability we did not have.
 
-**Phase 5 — onscreen awareness and Foundation Models.** Annotate the app grid and
-window picker. Prototype a natural-language command bar with `@Generable` output
-into `ControlMessage`, evaluated before it ships. Acceptance: measured accuracy on
-a fixed command set, and a clean failure path when the model is unsure.
+**Phase 5 — image understanding, starting small.** "Ask about this capture": a
+prompt field on the existing capture preview, backed by a model session with
+`OCRTool` attached. This phase depends on nothing but Phase 0, so it can run in
+parallel with 2–4 if it is the more motivating work. Acceptance: a useful answer
+about a real screenshot, and a clean unavailable state on hardware or regions
+without Apple Intelligence. Only then consider AX-fallback screen reading (2.4),
+which needs a confidence story and should suggest rather than act.
+
+**Phase 6 — onscreen awareness and natural-language control.** Annotate the app
+grid and window picker. Prototype a command bar with `@Generable` output into
+`ControlMessage`, evaluated before it ships. Acceptance: measured accuracy on a
+fixed command set, and a clean failure path when the model is unsure.
 
 Wi-Fi Aware is deliberately absent. It is gated on the macOS availability
 question in 2.8; if the answer is "Mac Catalyst only", it never gets a phase.
@@ -426,6 +544,17 @@ Honest list of what I could not establish from available sources:
    require?** Gates any background inference.
 5. **Does the menu-image change actually affect a SwiftUI popover** rather than an
    `NSMenu`? Determines whether 1.2's second bullet is real work or a non-issue.
+6. **Is Apple Intelligence available on the specific hardware and region this app
+   is developed and used on?** Every Foundation Models feature in 2.4 is gated on
+   it, and on a region rollout that has been uneven. Check
+   `SystemLanguageModel.default.availability` on both devices before planning any
+   phase around it, and treat an unavailable model as a first-class UI state
+   rather than an error.
+7. **How large is the token cost of a full-resolution Mac screenshot?** Image
+   input accepts any size, but cost scales with pixels and the on-device context
+   is 4K tokens. A 6K Studio Display frame may simply not fit, which would force
+   downscaling, region cropping, or Private Cloud Compute. Measure before
+   designing around it.
 
 ---
 
@@ -434,9 +563,12 @@ Honest list of what I could not establish from available sources:
 Apple: Xcode 27, macOS 27, and iOS & iPadOS 27 release notes; What's new in
 macOS 27 and iPadOS 27; ScreenCaptureKit, Foundation Models, App Intents, and
 Wi-Fi Aware documentation; TN3213 (Multipeer Connectivity to Network framework),
-TN3111 (iOS Wi-Fi API overview); WWDC26 sessions 240, 241, 278, 339, 343;
-WWDC24 session 10088; WWDC25 sessions 228, 250.
+TN3111 (iOS Wi-Fi API overview); WWDC26 sessions 237, 240, 241, 278, 297, 339,
+343; WWDC24 session 10088; WWDC25 sessions 228, 250.
 
-Local verification: `sw_vers`, `xcodebuild -version`, `swift --version`, and full
-builds of `DeckHandMac` and `DeckHandiOS` against `MacOSX27.0.sdk` on
-16 September 2026.
+Local verification on 16 September 2026: `sw_vers`, `xcodebuild -version`,
+`swift --version`, full builds of `DeckHandMac` and `DeckHandiOS` against
+`MacOSX27.0.sdk`, `simctl list runtimes`, `devicectl list devices`, and a
+`DeckHandTests` run under Xcode 27 (12 tests, 0 failures). The signed
+`DeckHandMac` build was attempted with `-allowProvisioningUpdates` and failed on
+developer-account authentication, not on project configuration.
