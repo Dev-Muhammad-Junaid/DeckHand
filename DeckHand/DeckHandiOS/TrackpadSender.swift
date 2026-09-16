@@ -269,9 +269,10 @@ actor TrackpadSender {
     /// that macOS uses for trackpad gestures.
     func sendThreeFingerSwipe(_ direction: TrackpadGestureKind.ThreeFingerDirection) async {
         switch direction {
-        case .left:  await send(.keyboardShortcut(keys: ["ctrl", "left"]))
-        case .right: await send(.keyboardShortcut(keys: ["ctrl", "right"]))
-        // Mission Control & Exposé need dedicated handling on Mac
+        case .left:
+            await send(.switchSpace(direction: .previous, displayID: nil))
+        case .right:
+            await send(.switchSpace(direction: .next, displayID: nil))
         case .up:    await send(.macroButton(id: "missioncontrol_trigger"))
         case .down:  await send(.macroButton(id: "expose_trigger"))
         }

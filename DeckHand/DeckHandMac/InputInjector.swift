@@ -305,11 +305,25 @@ final class InputInjector {
         }
     }
 
-    /// Moves the cursor to the centre of `displayID` so subsequent Space
-    /// shortcuts (Control-Left/Right) apply to that monitor. Mission Control
-    /// Spaces follow the display that has pointer focus; without this, a
-    /// PIP pointed at the extended display would still swipe Spaces on the
-    /// built-in panel.
+    /// Parks the pointer in this display's menu bar. Spaces follow the
+    /// display that contains the pointer; the menu bar is used instead of
+    /// the centre so Control-Left/Right is not delivered into a focused
+    /// text field or browser (which swallow the shortcut).
+    func moveCursorToMenuBar(ofDisplay displayID: CGDirectDisplayID) {
+        guard isAccessibilityGranted else { noteInjectSkipped("warpCursor"); return }
+        let bounds = CGDisplayBounds(displayID)
+        guard bounds.width > 0, bounds.height > 0 else { return }
+        let point = CGPoint(x: bounds.midX, y: bounds.minY + 8)
+        let event = CGEvent(
+            mouseEventSource: nil,
+            mouseType: .mouseMoved,
+            mouseCursorPosition: point,
+            mouseButton: .left
+        )
+        event?.post(tap: .cghidEventTap)
+        noteInjectionActive("warpCursor")
+    }
+
     func moveCursorToCenter(ofDisplay displayID: CGDirectDisplayID) {
         guard isAccessibilityGranted else { noteInjectSkipped("warpCursor"); return }
         let bounds = CGDisplayBounds(displayID)

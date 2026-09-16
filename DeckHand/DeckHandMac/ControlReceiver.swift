@@ -264,15 +264,6 @@ final class ControlReceiver {
         }
     }
 
-    // MARK: - Screenshot Permission
-
-    /// Call once at startup so macOS has already shown the prompt before the user
-    /// taps the screenshot button on their iPad. Touches `SCShareableContent` to
-    /// surface the TCC dialog on first launch.
-    func requestScreenCaptureIfNeeded() {
-        Task { await ScreenCaptureService.shared.primePermission() }
-    }
-
     // MARK: - Screenshot Capture
 
     /// Captures the requested slice of the screen and sends it back as JPEG,
@@ -345,29 +336,23 @@ final class ControlReceiver {
         }
     }
 
-    /// Warps the pointer onto the mirrored display (Spaces follow pointer
-    /// focus), fires Control-Left/Right, then parks the cursor on the Space
-    /// that just became visible. macOS restores a per-Space cursor location
-    /// after the transition, which can yank the pointer onto another
-    /// display — the second warp, after `activeSpaceDidChange`, is what
-    /// actually leaves the mouse on the desktop the user switched to.
+    /// Mission Control's "Move left/right a space" is a *symbolic hotkey*,
+    /// not an app key equivalent. `CGEvent` HID posts (what `sendShortcut`
+    /// uses) never fire those — the same reason App Exposé already goes
+    /// through System Events. Control-Left/Right posted as HID also lands
+    /// in whatever window we just focused, so both chevrons looked like a
+    /// no-op on the same desktop.
     private func handleSwitchSpace(direction: SpaceDirection, displayID: UInt32?) async {
         let target = displayID.map { CGDirectDisplayID($0) }
             ?? injector.displayIDUnderCursor()
 
-        injector.moveCursorToCenter(ofDisplay: target)
-        try? await Task.sleep(for: .milliseconds(80))
+        injector.moveCursorToMenuBar(ofDisplay: target)
+        try? await Task.sleep(for: .milliseconds(60))
 
         switch direction {
         case .previous, .next:
-            // Observer first — a fast Space switch can finish before we
-            // return from posting the shortcut.
             async let spaceChanged: Void = waitForActiveSpaceChange()
-            if direction == .previous {
-                injector.sendShortcut(keys: ["ctrl", "left"])
-            } else {
-                injector.sendShortcut(keys: ["ctrl", "right"])
-            }
+            postSystemSpaceKey(previous: direction == .previous)
             await spaceChanged
             injector.moveCursorToCenter(ofDisplay: target)
             CursorLocator.shared.ping()
@@ -376,9 +361,22 @@ final class ControlReceiver {
         }
     }
 
+    /// `key code 123` = Left Arrow, `124` = Right Arrow. Control+Arrow is
+    /// the default Mission Control binding for adjacent Spaces.
+    private func postSystemSpaceKey(previous: Bool) {
+        let keyCode = previous ? 123 : 124
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        proc.arguments = [
+            "-e",
+            "tell application \"System Events\" to key code \(keyCode) using control down"
+        ]
+        try? proc.run()
+    }
+
     /// Resolves when Mission Control finishes switching Space, or after a
     /// short timeout if we were already at the end of the strip.
-    private func waitForActiveSpaceChange(timeout: Duration = .milliseconds(450)) async {
+    private func waitForActiveSpaceChange(timeout: Duration = .milliseconds(800)) async {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             let once = OnceResume(continuation)
             let center = NSWorkspace.shared.notificationCenter

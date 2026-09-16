@@ -178,11 +178,11 @@ struct MirrorThumbnailView: View {
                 .onTapGesture { toggleSize() }
 
             HStack {
-                spaceChevron(direction: .previous, symbol: "chevron.left", label: "Previous desktop")
+                spaceChevron(direction: .previous, symbol: "chevron.left.circle.fill", label: "Previous desktop")
                 Spacer(minLength: 0)
-                spaceChevron(direction: .next, symbol: "chevron.right", label: "Next desktop")
+                spaceChevron(direction: .next, symbol: "chevron.right.circle.fill", label: "Next desktop")
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 6)
         }
         .frame(width: width)
         .clipShape(RoundedRectangle(cornerRadius: Layout.cornerRadius, style: .continuous))
@@ -315,7 +315,7 @@ struct MirrorThumbnailView: View {
             spaceProgress = 1
         }
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(420))
+            try? await Task.sleep(for: .milliseconds(700))
             outgoingSnapshot = nil
             spaceDirection = nil
             spaceProgress = 0
@@ -331,24 +331,11 @@ struct MirrorThumbnailView: View {
             performSpaceSwitch(direction)
         } label: {
             Image(systemName: symbol)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 34, height: 34)
-                .background(.ultraThinMaterial, in: Circle())
-                .overlay(
-                    Circle().strokeBorder(Color.white.opacity(0.22), lineWidth: 0.5)
-                )
-                .shadow(color: .black.opacity(0.28), radius: 8, y: 2)
+                .font(.system(size: 28))
+                .symbolRenderingMode(.palette)
+                .foregroundStyle(.white, .black.opacity(0.45))
         }
-        .buttonStyle(ScalePressStyle())
+        .buttonStyle(.plain)
         .accessibilityLabel(label)
-    }
-}
-
-private struct ScalePressStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.9 : 1)
-            .animation(.spring(response: 0.28, dampingFraction: 0.72), value: configuration.isPressed)
     }
 }
