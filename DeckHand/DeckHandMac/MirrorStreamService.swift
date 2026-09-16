@@ -163,6 +163,7 @@ final class MirrorStreamService: NSObject {
         // Small queue: stale frames are worthless for a live mirror.
         config.queueDepth = 3
         config.showsCursor = true
+        config.capturesAudio = false
 
         let filter = SCContentFilter(display: display, excludingWindows: [])
 

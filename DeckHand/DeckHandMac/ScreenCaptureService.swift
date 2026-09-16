@@ -8,9 +8,10 @@
 //  supported surface on macOS 26 (Tahoe); ScreenCaptureKit's `SCScreenshotManager`
 //  is the current Apple-recommended path for one-shot screen grabs.
 //
-//  Permission handling moves from `CGPreflightScreenCaptureAccess` to probing
-//  `SCShareableContent` — if the user hasn't granted Screen Recording access the
-//  first call surfaces the TCC prompt and throws `.permissionDenied`.
+//  Permission handling uses `CGPreflightScreenCaptureAccess` for status
+//  and `SCShareableContent` only on an actual capture. Touching
+//  shareable content at launch is a permission *request* on current macOS
+//  (the "screen and system audio" dialog), so we never use it as a probe.
 //
 //  Hot-path optimizations relative to the original implementation:
 //
@@ -76,13 +77,6 @@ final class ScreenCaptureService {
     // Swift 6 strict concurrency rejects. Keeping `contentObserver` alive on
     // the singleton is exactly what we want: the observation should fire for
     // the life of the process.
-
-    /// Triggers the system Screen Recording prompt by touching `SCShareableContent`.
-    /// Call this once at launch so the dialog appears before the user actually
-    /// requests a screenshot from the iPad. Result is cached for reuse.
-    func primePermission() async {
-        _ = try? await loadContent()
-    }
 
     private func loadContent(forceRefresh: Bool = false) async throws -> SCShareableContent {
         if !forceRefresh, let cachedContent {

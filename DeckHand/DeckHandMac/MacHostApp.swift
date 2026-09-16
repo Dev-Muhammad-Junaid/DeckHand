@@ -72,13 +72,20 @@ final class MacDaemon: ObservableObject {
         }
         
         Task {
-            // Defer notification request until NSApplication is fully launched
-            DeviceAuthorizationManager.shared.requestNotificationPermissions()
+            // Categories must be registered before any notification fires.
+            // Do not request authorization unless the user has never been
+            // asked — requesting again after a grant still surfaces a
+            // Settings jump on some macOS builds.
+            DeviceAuthorizationManager.shared.prepareNotifications()
             
-            // Proactively prompt for Screen Recording permission at launch
-            // so macOS shows the dialog immediately, before the user taps screenshot.
-            receiver.requestScreenCaptureIfNeeded()
-            
+            // Do not touch ScreenCaptureKit here. `SCShareableContent` is
+            // what presents the "record your screen and system audio"
+            // dialog, and calling it at launch re-prompts on every Xcode
+            // Run even when Settings already shows the toggle on (dev
+            // signing changes the binary identity each rebuild). Capture
+            // paths prompt on first real use; the Fix button in the panel
+            // is the explicit ask.
+
             // Start Loom runtime permanently
             do {
                 DeckHandLog.app.info("Starting LoomContext")
