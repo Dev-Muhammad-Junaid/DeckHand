@@ -93,13 +93,27 @@ final class PermissionsMonitor: ObservableObject {
 
     func fixNotifications() {
         DeviceAuthorizationManager.shared.requestNotificationPermissions()
-        openSettings(pane: "Privacy_Notifications")
+        openNotificationSettings()
         refresh()
     }
 
     private func openSettings(pane: String) {
         guard let url = URL(
             string: "x-apple.systempreferences:com.apple.preference.security?\(pane)"
+        ) else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    /// Notifications is its own top-level System Settings pane, not a
+    /// Privacy & Security anchor — `Privacy_Notifications` isn't a real
+    /// anchor there, so the old code landed on the generic Privacy &
+    /// Security overview with no Allow toggle in sight. `id=<bundleID>`
+    /// deep-links straight to this app's row, where the Allow Notifications
+    /// switch lives even after a prior denial.
+    private func openNotificationSettings() {
+        let bundleID = Bundle.main.bundleIdentifier ?? "com.deckhand.mac"
+        guard let url = URL(
+            string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(bundleID)"
         ) else { return }
         NSWorkspace.shared.open(url)
     }
