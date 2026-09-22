@@ -8,9 +8,10 @@
 //  supported surface on macOS 26 (Tahoe); ScreenCaptureKit's `SCScreenshotManager`
 //  is the current Apple-recommended path for one-shot screen grabs.
 //
-//  Permission handling moves from `CGPreflightScreenCaptureAccess` to probing
-//  `SCShareableContent` — if the user hasn't granted Screen Recording access the
-//  first call surfaces the TCC prompt and throws `.permissionDenied`.
+//  Permission handling uses `CGPreflightScreenCaptureAccess` for status
+//  and `SCShareableContent` only on an actual capture. Touching
+//  shareable content at launch is a permission *request* on current macOS
+//  (the "screen and system audio" dialog), so we never use it as a probe.
 //
 //  Hot-path optimizations relative to the original implementation:
 //
@@ -77,13 +78,6 @@ final class ScreenCaptureService {
     // the singleton is exactly what we want: the observation should fire for
     // the life of the process.
 
-    /// Triggers the system Screen Recording prompt by touching `SCShareableContent`.
-    /// Call this once at launch so the dialog appears before the user actually
-    /// requests a screenshot from the iPad. Result is cached for reuse.
-    func primePermission() async {
-        _ = try? await loadContent()
-    }
-
     private func loadContent(forceRefresh: Bool = false) async throws -> SCShareableContent {
         if !forceRefresh, let cachedContent {
             return cachedContent
@@ -111,6 +105,49 @@ final class ScreenCaptureService {
         let display = try await primaryDisplay()
         let cgImage = try await captureDisplay(display, maxWidth: maxWidth)
         return try Self.encodeJPEG(cgImage, quality: quality)
+    }
+
+    /// Physical monitors ScreenCaptureKit can stream, matched to
+    /// `NSScreen` for a localized name. Main display first.
+    func enumerateDisplays() async throws -> [DisplayInfo] {
+        let content = try await loadContent(forceRefresh: true)
+        let screensByID: [CGDirectDisplayID: NSScreen] = Dictionary(
+            uniqueKeysWithValues: NSScreen.screens.compactMap { screen in
+                guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
+                    return nil
+                }
+                return (CGDirectDisplayID(truncating: number), screen)
+            }
+        )
+        let mainID = CGMainDisplayID()
+        return content.displays
+            .map { display in
+                DisplayInfo(
+                    displayID: display.displayID,
+                    name: screensByID[display.displayID]?.localizedName ?? "Display",
+                    isMain: display.displayID == mainID,
+                    width: display.width,
+                    height: display.height
+                )
+            }
+            .sorted { a, b in
+                if a.isMain != b.isMain { return a.isMain }
+                return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+            }
+    }
+
+    /// Resolves an `SCDisplay` by CoreGraphics id, falling back to the
+    /// main display, then to whatever ScreenCaptureKit lists first.
+    func display(matching id: CGDirectDisplayID?) async throws -> SCDisplay {
+        let content = try await loadContent()
+        if let id, let match = content.displays.first(where: { $0.displayID == id }) {
+            return match
+        }
+        let mainID = CGMainDisplayID()
+        if let match = content.displays.first(where: { $0.displayID == mainID }) {
+            return match
+        }
+        return try await primaryDisplay()
     }
 
     /// Captures the main display at full native resolution, then crops it

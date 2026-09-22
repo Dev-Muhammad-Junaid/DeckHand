@@ -163,20 +163,6 @@ struct MacMenuBarView: View {
                     status: permissions.notifications
                 ) { permissions.fixNotifications() }
 
-                if permissions.screenRecordingNeedsRelaunch {
-                    Button {
-                        permissions.relaunchApp()
-                    } label: {
-                        Label("Settings says on, but capture is denied — remove & re-add in Settings, then tap to relaunch", systemImage: "arrow.clockwise.circle.fill")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.orange)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 6)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .buttonStyle(.plain)
-                }
-
                 if permissions.accessibility == .denied || permissions.screenRecording == .denied {
                     Text("Enabled it but still listed as off? Development builds change identity on every rebuild — remove Deck Hand from the Settings list and add it back.")
                         .font(.system(size: 9))

@@ -253,21 +253,26 @@ actor TrackpadSender {
     /// 640px @ 20 fps keeps frames in the 20–50 KB range — smooth on LAN,
     /// far below anything that could starve the 120 Hz input path. The
     /// expanded thumbnail re-negotiates at a higher width (see ControlView).
-    func startMirror(fps: Int = 20, maxWidth: Int = 640) async {
-        await send(.startMirror(fps: fps, maxWidth: maxWidth))
+    func startMirror(fps: Int = 20, maxWidth: Int = 640, displayID: UInt32? = nil) async {
+        await send(.startMirror(fps: fps, maxWidth: maxWidth, displayID: displayID))
     }
 
     func stopMirror() async {
         await send(.stopMirror)
     }
 
+    func switchSpace(_ direction: SpaceDirection, displayID: UInt32?) async {
+        await send(.switchSpace(direction: direction, displayID: displayID))
+    }
+
     /// Maps 3-finger swipe directions to the same keyboard shortcuts
     /// that macOS uses for trackpad gestures.
     func sendThreeFingerSwipe(_ direction: TrackpadGestureKind.ThreeFingerDirection) async {
         switch direction {
-        case .left:  await send(.keyboardShortcut(keys: ["ctrl", "left"]))
-        case .right: await send(.keyboardShortcut(keys: ["ctrl", "right"]))
-        // Mission Control & Exposé need dedicated handling on Mac
+        case .left:
+            await send(.switchSpace(direction: .previous, displayID: nil))
+        case .right:
+            await send(.switchSpace(direction: .next, displayID: nil))
         case .up:    await send(.macroButton(id: "missioncontrol_trigger"))
         case .down:  await send(.macroButton(id: "expose_trigger"))
         }

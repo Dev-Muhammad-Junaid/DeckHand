@@ -305,6 +305,53 @@ final class InputInjector {
         }
     }
 
+    /// Parks the pointer in this display's menu bar. Spaces follow the
+    /// display that contains the pointer; the menu bar is used instead of
+    /// the centre so Control-Left/Right is not delivered into a focused
+    /// text field or browser (which swallow the shortcut).
+    func moveCursorToMenuBar(ofDisplay displayID: CGDirectDisplayID) {
+        guard isAccessibilityGranted else { noteInjectSkipped("warpCursor"); return }
+        let bounds = CGDisplayBounds(displayID)
+        guard bounds.width > 0, bounds.height > 0 else { return }
+        let point = CGPoint(x: bounds.midX, y: bounds.minY + 8)
+        let event = CGEvent(
+            mouseEventSource: nil,
+            mouseType: .mouseMoved,
+            mouseCursorPosition: point,
+            mouseButton: .left
+        )
+        event?.post(tap: .cghidEventTap)
+        noteInjectionActive("warpCursor")
+    }
+
+    func moveCursorToCenter(ofDisplay displayID: CGDirectDisplayID) {
+        guard isAccessibilityGranted else { noteInjectSkipped("warpCursor"); return }
+        let bounds = CGDisplayBounds(displayID)
+        guard bounds.width > 0, bounds.height > 0 else { return }
+        let center = CGPoint(x: bounds.midX, y: bounds.midY)
+        let event = CGEvent(
+            mouseEventSource: nil,
+            mouseType: .mouseMoved,
+            mouseCursorPosition: center,
+            mouseButton: .left
+        )
+        event?.post(tap: .cghidEventTap)
+        noteInjectionActive("warpCursor")
+    }
+
+    /// Display currently under the pointer, used when the iPad has not
+    /// yet named a monitor. Falls back to the main display.
+    func displayIDUnderCursor() -> CGDirectDisplayID {
+        let point = NSEvent.mouseLocation
+        for screen in NSScreen.screens {
+            guard screen.frame.contains(point),
+                  let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+            else { continue }
+            return CGDirectDisplayID(truncating: number)
+        }
+        return CGMainDisplayID()
+    }
+
     // MARK: - Helpers
 
     private func currentCGCursorPosition() -> CGPoint {

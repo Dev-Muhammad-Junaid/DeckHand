@@ -42,21 +42,33 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
         // launch, by design.
     }
     
-    func requestNotificationPermissions() {
+    func prepareNotifications() {
         UNUserNotificationCenter.current().delegate = self
-        
-        // Define Notification Categories / Actions first to prevent XPC races
+
         let acceptAction = UNNotificationAction(identifier: "ACCEPT_ACTION", title: "Allow", options: .foreground)
         let rejectAction = UNNotificationAction(identifier: "REJECT_ACTION", title: "Deny", options: .destructive)
-        let category = UNNotificationCategory(identifier: "INCOMING_CONNECTION", actions: [acceptAction, rejectAction], intentIdentifiers: [], options: [])
-        
+        let category = UNNotificationCategory(
+            identifier: "INCOMING_CONNECTION",
+            actions: [acceptAction, rejectAction],
+            intentIdentifiers: [],
+            options: []
+        )
         UNUserNotificationCenter.current().setNotificationCategories([category])
 
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { @Sendable success, error in
-            if let error = error {
-                DeckHandLog.trust.error("Notification auth error: \(error.localizedDescription, privacy: .public)")
+        UNUserNotificationCenter.current().getNotificationSettings { @Sendable settings in
+            guard settings.authorizationStatus == .notDetermined else { return }
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { @Sendable success, error in
+                if let error = error {
+                    DeckHandLog.trust.error("Notification auth error: \(error.localizedDescription, privacy: .public)")
+                }
             }
         }
+    }
+
+    /// Explicit ask from the panel's Fix button. Safe to call when status
+    /// is `.notDetermined`; a no-op prompt-wise once the user has decided.
+    func requestNotificationPermissions() {
+        prepareNotifications()
     }
 
     func isAuthorized(peerID: LoomPeerID) -> Bool {

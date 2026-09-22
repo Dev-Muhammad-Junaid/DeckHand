@@ -26,6 +26,7 @@
 //
 
 import AppKit
+import CoreGraphics
 import CoreImage
 import Foundation
 import ImageIO
@@ -60,37 +61,78 @@ final class MirrorStreamService: NSObject {
     private var subscribers: [UUID: LoomConnectionHandle] = [:]
     private var stream: SCStream?
     private var output: MirrorFrameOutput?
+    /// Display currently being captured. `0` is not a valid CGDirectDisplayID
+    /// in practice; treated as "unset" until the first successful start.
+    private var currentDisplayID: CGDirectDisplayID = 0
+    private var currentFPS = 20
+    private var currentMaxWidth = 640
     /// Serial queue ScreenCaptureKit delivers frames on. Encoding happens
     /// here too, keeping all pixel work off the main thread.
     private let sampleQueue = DispatchQueue(label: "com.deckhand.mirror.frames", qos: .userInteractive)
+    private var screenObserver: NSObjectProtocol?
 
-    private override init() { super.init() }
+    private override init() {
+        super.init()
+        // If a panel is unplugged mid-stream, the SCDisplay we captured
+        // becomes invalid. Drop back to the main display and tell every
+        // subscriber which monitors remain.
+        screenObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                await self?.handleScreensChanged()
+            }
+        }
+    }
 
     // MARK: - Subscriber lifecycle
 
     /// Adds `handle` as a mirror subscriber, starting the capture stream
-    /// if it isn't running. Multiple iPads share one stream; the first
-    /// subscriber's fps/width preferences win until the stream restarts.
-    func start(subscriberID: UUID, handle: LoomConnectionHandle, fps: Int, maxWidth: Int) async {
+    /// if it isn't running. Passing a `displayID` that differs from the
+    /// current stream retargets capture for every subscriber — one stream,
+    /// one display. The first subscriber's fps/width preferences win until
+    /// the stream restarts.
+    func start(
+        subscriberID: UUID,
+        handle: LoomConnectionHandle,
+        fps: Int,
+        maxWidth: Int,
+        displayID: UInt32?
+    ) async {
         subscribers[subscriberID] = handle
-        guard stream == nil else { return }
 
         let clampedFPS = max(1, min(fps, Self.maxAllowedFPS))
         let clampedWidth = max(120, min(maxWidth, Self.maxAllowedWidth))
+        currentFPS = clampedFPS
+        currentMaxWidth = clampedWidth
 
-        do {
-            try await startStream(fps: clampedFPS, maxWidth: clampedWidth)
-            DeckHandLog.app.info("Mirror stream started (\(clampedFPS, privacy: .public) fps, \(clampedWidth, privacy: .public)px)")
-        } catch {
-            DeckHandLog.app.error("Mirror stream failed to start: \(error.localizedDescription, privacy: .public)")
-            subscribers.removeValue(forKey: subscriberID)
-            // Surface the failure through the screenshot error channel the
-            // iPad already knows how to present.
-            try? await handle.send(.screenshotError(
-                requestID: "mirror",
-                message: "Live mirror unavailable: \(error.localizedDescription)"
-            ))
+        let requestedID = displayID.map { CGDirectDisplayID($0) }
+        let needsNewStream = stream == nil
+            || (requestedID != nil && requestedID != currentDisplayID)
+
+        if needsNewStream {
+            await teardownStream()
+            do {
+                try await startStream(
+                    fps: clampedFPS,
+                    maxWidth: clampedWidth,
+                    preferredDisplayID: displayID.map { CGDirectDisplayID($0) }
+                )
+                DeckHandLog.app.info("Mirror stream started (\(clampedFPS, privacy: .public) fps, \(clampedWidth, privacy: .public)px, display \(self.currentDisplayID, privacy: .public))")
+            } catch {
+                DeckHandLog.app.error("Mirror stream failed to start: \(error.localizedDescription, privacy: .public)")
+                subscribers.removeValue(forKey: subscriberID)
+                try? await handle.send(.screenshotError(
+                    requestID: "mirror",
+                    message: "Live mirror unavailable: \(error.localizedDescription)"
+                ))
+                return
+            }
         }
+
+        await sendDisplayList(to: handle)
     }
 
     /// Removes a subscriber; tears the stream down when none remain.
@@ -104,13 +146,13 @@ final class MirrorStreamService: NSObject {
 
     // MARK: - Stream control
 
-    private func startStream(fps: Int, maxWidth: Int) async throws {
-        guard let display = try await SCShareableContent
-            .excludingDesktopWindows(false, onScreenWindowsOnly: true)
-            .displays.first
-        else {
-            throw ScreenCaptureService.CaptureError.noDisplay
-        }
+    private func startStream(
+        fps: Int,
+        maxWidth: Int,
+        preferredDisplayID: CGDirectDisplayID?
+    ) async throws {
+        let display = try await ScreenCaptureService.shared.display(matching: preferredDisplayID)
+        currentDisplayID = display.displayID
 
         let aspect = CGFloat(display.height) / CGFloat(display.width)
         let config = SCStreamConfiguration()
@@ -121,6 +163,7 @@ final class MirrorStreamService: NSObject {
         // Small queue: stale frames are worthless for a live mirror.
         config.queueDepth = 3
         config.showsCursor = true
+        config.capturesAudio = false
 
         let filter = SCContentFilter(display: display, excludingWindows: [])
 
@@ -150,6 +193,38 @@ final class MirrorStreamService: NSObject {
         DeckHandLog.app.info("Mirror stream stopped")
     }
 
+    /// Re-resolve the captured display after a plug/unplug. If the current
+    /// id is gone, drop back to the main display rather than dying.
+    private func handleScreensChanged() async {
+        guard stream != nil, !subscribers.isEmpty else { return }
+        let displays = (try? await ScreenCaptureService.shared.enumerateDisplays()) ?? []
+        let stillPresent = displays.contains { $0.displayID == currentDisplayID }
+        if !stillPresent {
+            await teardownStream()
+            do {
+                try await startStream(
+                    fps: currentFPS,
+                    maxWidth: currentMaxWidth,
+                    preferredDisplayID: nil
+                )
+            } catch {
+                handleStreamFailure(error)
+                return
+            }
+        }
+        for handle in subscribers.values {
+            await sendDisplayList(to: handle)
+        }
+    }
+
+    private func sendDisplayList(to handle: LoomConnectionHandle) async {
+        let displays = (try? await ScreenCaptureService.shared.enumerateDisplays()) ?? []
+        try? await handle.send(.displayListUpdate(
+            displays: displays,
+            selectedDisplayID: currentDisplayID
+        ))
+    }
+
     /// Called by `MirrorFrameOutput` when ScreenCaptureKit reports the
     /// stream died (display unplugged, TCC revoked mid-stream, …).
     fileprivate func handleStreamFailure(_ error: Error) {
@@ -158,6 +233,7 @@ final class MirrorStreamService: NSObject {
         subscribers.removeAll()
         stream = nil
         output = nil
+        currentDisplayID = 0
         for handle in handles {
             Task {
                 try? await handle.send(.screenshotError(

@@ -36,10 +36,9 @@
 		<string>$(AppIdentifierPrefix)com.deckhand.mac</string>
 	</array>
 
-	<!-- Same-iCloud device awareness (disabled — requires a paid developer
-	     account). Uncomment together with DeckHandCloud.isCloudEnabled once
-	     the container is registered in the developer portal.
-
+	<!-- Same-iCloud device awareness. Enabled now that com.deckhand.mac is
+	     registered under the Mega Creations LLC team with the CloudKit
+	     capability turned on (see DeckHandCloud.isCloudEnabled). -->
 	<key>com.apple.developer.icloud-services</key>
 	<array>
 		<string>CloudKit</string>
@@ -48,7 +47,6 @@
 	<array>
 		<string>iCloud.com.deckhand.shared</string>
 	</array>
-	-->
 
 </dict>
 </plist>

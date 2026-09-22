@@ -4,6 +4,7 @@
 //
 
 import AppKit
+import CoreGraphics
 import Foundation
 import LoomKit
 
@@ -209,7 +210,7 @@ final class ControlReceiver {
             // timeout (~6 s) on an unresponsive app — own task.
             Task { ContextObserver.shared.performAction(id: id) }
 
-        case let .startMirror(fps, maxWidth):
+        case let .startMirror(fps, maxWidth, displayID):
             // SCShareableContent inside — the #1 hang candidate. Own task.
             let subscriberID = handle.id
             Task {
@@ -217,13 +218,17 @@ final class ControlReceiver {
                     subscriberID: subscriberID,
                     handle: handle,
                     fps: fps,
-                    maxWidth: maxWidth
+                    maxWidth: maxWidth,
+                    displayID: displayID
                 )
             }
 
         case .stopMirror:
             let subscriberID = handle.id
             Task { await MirrorStreamService.shared.stop(subscriberID: subscriberID) }
+
+        case let .switchSpace(direction, displayID):
+            Task { await self.handleSwitchSpace(direction: direction, displayID: displayID) }
 
         case let .ping(seq):
             hasPinged.insert(handle.id)
@@ -253,19 +258,10 @@ final class ControlReceiver {
 
         case .authorizationStatus:
             break
-        case .screenshotData, .screenshotError, .activeAppUpdate, .appListResponse, .appMenuShortcutsResponse, .runningAppsUpdate, .uiContextUpdate, .windowListResponse, .mirrorFrame, .hostCapabilities:
+        case .screenshotData, .screenshotError, .activeAppUpdate, .appListResponse, .appMenuShortcutsResponse, .runningAppsUpdate, .uiContextUpdate, .windowListResponse, .mirrorFrame, .displayListUpdate, .hostCapabilities:
             // Client-bound messages; host doesn't process them locally
             break
         }
-    }
-
-    // MARK: - Screenshot Permission
-
-    /// Call once at startup so macOS has already shown the prompt before the user
-    /// taps the screenshot button on their iPad. Touches `SCShareableContent` to
-    /// surface the TCC dialog on first launch.
-    func requestScreenCaptureIfNeeded() {
-        Task { await ScreenCaptureService.shared.primePermission() }
     }
 
     // MARK: - Screenshot Capture
@@ -337,6 +333,65 @@ final class ControlReceiver {
                 to: handle,
                 message: "Couldn't read window list: \(error.localizedDescription)"
             )
+        }
+    }
+
+    /// Mission Control's "Move left/right a space" is a *symbolic hotkey*,
+    /// not an app key equivalent. `CGEvent` HID posts (what `sendShortcut`
+    /// uses) never fire those — the same reason App Exposé already goes
+    /// through System Events. Control-Left/Right posted as HID also lands
+    /// in whatever window we just focused, so both chevrons looked like a
+    /// no-op on the same desktop.
+    private func handleSwitchSpace(direction: SpaceDirection, displayID: UInt32?) async {
+        let target = displayID.map { CGDirectDisplayID($0) }
+            ?? injector.displayIDUnderCursor()
+
+        injector.moveCursorToMenuBar(ofDisplay: target)
+        try? await Task.sleep(for: .milliseconds(60))
+
+        switch direction {
+        case .previous, .next:
+            async let spaceChanged: Void = waitForActiveSpaceChange()
+            postSystemSpaceKey(previous: direction == .previous)
+            await spaceChanged
+            injector.moveCursorToCenter(ofDisplay: target)
+            CursorLocator.shared.ping()
+        case .missionControl:
+            await dispatchMacro(id: "missioncontrol_trigger")
+        }
+    }
+
+    /// `key code 123` = Left Arrow, `124` = Right Arrow. Control+Arrow is
+    /// the default Mission Control binding for adjacent Spaces.
+    private func postSystemSpaceKey(previous: Bool) {
+        let keyCode = previous ? 123 : 124
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        proc.arguments = [
+            "-e",
+            "tell application \"System Events\" to key code \(keyCode) using control down"
+        ]
+        try? proc.run()
+    }
+
+    /// Resolves when Mission Control finishes switching Space, or after a
+    /// short timeout if we were already at the end of the strip.
+    private func waitForActiveSpaceChange(timeout: Duration = .milliseconds(800)) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let once = OnceResume(continuation)
+            let center = NSWorkspace.shared.notificationCenter
+            let token = center.addObserver(
+                forName: NSWorkspace.activeSpaceDidChangeNotification,
+                object: nil,
+                queue: .main
+            ) { _ in
+                once.resume()
+            }
+            once.setToken(token)
+            Task { @MainActor in
+                try? await Task.sleep(for: timeout)
+                once.resume()
+            }
         }
     }
 
@@ -434,5 +489,36 @@ final class ControlReceiver {
         case .momentumChanged: return .momentumChanged
         case .momentumEnd:     return .momentumEnd
         }
+    }
+}
+
+/// Resumes a continuation at most once and drops the matching workspace
+/// observer. Shared between the space-change notification and its timeout.
+private final class OnceResume: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var token: NSObjectProtocol?
+
+    init(_ continuation: CheckedContinuation<Void, Never>) {
+        self.continuation = continuation
+    }
+
+    func setToken(_ token: NSObjectProtocol) {
+        lock.lock()
+        self.token = token
+        lock.unlock()
+    }
+
+    func resume() {
+        lock.lock()
+        let pending = continuation
+        continuation = nil
+        let token = self.token
+        self.token = nil
+        lock.unlock()
+        if let token {
+            NSWorkspace.shared.notificationCenter.removeObserver(token)
+        }
+        pending?.resume()
     }
 }

@@ -81,6 +81,8 @@ struct ControlView: View {
     /// Highest sequence number rendered; lower/equal arrivals are stale
     /// (shouldn't happen on an ordered transport, but cheap to guard).
     @State private var mirrorLastSeq: UInt64 = 0
+    /// Display the current stream is pointed at. `nil` until the host says.
+    @State private var selectedMirrorDisplayID: UInt32?
 
     /// `true` once any `authorizationStatus` has arrived from the host.
     /// Gates the resync poll below — we stop asking once we've heard
@@ -204,6 +206,14 @@ struct ControlView: View {
                             image: mirrorImage,
                             containerSize: proxy.size,
                             onClose: { toggleMirror() },
+                            onSwitchSpace: { direction in
+                                Task {
+                                    await sender?.switchSpace(
+                                        direction,
+                                        displayID: selectedMirrorDisplayID
+                                    )
+                                }
+                            },
                             onStreamWidthChanged: { naturalWidth in
                                 mirrorNaturalWidth = naturalWidth
                                 renegotiateMirror()
@@ -665,6 +675,9 @@ struct ControlView: View {
                         uiContext = snapshot
                     }
 
+                case let .displayListUpdate(_, selectedDisplayID):
+                    selectedMirrorDisplayID = selectedDisplayID
+
                 case let .appMenuShortcutsResponse(bundleID, shortcuts):
                     let added = ShortcutStore.shared.importBindings(shortcuts, for: bundleID)
                     NotificationCenter.default.post(
@@ -712,7 +725,7 @@ struct ControlView: View {
             }
             let fps = settings.mirrorFrameRate.rawValue
             let width = settings.mirrorStreamWidth(naturalWidth: mirrorNaturalWidth)
-            Task { await sender.startMirror(fps: fps, maxWidth: width) }
+            Task { await sender.startMirror(fps: fps, maxWidth: width, displayID: selectedMirrorDisplayID) }
         } else {
             mirrorImage = nil
             Task { await sender.stopMirror() }
@@ -732,7 +745,11 @@ struct ControlView: View {
         let width = settings.mirrorStreamWidth(naturalWidth: mirrorNaturalWidth)
         Task {
             await sender.stopMirror()
-            await sender.startMirror(fps: fps, maxWidth: width)
+            await sender.startMirror(
+                fps: fps,
+                maxWidth: width,
+                displayID: selectedMirrorDisplayID
+            )
         }
     }
 

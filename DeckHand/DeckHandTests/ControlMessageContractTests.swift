@@ -13,7 +13,7 @@
 //       on the envelope.
 //    2. Back-compat decode rules: optional fields added after 1.0
 //       (`phase` on mouseScroll, `mode` and `quality` on
-//       requestScreenshot) must keep
+//       requestScreenshot, `displayID` on startMirror) must keep
 //       their documented defaults when absent.
 //    3. Hostile input: unknown `type` must throw, not crash or misroute.
 //
@@ -90,8 +90,18 @@ final class ControlMessageContractTests: XCTestCase {
             .uiContextUpdate(snapshot: .textField(TextFieldContext(kind: .numeric))),
             .triggerContextAction(id: "00deadbeef00cafe|2|Save"),
             .startMirror(fps: 20, maxWidth: 480),
+            .startMirror(fps: 20, maxWidth: 480, displayID: 1),
             .stopMirror,
             .mirrorFrame(seq: 42, data: Data([0xFF, 0xD8, 0xFF, 0xE0])),
+            .displayListUpdate(
+                displays: [
+                    DisplayInfo(displayID: 1, name: "Built-in Retina Display", isMain: true, width: 1728, height: 1117),
+                    DisplayInfo(displayID: 2, name: "Studio Display", isMain: false, width: 5120, height: 2880),
+                ],
+                selectedDisplayID: 2
+            ),
+            .switchSpace(direction: .next),
+            .switchSpace(direction: .missionControl, displayID: 1),
             .requestAuthorizationStatus,
             .ping(seq: 7),
             .pong(seq: 7),
@@ -124,7 +134,7 @@ final class ControlMessageContractTests: XCTestCase {
             let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
             return try XCTUnwrap(obj["type"] as? String)
         })
-        XCTAssertEqual(types.count, 30, "Expected fixtures for all 30 message types, got \(types.sorted())")
+        XCTAssertEqual(types.count, 32, "Expected fixtures for all 32 message types, got \(types.sorted())")
     }
 
     // MARK: - 2. Back-compat decode rules
@@ -138,6 +148,23 @@ final class ControlMessageContractTests: XCTestCase {
         XCTAssertEqual(dx, 1)
         XCTAssertEqual(dy, 2)
         XCTAssertEqual(phase, .changed, "Legacy unphased scroll must default to .changed")
+    }
+
+    func testStartMirrorWithoutDisplayIDDefaultsToNil() throws {
+        let legacy = Data(#"{"type":"startMirror","fps":20,"maxWidth":480}"#.utf8)
+        let decoded = try decoder.decode(ControlMessage.self, from: legacy)
+        guard case let .startMirror(fps, maxWidth, displayID) = decoded else {
+            return XCTFail("Decoded wrong case: \(decoded)")
+        }
+        XCTAssertEqual(fps, 20)
+        XCTAssertEqual(maxWidth, 480)
+        XCTAssertNil(displayID, "Legacy startMirror without displayID must default to nil")
+    }
+
+    func testStartMirrorOmitsNilDisplayID() throws {
+        let data = try encoder.encode(ControlMessage.startMirror(fps: 15, maxWidth: 640, displayID: nil))
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertNil(obj["displayID"], "nil displayID must be omitted (encodeIfPresent), not encoded as null")
     }
 
     func testRequestScreenshotWithoutModeDefaultsToFullScreen() throws {
