@@ -25,14 +25,13 @@ import LoomCloudKit
 import LoomKit
 
 enum DeckHandCloud {
-    /// Master switch for same-iCloud awareness. CloudKit requires a paid
-    /// Apple Developer account (registered container + iCloud capability
-    /// in both targets' entitlements), so this ships OFF. Flip to `true`
-    /// once `containerIdentifier` is registered and the iCloud keys in
-    /// both .entitlements files are uncommented — no other change needed.
-    /// With it off, everything else works exactly as before: Bonjour
-    /// discovery, approval prompts, mirror, transfers.
-    static let isCloudEnabled = false
+    /// Master switch for same-iCloud awareness. Requires a paid Apple
+    /// Developer account with `containerIdentifier` registered and the
+    /// iCloud capability enabled on both targets — both are true now that
+    /// the apps sign under the Mega Creations LLC team (`DD5AWPLT2V`).
+    /// Flip back to `false` (and re-comment the iCloud keys in both
+    /// .entitlements files) to fall back to Bonjour-only discovery.
+    static let isCloudEnabled = true
 
     /// CloudKit container shared by the iOS remote and the Mac host.
     /// Must be registered in the Apple Developer portal and present in
