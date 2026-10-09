@@ -50,25 +50,44 @@ def screen_hole(img):
     if not inside:
         raise SystemExit('no transparent screen area found inside the frame')
     xs = [p[0] for p in inside]; ys = [p[1] for p in inside]
-    # Refine each edge at full resolution, walking out from the hole's centre.
+    # Refine each edge at full resolution, walking out from inside the hole.
+    # Probe several rows and columns away from the centre so a camera or
+    # Dynamic Island drawn into the cutout doesn't cut the scan short.
     full = alpha.load()
-    cx = (min(xs) + max(xs) + 1) * step // 2
-    cy = (min(ys) + max(ys) + 1) * step // 2
+    x0, x1 = min(xs) * step, (max(xs) + 1) * step
+    y0, y1 = min(ys) * step, (max(ys) + 1) * step
+    cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
     is_clear = lambda x, y: full[x, y] < 16
-    left = cx
-    while left > 0 and is_clear(left - 1, cy): left -= 1
-    right = cx
-    while right < w - 1 and is_clear(right + 1, cy): right += 1
-    top = cy
-    while top > 0 and is_clear(cx, top - 1): top -= 1
-    bottom = cy
-    while bottom < h - 1 and is_clear(cx, bottom + 1): bottom += 1
-    right += 1; bottom += 1
+    cols = [x0 + (x1 - x0) * k // 8 for k in range(2, 7)]
+    rows = [y0 + (y1 - y0) * k // 8 for k in range(2, 7)]
 
-    # Corner radius: on the hole's top row the opening starts one radius in.
-    start = cx
-    while start > left and is_clear(start - 1, top): start -= 1
-    radius = max(0, start - left)
+    def walk(x, y, dx, dy):
+        while 0 <= x + dx < w and 0 <= y + dy < h and is_clear(x + dx, y + dy):
+            x += dx; y += dy
+        return x if dx else y
+
+    left = min(walk(cx, y, -1, 0) for y in rows)
+    right = max(walk(cx, y, 1, 0) for y in rows) + 1
+    top = min(walk(x, cy, 0, -1) for x in cols)
+    bottom = max(walk(x, cy, 0, 1) for x in cols) + 1
+
+    # Corner radius: the largest circular corner that still covers every clear
+    # pixel of the top-left corner, so no gap shows between the UI and the frame.
+    def covers(r):
+        for y in range(top, top + r):
+            # Walk left from inside the hole; stop at the frame, not the outside.
+            x = left + r - 1
+            while x >= left and is_clear(x, y):
+                if (left + r - x - 0.5) ** 2 + (top + r - y - 0.5) ** 2 > r * r:
+                    return False
+                x -= 1
+        return True
+    lo, hi = 0, min(right - left, bottom - top) // 2
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if covers(mid): lo = mid
+        else: hi = mid - 1
+    radius = lo
     return left, top, right, bottom, radius
 
 
