@@ -447,3 +447,28 @@ a { color: inherit; }
 .closing::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
   background-image: radial-gradient(circle, rgba(207, 214, 255, 0.09) 1.1px, transparent 1.7px); background-size: 18px 18px; background-position: center top;
   -webkit-mask-image: radial-gradient(60% 60% at 50% 35%, #000 10%, transparent 80%); mask-image: radial-gradient(60% 60% at 50% 35%, #000 10%, transparent 80%); }
+
+/* ---------- Legal pages ---------- */
+.nav--static { position: absolute; }
+.legal-hero { padding: 150px var(--gutter) 110px; text-align: center; color: #fff; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+.legal-hero h1 { margin: 0; font: 500 48px/57.6px var(--font-display); letter-spacing: -1.4px; text-wrap: balance; }
+.legal-hero p { margin: 0; max-width: 460px; color: rgba(255, 255, 255, 0.72); }
+.legal { max-width: calc(680px + 2 * var(--gutter)); margin: 0 auto; padding: 72px var(--gutter) 140px; color: var(--ink-soft); }
+.legal h2 { margin: 56px 0 16px; font: 500 28px/33.6px var(--font-display); letter-spacing: -0.8px; color: var(--ink); }
+.legal h3 { margin: 32px 0 10px; font: 500 18px/24px var(--font-display); color: var(--ink); }
+.legal p, .legal li { margin: 0 0 14px; text-wrap: pretty; }
+.legal ul:not(.check) { margin: 0 0 14px; padding-left: 22px; }
+.legal ul:not(.check) li { margin-bottom: 8px; }
+.legal a { color: var(--accent-ink); text-underline-offset: 3px; }
+.legal b { color: var(--ink); font-weight: 600; }
+.legal__updated { font-size: 14px; color: var(--ink-muted); }
+.legal__summary { margin: 24px 0 40px; padding: 28px; border-radius: var(--radius-24); background: var(--surface-muted); }
+.legal__summary h2 { margin-top: 0; font-size: 20px; line-height: 24px; letter-spacing: -0.3px; }
+.legal__summary .check li { margin: 0; align-items: flex-start; }
+.legal__summary .check__dot { margin-top: 2px; }
+.legal__contact { font-weight: 600; color: var(--ink); background: #fff3c4; padding: 1px 6px; border-radius: 6px; }
+@media (max-width: 809px) { .legal-hero { padding-top: 120px; } .legal-hero h1 { font-size: 36px; line-height: 43.2px; } }
+
+.wl__note { margin: 0; font: 400 12px/18px var(--font-sans); color: rgba(255, 255, 255, 0.6); text-align: center; }
+.wl__note a { color: rgba(255, 255, 255, 0.85); text-underline-offset: 2px; }
+.wl.is-done .wl__note { display: none; }

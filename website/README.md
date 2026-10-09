@@ -54,6 +54,20 @@ Browse them in the dashboard under the KV namespace, or export:
 npx wrangler kv key list --namespace-id <id> > waitlist-keys.json
 ```
 
+## Before launch
+
+- [ ] Replace both `[contact email — add before launch]` placeholders in
+      `public/privacy.html` with the address that handles privacy requests.
+- [ ] Bind the `WAITLIST` KV namespace (above) and test a signup on
+      `<project>.pages.dev`.
+- [ ] Add the custom domain, then set the absolute `og:image` URL and the
+      canonical link in `src/index.html` and rebuild.
+
+The privacy policy is served at `/privacy` (Cloudflare Pages maps it to
+`privacy.html`) and is linked from both waitlist forms and the footer. If you
+turn on analytics or a mailing tool, update its "Cookies and storage" and
+"The waitlist" sections to match.
+
 ## Official Apple bezels and app icons
 
 The device frames and app tiles are drawn in CSS until Apple's own assets
