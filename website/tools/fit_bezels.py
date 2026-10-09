@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+"""Fits Apple's device bezel PNGs to the website mockups.
+
+Finds the transparent screen cutout in each bezel, writes a web-sized copy to
+website/public/assets/bezels/, and writes website/public/bezels.css so the
+`.dev-ipad` and `.dev-iphone` mockups sit exactly inside the screen with the
+real frame drawn over them.
+
+    python3 website/tools/fit_bezels.py --ipad "<landscape iPad>.png" --iphone "<portrait iPhone>.png"
+
+Needs Pillow (pip3 install pillow).
+"""
+import argparse
+from collections import deque
+from pathlib import Path
+
+from PIL import Image
+
+PUBLIC = Path(__file__).resolve().parents[1] / 'public'
+OUT_DIR = PUBLIC / 'assets' / 'bezels'
+WEB_WIDTH = {'ipad': 1800, 'iphone': 900}
+
+
+def screen_hole(img):
+    """Bounding box and corner radius of the transparent area enclosed by the frame."""
+    alpha = img.getchannel('A')
+    w, h = img.size
+    # Work on a reduced copy for the flood fill, then refine at full size.
+    step = max(1, w // 600)
+    sw, sh = w // step, h // step
+    small = alpha.resize((sw, sh), Image.NEAREST).load()
+    clear = lambda x, y: small[x, y] < 16
+    outside = [[False] * sw for _ in range(sh)]
+    q = deque()
+    for x in range(sw):
+        for y in (0, sh - 1):
+            if clear(x, y) and not outside[y][x]:
+                outside[y][x] = True; q.append((x, y))
+    for y in range(sh):
+        for x in (0, sw - 1):
+            if clear(x, y) and not outside[y][x]:
+                outside[y][x] = True; q.append((x, y))
+    while q:
+        x, y = q.popleft()
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < sw and 0 <= ny < sh and not outside[ny][nx] and clear(nx, ny):
+                outside[ny][nx] = True; q.append((nx, ny))
+    inside = [(x, y) for y in range(sh) for x in range(sw) if clear(x, y) and not outside[y][x]]
+    if not inside:
+        raise SystemExit('no transparent screen area found inside the frame')
+    xs = [p[0] for p in inside]; ys = [p[1] for p in inside]
+    # Refine each edge at full resolution, walking out from inside the hole.
+    # Probe several rows and columns away from the centre so a camera or
+    # Dynamic Island drawn into the cutout doesn't cut the scan short.
+    full = alpha.load()
+    x0, x1 = min(xs) * step, (max(xs) + 1) * step
+    y0, y1 = min(ys) * step, (max(ys) + 1) * step
+    cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
+    is_clear = lambda x, y: full[x, y] < 16
+    cols = [x0 + (x1 - x0) * k // 8 for k in range(2, 7)]
+    rows = [y0 + (y1 - y0) * k // 8 for k in range(2, 7)]
+
+    def walk(x, y, dx, dy):
+        while 0 <= x + dx < w and 0 <= y + dy < h and is_clear(x + dx, y + dy):
+            x += dx; y += dy
+        return x if dx else y
+
+    left = min(walk(cx, y, -1, 0) for y in rows)
+    right = max(walk(cx, y, 1, 0) for y in rows) + 1
+    top = min(walk(x, cy, 0, -1) for x in cols)
+    bottom = max(walk(x, cy, 0, 1) for x in cols) + 1
+
+    # Corner radius: the largest circular corner that still covers every clear
+    # pixel of the top-left corner, so no gap shows between the UI and the frame.
+    def covers(r):
+        for y in range(top, top + r):
+            # Walk left from inside the hole; stop at the frame, not the outside.
+            x = left + r - 1
+            while x >= left and is_clear(x, y):
+                if (left + r - x - 0.5) ** 2 + (top + r - y - 0.5) ** 2 > r * r:
+                    return False
+                x -= 1
+        return True
+    lo, hi = 0, min(right - left, bottom - top) // 2
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if covers(mid): lo = mid
+        else: hi = mid - 1
+    radius = lo
+    return left, top, right, bottom, radius
+
+
+def fit(kind, path):
+    img = Image.open(path).convert('RGBA')
+    w, h = img.size
+    left, top, right, bottom, radius = screen_hole(img)
+    sw, sh = right - left, bottom - top
+    out = OUT_DIR / f'{kind}.png'
+    # Re-fitting the web copy itself only rewrites the CSS.
+    if Path(path).resolve() != out.resolve():
+        web = img.resize((WEB_WIDTH[kind], round(h * WEB_WIDTH[kind] / w)), Image.LANCZOS)
+        OUT_DIR.mkdir(parents=True, exist_ok=True)
+        web.save(out, optimize=True)
+    pct = lambda v: f'{v * 100:.3f}%'
+    print(f'{kind}: {w}x{h}, screen {sw}x{sh} at ({left},{top}), corner {radius}px')
+    # The screen is placed with absolute insets, which resolve against the
+    # device box itself. Percentage padding would resolve against the parent's
+    # width and misplace the screen whenever the device is narrower than it.
+    return f'''
+.dev-{kind} {{ aspect-ratio: {w} / {h}; padding: 0; background: none; box-shadow: none; border-radius: 0; }}
+.dev-{kind}::after {{ content: ""; position: absolute; inset: 0; z-index: 6; pointer-events: none;
+  background: url("assets/bezels/{kind}.png") center / 100% 100% no-repeat; }}
+.dev-{kind} > .ui {{ position: absolute; left: {pct(left / w)}; right: {pct((w - right) / w)}; top: {pct(top / h)}; bottom: {pct((h - bottom) / h)};
+  width: auto; height: auto; border-radius: {pct(radius / sw)} / {pct(radius / sh)}; }}
+'''
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--ipad', help='landscape iPad bezel PNG')
+    ap.add_argument('--iphone', help='portrait iPhone bezel PNG')
+    args = ap.parse_args()
+    css = '/* Generated by website/tools/fit_bezels.py from Apple Design Resources bezels. */\n'
+    if args.ipad:
+        css += fit('ipad', args.ipad)
+    if args.iphone:
+        css += fit('iphone', args.iphone)
+        css += '.dev-iphone .island { display: none; } /* the bezel draws the Dynamic Island */\n'
+    (PUBLIC / 'bezels.css').write_text(css)
+    print(f'wrote {PUBLIC / "bezels.css"}')
+
+
+if __name__ == '__main__':
+    main()

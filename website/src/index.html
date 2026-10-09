@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Deck Hand</title>
+<meta name="description" content="Deck Hand turns an iPad or iPhone into a control surface for your Mac: a precision trackpad, a live view of the screen, captures, and shortcuts that follow the app in front. Peer to peer, over your own Wi-Fi.">
+<meta name="theme-color" content="#07070f">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Deck Hand — your iPad, now a control surface for your Mac">
+<meta property="og:description" content="A precision trackpad, a live view of your Mac, captures, and shortcuts that follow the app in front. Peer to peer, over your own Wi-Fi.">
+<meta property="og:image" content="/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="64x64" href="assets/favicon-64.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=Google+Sans:wght@400;500;600&family=Google+Sans+Code&display=swap">
+<link rel="stylesheet" href="styles.css">
+<script>document.documentElement.classList.add('js')</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<nav class="nav" aria-label="Main">
+  <a class="nav__brand" href="#top"><img src="assets/favicon-64.png" alt="" width="30" height="30">Deck Hand</a>
+  <div class="nav__links">
+    <a class="nav__link" href="#pointer">Features</a>
+    <a class="nav__link" href="#context">Shortcuts</a>
+    <a class="nav__link" href="#privacy">Privacy</a>
+    <a class="nav__link" href="#faq">FAQ</a>
+  </div>
+  <a class="btn btn--primary btn--nav" href="#waitlist">Join Waitlist</a>
+</nav>
+
+<div class="stack-night">
+<div class="sheet sheet--bottom" id="top">
+  <header class="hero">
+    <div class="hero__sky" aria-hidden="true"></div>
+    <div class="hero__stars" aria-hidden="true"></div>
+    <div class="hero__inner">
+      <h1 class="hero__title" data-words>Your iPad, now a control surface for your Mac.</h1>
+      <p class="hero__desc appear" style="--delay:.6s;--y:20px">A precision trackpad, a live view of the screen, captures, and shortcuts that follow whatever app is in front. Over your own Wi-Fi, with nothing in between.</p>
+      <div class="hero__cta appear" style="--delay:.8s;--y:10px">
+        <form class="wl" action="/api/waitlist" method="post" data-waitlist novalidate>
+          <div class="wl__row">
+            <label class="sr-only" for="wl-hero">Email address</label>
+            <input class="wl__input" id="wl-hero" name="email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required>
+            <input class="wl__trap" name="company" tabindex="-1" autocomplete="off" aria-hidden="true">
+            <input type="hidden" name="source" value="hero">
+            <button class="btn btn--primary wl__btn" type="submit">Join the waitlist</button>
+          </div>
+          <p class="wl__msg" role="status" aria-live="polite"></p>
+          <p class="wl__note">One email when Deck Hand is ready. Nothing else. <a href="/privacy">Privacy policy</a></p>
+        </form>
+      </div>
+      <div class="hero__meta">
+        <span class="appear" style="--delay:.9s;--y:4px">macOS 14 and iPadOS 17.4 or later</span>
+        <span class="dot appear" style="--delay:1s;--y:4px" aria-hidden="true"></span>
+        <span class="appear" style="--delay:1.1s;--y:4px">No account, no cloud</span>
+      </div>
+
+      <div class="hero__media appear" style="--delay:1s;--s:1.2">
+        <div class="device" role="img" aria-label="The Deck Hand remote on an iPad: a large trackpad with two fingers scrolling, a live mirror of the Mac in the corner, an app grid, and shortcut chips for Xcode with Save, Cancel and Don't Save buttons from a dialog on the Mac.">
+          <div class="device__screen">
+            <div class="remote">
+              <div class="remote__bar">
+                <span class="remote__host"><span class="remote__live"></span>Studio Mac</span>
+                <span class="remote__session">session 7f3a91c2</span>
+                <span class="remote__spacer"></span>
+                <span class="remote__icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 8.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7zm9.4 4.6l-2-.4a7.6 7.6 0 000-1.4l2-.4-.9-2.6-2 .5a7.4 7.4 0 00-1-1.1l.7-1.9-2.4-1.4-1.3 1.6a7.5 7.5 0 00-1.4-.4L12.5 3h-2.8l-.4 2a7.5 7.5 0 00-1.4.4L6.6 3.8 4.2 5.2l.7 1.9a7.4 7.4 0 00-1 1.1l-2-.5L1 10.3l2 .4a7.6 7.6 0 000 1.4l-2 .4.9 2.6 2-.5c.3.4.6.8 1 1.1l-.7 1.9 2.4 1.4 1.3-1.6c.4.2.9.3 1.4.4l.4 2h2.8l.4-2c.5-.1 1-.2 1.4-.4l1.3 1.6 2.4-1.4-.7-1.9c.4-.3.7-.7 1-1.1l2 .5z"/></svg></span>
+                <span class="remote__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg></span>
+              </div>
+
+              <div class="remote__main">
+                <div class="trackpad">
+                  <span class="touch-trail" style="left:30%;top:52%;width:14%;transform:rotate(-58deg)"></span>
+                  <span class="touch-trail" style="left:38%;top:58%;width:14%;transform:rotate(-58deg)"></span>
+                  <span class="touch" style="left:42%;top:40%"></span>
+                  <span class="touch" style="left:50%;top:46%"></span>
+                  <div class="mirror">
+                    <div class="mac" aria-hidden="true"><div class="mac__menubar"><span></span>Xcode<span style="font-weight:400">File</span><span style="font-weight:400">Edit</span><span style="font-weight:400">Product</span></div><div class="mac__win"><div class="mac__chrome"><i></i><i></i><i></i></div><div class="mac__rail"><i style="--w:70%"></i><i class="is-sel" style="--w:85%"></i><i style="--w:60%"></i><i style="--w:75%"></i><i style="--w:50%"></i></div><div class="mac__code"><i style="--w:40%;--c:#c9b8ff"></i><i style="--w:70%;--x:8%"></i><i style="--w:55%;--x:8%;--c:#a6ecd6"></i><i style="--w:62%;--x:16%"></i><i style="--w:30%;--x:8%;--c:#ffc2b3"></i><i style="--w:12%"></i><i style="--w:48%;--c:#c9b8ff"></i><i style="--w:66%;--x:8%"></i></div><div class="mac__sheet">Save changes to “Package.swift”?<span><i>Don’t Save</i><i>Cancel</i><i>Save</i></span></div></div><div class="mac__dock"><i style="background:linear-gradient(150deg,#5ac8fa,#007aff)"></i><i style="background:linear-gradient(150deg,#e8f1ff,#9cc3ff)"></i><i style="background:linear-gradient(150deg,#7af0cf,#1fb88b)"></i><i style="background:linear-gradient(150deg,#ffd479,#ff9f0a)"></i><i style="background:linear-gradient(150deg,#c7c7cc,#8e8e93)"></i></div></div>
+                    <span class="mirror__badge">30 fps</span>
+                  </div>
+                  <span class="trackpad__hint">Two fingers to scroll · Three to switch Spaces</span>
+                </div>
+                <div class="remote__side">
+                  <span class="remote__label">Running</span>
+                  <div class="grid-deck">
+                    <span class="tile"><i style="background:linear-gradient(150deg,#5ac8fa,#007aff)"></i>Xcode</span>
+                    <span class="tile"><i style="background:linear-gradient(150deg,#e8f1ff,#9cc3ff)"></i>Safari</span>
+                    <span class="tile tile--mint"><i style="background:linear-gradient(150deg,#7af0cf,#1fb88b)"></i>Messages</span>
+                    <span class="tile"><i style="background:linear-gradient(150deg,#ffd479,#ff9f0a)"></i>Notes</span>
+                    <span class="tile tile--lit"><i></i>Terminal</span>
+                    <span class="tile"><i style="background:linear-gradient(150deg,#c7c7cc,#8e8e93)"></i>Finder</span>
+                    <span class="tile"><i style="background:linear-gradient(150deg,#ff8aa0,#ff375f)"></i>Music</span>
+                    <span class="tile"><i style="background:linear-gradient(150deg,#b89cff,#7c5cff)"></i>Slack</span>
+                    <span class="tile"><i style="background:linear-gradient(150deg,#a1e3ff,#30b0ff)"></i>Mail</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="qa">
+                <div class="qa__dialog">
+                  <span class="qa__dialog-label"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 1 21h22L12 2zm1 15h-2v-2h2v2zm0-4h-2V9h2v4z"/></svg>Save changes to “Package.swift”?</span>
+                  <span class="chip chip--quiet">Don’t Save</span>
+                  <span class="chip">Cancel</span>
+                  <span class="chip chip--primary">Save</span>
+                </div>
+                <div class="qa__row">
+                  <span class="qa__app"><i style="background:linear-gradient(150deg,#5ac8fa,#007aff)"></i>Xcode</span>
+                  <span class="chip">Build <kbd>⌘B</kbd></span>
+                  <span class="chip">Run <kbd>⌘R</kbd></span>
+                  <span class="chip">Stop <kbd>⌘.</kbd></span>
+                  <span class="chip">Open Quickly <kbd>⌘⇧O</kbd></span>
+                  <span class="qa__capture"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h5V2H2v7h2V4zm11-2v2h5v5h2V2h-7zM4 15H2v7h7v-2H4v-5zm16 5h-5v2h7v-7h-2v5zM12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>Capture</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="marquee" aria-label="Shortcut chips">
+    <p class="marquee__label reveal">Shortcut chips are read from the menu bar of whatever app is in front</p>
+    <div class="marquee__viewport">
+      <ul class="marquee__track">
+        <li class="kchip"><span class="kchip__app">Xcode</span><span class="kchip__name">Build</span><kbd>⌘B</kbd></li><li class="kchip"><span class="kchip__app">Safari</span><span class="kchip__name">New Tab</span><kbd>⌘T</kbd></li><li class="kchip"><span class="kchip__app">Finder</span><span class="kchip__name">New Folder</span><kbd>⌘⇧N</kbd></li><li class="kchip"><span class="kchip__app">Terminal</span><span class="kchip__name">Split Pane</span><kbd>⌘D</kbd></li><li class="kchip"><span class="kchip__app">Mail</span><span class="kchip__name">Reply All</span><kbd>⌘⇧R</kbd></li><li class="kchip"><span class="kchip__app">VS Code</span><span class="kchip__name">Command Palette</span><kbd>⌘⇧P</kbd></li><li class="kchip"><span class="kchip__app">Slack</span><span class="kchip__name">Quick Switcher</span><kbd>⌘K</kbd></li><li class="kchip"><span class="kchip__app">Xcode</span><span class="kchip__name">Run</span><kbd>⌘R</kbd></li><li class="kchip"><span class="kchip__app">Chrome</span><span class="kchip__name">Developer Tools</span><kbd>⌘⌥I</kbd></li><li class="kchip"><span class="kchip__app">Safari</span><span class="kchip__name">Reader Mode</span><kbd>⌘⇧R</kbd></li><li class="kchip"><span class="kchip__app">Cursor</span><span class="kchip__name">Inline Edit</span><kbd>⌘K</kbd></li><li class="kchip"><span class="kchip__app">Finder</span><span class="kchip__name">Go to Folder</span><kbd>⌘⇧G</kbd></li><li class="kchip"><span class="kchip__app">Mail</span><span class="kchip__name">Archive</span><kbd>⌃⌘A</kbd></li><li class="kchip"><span class="kchip__app">Xcode</span><span class="kchip__name">Open Quickly</span><kbd>⌘⇧O</kbd></li><li class="kchip" aria-hidden="true"><span class="kchip__app">Xcode</span><span class="kchip__name">Build</span><kbd>⌘B</kbd></li><li class="kchip" aria-hidden="true"><span class="kchip__app">Safari</span><span class="kchip__name">New Tab</span><kbd>⌘T</kbd></li><li class="kchip" aria-hidden="true"><span class="kchip__app">Finder</span><span class="kchip__name">New Folder</span><kbd>⌘⇧N</kbd></li><li class="kchip" aria-hidden="true"><span class="kchip__app">Terminal</span><span class="kchip__name">Split Pane</span><kbd>⌘D</kbd></li><li class="kchip" aria-hidden="true"><span class="kchip__app">Mail</span><span class="kchip__name">Reply All</span><kbd>⌘⇧R</kbd></li><li class="kchip" aria-hidden="true"><span class="kchip__app">VS Code</span><span class="kchip__name">Command Palette</span><kbd>⌘⇧P</kbd></li><li class="kchip" aria-hidden="true"><span class="kchip__app">Slack</span><span class="kchip__name">Quick Switcher</span><kbd>⌘K</kbd></li><li class="kchip" aria-hidden="true"><span class="kchip__app">Xcode</span><span class="kchip__name">Run</span><kbd>⌘R</kbd></li><li class="kchip" aria-hidden="true"><span class="kchip__app">Chrome</span><span class="kchip__name">Developer Tools</span><kbd>⌘⌥I</kbd></li><li class="kchip" aria-hidden="true"><span class="kchip__app">Safari</span><span class="kchip__name">Reader Mode</span><kbd>⌘⇧R</kbd></li><li class="kchip" aria-hidden="true"><span class="kchip__app">Cursor</span><span class="kchip__name">Inline Edit</span><kbd>⌘K</kbd></li><li class="kchip" aria-hidden="true"><span class="kchip__app">Finder</span><span class="kchip__name">Go to Folder</span><kbd>⌘⇧G</kbd></li><li class="kchip" aria-hidden="true"><span class="kchip__app">Mail</span><span class="kchip__name">Archive</span><kbd>⌃⌘A</kbd></li><li class="kchip" aria-hidden="true"><span class="kchip__app">Xcode</span><span class="kchip__name">Open Quickly</span><kbd>⌘⇧O</kbd></li>
+      </ul>
+    </div>
+  </section>
+  <div style="height:120px" aria-hidden="true"></div>
+</div>
+</div>
+
+<main id="main">
+<div class="stack-night">
+  <section class="interlude" aria-label="What it does">
+    <p class="interlude__line reveal">Everything you reach across the desk for, now in your hand.</p>
+    <ul class="verbs">
+      <li class="reveal" style="--delay:0ms"><span class="verbs__glyph"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 2.5 19 13l-6.2.9 3.6 6.6-2.6 1.4-3.6-6.7L5 19.5z"/></svg></span>Point</li>
+      <li class="reveal" style="--delay:80ms"><span class="verbs__glyph"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5a2 2 0 012-2h11a2 2 0 012 2v1H7a2 2 0 00-2 2v8H5a2 2 0 01-2-2V5zm4 5a2 2 0 012-2h10a2 2 0 012 2v7a2 2 0 01-2 2H9a2 2 0 01-2-2v-7z"/></svg></span>Mirror</li>
+      <li class="reveal" style="--delay:160ms"><span class="verbs__glyph"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h5V2H2v7h2V4zm11-2v2h5v5h2V2h-7zM4 15H2v7h7v-2H4v-5zm16 5h-5v2h7v-7h-2v5zM12 8a4 4 0 100 8 4 4 0 000-8z"/></svg></span>Capture</li>
+      <li class="reveal" style="--delay:240ms"><span class="verbs__glyph"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="2.4"/><rect x="13" y="3" width="8" height="8" rx="2.4"/><rect x="3" y="13" width="8" height="8" rx="2.4"/><rect x="13" y="13" width="8" height="8" rx="2.4"/></svg></span>Launch</li>
+      <li class="reveal" style="--delay:320ms"><span class="verbs__glyph"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 3h16a2 2 0 012 2v10a2 2 0 01-2 2h-7l-5 4v-4H4a2 2 0 01-2-2V5a2 2 0 012-2zm3 8.5h4v-2H7v2zm6 0h4v-2h-4v2z"/></svg></span>Answer</li>
+    </ul>
+  </section>
+
+  <div class="sheet sheet--both">
+    <section class="section" id="pointer" aria-labelledby="pointer-h">
+      <div class="wrap">
+        <div class="heading">
+          <span class="pill pill--neutral reveal" style="--y:12px"><span>Remote</span></span>
+          <h2 class="heading__title" id="pointer-h" data-words>Point, watch, and capture. All from the couch.</h2>
+        </div>
+
+        <div class="rows after-heading">
+          <article class="row">
+            <div class="row__text">
+              <span class="pill pill--violet pill--sm reveal"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 2.5 19 13l-6.2.9 3.6 6.6-2.6 1.4-3.6-6.7L5 19.5z"/></svg>Trackpad</span>
+              <h3 class="row__title reveal" style="--delay:80ms">Scrolling that feels like the glass is on your desk.</h3>
+              <p class="row__body reveal" style="--delay:160ms">Deck Hand sends real scroll phase and momentum, so your Mac rubber-bands like it would under a Magic Trackpad instead of stepping through wheel ticks.</p>
+              <ul class="check reveal" style="--delay:240ms">
+                <li><span class="check__dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg></span>Two fingers to scroll, three to switch Spaces</li>
+                <li><span class="check__dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg></span>Press and hold to right-click</li>
+                <li><span class="check__dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg></span>Sends at 120 Hz to match ProMotion</li>
+              </ul>
+            </div>
+            <div class="frame frame--violet reveal" style="--delay:120ms">
+              <div class="frame__stage">
+                <div class="tp" role="img" aria-label="Two fingers scrolling on the trackpad, with a momentum curve easing out after the fingers lift.">
+                  <div class="tp__readout"><span>2 fingers</span><span>phase: momentum</span></div>
+                  <span class="touch-trail" style="left:22%;top:66%;width:20%;transform:rotate(-62deg)"></span>
+                  <span class="touch-trail" style="left:34%;top:72%;width:20%;transform:rotate(-62deg)"></span>
+                  <span class="touch" style="left:38%;top:42%"></span>
+                  <span class="touch" style="left:50%;top:48%"></span>
+                  <div class="tp__curve">
+                    <p>Scroll velocity after lift-off</p>
+                    <svg viewBox="0 0 200 70" aria-hidden="true"><path d="M0 69.5H200" stroke="rgba(255,255,255,0.15)" fill="none"/><path d="M0 8C30 9 48 30 70 46S130 66 200 68" stroke="#9e7bff" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="0" cy="8" r="4" fill="#3de0b0"/></svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="row row--flip">
+            <div class="row__text">
+              <span class="pill pill--teal pill--sm reveal"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5a2 2 0 012-2h11a2 2 0 012 2v1H7a2 2 0 00-2 2v8H5a2 2 0 01-2-2V5zm4 5a2 2 0 012-2h10a2 2 0 012 2v7a2 2 0 01-2 2H9a2 2 0 01-2-2v-7z"/></svg>Live mirror</span>
+              <h3 class="row__title reveal" style="--delay:80ms">Keep an eye on your Mac. Pinch when you need to read.</h3>
+              <p class="row__body reveal" style="--delay:160ms">A floating view of the Mac screen sits wherever you drop it. Pinch it up to nearly full screen and it renegotiates resolution as it grows.</p>
+              <ul class="check check--teal reveal" style="--delay:240ms">
+                <li><span class="check__dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg></span>Sharpens in tiers up to 1920 px</li>
+                <li><span class="check__dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg></span>Pick a display and slide between Spaces</li>
+                <li><span class="check__dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg></span>Remembers where you left it</li>
+              </ul>
+            </div>
+            <div class="frame frame--teal reveal" style="--delay:120ms">
+              <div class="frame__stage">
+                <div class="tiers" role="img" aria-label="The mirror at three sizes, 640, 1280 and 1920 pixels wide, getting sharper as it grows.">
+                  <div class="tier"><div class="tier__shot" style="--blur:1.2px"><div class="mac" aria-hidden="true"><div class="mac__menubar"><span></span>Xcode<span style="font-weight:400">File</span><span style="font-weight:400">Edit</span><span style="font-weight:400">Product</span></div><div class="mac__win"><div class="mac__chrome"><i></i><i></i><i></i></div><div class="mac__rail"><i style="--w:70%"></i><i class="is-sel" style="--w:85%"></i><i style="--w:60%"></i><i style="--w:75%"></i><i style="--w:50%"></i></div><div class="mac__code"><i style="--w:40%;--c:#c9b8ff"></i><i style="--w:70%;--x:8%"></i><i style="--w:55%;--x:8%;--c:#a6ecd6"></i><i style="--w:62%;--x:16%"></i><i style="--w:30%;--x:8%;--c:#ffc2b3"></i><i style="--w:12%"></i><i style="--w:48%;--c:#c9b8ff"></i><i style="--w:66%;--x:8%"></i></div><div class="mac__sheet">Save changes to “Package.swift”?<span><i>Don’t Save</i><i>Cancel</i><i>Save</i></span></div></div><div class="mac__dock"><i style="background:linear-gradient(150deg,#5ac8fa,#007aff)"></i><i style="background:linear-gradient(150deg,#e8f1ff,#9cc3ff)"></i><i style="background:linear-gradient(150deg,#7af0cf,#1fb88b)"></i><i style="background:linear-gradient(150deg,#ffd479,#ff9f0a)"></i><i style="background:linear-gradient(150deg,#c7c7cc,#8e8e93)"></i></div></div></div><span class="tier__label">640 px</span></div>
+                  <div class="tier"><div class="tier__shot" style="--blur:.5px"><div class="mac" aria-hidden="true"><div class="mac__menubar"><span></span>Xcode<span style="font-weight:400">File</span><span style="font-weight:400">Edit</span><span style="font-weight:400">Product</span></div><div class="mac__win"><div class="mac__chrome"><i></i><i></i><i></i></div><div class="mac__rail"><i style="--w:70%"></i><i class="is-sel" style="--w:85%"></i><i style="--w:60%"></i><i style="--w:75%"></i><i style="--w:50%"></i></div><div class="mac__code"><i style="--w:40%;--c:#c9b8ff"></i><i style="--w:70%;--x:8%"></i><i style="--w:55%;--x:8%;--c:#a6ecd6"></i><i style="--w:62%;--x:16%"></i><i style="--w:30%;--x:8%;--c:#ffc2b3"></i><i style="--w:12%"></i><i style="--w:48%;--c:#c9b8ff"></i><i style="--w:66%;--x:8%"></i></div><div class="mac__sheet">Save changes to “Package.swift”?<span><i>Don’t Save</i><i>Cancel</i><i>Save</i></span></div></div><div class="mac__dock"><i style="background:linear-gradient(150deg,#5ac8fa,#007aff)"></i><i style="background:linear-gradient(150deg,#e8f1ff,#9cc3ff)"></i><i style="background:linear-gradient(150deg,#7af0cf,#1fb88b)"></i><i style="background:linear-gradient(150deg,#ffd479,#ff9f0a)"></i><i style="background:linear-gradient(150deg,#c7c7cc,#8e8e93)"></i></div></div></div><span class="tier__label">1280 px</span></div>
+                  <div class="tier"><div class="tier__shot"><div class="mac" aria-hidden="true"><div class="mac__menubar"><span></span>Xcode<span style="font-weight:400">File</span><span style="font-weight:400">Edit</span><span style="font-weight:400">Product</span></div><div class="mac__win"><div class="mac__chrome"><i></i><i></i><i></i></div><div class="mac__rail"><i style="--w:70%"></i><i class="is-sel" style="--w:85%"></i><i style="--w:60%"></i><i style="--w:75%"></i><i style="--w:50%"></i></div><div class="mac__code"><i style="--w:40%;--c:#c9b8ff"></i><i style="--w:70%;--x:8%"></i><i style="--w:55%;--x:8%;--c:#a6ecd6"></i><i style="--w:62%;--x:16%"></i><i style="--w:30%;--x:8%;--c:#ffc2b3"></i><i style="--w:12%"></i><i style="--w:48%;--c:#c9b8ff"></i><i style="--w:66%;--x:8%"></i></div><div class="mac__sheet">Save changes to “Package.swift”?<span><i>Don’t Save</i><i>Cancel</i><i>Save</i></span></div></div><div class="mac__dock"><i style="background:linear-gradient(150deg,#5ac8fa,#007aff)"></i><i style="background:linear-gradient(150deg,#e8f1ff,#9cc3ff)"></i><i style="background:linear-gradient(150deg,#7af0cf,#1fb88b)"></i><i style="background:linear-gradient(150deg,#ffd479,#ff9f0a)"></i><i style="background:linear-gradient(150deg,#c7c7cc,#8e8e93)"></i></div></div></div><span class="tier__label">1920 px</span></div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="row">
+            <div class="row__text">
+              <span class="pill pill--dark pill--sm reveal"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h5V2H2v7h2V4zm11-2v2h5v5h2V2h-7zM4 15H2v7h7v-2H4v-5zm16 5h-5v2h7v-7h-2v5zM12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>Capture</span>
+              <h3 class="row__title reveal" style="--delay:80ms">Grab the screen, mark it up, lift the text.</h3>
+              <p class="row__body reveal" style="--delay:160ms">Pull a capture from the Mac straight onto the iPad, then annotate it, run text recognition on it with Vision, or save it to Photos.</p>
+              <ul class="check check--ink reveal" style="--delay:240ms">
+                <li><span class="check__dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg></span>Full screen, a region, or one window</li>
+                <li><span class="check__dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg></span>Annotate before you save or share</li>
+                <li><span class="check__dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg></span>Auto-save to Photos if you want it</li>
+              </ul>
+            </div>
+            <div class="frame frame--muted reveal" style="--delay:120ms">
+              <div class="frame__stage">
+                <div class="cap" role="img" aria-label="A capture of the Mac with a region selected and an annotation arrow, above buttons for Region, Annotate, Recognize Text and Save to Photos.">
+                  <div class="cap__shot">
+                    <div class="mac" aria-hidden="true"><div class="mac__menubar"><span></span>Xcode<span style="font-weight:400">File</span><span style="font-weight:400">Edit</span><span style="font-weight:400">Product</span></div><div class="mac__win"><div class="mac__chrome"><i></i><i></i><i></i></div><div class="mac__rail"><i style="--w:70%"></i><i class="is-sel" style="--w:85%"></i><i style="--w:60%"></i><i style="--w:75%"></i><i style="--w:50%"></i></div><div class="mac__code"><i style="--w:40%;--c:#c9b8ff"></i><i style="--w:70%;--x:8%"></i><i style="--w:55%;--x:8%;--c:#a6ecd6"></i><i style="--w:62%;--x:16%"></i><i style="--w:30%;--x:8%;--c:#ffc2b3"></i><i style="--w:12%"></i><i style="--w:48%;--c:#c9b8ff"></i><i style="--w:66%;--x:8%"></i></div><div class="mac__sheet">Save changes to “Package.swift”?<span><i>Don’t Save</i><i>Cancel</i><i>Save</i></span></div></div><div class="mac__dock"><i style="background:linear-gradient(150deg,#5ac8fa,#007aff)"></i><i style="background:linear-gradient(150deg,#e8f1ff,#9cc3ff)"></i><i style="background:linear-gradient(150deg,#7af0cf,#1fb88b)"></i><i style="background:linear-gradient(150deg,#ffd479,#ff9f0a)"></i><i style="background:linear-gradient(150deg,#c7c7cc,#8e8e93)"></i></div></div>
+                    <span class="cap__region"></span>
+                    <svg class="cap__arrow" viewBox="0 0 100 60" fill="none" aria-hidden="true"><path d="M6 52C30 50 56 38 82 14" stroke="#ff4d5e" stroke-width="6" stroke-linecap="round"/><path d="M66 12 86 10 82 30" stroke="#ff4d5e" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </div>
+                  <div class="cap__bar">
+                    <span>Region</span>
+                    <span>Annotate</span>
+                    <span>Recognize Text</span>
+                    <span>Save to Photos</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="context" aria-labelledby="context-h">
+      <div class="wrap">
+        <div class="heading">
+          <span class="pill pill--neutral reveal" style="--y:12px"><span>Shortcuts</span></span>
+          <h2 class="heading__title" id="context-h" data-words>Buttons that change with the app in front.</h2>
+          <p class="heading__sub reveal" style="--delay:300ms">Deck Hand reads what is on your Mac over Accessibility, so the remote shows the controls you actually need right now.</p>
+        </div>
+
+        <div class="bento-grid after-heading">
+          <article class="bento reveal">
+            <div class="bento__media">
+              <div class="menu-arrow" aria-hidden="true">
+                <div class="menu">
+                  <div class="menu__head">Product</div>
+                  <div class="menu__item is-hot">Build <kbd>⌘B</kbd></div>
+                  <div class="menu__item">Run <kbd>⌘R</kbd></div>
+                  <div class="menu__item">Stop <kbd>⌘.</kbd></div>
+                  <div class="menu__sep"></div>
+                  <div class="menu__item">Clean Build Folder <kbd>⇧⌘K</kbd></div>
+                </div>
+              </div>
+            </div>
+            <div class="bento__body">
+              <h3 class="bento__title">Read from the real menu bar</h3>
+              <p class="bento__text">Chips come from the frontmost app’s own menus, so they match its real shortcuts instead of a hard-coded list.</p>
+            </div>
+          </article>
+
+          <article class="bento reveal" style="--delay:80ms">
+            <div class="bento__media">
+              <div class="menu-arrow" aria-hidden="true">
+                <div class="dialog"><b>Do you want to save the changes you made to “Q3 Review”?</b><p>Your changes will be lost if you don’t save them.</p></div>
+                <div class="menu-arrow__chips"><span class="dchip dchip--ghost">Don’t Save</span><span class="dchip">Cancel</span><span class="dchip dchip--accent">Save</span></div>
+              </div>
+            </div>
+            <div class="bento__body">
+              <h3 class="bento__title">Dialogs answered from the remote</h3>
+              <p class="bento__text">When a sheet or alert is up on the Mac, its buttons show up as chips. One tap, no trip across the screen.</p>
+            </div>
+          </article>
+
+          <article class="bento reveal">
+            <div class="bento__media">
+              <div class="launcher" aria-hidden="true">
+                <span class="is-running" style="background:linear-gradient(150deg,#5ac8fa,#007aff)"></span>
+                <span class="is-running" style="background:linear-gradient(150deg,#e8f1ff,#9cc3ff)"></span>
+                <span class="is-running" style="background:linear-gradient(150deg,#7af0cf,#1fb88b)"></span>
+                <span class="is-running" style="background:linear-gradient(150deg,#ffd479,#ff9f0a)"></span>
+                <span style="background:linear-gradient(150deg,#ff8aa0,#ff375f)"></span>
+                <span style="background:linear-gradient(150deg,#b89cff,#7c5cff)"></span>
+                <span style="background:linear-gradient(150deg,#a1e3ff,#30b0ff)"></span>
+                <span style="background:linear-gradient(150deg,#c7c7cc,#8e8e93)"></span>
+                <span class="launcher__label">Running, in Cmd-Tab order</span>
+              </div>
+            </div>
+            <div class="bento__body">
+              <h3 class="bento__title">Every app, one tap away</h3>
+              <p class="bento__text">Browse and launch installed apps, see what is running in Cmd-Tab order, and hide the ones you never use.</p>
+            </div>
+          </article>
+
+          <article class="bento reveal" style="--delay:80ms">
+            <div class="bento__media">
+              <div class="media-keys" aria-hidden="true">
+                <span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 6v12L2.5 12 11 6zm10 0v12l-8.5-6L21 6z"/></svg></span>
+                <span><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg></span>
+                <span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 6v12l8.5-6L13 6zM3 6v12l8.5-6L3 6z"/></svg></span>
+              </div>
+            </div>
+            <div class="bento__body">
+              <h3 class="bento__title">Media keys</h3>
+              <p class="bento__text">Play, pause, and skip whatever is playing on the Mac without touching it.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="settings" aria-labelledby="settings-h">
+      <div class="wrap">
+        <div class="heading">
+          <span class="pill pill--neutral reveal" style="--y:12px"><span>Settings</span></span>
+          <h2 class="heading__title" id="settings-h" data-words>You choose the trade-offs. Nothing guesses.</h2>
+          <p class="heading__sub reveal" style="--delay:300ms">Anything that costs bandwidth or Mac CPU is a manual control, so the remote never changes behaviour behind your back.</p>
+        </div>
+        <div class="fgrid after-heading reveal">
+          <div class="fgrid__cell">
+            <svg class="fgrid__icon" viewBox="0 0 24 24" fill="currentColor"><path d="M3 5a2 2 0 012-2h11a2 2 0 012 2v1H7a2 2 0 00-2 2v8H5a2 2 0 01-2-2V5zm4 5a2 2 0 012-2h10a2 2 0 012 2v7a2 2 0 01-2 2H9a2 2 0 01-2-2v-7z"/></svg>
+            <h3 class="fgrid__title">Mirror frame rate</h3>
+            <div class="fgrid__opts"><span>15 fps</span><span>20 fps</span><span>30 fps</span></div>
+          </div>
+          <div class="fgrid__cell">
+            <svg class="fgrid__icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 2v16a8 8 0 010-16z"/></svg>
+            <h3 class="fgrid__title">Mirror sharpness</h3>
+            <div class="fgrid__opts"><span>Auto</span><span>Battery saver 640 px</span><span>Sharp 1920 px</span></div>
+          </div>
+          <div class="fgrid__cell">
+            <svg class="fgrid__icon" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h5V2H2v7h2V4zm11-2v2h5v5h2V2h-7zM4 15H2v7h7v-2H4v-5zm16 5h-5v2h7v-7h-2v5zM12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
+            <h3 class="fgrid__title">Screenshot quality</h3>
+            <div class="fgrid__opts"><span>Standard</span><span>High</span><span>Native</span></div>
+          </div>
+          <div class="fgrid__cell">
+            <svg class="fgrid__icon" viewBox="0 0 24 24" fill="currentColor"><path d="M5 2.5 19 13l-6.2.9 3.6 6.6-2.6 1.4-3.6-6.7L5 19.5z"/></svg>
+            <h3 class="fgrid__title">Input send rate</h3>
+            <div class="fgrid__opts"><span>60 Hz</span><span>120 Hz</span></div>
+          </div>
+          <div class="fgrid__cell">
+            <svg class="fgrid__icon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 2h8a2 2 0 012 2v16a2 2 0 01-2 2H8a2 2 0 01-2-2V4a2 2 0 012-2zM2 8h2v8H2V8zm18 0h2v8h-2V8z"/></svg>
+            <h3 class="fgrid__title">Haptics</h3>
+            <div class="fgrid__opts"><span>Off</span><span>Light</span><span>Full</span></div>
+          </div>
+          <div class="fgrid__cell">
+            <svg class="fgrid__icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3a9 9 0 109 9c0-.5 0-1-.1-1.4A5.5 5.5 0 0113.4 3.1C13 3 12.5 3 12 3z"/></svg>
+            <h3 class="fgrid__title">Appearance</h3>
+            <div class="fgrid__opts"><span>System</span><span>Light</span><span>Dark</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <div style="height:160px" aria-hidden="true"></div>
+  </div>
+</div>
+
+<section class="band-night night on-dark" id="privacy" aria-labelledby="privacy-h">
+  <div class="night__orb reveal"><img src="assets/icon-256.png" alt="" width="120" height="120"></div>
+  <div class="heading">
+    <span class="pill pill--glass reveal" style="--y:12px"><span>Privacy</span></span>
+    <h2 class="heading__title frost" id="privacy-h" data-words>Peer to peer. No account. Nothing in between.</h2>
+    <p class="heading__sub reveal" style="--delay:300ms">The iPad finds your Mac on the local network and connects to it directly. There is no relay, no sign-in, and no cloud service in the path.</p>
+  </div>
+
+  <div class="link-diagram reveal">
+    <svg viewBox="0 0 820 200" role="img" aria-label="An iPad and a Mac connected directly over local Wi-Fi, with the Bonjour service _deckhand._tcp between them and no cloud in the path.">
+      <rect x="20" y="40" width="170" height="128" rx="16" fill="#10101e" stroke="rgba(255,255,255,0.18)"/>
+      <rect x="32" y="52" width="146" height="104" rx="8" fill="#1b1550"/>
+      <rect x="46" y="66" width="80" height="76" rx="6" fill="rgba(124,92,255,0.35)"/>
+      <rect x="134" y="66" width="30" height="30" rx="5" fill="#7c5cff"/>
+      <rect x="134" y="104" width="30" height="30" rx="5" fill="none" stroke="#3de0b0"/>
+      <text x="105" y="194" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="14">iPad remote</text>
+
+      <rect x="620" y="36" width="180" height="116" rx="10" fill="#10101e" stroke="rgba(255,255,255,0.18)"/>
+      <rect x="632" y="48" width="156" height="92" rx="5" fill="#2a2170"/>
+      <rect x="648" y="60" width="104" height="64" rx="5" fill="rgba(255,255,255,0.85)"/>
+      <path d="M598 152h224l-14 14H612z" fill="#23212e"/>
+      <text x="710" y="194" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="14">Mac host</text>
+
+      <path d="M210 104H600" stroke="rgba(207,198,255,0.55)" stroke-width="2" stroke-dasharray="2 8" stroke-linecap="round" fill="none"/>
+      <circle class="packet" cx="300" cy="104" r="5" fill="#9e7bff"/>
+      <circle class="packet" cx="520" cy="104" r="5" fill="#3de0b0"/>
+      <rect x="318" y="82" width="184" height="44" rx="22" fill="#0b0a1c" stroke="rgba(255,255,255,0.12)"/>
+      <text x="410" y="109" text-anchor="middle" fill="#cfc6ff" font-size="14" font-family="Google Sans Code, ui-monospace, monospace">_deckhand._tcp</text>
+      <text x="410" y="152" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-size="13">Same Wi-Fi · direct connection</text>
+
+      <g transform="translate(410 22)">
+        <path d="M-26 8a12 12 0 010-24h2a16 16 0 0130 0h2a12 12 0 010 24z" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2" transform="translate(0 10)"/>
+        <path d="M-30 -8 30 26" stroke="#ff4d5e" stroke-width="2.5" stroke-linecap="round"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="trust">
+    <div class="trust__card reveal">
+      <h3>Every connection approved</h3>
+      <p>The Mac asks before any device can control it, and that approval is not saved. A fresh launch of the Mac app asks again.</p>
+    </div>
+    <div class="trust__card reveal" style="--delay:80ms">
+      <h3>Dead sessions noticed fast</h3>
+      <p>Both sides ping every two seconds and trust only recent traffic. If the Mac goes away, the remote returns to the picker.</p>
+    </div>
+    <div class="trust__card reveal" style="--delay:160ms">
+      <h3>Honest about permissions</h3>
+      <p>The Mac reports whether Accessibility and Screen Recording are granted, so the remote tells you what is missing instead of failing quietly.</p>
+    </div>
+  </div>
+</section>
+
+<div class="stack-bottom-void">
+<div class="sheet sheet--both">
+  <section class="section" id="setup" aria-labelledby="setup-h">
+    <div class="wrap">
+      <div class="heading">
+        <span class="pill pill--neutral reveal" style="--y:12px"><span>Setup</span></span>
+        <h2 class="heading__title" id="setup-h" data-words>Open it on both. Approve once. Done.</h2>
+      </div>
+      <ol class="steps after-heading">
+        <li class="step reveal">
+          <span class="pill pill--violet pill--sm">01</span>
+          <h3>Open Deck Hand on your Mac</h3>
+          <p>It lives in the menu bar. Grant Accessibility and Screen Recording when it asks.</p>
+        </li>
+        <li class="step reveal" style="--delay:80ms">
+          <span class="pill pill--violet pill--sm">02</span>
+          <h3>Join the same Wi-Fi</h3>
+          <p>Open the remote on your iPad or iPhone. Your Mac appears in the list on its own.</p>
+        </li>
+        <li class="step reveal" style="--delay:160ms">
+          <span class="pill pill--violet pill--sm">03</span>
+          <h3>Approve the iPad</h3>
+          <p>Click Approve in the Mac’s menu bar and the trackpad, mirror, and shortcuts are live.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="section" id="requirements" aria-labelledby="req-h">
+    <div class="wrap">
+      <div class="heading">
+        <span class="pill pill--neutral reveal" style="--y:12px"><span>Requirements</span></span>
+        <h2 class="heading__title" id="req-h" data-words>Two apps. One for each side of the desk.</h2>
+      </div>
+      <div class="req-grid after-heading">
+        <article class="req req--dark reveal">
+          <div class="req__head">
+            <div class="req__name">Mac host <span class="badge badge--violet">Menu bar</span></div>
+            <p class="req__desc">Captures the screen and drives the pointer.</p>
+          </div>
+          <div class="req__body">
+            <div class="req__figure"><b>macOS 14</b><span>or later</span></div>
+            <ul class="check">
+              <li><span class="check__dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg></span>Accessibility, for pointer and shortcuts</li>
+              <li><span class="check__dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg></span>Screen Recording, for mirror and captures</li>
+              <li><span class="check__dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg></span>Local Network, for discovery</li>
+            </ul>
+          </div>
+        </article>
+        <article class="req req--light reveal" style="--delay:80ms">
+          <div class="req__head">
+            <div class="req__name">Remote <span class="badge badge--teal">iPad and iPhone</span></div>
+            <p class="req__desc">The trackpad, mirror, and capture tools in your hand.</p>
+          </div>
+          <div class="req__body">
+            <div class="req__figure"><b>iPadOS 17.4</b><span>or iOS 17.4</span></div>
+            <ul class="check check--teal">
+              <li><span class="check__dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg></span>Built for iPad and iPhone</li>
+              <li><span class="check__dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg></span>Local Network, for discovery</li>
+              <li><span class="check__dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg></span>Photos, only when you save a capture</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="faq" aria-labelledby="faq-h">
+    <div class="wrap">
+      <div class="heading">
+        <span class="pill pill--neutral reveal" style="--y:12px"><span>FAQ</span></span>
+        <h2 class="heading__title" id="faq-h" data-words>Questions, answered.</h2>
+      </div>
+      <div class="faq after-heading">
+        <div class="faq__item reveal">
+          <button class="faq__q" type="button" id="faq-q0" aria-expanded="false" aria-controls="faq-a0">When can I get Deck Hand?<svg class="faq__chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 7.5 5 5 5-5"/></svg></button>
+          <div class="faq__panel" id="faq-a0" role="region" aria-labelledby="faq-q0"><div><p class="faq__a">Deck Hand is being prepared for release. Join the waitlist and you’ll get one email when it’s ready to download.</p></div></div>
+        </div>
+        <div class="faq__item reveal">
+          <button class="faq__q" type="button" id="faq-q1" aria-expanded="false" aria-controls="faq-a1">Does it work over the internet?<svg class="faq__chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 7.5 5 5 5-5"/></svg></button>
+          <div class="faq__panel" id="faq-a1" role="region" aria-labelledby="faq-q1"><div><p class="faq__a">Not yet. The remote and the Mac find each other on your local network and connect directly. Reaching your Mac from outside your home network is planned.</p></div></div>
+        </div>
+        <div class="faq__item reveal">
+          <button class="faq__q" type="button" id="faq-q2" aria-expanded="false" aria-controls="faq-a2">Why does my Mac ask me to approve the iPad again?<svg class="faq__chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 7.5 5 5 5-5"/></svg></button>
+          <div class="faq__panel" id="faq-a2" role="region" aria-labelledby="faq-q2"><div><p class="faq__a">Approvals are deliberately not saved. Each new launch of the Mac app asks once more, because silently trusting stored state proved too easy to get wrong.</p></div></div>
+        </div>
+        <div class="faq__item reveal">
+          <button class="faq__q" type="button" id="faq-q3" aria-expanded="false" aria-controls="faq-a3">Which permissions does the Mac app need?<svg class="faq__chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 7.5 5 5 5-5"/></svg></button>
+          <div class="faq__panel" id="faq-a3" role="region" aria-labelledby="faq-q3"><div><p class="faq__a">Accessibility for the pointer, keyboard, menu shortcuts, and dialog buttons. Screen Recording for captures and the live mirror. Local Network for discovery. The remote asks for Photos only when you save a capture.</p></div></div>
+        </div>
+        <div class="faq__item reveal">
+          <button class="faq__q" type="button" id="faq-q4" aria-expanded="false" aria-controls="faq-a4">Does it work on iPhone?<svg class="faq__chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 7.5 5 5 5-5"/></svg></button>
+          <div class="faq__panel" id="faq-a4" role="region" aria-labelledby="faq-q4"><div><p class="faq__a">Yes. The remote is built for both iPhone and iPad. The larger screen of an iPad gives the trackpad and mirror more room.</p></div></div>
+        </div>
+        <div class="faq__item reveal">
+          <button class="faq__q" type="button" id="faq-q5" aria-expanded="false" aria-controls="faq-a5">What is Loom?<svg class="faq__chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 7.5 5 5 5-5"/></svg></button>
+          <div class="faq__panel" id="faq-a5" role="region" aria-labelledby="faq-q5"><div><p class="faq__a">Loom is the Swift networking package Deck Hand is built on, created by Ethan Lipnik. It handles Bonjour discovery, the direct connection, device identity, and trust. This repository carries a fork of it.</p></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <div style="height:40px" aria-hidden="true"></div>
+</div>
+</div>
+</main>
+
+<div class="band-void">
+  <section class="closing" id="waitlist" aria-labelledby="closing-h">
+    <img class="closing__icon reveal" src="assets/icon-256.png" alt="Deck Hand app icon" width="96" height="96">
+    <h2 class="closing__title" id="closing-h" data-words>Put your Mac within reach. From anywhere in the room.</h2>
+    <p class="closing__sub reveal" style="--delay:200ms">Join the waitlist and we’ll send one email when Deck Hand is ready.</p>
+    <div class="hero__cta reveal" style="--delay:300ms">
+        <form class="wl" action="/api/waitlist" method="post" data-waitlist novalidate>
+          <div class="wl__row">
+            <label class="sr-only" for="wl-closing">Email address</label>
+            <input class="wl__input" id="wl-closing" name="email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required>
+            <input class="wl__trap" name="company" tabindex="-1" autocomplete="off" aria-hidden="true">
+            <input type="hidden" name="source" value="closing">
+            <button class="btn btn--primary wl__btn" type="submit">Join the waitlist</button>
+          </div>
+          <p class="wl__msg" role="status" aria-live="polite"></p>
+          <p class="wl__note">One email when Deck Hand is ready. Nothing else. <a href="/privacy">Privacy policy</a></p>
+        </form>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="footer__inner">
+      <div class="footer__brand">
+        <strong><img src="assets/favicon-64.png" alt="" width="28" height="28">Deck Hand</strong>
+        <p>Turn an iPad into a control surface for your Mac. Built on Loom, the Swift networking package by Ethan Lipnik.</p>
+      </div>
+      <div class="footer__cols">
+        <div class="footer__col">
+          <b>Product</b>
+          <a href="#pointer">Features</a>
+          <a href="#privacy">Privacy</a>
+          <a href="#setup">Setup</a>
+          <a href="#waitlist">Waitlist</a>
+          <a href="#faq">FAQ</a>
+          <a href="/privacy">Privacy policy</a>
+        </div>
+        <div class="footer__col">
+          <b>Project</b>
+          <a href="https://github.com/Dev-Muhammad-Junaid/DeckHand">Source code</a>
+          <a href="https://github.com/Dev-Muhammad-Junaid/DeckHand/issues">Report an issue</a>
+          <a href="https://github.com/Dev-Muhammad-Junaid/DeckHand/blob/main/LICENSE">MIT License</a>
+          <a href="https://github.com/EthanLipnik/Loom">Loom</a>
+        </div>
+      </div>
+    </div>
+    <p class="footer__fine">© 2026 Deck Hand. Mac, iPad, iPhone, macOS, and iPadOS are trademarks of Apple Inc. Deck Hand is not affiliated with Apple.</p>
+  </footer>
+</div>
+
+<script src="site.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Deck Hand waitlist</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@500&family=Google+Sans:wght@400;500&display=swap">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="band-void" style="min-height:100vh;display:grid;place-items:center;padding:40px 20px">
+  <main class="closing" style="padding:0">
+    <img class="closing__icon" src="/assets/icon-256.png" alt="Deck Hand app icon" width="96" height="96">
+    <h1 class="closing__title" id="joined-title">You’re on the list.</h1>
+    <p class="closing__sub" id="joined-text">We’ll send one email when Deck Hand is ready to download.</p>
+    <div class="hero__cta"><a class="btn btn--primary" href="/">Back to Deck Hand</a></div>
+  </main>
+  <script>
+    (function () {
+      var error = new URLSearchParams(location.search).get('error');
+      if (!error) return;
+      document.getElementById('joined-title').textContent = error === 'email' ? 'That email doesn’t look right.' : 'We couldn’t add you just now.';
+      document.getElementById('joined-text').textContent = error === 'email' ? 'Go back and check the address, then try again.' : 'Go back and try again in a minute.';
+    })();
+  </script>
+</body>
+</html>
