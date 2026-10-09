@@ -36,19 +36,21 @@ for dmg in "Bezel-iPad-Pro-(M5).dmg" "Bezel-iPhone-17.dmg"; do
 done
 
 # ---------- App icons ----------
-# slug:App Store ID (Mac App Store apps, so the artwork is the macOS icon)
+# slug:App Store ID. Mac App Store apps give the macOS icon directly. Keynote,
+# Pages and Numbers are no longer listed on the Mac App Store, so they use the
+# iOS listing (marked :ios) and mac_icon.py shapes that artwork like a Mac icon.
 APPS=(
   "xcode:497799835"
-  "keynote:409183694"
-  "pages:409201541"
-  "numbers:409203825"
+  "keynote:361285480:ios"
+  "pages:361309726:ios"
+  "numbers:361304891:ios"
   "final-cut-pro:424389933"
   "logic-pro:634148309"
   "pixelmator-pro:1289583905"
   "slack:803453959"
 )
 for entry in "${APPS[@]}"; do
-  slug="${entry%%:*}"; id="${entry##*:}"
+  IFS=: read -r slug id platform <<<"$entry"
   out="$ICONS/$slug.png"
   url="$(curl -fsS "https://itunes.apple.com/lookup?id=$id" \
     | python3 -c 'import sys,json; r=json.load(sys.stdin)["results"]; print(r[0]["artworkUrl512"] if r else "")')"
@@ -56,7 +58,11 @@ for entry in "${APPS[@]}"; do
   # Ask for a PNG so the macOS icon keeps its transparent margin.
   url="${url%/*}/512x512bb.png"
   curl -fsSL "$url" -o "$out"
-  sips -Z 256 "$out" >/dev/null 2>&1 || true
+  if [ "${platform:-}" = ios ]; then
+    python3 "$ROOT/website/tools/mac_icon.py" "$out" "$out"
+  else
+    sips -Z 256 "$out" >/dev/null 2>&1 || true
+  fi
   echo "✓ $slug"
 done
 
