@@ -63,32 +63,35 @@ private enum MarkArtwork {
     static let bezel: CGFloat = 36
     static let deviceCorner: CGFloat = 118
     static let screenCorner: CGFloat = 74
-    static let pitch: CGFloat = 27
-    static let dot: CGFloat = 19
+    static let pitch: CGFloat = 26
+    static let dot: CGFloat = 18
 
-    /// The pointing hand, one character per dot. Index finger up, thumb on
-    /// the left, three folded fingers on the right.
+    /// The pointing hand, one character per dot, drawn like the classic Mac
+    /// hand cursor: `X` is the lit outline (including the knuckle dividers
+    /// and thumb crease), `o` is the violet fill.
     static let hand: [String] = [
-        "...###........",
-        "...###........",
-        "...###........",
-        "...###........",
-        "...###........",
-        "...###........",
-        "...#####......",
-        "...##########.",
-        "...###########",
-        "##############",
-        "##############",
-        "##############",
-        ".#############",
-        ".#############",
-        "...##########.",
-        "...#########..",
-        "....#######...",
+        ".....XX..........",
+        "....XooX.........",
+        "....XooX.........",
+        "....XooX.........",
+        "....XooX.........",
+        "....XooXXX.XX....",
+        "....XooXooXooXX..",
+        "....XooXooXooXoX.",
+        ".XX.XooXooXooXoX.",
+        "XooXXooXooXooXoX.",
+        "XoooXooooooooooX.",
+        ".XooXooooooooooX.",
+        "..XoooooooooooX..",
+        "..XoooooooooooX..",
+        "...XooooooooooX..",
+        "....XooooooooX...",
+        "....XooooooooX...",
+        "....XXXXXXXXXX...",
     ]
 
-    static let cells: [[Bool]] = hand.map { row in row.map { $0 == "#" } }
+    static let cells: [[Bool]] = hand.map { row in row.map { $0 != "." } }
+    static let outline: [[Bool]] = hand.map { row in row.map { $0 == "X" } }
 
     static var screenSize: CGSize {
         CGSize(width: deviceSize.width - bezel * 2, height: deviceSize.height - bezel * 2)
@@ -102,7 +105,7 @@ private enum MarkArtwork {
     /// Centre of the hand's top-left dot. The hand sits a touch left of
     /// centre so the finger and its rays read as the middle of the screen.
     static var origin: CGPoint {
-        CGPoint(x: -(6.5 - 0.4) * pitch, y: -screenSize.height / 2 + 4 * pitch)
+        CGPoint(x: -(8 - 0.3) * pitch, y: -screenSize.height / 2 + 3.5 * pitch)
     }
 
     enum Kind {
@@ -116,9 +119,7 @@ private enum MarkArtwork {
 
     static func kind(_ x: Int, _ y: Int) -> Kind {
         if isFilled(x, y) {
-            let neighbours = [(1, 0), (-1, 0), (0, 1), (0, -1)]
-            let onEdge = neighbours.contains { !isFilled(x + $0.0, y + $0.1) }
-            return onEdge ? .edge : .fill
+            return outline[y][x] ? .edge : .fill
         }
         if let ray = ray(x, y) { return ray }
         if x == mintCell.x && y == mintCell.y { return .mint }

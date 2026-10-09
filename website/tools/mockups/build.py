@@ -250,41 +250,34 @@ html = html.replace('family=Google+Sans+Code&display=swap', 'family=Google+Sans+
 # lit in them. X = outline (white with a cyan bloom), o = violet fill,
 # c = the one cyan "active" detail.
 GLYPHS = {
- 'Point': [
-  "..X..........", "..XX.........", "..XoX........", "..XooX.......", "..XoooX......", "..XooooX.....",
-  "..XoooooX....", "..XooooooX...", "..XoooooooX..", "..XooooXXXXX.", "..XooXoX.....", "..XoX.XoX....", "..XX...XX....",
+ 'Point': [  # the classic Mac arrow
+  "X...........", "XX..........", "XoX.........", "XooX........", "XoooX.......", "XooooX......",
+  "XoooooX.....", "XooooooX....", "XoooooooX...", "XooooooooX..", "XoooooXXXXX.", "XooXooX.....",
+  "XoX.XooX....", "XX..XooX....", "X....XooX...", ".....XooX...", "......XX....",
  ],
- 'Mirror': [
-  ".............", "....XXXXXXXXX", "....X.......X", "....X.......X", "XXXXXXXXX...X", "XoooooooX...X",
-  "XoocooooX...X", "XoooooooX...X", "XoooooooXXXXX", "XoooooooX....", "XXXXXXXXX....", ".............", ".............",
- ],
- 'Capture': [
-  "XXXX.....XXXX", "X...........X", "X...........X", "X....ooo....X", "....ooooo....", "...ooocooo...",
-  "...oocccoo...", "...ooocooo...", "....ooooo....", "X....ooo....X", "X...........X", "X...........X", "XXXX.....XXXX",
- ],
- 'Launch': [
-  "XXXXX...XXXXX", "XoooX...XcccX", "XoooX...XcccX", "XoooX...XcccX", "XXXXX...XXXXX", ".............",
-  ".............", ".............", "XXXXX...XXXXX", "XoooX...XoooX", "XoooX...XoooX", "XoooX...XoooX", "XXXXX...XXXXX",
- ],
- 'Answer': [
-  ".............", "XXXXXXXXXXXXX", "X...........X", "X.ooooooooo.X", "X...........X", "X.oooooo....X",
-  "X...........X", "X...........X", "X.oooo.cccc.X", "X.oooo.cccc.X", "X...........X", "XXXXXXXXXXXXX", ".............",
- ],
+ 'Mirror': ["...XXXXXXXXX", "...X.......X", "XXXXXXXX...X", "XooooooX...X", "XoocoooX...X",
+            "XooooooXXXXX", "XooooooX....", "XXXXXXXX...."],
+ 'Capture': ["XXX.....XXX", "X.........X", "X.........X", "....ooo....", "...oocoo...",
+             "...ooooo...", "....ooo....", "X.........X", "X.........X", "XXX.....XXX"],
+ 'Launch': ["XXXX..XXXX", "XooX..XccX", "XooX..XccX", "XXXX..XXXX", "..........",
+            "..........", "XXXX..XXXX", "XooX..XooX", "XooX..XooX", "XXXX..XXXX"],
+ 'Answer': ["XXXXXXXXXXXX", "X..........X", "X.oooooooo.X", "X.ooooo....X", "X..........X",
+            "X.ooo..cccc.X"[:12], "X..........X", "XXXXXXXXXXXX"],
 }
 
 def glyph_tile(rows):
-    n = 13; pitch = 4.0; dot = 3.0; off = (64 - (n - 1) * pitch - dot) / 2
-    dim, lit = [], []
+    """Lit dots only, at one dot size for every glyph so the row reads as a set."""
+    pitch, dot = 5, 4
+    w, h = len(rows[0]) * pitch, len(rows) * pitch
+    fill, lit = [], []
     for y, row in enumerate(rows):
         for x, ch in enumerate(row):
-            cx, cy = off + x * pitch, off + y * pitch
-            r = f'<rect x="{cx:.1f}" y="{cy:.1f}" width="{dot}" height="{dot}" rx="0.9"'
+            r = f'<rect x="{x * pitch}" y="{y * pitch}" width="{dot}" height="{dot}" rx="1.1"'
             if ch == 'X': lit.append(r + ' fill="#effffc"/>')
-            elif ch == 'o': dim.append(r + ' fill="#8e70ff"/>')
             elif ch == 'c': lit.append(r + ' fill="#9ff6ff"/>')
-            else: dim.append(r + ' fill="#2b3c99" opacity=".5"/>')
-    return ('<svg class="verbs__dots" viewBox="0 0 64 64" aria-hidden="true">' + ''.join(dim)
-            + '<g filter="url(#dotglow)">' + ''.join(lit) + '</g></svg>')
+            elif ch == 'o': fill.append(r + ' fill="#8e70ff"/>')
+    return (f'<svg class="verbs__dots" width="{w}" height="{h}" viewBox="-2 -2 {w + 4} {h + 4}" aria-hidden="true">'
+            + ''.join(fill) + '<g filter="url(#dotglow)">' + ''.join(lit) + '</g></svg>')
 
 VERBS = ('<ul class="verbs">' + ''.join(
     f'<li class="reveal" style="--delay:{i * 80}ms"><span class="verbs__glyph">{glyph_tile(GLYPHS[name])}</span>{name}</li>'
