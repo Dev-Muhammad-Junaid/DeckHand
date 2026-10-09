@@ -96,17 +96,23 @@ def fit(kind, path):
     w, h = img.size
     left, top, right, bottom, radius = screen_hole(img)
     sw, sh = right - left, bottom - top
-    web = img.resize((WEB_WIDTH[kind], round(h * WEB_WIDTH[kind] / w)), Image.LANCZOS)
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    web.save(OUT_DIR / f'{kind}.png', optimize=True)
+    out = OUT_DIR / f'{kind}.png'
+    # Re-fitting the web copy itself only rewrites the CSS.
+    if Path(path).resolve() != out.resolve():
+        web = img.resize((WEB_WIDTH[kind], round(h * WEB_WIDTH[kind] / w)), Image.LANCZOS)
+        OUT_DIR.mkdir(parents=True, exist_ok=True)
+        web.save(out, optimize=True)
     pct = lambda v: f'{v * 100:.3f}%'
     print(f'{kind}: {w}x{h}, screen {sw}x{sh} at ({left},{top}), corner {radius}px')
+    # The screen is placed with absolute insets, which resolve against the
+    # device box itself. Percentage padding would resolve against the parent's
+    # width and misplace the screen whenever the device is narrower than it.
     return f'''
-.dev-{kind} {{ aspect-ratio: {w} / {h}; padding: {pct(top / w)} {pct((w - right) / w)} {pct((h - bottom) / w)} {pct(left / w)};
-  background: none; box-shadow: none; border-radius: 0; }}
+.dev-{kind} {{ aspect-ratio: {w} / {h}; padding: 0; background: none; box-shadow: none; border-radius: 0; }}
 .dev-{kind}::after {{ content: ""; position: absolute; inset: 0; z-index: 6; pointer-events: none;
   background: url("assets/bezels/{kind}.png") center / 100% 100% no-repeat; }}
-.dev-{kind} > .ui {{ border-radius: {pct(radius / sw)} / {pct(radius / sh)}; }}
+.dev-{kind} > .ui {{ position: absolute; left: {pct(left / w)}; right: {pct((w - right) / w)}; top: {pct(top / h)}; bottom: {pct((h - bottom) / h)};
+  width: auto; height: auto; border-radius: {pct(radius / sw)} / {pct(radius / sh)}; }}
 '''
 
 

@@ -81,7 +81,7 @@ S = {
  'chevdown-sm': '<path d="M6 9.5l6 6 6-6" stroke-width="2.6"/>',
  'antenna': '<circle cx="12" cy="11" r="2"/><path d="M8 7a5.6 5.6 0 000 8M16 7a5.6 5.6 0 010 8M5 4.5a9.5 9.5 0 000 13M19 4.5a9.5 9.5 0 010 13M12 13v8"/>',
 }
-SPRITE = '<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="litg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9E7BFF"/><stop offset=".5" stop-color="#7C5CFF"/><stop offset="1" stop-color="#6E86FF"/></linearGradient></defs>' + \
+SPRITE = '<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><filter id="dotglow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="1.4" result="b"/><feFlood flood-color="#3de0e0" flood-opacity=".9"/><feComposite in2="b" operator="in" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter><linearGradient id="litg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9E7BFF"/><stop offset=".5" stop-color="#7C5CFF"/><stop offset="1" stop-color="#6E86FF"/></linearGradient></defs>' + \
     ''.join(f'<symbol id="i-{k}" viewBox="0 0 24 24" fill="none" stroke="currentColor">{v}</symbol>' for k, v in S.items()) + \
     '<symbol id="i-battery" viewBox="0 0 28 13" fill="none" stroke="currentColor"><rect x="1" y="1" width="22.5" height="11" rx="3.2" opacity=".4" stroke-width="1.2"/><rect x="3" y="3" width="18.5" height="7" rx="1.6" fill="currentColor" stroke="none"/><path d="M26 4.8v3.4" stroke-width="1.6" opacity=".5"/></symbol></svg>'
 
@@ -245,6 +245,51 @@ if 'ui.css' not in html:
 html = html.replace('<link rel="stylesheet" href="ui.css">', '<link rel="stylesheet" href="ui.css">\n<link rel="stylesheet" href="bezels.css">') if 'bezels.css' not in html else html
 html = html.replace('family=Google+Sans+Code&display=swap', 'family=Google+Sans+Code&family=Nunito:wght@400;500;600;700&display=swap')
 
+# ---------- Dot-matrix glyph tiles (the interlude row) ----------
+# Each tile is a miniature of the app icon's screen: dim dots, with the glyph
+# lit in them. X = outline (white with a cyan bloom), o = violet fill,
+# c = the one cyan "active" detail.
+GLYPHS = {
+ 'Point': [
+  "..X..........", "..XX.........", "..XoX........", "..XooX.......", "..XoooX......", "..XooooX.....",
+  "..XoooooX....", "..XooooooX...", "..XoooooooX..", "..XooooXXXXX.", "..XooXoX.....", "..XoX.XoX....", "..XX...XX....",
+ ],
+ 'Mirror': [
+  ".............", "....XXXXXXXXX", "....X.......X", "....X.......X", "XXXXXXXXX...X", "XoooooooX...X",
+  "XoocooooX...X", "XoooooooX...X", "XoooooooXXXXX", "XoooooooX....", "XXXXXXXXX....", ".............", ".............",
+ ],
+ 'Capture': [
+  "XXXX.....XXXX", "X...........X", "X...........X", "X....ooo....X", "....ooooo....", "...ooocooo...",
+  "...oocccoo...", "...ooocooo...", "....ooooo....", "X....ooo....X", "X...........X", "X...........X", "XXXX.....XXXX",
+ ],
+ 'Launch': [
+  "XXXXX...XXXXX", "XoooX...XcccX", "XoooX...XcccX", "XoooX...XcccX", "XXXXX...XXXXX", ".............",
+  ".............", ".............", "XXXXX...XXXXX", "XoooX...XoooX", "XoooX...XoooX", "XoooX...XoooX", "XXXXX...XXXXX",
+ ],
+ 'Answer': [
+  ".............", "XXXXXXXXXXXXX", "X...........X", "X.ooooooooo.X", "X...........X", "X.oooooo....X",
+  "X...........X", "X...........X", "X.oooo.cccc.X", "X.oooo.cccc.X", "X...........X", "XXXXXXXXXXXXX", ".............",
+ ],
+}
+
+def glyph_tile(rows):
+    n = 13; pitch = 4.0; dot = 3.0; off = (64 - (n - 1) * pitch - dot) / 2
+    dim, lit = [], []
+    for y, row in enumerate(rows):
+        for x, ch in enumerate(row):
+            cx, cy = off + x * pitch, off + y * pitch
+            r = f'<rect x="{cx:.1f}" y="{cy:.1f}" width="{dot}" height="{dot}" rx="0.9"'
+            if ch == 'X': lit.append(r + ' fill="#effffc"/>')
+            elif ch == 'o': dim.append(r + ' fill="#8e70ff"/>')
+            elif ch == 'c': lit.append(r + ' fill="#9ff6ff"/>')
+            else: dim.append(r + ' fill="#2b3c99" opacity=".5"/>')
+    return ('<svg class="verbs__dots" viewBox="0 0 64 64" aria-hidden="true">' + ''.join(dim)
+            + '<g filter="url(#dotglow)">' + ''.join(lit) + '</g></svg>')
+
+VERBS = ('<ul class="verbs">' + ''.join(
+    f'<li class="reveal" style="--delay:{i * 80}ms"><span class="verbs__glyph">{glyph_tile(GLYPHS[name])}</span>{name}</li>'
+    for i, name in enumerate(GLYPHS)) + '</ul>')
+
 def replace_element(start, new):
     """Replace the whole element that begins at `start` (div depth counting)."""
     global html
@@ -262,6 +307,7 @@ def frame(cls, inner, extra=''):
     return f'<div class="frame {cls} reveal" style="--delay:120ms"><div class="frame__stage{extra}">{inner}</div></div>'
 
 replace_element('<div class="device" role="img"', pts(HERO))
+replace_element('<ul class="verbs">', VERBS)
 replace_element('<div class="frame frame--violet reveal"', frame('frame--violet frame--phone', pts(PHONE_TP)))
 replace_element('<div class="frame frame--teal reveal"', frame('frame--teal frame--ipad', pts(MIRROR_IPAD)))
 replace_element('<div class="frame frame--muted reveal"', frame('frame--muted frame--ipad', pts(CAPTURE)))
