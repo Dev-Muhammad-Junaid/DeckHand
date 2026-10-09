@@ -15,15 +15,15 @@
   --hairline: #e6e4ee;
 
   /* Brand, sampled from the app icon */
-  --accent: #4f2bff;
-  --accent-hover: #6a4bff;
-  --accent-ink: #3a17e0;
-  --accent-tint: #e9e4ff;
+  --accent: #3a4cf2;
+  --accent-hover: #5466ff;
+  --accent-ink: #2a38c9;
+  --accent-tint: #e6eaff;
   --on-accent: #ffffff;
   --mint: #3de0b0;
-  --coral: #ff5470;
-  --coral-ink: #d11f45;
-  --coral-tint: #ffe4e8;
+  --teal: #3de0c8;
+  --teal-ink: #0b7a6c;
+  --teal-tint: #dcf6f1;
   --signal-red: #ff4d5e;
 
   /* Dark grounds */
@@ -57,7 +57,7 @@
   --radius-pill: 300px;
 
   --shadow-nav: 0 2px 40px rgba(0, 0, 0, 0.25);
-  --shadow-cta: inset 0 3px 0 rgba(255, 255, 255, 0.2), 0 2px 4px rgba(79, 43, 255, 0.35);
+  --shadow-cta: inset 0 3px 0 rgba(255, 255, 255, 0.2), 0 2px 4px rgba(58, 76, 242, 0.35);
   --shadow-button: 0 2px 4px rgba(0, 0, 0, 0.06);
   --shadow-card: 0 8px 19px -7px rgba(0, 0, 0, 0.08);
   --shadow-frame: 0 1px 20px rgba(0, 0, 0, 0.25);
@@ -165,7 +165,7 @@ a { color: inherit; }
 .pill--sm { padding: 8px 12px; }
 .pill--neutral { background: var(--surface-muted); color: var(--ink-soft); }
 .pill--violet { background: var(--accent-tint); color: var(--accent-ink); }
-.pill--coral { background: var(--coral-tint); color: var(--coral-ink); }
+.pill--teal { background: var(--teal-tint); color: var(--teal-ink); }
 .pill--dark { background: var(--app-ink); color: #fff; }
 .pill--glass { background: rgba(244, 244, 245, 0.1); color: #fff; }
 
@@ -321,7 +321,7 @@ a { color: inherit; }
 .verbs svg { width: 24px; height: 24px; color: #fff; }
 .verbs__glyph { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; background: linear-gradient(160deg, #15142a, #0a0a14); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
 .verbs li:nth-child(2) .verbs__glyph { background: linear-gradient(135deg, #9e7bff, #7c5cff 55%, #6e86ff); box-shadow: 0 0 26px rgba(124, 92, 255, 0.55); }
-.verbs li:nth-child(5) .verbs__glyph { box-shadow: inset 0 0 0 1px var(--coral), 0 0 16px rgba(255, 84, 112, 0.35); }
+.verbs li:nth-child(5) .verbs__glyph { box-shadow: inset 0 0 0 1px var(--teal), 0 0 16px rgba(61, 224, 200, 0.35); }
 @media (max-width: 640px) { .verbs { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 32px; } .interlude__line { font-size: 24px; line-height: 30px; } }
 
 /* ---------- Feature rows ---------- */
@@ -342,12 +342,12 @@ a { color: inherit; }
 .check li { display: flex; align-items: center; gap: 10px; color: var(--ink); }
 .check__dot { flex: none; width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; color: #fff; background: var(--accent); }
 .check__dot svg { width: 12px; height: 12px; }
-.check--coral .check__dot { background: var(--coral-ink); }
+.check--teal .check__dot { background: var(--teal-ink); }
 .check--ink .check__dot { background: var(--ink); }
 
 .frame { position: relative; border-radius: var(--radius-30); overflow: hidden; aspect-ratio: 5 / 4; max-width: 100%; box-shadow: var(--shadow-glow-inset); }
 .frame--violet { background: var(--accent-tint); }
-.frame--coral { background: var(--coral-tint); }
+.frame--teal { background: var(--teal-tint); }
 .frame--muted { background: var(--surface-muted); }
 .frame__stage { position: absolute; inset: 0; display: grid; place-items: center; padding: 8%; container-type: inline-size; }
 
@@ -367,7 +367,7 @@ a { color: inherit; }
 .tier { display: flex; flex-direction: column; gap: 2cqw; }
 .tier__shot { aspect-ratio: 16 / 10; border-radius: 2cqw; overflow: hidden; box-shadow: var(--shadow-frame), 0 0 0 1px rgba(0, 0, 0, 0.04); }
 .tier__shot .mac { filter: blur(var(--blur, 0)); }
-.tier__label { font: 500 2.6cqw/1 var(--font-mono); color: var(--coral-ink); letter-spacing: 0; text-align: center; }
+.tier__label { font: 500 2.6cqw/1 var(--font-mono); color: var(--teal-ink); letter-spacing: 0; text-align: center; }
 
 /* capture feature mock */
 .cap { width: 100%; display: grid; gap: 3cqw; }
@@ -465,7 +465,7 @@ a { color: inherit; }
 .req--light .req__body { background: var(--surface-raised); box-shadow: var(--shadow-button); }
 .badge { display: inline-flex; padding: 2px 11px; border-radius: 20px; font: 500 14px/22px var(--font-sans); }
 .badge--violet { background: var(--accent); color: #fff; }
-.badge--coral { background: var(--coral-tint); color: var(--coral-ink); }
+.badge--teal { background: var(--teal-tint); color: var(--teal-ink); }
 @media (max-width: 809px) { .req-grid { grid-template-columns: minmax(0, 1fr); } .req__figure b { font-size: 44px; line-height: 44px; } }
 
 /* ---------- Build from source ---------- */
