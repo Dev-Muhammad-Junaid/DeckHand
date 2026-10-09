@@ -222,5 +222,61 @@
 .mperm span { font: 400 calc(10 * var(--pt))/1.2 var(--sf); color: var(--sec); }
 .mpop__quit { padding: calc(8 * var(--pt)) calc(16 * var(--pt)) calc(10 * var(--pt)); font: 400 calc(12 * var(--pt))/1 var(--sf); color: var(--sec); }
 
+/* Official app icons, when present, replace the tinted fallback tile. macOS
+   icon artwork carries the 824-on-1024 grid margin, so it is drawn larger. */
+.appicon { position: relative; overflow: visible; }
+.appicon img { position: absolute; left: 50%; top: 50%; width: 124%; height: 124%; translate: -50% -50%; max-width: none; }
+.appicon.has-icon { background: none !important; box-shadow: none !important; }
+
 .ui svg { stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .gbtn svg, .shot__bar svg { stroke-width: 1.1; }
+
+/* ---------- macOS desktop (1440x900 mac points) ---------- */
+.mac { --mp: calc(100cqw / 1440); position: relative; width: 100%; height: 100%; container-type: inline-size; overflow: hidden; font-family: -apple-system, "SF Pro Text", "Inter", system-ui, sans-serif; letter-spacing: 0; text-align: left;
+  background: radial-gradient(80% 60% at 70% 110%, #f2b9a3 0%, transparent 60%), radial-gradient(70% 70% at 15% 0%, #3a3fb8 0%, transparent 70%), linear-gradient(170deg, #1d1f5e 0%, #5a54c9 48%, #b98fd6 78%, #f1c1ae 100%); }
+.mac svg { display: block; flex: none; }
+.mac__bar { height: calc(30 * var(--mp)); display: flex; align-items: center; gap: calc(18 * var(--mp)); padding: 0 calc(16 * var(--mp)); color: #fff; font-size: calc(13 * var(--mp)); font-weight: 400; background: rgba(20, 18, 50, 0.18); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+.mac__bar > svg:first-child { width: calc(14 * var(--mp)); height: calc(17 * var(--mp)); margin-right: calc(4 * var(--mp)); }
+.mac__bar b { font-weight: 700; }
+.mac__bar > svg:not(:first-child) { width: calc(16 * var(--mp)); height: calc(16 * var(--mp)); }
+.mac__sp { flex: 1; }
+.mac__win { position: absolute; left: calc(110 * var(--mp)); top: calc(62 * var(--mp)); width: calc(1220 * var(--mp)); height: calc(800 * var(--mp)); border-radius: calc(18 * var(--mp)); overflow: hidden; display: flex; background: #fff;
+  box-shadow: 0 calc(30 * var(--mp)) calc(80 * var(--mp)) rgba(10, 8, 40, 0.42), 0 0 0 calc(0.5 * var(--mp)) rgba(0, 0, 0, 0.25); }
+.mac__side { width: calc(250 * var(--mp)); flex: none; background: #ececf0; border-right: calc(1 * var(--mp)) solid #dcdce0; padding: calc(16 * var(--mp)) calc(10 * var(--mp)); }
+.mac__lights { display: flex; gap: calc(8 * var(--mp)); padding: calc(2 * var(--mp)) calc(8 * var(--mp)) calc(20 * var(--mp)); }
+.mac__lights i { width: calc(13 * var(--mp)); height: calc(13 * var(--mp)); border-radius: 50%; background: #ff5f57; box-shadow: inset 0 0 0 calc(0.5 * var(--mp)) rgba(0, 0, 0, 0.15); }
+.mac__lights i:nth-child(2) { background: #febc2e; } .mac__lights i:nth-child(3) { background: #28c840; }
+.mac__tree { list-style: none; margin: 0; padding: 0; font-size: calc(13 * var(--mp)); color: #1d1d1f; }
+.mac__tree li { height: calc(26 * var(--mp)); display: flex; align-items: center; gap: calc(6 * var(--mp)); border-radius: calc(6 * var(--mp)); white-space: nowrap; }
+.mac__tree li.lv0 { padding-left: calc(6 * var(--mp)); font-weight: 600; } .mac__tree li.lv1 { padding-left: calc(22 * var(--mp)); } .mac__tree li.lv2 { padding-left: calc(38 * var(--mp)); }
+.mac__tree li svg { width: calc(15 * var(--mp)); height: calc(14 * var(--mp)); }
+.mac__tree li.sel { background: #0a84ff; color: #fff; }
+.mac__tree em { margin-left: auto; margin-right: calc(8 * var(--mp)); font-style: normal; font-size: calc(11 * var(--mp)); color: #8e8e93; }
+.mac__main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.mac__tool { height: calc(52 * var(--mp)); flex: none; display: flex; align-items: center; gap: calc(14 * var(--mp)); padding: 0 calc(18 * var(--mp)); border-bottom: calc(1 * var(--mp)) solid #e5e5ea; font-size: calc(13 * var(--mp)); color: #1d1d1f; }
+.mac__scheme { padding: calc(4 * var(--mp)) calc(10 * var(--mp)); border-radius: calc(7 * var(--mp)); background: #f2f2f7; color: #3c3c43; font-size: calc(12 * var(--mp)); } .mac__scheme s { text-decoration: none; color: #aeaeb2; }
+.mac__status { margin-left: auto; padding: calc(5 * var(--mp)) calc(12 * var(--mp)); border-radius: calc(7 * var(--mp)); background: #f2f2f7; color: #6e6e73; font-size: calc(12 * var(--mp)); }
+.mac__tabs { height: calc(30 * var(--mp)); flex: none; display: flex; background: #f5f5f7; border-bottom: calc(1 * var(--mp)) solid #e5e5ea; font-size: calc(12 * var(--mp)); color: #6e6e73; }
+.mac__tabs span { display: flex; align-items: center; gap: calc(6 * var(--mp)); padding: 0 calc(16 * var(--mp)); border-right: calc(1 * var(--mp)) solid #e5e5ea; }
+.mac__tabs span.on { background: #fff; color: #1d1d1f; }
+.mac__tabs svg { width: calc(11 * var(--mp)); height: calc(13 * var(--mp)); }
+.mac__code { list-style: none; margin: 0; padding: calc(10 * var(--mp)) 0; font: calc(12.5 * var(--mp))/calc(19 * var(--mp)) "SF Mono", ui-monospace, Menlo, monospace; color: #1d1d1f; overflow: hidden; }
+.mac__code li { display: flex; white-space: pre; }
+.mac__code li.cur { background: #eef5ff; }
+.mac__code i { width: calc(46 * var(--mp)); flex: none; padding-right: calc(14 * var(--mp)); text-align: right; font-style: normal; color: #aeaeb2; }
+.mac__code .k { color: #9b2393; font-weight: 600; } .mac__code .d { color: #0f68a0; } .mac__code .t { color: #3900a0; } .mac__code .p { color: #1c464a; }
+.mac__code .c { color: #5d6c79; } .mac__code .mk { color: #5d6c79; font-weight: 700; } .mac__code .s { color: #c41a16; } .mac__code .n { color: #1c00cf; }
+
+/* ---------- macOS alert (Big Sur and later) ---------- */
+.nsalert { width: calc(272 * var(--mp)); padding: calc(20 * var(--mp)) calc(16 * var(--mp)) calc(16 * var(--mp)); border-radius: calc(14 * var(--mp)); background: rgba(246, 246, 248, 0.97); text-align: center; color: #1d1d1f;
+  font-family: -apple-system, "SF Pro Text", "Inter", system-ui, sans-serif; letter-spacing: 0; display: flex; flex-direction: column; align-items: center;
+  box-shadow: 0 calc(20 * var(--mp)) calc(50 * var(--mp)) rgba(0, 0, 0, 0.3), 0 0 0 calc(0.5 * var(--mp)) rgba(0, 0, 0, 0.18); }
+.mac .nsalert { position: absolute; left: 50%; top: calc(52 * var(--mp)); translate: -50% 0; }
+.nsalert__icon { width: calc(64 * var(--mp)); height: calc(64 * var(--mp)); margin-bottom: calc(12 * var(--mp)); }
+.nsalert b { font-size: calc(13 * var(--mp)); line-height: 1.3; font-weight: 700; }
+.nsalert p { margin: calc(8 * var(--mp)) 0 calc(16 * var(--mp)); font-size: calc(11 * var(--mp)); line-height: 1.35; color: #3c3c43; }
+.nsalert__btns { width: 100%; display: flex; flex-direction: column; gap: calc(8 * var(--mp)); }
+.nsalert__btns i { height: calc(28 * var(--mp)); display: grid; place-items: center; border-radius: calc(7 * var(--mp)); font-style: normal; font-size: calc(13 * var(--mp)); background: rgba(0, 0, 0, 0.06); box-shadow: inset 0 0 0 calc(0.5 * var(--mp)) rgba(0, 0, 0, 0.08); }
+.nsalert__btns i.def { background: linear-gradient(#2f90ff, #0a78f5); color: #fff; box-shadow: none; }
+.macpane { container-type: inline-size; width: 100%; display: flex; justify-content: center; }
+.macpane .nsalert { position: static; translate: none; }
