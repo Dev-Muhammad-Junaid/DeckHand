@@ -81,14 +81,18 @@ struct PixelMorph: View {
         let changedAt = self.changedAt
         let pitch = self.pitch
         let breathes = glyph.breathes && !reduceMotion
-        TimelineView(.animation(minimumInterval: nil, paused: previous == nil && !breathes)) { timeline in
+        // A slow breath doesn't need the full ProMotion rate; a change does.
+        let interval: Double? = previous == nil ? 1.0 / 30 : nil
+        TimelineView(.animation(minimumInterval: interval, paused: previous == nil && !breathes)) { timeline in
             let now = timeline.date.timeIntervalSinceReferenceDate
+            let wave: Double = 0.5 + 0.5 * sin(now * 2 * Double.pi / Self.breathPeriod)
+            let breath: Double = breathes ? 0.35 + 0.65 * wave : 1
             Canvas { context, _ in
                 Self.draw(
                     glyph: glyph,
                     previous: previous,
                     elapsed: now - changedAt,
-                    breath: breathes ? 0.35 + 0.65 * (0.5 + 0.5 * sin(now * 2 * .pi / Self.breathPeriod)) : 1,
+                    breath: breath,
                     pitch: pitch,
                     in: &context
                 )

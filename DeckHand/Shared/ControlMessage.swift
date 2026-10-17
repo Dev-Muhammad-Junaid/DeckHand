@@ -129,10 +129,10 @@ public enum ControlMessage: Codable, Sendable {
     case hostCapabilities(accessibility: Bool, screenRecording: Bool)
 
     // ── Delivery receipts ────────────────────────────────────────────
-    /// Mac → iPad, once per session: optional protocol features this host
-    /// build supports. Older remotes can't decode it and skip it, and older
-    /// hosts never send it, so the remote only ever sends `tracked` to a
-    /// host that can run it. Every flag decodes as `false` when absent, so
+    /// Mac → iPad, at session start and with each capability report: the
+    /// optional protocol features this host build supports. Older remotes
+    /// can't decode it and skip it, and older hosts never send it, so the
+    /// remote only ever sends `tracked` to a host that can run it. Every flag decodes as `false` when absent, so
     /// later builds can add more.
     case hostFeatures(commandReceipts: Bool)
     /// iPad → Mac: run `command`, then reply `commandReceipt` with the same
@@ -140,9 +140,10 @@ public enum ControlMessage: Codable, Sendable {
     /// Doesn't nest: a `tracked` command inside another fails to decode.
     indirect case tracked(requestID: String, command: ControlMessage)
     /// Mac → iPad: the host received `requestID`'s command and handed it to
-    /// input injection (`delivered`), or couldn't because Accessibility
-    /// isn't granted. Slow commands such as `appShortcut` finish in their
-    /// own tasks afterwards, so this confirms delivery, not the app's result.
+    /// input injection (`delivered`), or couldn't: Accessibility isn't
+    /// granted, or a dialog button is no longer on screen. Slow commands such
+    /// as `appShortcut` finish in their own tasks afterwards, so this
+    /// confirms delivery, not the app's result.
     case commandReceipt(requestID: String, delivered: Bool)
 
     // MARK: Codable
