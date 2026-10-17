@@ -23,20 +23,25 @@ struct MacMenuBarView: View {
         VStack(alignment: .leading, spacing: 0) {
             // ── Header ────────────────────────────────────────────────
             HStack(spacing: 10) {
+                // The icon's tile with its dot hand, matching the menu bar item.
                 ZStack {
-                    Circle()
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: DeckHandTheme.headerGradientColors,
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+                                startPoint: .top,
+                                endPoint: .bottom
                             )
                         )
                         .frame(width: 36, height: 36)
-                    Image(systemName: "cursorarrow.rays")
-                        .foregroundStyle(.white)
-                        .font(.system(size: 16, weight: .semibold))
+                    PixelGlyph(
+                        bitmap: PixelArt.hand,
+                        pitch: 1.5,
+                        palette: .solid(.white, unlit: .clear),
+                        glows: false
+                    )
                 }
+                .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Deck Hand")
                         .font(.system(size: 14, weight: .bold))
@@ -99,9 +104,10 @@ struct MacMenuBarView: View {
 
             if authorizedConnections.isEmpty {
                 VStack(spacing: 8) {
-                    Image(systemName: "ipad.and.iphone")
-                        .font(.system(size: 32))
-                        .foregroundStyle(DeckHandTheme.accent.opacity(0.7))
+                    PixelScreen(cornerRadius: 12, padding: 9) {
+                        PixelGlyph(bitmap: PixelArt.hand, pitch: 2)
+                    }
+                    .padding(.bottom, 2)
                     Text("Waiting for Connection Request...")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.secondary)
@@ -310,9 +316,9 @@ private struct ConnectionRow: View {
                 .buttonStyle(.plain)
                 .help("Remove Authorization & Disconnect")
             } else {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(DeckHandTheme.success)
-                    .font(.system(size: 12))
+                // The icon's mint pixel: this device is live right now.
+                LivePixel(size: 7)
+                    .frame(width: 14, height: 14)
             }
         }
         .padding(.horizontal, 16)
@@ -330,48 +336,50 @@ private struct PendingConnectionRow: View {
     @EnvironmentObject private var authManager: DeviceAuthorizationManager
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: deviceSystemImage)
-                .font(.system(size: 15, weight: .regular))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(DeckHandTheme.warning)
-                .frame(width: 24, alignment: .center)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(connection.peerName)
-                    .font(.system(size: 12, weight: .semibold))
-                Text("Requesting mouse access")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                if let requestedAt = authManager.pendingRequestedDate(for: connection.id) {
-                    Text("Pending \(requestedAt, style: .relative) ago")
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: deviceSystemImage)
+                    .font(.system(size: 15, weight: .regular))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(DeckHandTheme.warning)
+                    .frame(width: 24, alignment: .center)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(connection.peerName)
+                        .font(.system(size: 12, weight: .semibold))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Text("Requesting mouse access")
                         .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.secondary)
+                    if let requestedAt = authManager.pendingRequestedDate(for: connection.id) {
+                        Text("Pending \(requestedAt, style: .relative) ago")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                    }
                 }
+                Spacer(minLength: 0)
             }
-            Spacer()
 
+            // One decision, no modes: Allow (this session) or Deny. Labelled
+            // buttons rather than colored circles, so the choice doesn't
+            // rest on telling green from red. Their own row, so a long
+            // device name never has to share the panel's 270 pt with them.
             HStack(spacing: 6) {
-                // One decision, no modes: Allow (this session) or Deny.
-                Button {
-                    authManager.authorize(connection: connection)
-                } label: {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(DeckHandTheme.success)
-                        .font(.system(size: 16))
-                }
-                .buttonStyle(.plain)
-                .help("Allow for this session")
-
-                Button {
+                Spacer(minLength: 0)
+                Button("Deny") {
                     authManager.reject(connection: connection, loomContext: loomContext)
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(DeckHandTheme.danger)
-                        .font(.system(size: 16))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.bordered)
                 .help("Deny")
+
+                Button("Allow") {
+                    authManager.authorize(connection: connection)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(DeckHandTheme.accent)
+                .help("Allow for this session")
             }
+            .controlSize(.small)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 6)

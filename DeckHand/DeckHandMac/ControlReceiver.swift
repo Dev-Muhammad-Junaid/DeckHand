@@ -27,6 +27,10 @@ final class ControlReceiver {
     /// Sampled counter for high-rate input logging (see consumeMessages).
     private var inputMessageCount = 0
 
+    /// Fired with the number of authorized connections being served whenever
+    /// one starts or ends. Drives the menu bar icon's connected state.
+    var onLiveConnectionsChanged: ((Int) -> Void)?
+
     /// Connections silent for longer than this (after having pinged at
     /// least once — i.e. provably heartbeat-capable) are declared dead.
     /// The iPad pings every 2 s, so 8 s = four missed beats.
@@ -37,6 +41,7 @@ final class ControlReceiver {
         let key = connectionHandle.id
         connectionHandles[key] = connectionHandle
         lastActivityAt[key] = Date()
+        onLiveConnectionsChanged?(connectionHandles.count)
         startLivenessSweepIfNeeded()
         connectionTasks[key] = Task { [weak self] in
             ActiveAppMonitor.shared.addConnection(connectionHandle, id: key)
@@ -70,6 +75,7 @@ final class ControlReceiver {
     private func cleanupConnection(_ key: UUID) {
         connectionTasks.removeValue(forKey: key)
         connectionHandles.removeValue(forKey: key)
+        onLiveConnectionsChanged?(connectionHandles.count)
         lastActivityAt.removeValue(forKey: key)
         hasPinged.remove(key)
         ActiveAppMonitor.shared.removeConnection(id: key)
