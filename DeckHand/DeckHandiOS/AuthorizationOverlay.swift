@@ -11,7 +11,6 @@ struct AuthorizationOverlay: View {
     let onDisconnect: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// True when the only sensible action is to dismiss the overlay (the
     /// connection is already gone). Drives both the button label and its
@@ -27,7 +26,12 @@ struct AuthorizationOverlay: View {
 
             VStack(spacing: 22) {
                 statusContent
-                disconnectButton.padding(.top, 8)
+                disconnectButton
+                    .padding(.top, 8)
+                    // Approved shows for a moment before the card leaves;
+                    // keep the button's space so the card doesn't jump.
+                    .opacity(status == "granted" ? 0 : 1)
+                    .disabled(status == "granted")
             }
             .padding(28)
             .frame(maxWidth: .infinity)
@@ -88,80 +92,45 @@ struct AuthorizationOverlay: View {
         #endif
     }
 
-    @ViewBuilder
+    /// One glyph for every state, outside any `switch`, so it's the same
+    /// view across status changes and can rearrange its dots from one
+    /// state into the next.
     private var statusContent: some View {
-        switch status {
-        case "pending":
-            statusBlock(
-                systemImage: "lock.display",
-                title: "Waiting for Approval",
-                message: "Please allow the connection request on \(peerName).",
-                pulse: true
-            )
+        VStack(spacing: 16) {
+            PixelScreen(cornerRadius: 18, padding: 12) {
+                PixelMorph(glyph: ApprovalGlyph(status: status))
+            }
 
-        case "host_disconnected":
-            statusBlock(
-                systemImage: "wifi.slash",
-                title: "Disconnected",
-                message: "The connection to \(peerName) was closed."
-            )
-
-        case "denied":
-            statusBlock(
-                systemImage: "xmark.shield.fill",
-                title: "Access Denied",
-                message: "Your request to control \(peerName) was declined."
-            )
-
-        default:
-            VStack(spacing: 16) {
-                Image(systemName: "questionmark.circle")
-                    .font(.system(size: DeckHandTheme.StatusIcon.size))
-                    .foregroundStyle(Color.secondary)
-
-                Text("Unknown state")
+            VStack(spacing: 8) {
+                Text(copy.title)
                     .font(DeckHandTheme.TypeStyle.titleRounded)
                     .foregroundStyle(Color.primary)
+                    .multilineTextAlignment(.center)
+                    .contentTransition(.opacity)
+
+                if !copy.message.isEmpty {
+                    Text(copy.message)
+                        .font(DeckHandTheme.TypeStyle.bodyRounded)
+                        .foregroundStyle(Color.secondary)
+                        .multilineTextAlignment(.center)
+                        .contentTransition(.opacity)
+                }
             }
         }
     }
 
-    /// Shared layout for the three concrete status states (pending /
-    /// disconnected / denied). Pulls icon colors from
-    /// `DeckHandTheme.StatusIcon.colors(for:)` so the palette stays
-    /// consistent with any other dialog using the same status strings.
-    @ViewBuilder
-    private func statusBlock(
-        systemImage: String,
-        title: String,
-        message: String,
-        pulse: Bool = false
-    ) -> some View {
-        let palette = DeckHandTheme.StatusIcon.colors(for: status)
-        VStack(spacing: 16) {
-            Group {
-                if pulse {
-                    Image(systemName: systemImage)
-                        .symbolEffect(.pulse, options: .repeating, isActive: !reduceMotion)
-                } else {
-                    Image(systemName: systemImage)
-                }
-            }
-            .font(.system(size: DeckHandTheme.StatusIcon.size))
-            .symbolRenderingMode(.hierarchical)
-            .foregroundStyle(palette.primary, palette.secondary)
-
-            VStack(spacing: 8) {
-                Text(title)
-                    .font(DeckHandTheme.TypeStyle.titleRounded)
-                    .foregroundStyle(Color.primary)
-                    .multilineTextAlignment(.center)
-
-                Text(message)
-                    .font(DeckHandTheme.TypeStyle.bodyRounded)
-                    .foregroundStyle(Color.secondary)
-                    .multilineTextAlignment(.center)
-            }
+    private var copy: (title: String, message: String) {
+        switch status {
+        case "pending":
+            ("Waiting for Approval", "Please allow the connection request on \(peerName).")
+        case "granted":
+            ("Approved", "You’re connected to \(peerName).")
+        case "host_disconnected":
+            ("Disconnected", "The connection to \(peerName) was closed.")
+        case "denied":
+            ("Access Denied", "Your request to control \(peerName) was declined.")
+        default:
+            ("Unknown state", "")
         }
     }
 }

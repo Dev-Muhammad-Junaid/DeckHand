@@ -120,6 +120,11 @@ struct StreamDeckGridView: View {
                     .padding(.bottom, 40)
                 } else if installedApps.isEmpty {
                     DeckHandLoadingStateView(title: "Loading apps from Mac…")
+                } else if !searchText.isEmpty {
+                    // Without this a search with no matches left a blank page.
+                    DeckHandEmptyState(glyph: PixelArt.launch, title: "No apps match “\(searchText)”.")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 60)
                 }
             }
         }

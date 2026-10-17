@@ -66,32 +66,15 @@ private enum MarkArtwork {
     static let pitch: CGFloat = 26
     static let dot: CGFloat = 18
 
-    /// The pointing hand, one character per dot, drawn like the classic Mac
-    /// hand cursor: `X` is the lit outline (including the knuckle dividers
-    /// and thumb crease), `o` is the violet fill.
-    static let hand: [String] = [
-        ".....XX..........",
-        "....XooX.........",
-        "....XooX.........",
-        "....XooX.........",
-        "....XooX.........",
-        "....XooXXX.XX....",
-        "....XooXooXooXX..",
-        "....XooXooXooXoX.",
-        ".XX.XooXooXooXoX.",
-        "XooXXooXooXooXoX.",
-        "XoooXooooooooooX.",
-        ".XooXooooooooooX.",
-        "..XoooooooooooX..",
-        "..XoooooooooooX..",
-        "...XooooooooooX..",
-        "....XooooooooX...",
-        "....XooooooooX...",
-        "....XXXXXXXXXX...",
-    ]
-
-    static let cells: [[Bool]] = hand.map { row in row.map { $0 != "." } }
-    static let outline: [[Bool]] = hand.map { row in row.map { $0 == "X" } }
+    /// The pointing hand, shared with the menu bar icon and the approval
+    /// glyph: lit outline dots (including the knuckle dividers and thumb
+    /// crease) around the violet fill.
+    static let cells: [[Bool]] = (0..<PixelArt.hand.height).map { y in
+        (0..<PixelArt.hand.width).map { x in PixelArt.hand[x, y] != .off }
+    }
+    static let outline: [[Bool]] = (0..<PixelArt.hand.height).map { y in
+        (0..<PixelArt.hand.width).map { x in PixelArt.hand[x, y] == .outline }
+    }
 
     static var screenSize: CGSize {
         CGSize(width: deviceSize.width - bezel * 2, height: deviceSize.height - bezel * 2)

@@ -347,30 +347,6 @@ enum DeckHandTheme {
         [Brand.cobaltHigh, Brand.cobalt]
     }
 
-    // MARK: Status icons (auth overlay, pending dialog)
-
-    /// Shared sizing for hierarchical SF Symbol icons in dialog states.
-    enum StatusIcon {
-        static let size: CGFloat = 52
-
-        /// Color pair (primary, secondary) for hierarchical SF Symbol
-        /// rendering, keyed by the connection status string used by
-        /// `AuthorizationOverlay` and friends. Waiting on the Mac is a normal
-        /// step, so it uses the accent rather than the warning color.
-        static func colors(for status: String) -> (primary: Color, secondary: Color) {
-            switch status {
-            case "pending":
-                return (DeckHandTheme.accent,  DeckHandTheme.accent.opacity(0.45))
-            case "host_disconnected":
-                return (DeckHandTheme.warning, DeckHandTheme.warning.opacity(0.5))
-            case "denied":
-                return (DeckHandTheme.danger,  DeckHandTheme.danger.opacity(0.45))
-            default:
-                return (Color.secondary,     Color.secondary.opacity(0.5))
-            }
-        }
-    }
-
     /// Shadow color for floating dialog cards (auth overlay, modal sheets).
     static func dialogCardShadow(_ scheme: ColorScheme) -> Color {
         .black.opacity(scheme == .dark ? 0.35 : 0.12)

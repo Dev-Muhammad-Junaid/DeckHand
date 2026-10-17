@@ -187,8 +187,7 @@ struct ControlView: View {
                 } else {
                     DeckHandLoadingStateView(
                         title: "Initializing…",
-                        verticalPadding: 48,
-                        progressScale: 1.28
+                        verticalPadding: 48
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -248,9 +247,8 @@ struct ControlView: View {
                             .lineLimit(1)
                             .truncationMode(.middle)
                         HStack(spacing: 4) {
-                            Circle()
-                                .fill(DeckHandTheme.success)
-                                .frame(width: 6, height: 6)
+                            // The icon's mint pixel, breathing while connected.
+                            LivePixel()
                             Text(activeAppName ?? "Connected")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
@@ -335,8 +333,6 @@ struct ControlView: View {
                             DeckHandLoadingStateView(
                                 title: "Capturing screen…",
                                 verticalPadding: 0,
-                                progressScale: 1.35,
-                                progressTint: .white,
                                 titleColor: .white.opacity(0.88)
                             )
                             Button("Cancel") {

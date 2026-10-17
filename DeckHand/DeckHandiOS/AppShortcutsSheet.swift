@@ -312,13 +312,7 @@ struct AppShortcutsSheet: View {
     // MARK: - Empty state
 
     private var emptyState: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "keyboard")
-                .font(.system(size: 40, weight: .thin))
-                .foregroundStyle(Color.secondary.opacity(0.5))
-            Text("No shortcuts for \(app.displayName) yet.")
-                .font(.system(size: 14, design: .rounded))
-                .foregroundStyle(Color.secondary)
+        DeckHandEmptyState(glyph: PixelArt.answer, title: "No shortcuts for \(app.displayName) yet.") {
             HStack(spacing: 10) {
                 Button {
                     isAdding = true

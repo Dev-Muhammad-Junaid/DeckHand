@@ -97,17 +97,8 @@ struct OCRResultView: View {
                 }
             }
         case .empty:
-            VStack(spacing: 14) {
-                Image(systemName: "text.viewfinder")
-                    .font(.system(size: 42, weight: .thin))
-                    .foregroundStyle(Color.secondary.opacity(0.5))
-                Text("No text recognized in this image.")
-                    .font(.system(size: 14, design: .rounded))
-                    .foregroundStyle(Color.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            DeckHandEmptyState(glyph: PixelArt.capture, title: "No text recognized in this image.")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         case let .failed(message):
             VStack(spacing: 12) {
                 Image(systemName: "exclamationmark.triangle")

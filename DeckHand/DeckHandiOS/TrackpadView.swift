@@ -14,11 +14,11 @@ struct TrackpadView: View {
     // Sensitivity lives in settings so the inline slider and the settings
     // page stay in step, and the choice survives relaunch.
     @EnvironmentObject private var settings: DeckHandSettings
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var scrollMode: Bool = false
     @State private var activeGesture: TrackpadGestureKind?
-    @State private var ripplePos: CGPoint?
-    @State private var rippleVisible = false
+    /// Finger positions for the dot field. Only `DotField` reads it, so
+    /// touches don't re-render the rest of this view.
+    @State private var dots = DotFieldModel()
 
     private var bg: Color { DeckHandTheme.canvasBackground(colorScheme) }
     private var surfaceShadowColor: Color {
@@ -40,6 +40,10 @@ struct TrackpadView: View {
                     )
                     .shadow(color: surfaceShadowColor, radius: 16, y: 8)
 
+                // The icon's dot screen: lights under fingers and on taps.
+                DotField(model: dots)
+                    .clipShape(RoundedRectangle(cornerRadius: DeckHandTheme.Radius.hero, style: .continuous))
+
                 // Multi-touch surface — replaces the old DragGesture
                 MultiTouchTrackpad(
                     callbacks: TrackpadCallbacks(
@@ -57,20 +61,24 @@ struct TrackpadView: View {
                         },
                         onTap: { pos in
                             Task { await sender.sendClick(.left) }
-                            triggerRipple(at: pos)
+                            dots.pulse(at: pos)
                         },
                         onDoubleTap: { pos in
                             Task { await sender.sendDoubleClick(.left) }
-                            triggerRipple(at: pos)
+                            dots.pulse(at: pos)
                         },
                         onLongPress: { pos in
                             Task { await sender.sendClick(.right) }
-                            triggerRipple(at: pos)
+                            // Filled ring: a right-click reads differently from a tap.
+                            dots.pulse(at: pos, filled: true)
                         },
                         onGestureChanged: { gesture in
                             withAnimation(.easeInOut(duration: 0.15)) {
                                 activeGesture = gesture
                             }
+                        },
+                        onTouchesChanged: { points in
+                            dots.setTouches(points)
                         }
                     ),
                     sensitivity: settings.pointerSensitivity,
@@ -102,36 +110,6 @@ struct TrackpadView: View {
                     Spacer()
                 }
                 .allowsHitTesting(false)
-
-                // ── Ripple effect on tap ──────────────────────────────
-                if let pos = ripplePos, rippleVisible {
-                    Circle()
-                        .fill(DeckHandTheme.Brand.ray.opacity(0.3))
-                        .frame(width: 60, height: 60)
-                        // Fade in place under Reduce Motion instead of expanding.
-                        .scaleEffect(reduceMotion ? 1 : (rippleVisible ? 2.0 : 0.5))
-                        .opacity(rippleVisible ? 0 : 1)
-                        .position(pos)
-                        .allowsHitTesting(false)
-                        .onAppear {
-                            withAnimation(.easeOut(duration: 0.4)) {
-                                rippleVisible = false
-                            }
-                        }
-                }
-
-                // Finger guide dots (decoration)
-                VStack {
-                    Spacer()
-                    HStack(spacing: 6) {
-                        ForEach(0..<3) { _ in
-                            Circle()
-                                .fill(Color.primary.opacity(0.1))
-                                .frame(width: 5, height: 5)
-                        }
-                    }
-                    .padding(.bottom, 14)
-                }
             }
             .environment(\.colorScheme, .dark)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -189,16 +167,6 @@ struct TrackpadView: View {
                 .padding(.bottom, 16)
         }
         .background(bg)
-    }
-
-    // MARK: - Ripple
-
-    private func triggerRipple(at pos: CGPoint) {
-        rippleVisible = false
-        ripplePos = pos
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
-            rippleVisible = true
-        }
     }
 }
 
