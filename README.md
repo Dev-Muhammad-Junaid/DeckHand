@@ -34,7 +34,9 @@ turn that on.
 **Apps and shortcuts.** Browse and launch installed apps, see what is running in
 Cmd-Tab order, and get per-app shortcut chips. Deck Hand reads the frontmost
 app's menu bar over Accessibility, so the chips reflect that app's real
-shortcuts instead of a hard-coded list.
+shortcuts instead of a hard-coded list. A row of dots under a chip lights as the
+shortcut goes out and turns mint when the Mac confirms it, or red if it can't act
+on it.
 
 **Context-aware actions.** When a dialog or sheet is up on the Mac, its buttons
 appear on the remote as chips, so "Don't Save / Cancel / Save" is one tap away
@@ -84,8 +86,35 @@ format cannot drift between them. A few details worth knowing:
   the Mac is missing a permission instead of letting taps fail silently.
 - **Optional fields decode with defaults**, which is how capture quality was
   added without breaking older builds.
+- **Shortcuts are confirmed, without breaking older builds.** A host that supports
+  receipts says so in `hostFeatures` when a session starts. Only then does the
+  remote wrap shortcut and dialog-button commands in `tracked`, and the host
+  answers each with a `commandReceipt` once it has handed the command to input
+  injection. An older host never receives a message it can't run, and an older
+  remote ignores the announcement.
 
 The wire format has contract tests. If you change `ControlMessage`, run them.
+
+## Design
+
+Every brand color comes from a part of the app icon, and each has one job:
+
+| Color | Used for |
+| --- | --- |
+| Cobalt | The one action color: buttons, selection, tint (`AccentColor` in both apps) |
+| Screen navy | Surfaces that are always dark: first run, the picker, the trackpad |
+| Cyan glow | Live activity with the Mac: touches, searching, connecting |
+| Mint | Connected and approved |
+| Pixel violet | The hand's fill, inside dot art only |
+
+The icon's dot matrix carries into the apps, and lit dots always mean the remote
+is talking to the Mac. The trackpad lights under your fingers, the picker scans
+for Macs, and the approval card's hand rearranges into a check or a cross. The
+Mac's menu bar item is the same dot hand, in ready, request and connected states.
+The colors live in `DeckHand/Shared/DeckHandTheme.swift`, the pixel art in
+`DeckHand/Shared/PixelArt.swift`, and animation timings in
+`DeckHand/Shared/DeckHandMotion.swift`, which match the website's. Every effect
+holds still under Reduce Motion.
 
 ## Requirements
 
@@ -169,10 +198,12 @@ Foundation Models work.
 DeckHand/
   DeckHandMac/     macOS host: capture, input injection, Accessibility, menu bar
   DeckHandiOS/     iPad/iPhone remote: trackpad, mirror, capture UI, settings
-  Shared/          ControlMessage and every type that crosses the wire
+  Shared/          ControlMessage, every type that crosses the wire, and the
+                   shared theme, pixel art and motion
   DeckHandTests/   Wire-format contract tests
   Scripts/         App icon generation
   project.yml      XcodeGen project definition
+website/           Marketing site and waitlist (see website/README.md)
 Sources/           The Loom Swift package
 Tests/             Loom package tests
 ```
