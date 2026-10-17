@@ -4,8 +4,17 @@
    Every size is in SwiftUI points: {N} compiles to calc(N * var(--pt)), and each
    mock root sets --pt from its own design width so the UI scales with its frame. */
 
-.ui { --violet: #6C63FF; --violet-soft: #A78BFA; --indigo: #818CF8; --emerald: #10B981; --mint: #34D399; --sky: #38BDF8;
-  --success: #22C55E; --warning: #F59E0B; --danger: #EF4444; --brand-ink: #07070F; --brand-raised: #10101E; --glow: #7C5CFF; --glow-soft: #6E86FF; --brand-mint: #3DE0B0;
+.ui {
+  /* Brand, from DeckHandTheme.Brand: fixed colors sampled from the app icon. Cobalt is the one action
+     color, cyan glow is live activity with the Mac, mint is connected, and pixel violet is the hand's
+     fill (dot art only, never a control). */
+  --cobalt: #3A4CF2; --cobalt-high: #5466FF; --sky: #86B4FF;
+  --screen: #060A2A; --screen-high: #1C2C80; --screen-raised: #0E1540;
+  --phosphor: #EFFFFC; --glow: #3DE0E0; --ray: #9FF6FF; --pixel-violet: #8E70FF; --brand-mint: #3DE0B0;
+  --dot-off: rgba(80, 100, 210, 0.22);
+  --tile-gradient: linear-gradient(135deg, var(--sky), var(--cobalt-high));
+  --action-gradient: linear-gradient(var(--cobalt-high), var(--cobalt));
+  --screen-gradient: linear-gradient(135deg, var(--screen-raised), var(--screen));
   --rounded: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, sans-serif;
   --sf: -apple-system, "SF Pro Text", "Inter", system-ui, sans-serif;
   --sfmono: ui-monospace, "SF Mono", "Google Sans Code", Menlo, monospace;
@@ -13,13 +22,16 @@
   font-family: var(--sf); color: var(--c-primary); background: var(--c-canvas); }
 .ui *, .ui *::before, .ui *::after { box-sizing: border-box; }
 .ui svg { display: block; flex: none; }
+/* --c-tint is AccentColor (DeckHandTheme.accent); --success/--warning/--danger are the status pairs. */
 .ui-dark { --c-canvas: #0A0A0F; --c-primary: #ffffff; --c-secondary: rgba(235, 235, 245, 0.6); --c-tertiary: rgba(235, 235, 245, 0.3);
-  --c-tint: #0A84FF; --c-red: #FF453A; --c-seg: rgba(118, 118, 128, 0.24); --c-seg-sel: #636366; --c-track-fill: rgba(255, 255, 255, 0.06);
-  --c-track-shadow: rgba(0, 0, 0, 0.3); --c-bar: rgba(255, 255, 255, 0.06); --c-bar-border: rgba(255, 255, 255, 0.09); --c-well: rgba(255, 255, 255, 0.07);
+  --c-tint: #5466FF; --success: #3DE0B0; --warning: #FFB547; --danger: #FF4D5E;
+  --c-seg: rgba(118, 118, 128, 0.24); --c-seg-sel: #636366; --c-track-shadow: rgba(0, 0, 0, 0.3);
+  --c-bar: rgba(255, 255, 255, 0.06); --c-bar-border: rgba(255, 255, 255, 0.09); --c-well: rgba(255, 255, 255, 0.07);
   --c-divider: rgba(255, 255, 255, 0.07); --c-press: 0.15; }
 .ui-light { --c-canvas: #F2F2F7; --c-primary: #000000; --c-secondary: rgba(60, 60, 67, 0.6); --c-tertiary: rgba(60, 60, 67, 0.3);
-  --c-tint: #007AFF; --c-red: #FF3B30; --c-seg: rgba(118, 118, 128, 0.12); --c-seg-sel: #ffffff; --c-track-fill: #ffffff;
-  --c-track-shadow: rgba(0, 0, 0, 0.07); --c-bar: rgba(120, 120, 128, 0.2); --c-bar-border: rgba(0, 0, 0, 0.06); --c-well: rgba(0, 0, 0, 0.07);
+  --c-tint: #3A4CF2; --success: #0B7A6C; --warning: #A35F00; --danger: #D92D3F;
+  --c-seg: rgba(118, 118, 128, 0.12); --c-seg-sel: #ffffff; --c-track-shadow: rgba(6, 10, 42, 0.22);
+  --c-bar: rgba(120, 120, 128, 0.2); --c-bar-border: rgba(0, 0, 0, 0.06); --c-well: rgba(0, 0, 0, 0.07);
   --c-divider: rgba(0, 0, 0, 0.08); --c-press: 0.10; }
 .pa { color: color-mix(in srgb, var(--c-primary) var(--a, 100%), transparent); }
 
@@ -36,7 +48,7 @@
 
 /* ---------- Status + nav bars ---------- */
 .ui-col { position: absolute; inset: 0; display: flex; flex-direction: column; }
-.sbar { height: calc(24 * var(--pt)); flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 calc(20 * var(--pt)); font: 600 calc(12 * var(--pt))/1 var(--sf); color: var(--c-primary); }
+.sbar { height: calc(24 * var(--pt)); flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 calc(20 * var(--pt)); font: 600 calc(12 * var(--pt))/1 var(--sf); color: var(--c-primary); white-space: nowrap; }
 .sbar--phone { height: calc(54 * var(--pt)); padding: calc(6 * var(--pt)) calc(32 * var(--pt)) 0 calc(44 * var(--pt)); font-size: calc(16 * var(--pt)); }
 .sbar__r { display: flex; align-items: center; gap: calc(6 * var(--pt)); }
 .sbar__r svg { height: calc(11 * var(--pt)); width: auto; }
@@ -44,13 +56,14 @@
 .anav__title { position: absolute; left: 50%; top: 50%; translate: -50% -50%; display: flex; flex-direction: column; align-items: center; gap: calc(2 * var(--pt)); white-space: nowrap; }
 .anav__name { font: 600 calc(17 * var(--pt))/1.1 var(--sf); color: var(--c-primary); }
 .anav__status { display: flex; align-items: center; gap: calc(4 * var(--pt)); font: 400 calc(11 * var(--pt))/1.1 var(--sf); color: var(--c-secondary); }
-.anav__dot { width: calc(6 * var(--pt)); height: calc(6 * var(--pt)); border-radius: 50%; background: var(--success); }
+/* LivePixel: the icon's mint pixel as the live light. */
+.anav__dot { width: calc(6 * var(--pt)); height: calc(6 * var(--pt)); border-radius: calc(1.5 * var(--pt)); background: var(--success); box-shadow: 0 0 calc(4 * var(--pt)) color-mix(in srgb, var(--success) 55%, transparent); }
 .anav__session { font: 400 calc(9 * var(--pt))/1 var(--sfmono); color: var(--c-tertiary); }
 .anav__btn { color: var(--c-tint); display: flex; align-items: center; gap: calc(3 * var(--pt)); }
 .anav__btn svg { width: calc(22 * var(--pt)); height: calc(22 * var(--pt)); }
 .anav__btn svg.sm { width: calc(9 * var(--pt)); height: calc(9 * var(--pt)); }
-.anav__btn--violet { color: var(--violet); }
-.anav__btn--red { color: var(--c-red); }
+.anav__btn--live { color: var(--success); }
+.anav__btn--red { color: var(--danger); }
 .phone .anav { gap: calc(16 * var(--pt)); padding: 0 calc(16 * var(--pt)); height: calc(44 * var(--pt)); }
 .phone .anav__title { left: calc(20 * var(--pt)); translate: 0 -50%; align-items: flex-start; }
 .phone .anav__name { font-size: calc(16 * var(--pt)); }
@@ -64,20 +77,24 @@
 
 /* ---------- Trackpad tab ---------- */
 .tp-tab { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
-.surface { flex: 1; min-height: 0; margin: calc(16 * var(--pt)) calc(20 * var(--pt)) 0; position: relative; border-radius: calc(28 * var(--pt)); background: var(--c-track-fill);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-primary) 9%, transparent), 0 calc(8 * var(--pt)) calc(16 * var(--pt)) var(--c-track-shadow); overflow: hidden; }
+/* The surface is the icon's dark screen in both appearances, and everything on it renders dark. */
+.surface { flex: 1; min-height: 0; margin: calc(16 * var(--pt)) calc(20 * var(--pt)) 0; position: relative; border-radius: calc(28 * var(--pt)); overflow: hidden;
+  --c-primary: #ffffff; --c-secondary: rgba(235, 235, 245, 0.6);
+  background: radial-gradient(circle calc(720 * var(--pt)) at 50% 15%, #111A55 0%, var(--screen) 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09), 0 calc(8 * var(--pt)) calc(16 * var(--pt)) var(--c-track-shadow); }
+/* DotField's resting grid: 2.4pt dots on a 15pt pitch, anchored at the top-left so lit dots line up. */
+.surface::before { content: ""; position: absolute; inset: 0; pointer-events: none; background-position: 0 0; background-size: calc(15 * var(--pt)) calc(15 * var(--pt));
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 15 15'%3E%3Crect x='6.3' y='6.3' width='2.4' height='2.4' rx='.77' fill='rgba(80,100,210,.22)'/%3E%3C/svg%3E"); }
+.surface__lit { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
 .surface__hint { position: absolute; top: calc(12 * var(--pt)); right: calc(12 * var(--pt)); display: flex; flex-direction: column; align-items: flex-end; gap: calc(4 * var(--pt)); }
 .surface__hint b { font: 600 calc(13 * var(--pt))/1.1 var(--rounded); color: color-mix(in srgb, var(--c-secondary) 70%, transparent); }
 .surface__hint small { font: 500 calc(9 * var(--pt))/1.1 var(--sf); color: color-mix(in srgb, var(--c-secondary) 45%, transparent); white-space: pre; }
 .gcap { position: absolute; top: calc(12 * var(--pt)); left: calc(12 * var(--pt)); display: flex; align-items: center; gap: calc(6 * var(--pt)); padding: calc(6 * var(--pt)) calc(10 * var(--pt)); border-radius: 99px;
-  background: color-mix(in srgb, var(--c-primary) 8%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-primary) 8%, transparent);
-  font: 600 calc(11 * var(--pt))/1 var(--rounded); color: color-mix(in srgb, var(--c-primary) 80%, transparent); }
-.ui-dark .gcap { background: rgba(255, 255, 255, 0.10); }
-.gcap svg { width: calc(12 * var(--pt)); height: calc(12 * var(--pt)); color: var(--g, var(--violet)); }
-.ripple { position: absolute; width: calc(60 * var(--pt)); height: calc(60 * var(--pt)); margin: calc(-30 * var(--pt)) 0 0 calc(-30 * var(--pt)); border-radius: 50%; background: color-mix(in srgb, var(--violet) 35%, transparent); }
-.ripple--fade { scale: 1.7; opacity: 0.35; }
+  background: rgba(255, 255, 255, 0.10); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  font: 600 calc(11 * var(--pt))/1 var(--rounded); color: rgba(255, 255, 255, 0.8); }
+.gcap svg { width: calc(12 * var(--pt)); height: calc(12 * var(--pt)); color: var(--g, var(--glow)); }
 .surface__dots { position: absolute; left: 50%; bottom: calc(14 * var(--pt)); translate: -50% 0; display: flex; gap: calc(6 * var(--pt)); }
-.surface__dots i { width: calc(5 * var(--pt)); height: calc(5 * var(--pt)); border-radius: 50%; background: color-mix(in srgb, var(--c-primary) 10%, transparent); }
+.surface__dots i { width: calc(5 * var(--pt)); height: calc(5 * var(--pt)); border-radius: 50%; background: rgba(255, 255, 255, 0.1); }
 
 .sens { flex: none; padding: calc(8 * var(--pt)) calc(28 * var(--pt)) 0; display: flex; flex-direction: column; gap: calc(2 * var(--pt)); }
 .sens__row { display: flex; align-items: center; gap: calc(8 * var(--pt)); color: var(--c-secondary); }
@@ -93,9 +110,10 @@
 .gbtn { height: calc(62 * var(--pt)); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(5 * var(--pt)); border-radius: calc(14 * var(--pt)); }
 .gbtn svg { width: calc(30 * var(--pt)); height: calc(28 * var(--pt)); color: color-mix(in srgb, var(--g) 80%, transparent); }
 .gbtn span { font: 500 calc(8.5 * var(--pt))/1 var(--rounded); color: color-mix(in srgb, var(--c-secondary) 80%, transparent); white-space: nowrap; }
-.gbtn.on { background: color-mix(in srgb, var(--emerald) calc(var(--c-press) * 100%), transparent); scale: 0.95; }
-.gbtn.on svg, .gbtn.on span { color: var(--emerald); }
-.gbtn--scroll svg { color: color-mix(in srgb, var(--emerald) 60%, transparent); }
+/* Every gesture is an action (accent); only the Scroll toggle is a state, in mint. */
+.gbtn.on { background: color-mix(in srgb, var(--success) calc(var(--c-press) * 100%), transparent); scale: 0.95; }
+.gbtn.on svg, .gbtn.on span { color: var(--success); }
+.gbtn--scroll svg { color: color-mix(in srgb, var(--success) 60%, transparent); }
 
 /* ---------- Live mirror ---------- */
 .mirror2 { position: absolute; border-radius: calc(10 * var(--pt)); overflow: hidden; background: #000;
@@ -129,15 +147,15 @@
   color: color-mix(in srgb, var(--c-primary) 85%, transparent); }
 .qedit svg { width: calc(14 * var(--pt)); height: calc(14 * var(--pt)); }
 .qedit span { font: 500 calc(9 * var(--pt))/1.1 var(--rounded); color: color-mix(in srgb, var(--c-primary) 70%, transparent); }
-.qedit--go { background: var(--violet); color: #fff; }
+.qedit--go { background: var(--c-tint); color: #fff; }
 .qedit--go span { color: #fff; }
-.qinfo { flex: none; width: calc(36 * var(--pt)); height: calc(36 * var(--pt)); display: grid; place-items: center; color: var(--violet); }
+.qinfo { flex: none; width: calc(36 * var(--pt)); height: calc(36 * var(--pt)); display: grid; place-items: center; color: var(--c-tint); }
 .qinfo svg { width: calc(17 * var(--pt)); height: calc(17 * var(--pt)); }
 .qspacer { flex: 1; }
 .qdlg { flex: none; padding: calc(10 * var(--pt)) calc(12 * var(--pt)); border-radius: calc(8 * var(--pt)); font: 500 calc(12 * var(--pt))/1 var(--rounded); background: var(--c-well); color: var(--c-primary);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-primary) 8%, transparent); display: flex; align-items: center; gap: calc(6 * var(--pt)); }
 .qdlg--cancel { background: transparent; color: var(--c-secondary); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-primary) 14%, transparent); }
-.qdlg--default { background: var(--violet); color: #fff; font-weight: 600; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--violet) 80%, transparent); }
+.qdlg--default { background: var(--c-tint); color: #fff; font-weight: 600; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-tint) 80%, transparent); }
 .qdlg--default small { font-size: calc(10 * var(--pt)); opacity: 0.7; }
 .qhead { font: 600 calc(11 * var(--pt))/1 var(--sf); color: color-mix(in srgb, var(--c-secondary) 70%, transparent); padding: calc(12 * var(--pt)) calc(24 * var(--pt)) calc(10 * var(--pt)); }
 
@@ -149,14 +167,14 @@
 .atile { display: flex; flex-direction: column; align-items: center; gap: calc(8 * var(--pt)); font: 500 calc(11 * var(--pt))/1.2 var(--rounded); color: var(--c-secondary); text-align: center; }
 .atile i { width: calc(52 * var(--pt)); height: calc(52 * var(--pt)); border-radius: calc(12 * var(--pt)); display: block; box-shadow: 0 calc(2 * var(--pt)) calc(4 * var(--pt)) rgba(0, 0, 0, 0.2); position: relative; }
 .atile.front { color: var(--c-primary); font-weight: 600; }
-.atile.front i::after { content: ""; position: absolute; inset: calc(-3 * var(--pt)); border-radius: calc(14 * var(--pt)); box-shadow: 0 0 0 calc(2.5 * var(--pt)) var(--violet), 0 0 calc(6 * var(--pt)) color-mix(in srgb, var(--violet) 55%, transparent); }
+.atile.front i::after { content: ""; position: absolute; inset: calc(-3 * var(--pt)); border-radius: calc(14 * var(--pt)); box-shadow: 0 0 0 calc(2.5 * var(--pt)) var(--c-tint), 0 0 calc(6 * var(--pt)) color-mix(in srgb, var(--c-tint) 55%, transparent); }
 
 /* ---------- Screenshot preview ---------- */
 .shot { background: #000; }
 .shot__img { position: absolute; left: 0; right: 0; top: 50%; translate: 0 -55%; aspect-ratio: 16 / 10; }
 .shot__img .mac { position: absolute; inset: 0; }
 .shot__x { position: absolute; top: calc(16 * var(--pt)); right: calc(20 * var(--pt)); width: calc(28 * var(--pt)); height: calc(28 * var(--pt)); color: rgba(255, 255, 255, 0.7); z-index: 2; }
-.shot__badge { position: absolute; top: calc(20 * var(--pt)); left: calc(20 * var(--pt)); font: 600 calc(10 * var(--pt))/1 var(--sf); color: rgba(255, 204, 0, 0.9); background: rgba(255, 204, 0, 0.18); padding: calc(4 * var(--pt)) calc(8 * var(--pt)); border-radius: 99px; }
+.shot__badge { position: absolute; top: calc(20 * var(--pt)); left: calc(20 * var(--pt)); font: 600 calc(10 * var(--pt))/1 var(--sf); color: var(--sky); background: rgba(134, 180, 255, 0.18); padding: calc(4 * var(--pt)) calc(8 * var(--pt)); border-radius: 99px; }
 .shot__bar { position: absolute; left: 0; right: 0; bottom: 0; padding: calc(12 * var(--pt)) calc(16 * var(--pt)) calc(20 * var(--pt)); display: grid; grid-template-columns: repeat(5, 1fr);
   background: rgba(40, 40, 46, 0.72); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
 .shot__bar span { display: flex; flex-direction: column; align-items: center; gap: calc(6 * var(--pt)); padding: calc(8 * var(--pt)) 0; font: 500 calc(10 * var(--pt))/1 var(--rounded); color: rgba(255, 255, 255, 0.65); }
@@ -166,22 +184,24 @@
 .ink { position: absolute; inset: 0; width: 100%; height: 100%; }
 
 /* ---------- Peer picker (always dark, brand background) ---------- */
+/* DeckHandTheme.brandBackground(): the icon's navy screen, a cobalt bloom just above center and the mint pixel's cast. */
 .picker { background:
-    radial-gradient(107% 49% at 50% 34%, rgba(124, 92, 255, 0.30) 0%, rgba(124, 92, 255, 0.06) 51%, transparent 100%),
-    radial-gradient(66% 30.5% at 92% 8%, rgba(61, 224, 176, 0.14) 0%, transparent 100%),
-    var(--brand-ink); --c-primary: #fff; color: #fff; }
+    radial-gradient(circle calc(420 * var(--pt)) at 50% 34%, rgba(58, 76, 242, 0.34) 2%, rgba(58, 76, 242, 0.08) 51%, transparent 100%),
+    radial-gradient(circle calc(260 * var(--pt)) at 92% 8%, rgba(61, 224, 176, 0.12) 2%, transparent 100%),
+    var(--screen); --c-primary: #fff; color: #fff; }
 .picker__gear { position: absolute; top: calc(66 * var(--pt)); right: calc(22 * var(--pt)); width: calc(40 * var(--pt)); height: calc(40 * var(--pt)); border-radius: 50%; background: rgba(255, 255, 255, 0.06); display: grid; place-items: center; color: rgba(255, 255, 255, 0.55); }
 .picker__gear svg { width: calc(16 * var(--pt)); height: calc(16 * var(--pt)); }
 .picker__col { position: absolute; inset: calc(54 * var(--pt)) 0 0; display: flex; flex-direction: column; justify-content: center; }
 .picker__head { display: flex; flex-direction: column; align-items: center; gap: calc(26 * var(--pt)); padding: calc(32 * var(--pt)) 0 calc(40 * var(--pt)); text-align: center; }
-.picker__mark { width: calc(132 * var(--pt)); height: calc(132 * var(--pt)); border-radius: calc(30 * var(--pt)); box-shadow: 0 0 calc(40 * var(--pt)) rgba(124, 92, 255, 0.45); }
+.picker__mark { width: calc(132 * var(--pt)); height: calc(132 * var(--pt)); border-radius: calc(30 * var(--pt)); box-shadow: 0 0 calc(42 * var(--pt)) rgba(58, 76, 242, 0.55); }
 .picker__title { font: 600 calc(34 * var(--pt))/1.1 var(--rounded); color: #fff; }
 .picker__sub { margin-top: calc(8 * var(--pt)); font: 400 calc(16 * var(--pt))/1.2 var(--rounded); color: rgba(255, 255, 255, 0.55); }
 .peers { display: flex; flex-direction: column; gap: calc(10 * var(--pt)); padding: 0 calc(22 * var(--pt)); }
 .peer { display: flex; align-items: center; gap: calc(15 * var(--pt)); padding: calc(15 * var(--pt)) calc(16 * var(--pt)); border-radius: calc(20 * var(--pt));
-  background: linear-gradient(135deg, var(--brand-raised), var(--brand-ink)); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09); }
-.peer--busy { box-shadow: inset 0 0 0 1px rgba(124, 92, 255, 0.55), 0 0 calc(18 * var(--pt)) rgba(124, 92, 255, 0.32); }
-.peer__icon { width: calc(44 * var(--pt)); height: calc(44 * var(--pt)); border-radius: calc(13 * var(--pt)); background: rgba(124, 92, 255, 0.16); display: grid; place-items: center; }
+  background: var(--screen-gradient); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09); }
+/* Connecting is live activity with the Mac: a cyan stroke and bloom. */
+.peer--busy { box-shadow: inset 0 0 0 1px rgba(61, 224, 224, 0.55), 0 0 calc(18 * var(--pt)) rgba(61, 224, 224, 0.32); }
+.peer__icon { width: calc(44 * var(--pt)); height: calc(44 * var(--pt)); border-radius: calc(13 * var(--pt)); background: rgba(58, 76, 242, 0.22); display: grid; place-items: center; }
 .peer__icon svg { width: calc(22 * var(--pt)); height: calc(20 * var(--pt)); }
 .peer__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: calc(4 * var(--pt)); }
 .peer__name { display: flex; align-items: center; gap: calc(8 * var(--pt)); font: 600 calc(16 * var(--pt))/1.1 var(--rounded); color: #fff; white-space: nowrap; }
@@ -195,31 +215,38 @@
 
 /* ---------- Mac menu bar popover ---------- */
 .mpop { --pt: calc(100cqw / 270); container-type: inline-size; width: 100%; border-radius: 14px; overflow: hidden; font-family: var(--sf); color: #fff;
-  background: rgba(36, 34, 46, 0.86); -webkit-backdrop-filter: blur(30px) saturate(1.6); backdrop-filter: blur(30px) saturate(1.6);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), inset 0 0 0 0.5px rgba(255, 255, 255, 0.18); --sec: rgba(235, 235, 245, 0.6); --ter: rgba(235, 235, 245, 0.3); }
+  background: rgba(30, 32, 46, 0.86); -webkit-backdrop-filter: blur(30px) saturate(1.6); backdrop-filter: blur(30px) saturate(1.6);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), inset 0 0 0 0.5px rgba(255, 255, 255, 0.18); --sec: rgba(235, 235, 245, 0.6); --ter: rgba(235, 235, 245, 0.3);
+  --c-tint: #5466FF; --success: #3DE0B0; --warning: #FFB547; --danger: #FF4D5E; }
 .mpop__head { display: flex; align-items: center; gap: calc(10 * var(--pt)); padding: calc(12 * var(--pt)) calc(16 * var(--pt)); }
-.mpop__logo { width: calc(36 * var(--pt)); height: calc(36 * var(--pt)); border-radius: 50%; background: linear-gradient(135deg, #6C63FF, #A78BFA); display: grid; place-items: center; color: #fff; }
-.mpop__logo svg { width: calc(17 * var(--pt)); height: calc(17 * var(--pt)); }
+/* The header mark: the icon's tile with the pixel hand in white dots. */
+.mpop__logo { width: calc(36 * var(--pt)); height: calc(36 * var(--pt)); border-radius: calc(9 * var(--pt)); background: linear-gradient(135deg, var(--cobalt-high), var(--cobalt)); display: grid; place-items: center;
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.2); }
+.mpop__logo svg { width: calc(25.5 * var(--pt)); height: calc(27 * var(--pt)); }
 .mpop__head b { display: block; font: 700 calc(14 * var(--pt))/1.15 var(--sf); }
 .mpop__head small { display: block; margin-top: calc(2 * var(--pt)); font: 400 calc(11 * var(--pt))/1.1 var(--sf); color: var(--sec); }
 .mpop__div { height: 1px; background: rgba(255, 255, 255, 0.1); margin: 0 calc(10 * var(--pt)); }
 .mpop__h { padding: calc(10 * var(--pt)) calc(16 * var(--pt)) calc(2 * var(--pt)); font: 600 calc(10 * var(--pt))/1 var(--sf); color: var(--sec); }
-.mpop__h--warn { color: #FF9F0A; }
-.mrow { display: flex; align-items: center; gap: calc(8 * var(--pt)); padding: calc(6 * var(--pt)) calc(16 * var(--pt)); }
+.mpop__h--warn { color: var(--warning); }
+.mrow { display: flex; flex-wrap: wrap; align-items: center; gap: calc(8 * var(--pt)); padding: calc(6 * var(--pt)) calc(16 * var(--pt)); }
 .mrow__icon { width: calc(24 * var(--pt)); display: grid; place-items: center; }
 .mrow__icon svg { width: calc(16 * var(--pt)); height: calc(16 * var(--pt)); }
 .mrow__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: calc(1 * var(--pt)); }
 .mrow__text b { font: 600 calc(12 * var(--pt))/1.2 var(--sf); }
-.mrow__text span { font: 400 calc(10 * var(--pt))/1.2 var(--sf); color: var(--sec); }
+.mrow__text span { font: 400 calc(10 * var(--pt))/1.2 var(--sf); color: var(--sec); white-space: nowrap; }
 .mrow__text small { font: 400 calc(10 * var(--pt))/1.2 var(--sf); color: var(--ter); }
 .mrow__text code { font: 400 calc(9 * var(--pt))/1.2 var(--sfmono); color: var(--ter); }
-.mrow__acts { display: flex; gap: calc(6 * var(--pt)); }
-.mrow__acts svg { width: calc(17 * var(--pt)); height: calc(17 * var(--pt)); }
+/* Their own line, as in the app, so a long device name never shares the row. */
+.mrow__acts { display: flex; gap: calc(4 * var(--pt)); width: 100%; justify-content: flex-end; }
+.mbtn { padding: calc(3 * var(--pt)) calc(5.5 * var(--pt)); border-radius: calc(5 * var(--pt)); font: 500 calc(10 * var(--pt))/1.15 var(--sf); white-space: nowrap; }
+.mbtn--allow { background: var(--c-tint); color: #fff; box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.25); }
+.mbtn--deny { background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.85); box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.16); }
 .mperm { display: flex; align-items: center; gap: calc(8 * var(--pt)); padding: calc(5 * var(--pt)) calc(16 * var(--pt)); }
 .mperm svg { width: calc(13 * var(--pt)); height: calc(13 * var(--pt)); flex: none; }
 .mperm div { flex: 1; display: flex; flex-direction: column; gap: calc(1 * var(--pt)); }
 .mperm b { font: 500 calc(12 * var(--pt))/1.2 var(--sf); }
 .mperm span { font: 400 calc(10 * var(--pt))/1.2 var(--sf); color: var(--sec); }
+.mperm .mperm__fix { flex: none; font: 500 calc(11 * var(--pt))/1 var(--sf); color: var(--c-tint); }
 .mpop__quit { padding: calc(8 * var(--pt)) calc(16 * var(--pt)) calc(10 * var(--pt)); font: 400 calc(12 * var(--pt))/1 var(--sf); color: var(--sec); }
 
 /* Official app icons, when present, replace the tinted fallback tile. macOS
@@ -233,15 +260,16 @@
 
 /* ---------- macOS desktop (1440x900 mac points) ---------- */
 .mac { --mp: calc(100cqw / 1440); position: relative; width: 100%; height: 100%; container-type: inline-size; overflow: hidden; font-family: -apple-system, "SF Pro Text", "Inter", system-ui, sans-serif; letter-spacing: 0; text-align: left;
-  background: radial-gradient(80% 60% at 70% 110%, #f2b9a3 0%, transparent 60%), radial-gradient(70% 70% at 15% 0%, #3a3fb8 0%, transparent 70%), linear-gradient(170deg, #1d1f5e 0%, #5a54c9 48%, #b98fd6 78%, #f1c1ae 100%); }
+  /* Wallpaper: the site's night sky, navy through cobalt to a pale sky horizon. */
+  background: radial-gradient(80% 60% at 70% 110%, #cfe0ff 0%, transparent 60%), radial-gradient(70% 70% at 15% 0%, #2f44de 0%, transparent 70%), linear-gradient(170deg, #0b1450 0%, #2f44de 48%, #6f9cf5 78%, #c6dcff 100%); }
 .mac svg { display: block; flex: none; }
-.mac__bar { height: calc(30 * var(--mp)); display: flex; align-items: center; gap: calc(18 * var(--mp)); padding: 0 calc(16 * var(--mp)); color: #fff; font-size: calc(13 * var(--mp)); font-weight: 400; background: rgba(20, 18, 50, 0.18); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+.mac__bar { height: calc(30 * var(--mp)); display: flex; align-items: center; gap: calc(18 * var(--mp)); padding: 0 calc(16 * var(--mp)); color: #fff; font-size: calc(13 * var(--mp)); font-weight: 400; background: rgba(6, 10, 42, 0.18); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
 .mac__bar > svg:first-child { width: calc(14 * var(--mp)); height: calc(17 * var(--mp)); margin-right: calc(4 * var(--mp)); }
 .mac__bar b { font-weight: 700; }
 .mac__bar > svg:not(:first-child) { width: calc(16 * var(--mp)); height: calc(16 * var(--mp)); }
 .mac__sp { flex: 1; }
 .mac__win { position: absolute; left: calc(110 * var(--mp)); top: calc(62 * var(--mp)); width: calc(1220 * var(--mp)); height: calc(800 * var(--mp)); border-radius: calc(18 * var(--mp)); overflow: hidden; display: flex; background: #fff;
-  box-shadow: 0 calc(30 * var(--mp)) calc(80 * var(--mp)) rgba(10, 8, 40, 0.42), 0 0 0 calc(0.5 * var(--mp)) rgba(0, 0, 0, 0.25); }
+  box-shadow: 0 calc(30 * var(--mp)) calc(80 * var(--mp)) rgba(6, 10, 42, 0.42), 0 0 0 calc(0.5 * var(--mp)) rgba(0, 0, 0, 0.25); }
 .mac__side { width: calc(250 * var(--mp)); flex: none; background: #ececf0; border-right: calc(1 * var(--mp)) solid #dcdce0; padding: calc(16 * var(--mp)) calc(10 * var(--mp)); }
 .mac__lights { display: flex; gap: calc(8 * var(--mp)); padding: calc(2 * var(--mp)) calc(8 * var(--mp)) calc(20 * var(--mp)); }
 .mac__lights i { width: calc(13 * var(--mp)); height: calc(13 * var(--mp)); border-radius: 50%; background: #ff5f57; box-shadow: inset 0 0 0 calc(0.5 * var(--mp)) rgba(0, 0, 0, 0.15); }

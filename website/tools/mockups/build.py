@@ -68,11 +68,10 @@ S = {
  'bubble-x': '<path fill="currentColor" stroke="none" d="M4.5 3h15A2.5 2.5 0 0122 5.5v9a2.5 2.5 0 01-2.5 2.5H12l-5 4v-4H4.5A2.5 2.5 0 012 14.5v-9A2.5 2.5 0 014.5 3z"/><path d="M12 6.5v4.6M12 13.6v.2" stroke="#fff" stroke-width="2.3"/>',
  'desktop': '<rect x="2" y="3" width="20" height="13.5" rx="2.2"/><path d="M9 21h6M12 16.5V21"/>',
  'chev-r': '<path d="M9 5l7 7-7 7" stroke-width="2.6"/>',
- 'check-fill': '<circle cx="12" cy="12" r="10.5" fill="currentColor" stroke="none"/><path d="M7.4 12.4l3 3 6.1-6.6" stroke="#25232f" stroke-width="2.4"/>',
- 'xc-fill': '<circle cx="12" cy="12" r="10.5" fill="currentColor" stroke="none"/><path d="M8.6 8.6l6.8 6.8M15.4 8.6l-6.8 6.8" stroke="#25232f" stroke-width="2.4"/>',
- 'warn-fill': '<path fill="currentColor" stroke="none" d="M10.3 3.4a2 2 0 013.4 0l9 15.6a2 2 0 01-1.7 3H3a2 2 0 01-1.7-3z"/><path d="M12 9v5M12 17.4v.2" stroke="#25232f" stroke-width="2.4"/>',
+ 'check-fill': '<circle cx="12" cy="12" r="10.5" fill="currentColor" stroke="none"/><path d="M7.4 12.4l3 3 6.1-6.6" stroke="#1e2030" stroke-width="2.4"/>',
+ 'xc-fill': '<circle cx="12" cy="12" r="10.5" fill="currentColor" stroke="none"/><path d="M8.6 8.6l6.8 6.8M15.4 8.6l-6.8 6.8" stroke="#1e2030" stroke-width="2.4"/>',
+ 'warn-fill': '<path fill="currentColor" stroke="none" d="M10.3 3.4a2 2 0 013.4 0l9 15.6a2 2 0 01-1.7 3H3a2 2 0 01-1.7-3z"/><path d="M12 9v5M12 17.4v.2" stroke="#1e2030" stroke-width="2.4"/>',
  'ipad': '<rect x="4.5" y="2.5" width="15" height="19" rx="2.6"/><path d="M11 18.6h2"/>',
- 'rays': '<path d="M10 9v12l3-3 2.4 4.6 1.9-1-2.3-4.4h4.3z" fill="currentColor"/><path d="M5.5 7.5L7.6 9M8.4 3.8l.7 2.6M3.5 12.2l2.5-.4M14 3.5l-.8 2.4M18.4 6.6l-2 1.5"/>',
  'search': '<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/>',
  'grid33': '<g fill="currentColor" stroke="none"><rect x="3" y="3" width="5" height="5" rx="1.2"/><rect x="9.5" y="3" width="5" height="5" rx="1.2"/><rect x="16" y="3" width="5" height="5" rx="1.2"/><rect x="3" y="9.5" width="5" height="5" rx="1.2"/><rect x="9.5" y="9.5" width="5" height="5" rx="1.2"/><rect x="16" y="9.5" width="5" height="5" rx="1.2"/><rect x="3" y="16" width="5" height="5" rx="1.2"/><rect x="9.5" y="16" width="5" height="5" rx="1.2"/><rect x="16" y="16" width="5" height="5" rx="1.2"/></g>',
  'back': '<path fill="currentColor" stroke="none" d="M11.5 6v12L3 12zM21.5 6v12L13 12z"/>',
@@ -81,7 +80,7 @@ S = {
  'chevdown-sm': '<path d="M6 9.5l6 6 6-6" stroke-width="2.6"/>',
  'antenna': '<circle cx="12" cy="11" r="2"/><path d="M8 7a5.6 5.6 0 000 8M16 7a5.6 5.6 0 010 8M5 4.5a9.5 9.5 0 000 13M19 4.5a9.5 9.5 0 010 13M12 13v8"/>',
 }
-SPRITE = '<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><filter id="dotglow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="1.4" result="b"/><feFlood flood-color="#3de0e0" flood-opacity=".9"/><feComposite in2="b" operator="in" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter><linearGradient id="litg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9E7BFF"/><stop offset=".5" stop-color="#7C5CFF"/><stop offset="1" stop-color="#6E86FF"/></linearGradient></defs>' + \
+SPRITE = '<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><filter id="dotglow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="1.4" result="b"/><feFlood flood-color="#3de0e0" flood-opacity=".9"/><feComposite in2="b" operator="in" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter><linearGradient id="litg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#86B4FF"/><stop offset="1" stop-color="#5466FF"/></linearGradient></defs>' + \
     ''.join(f'<symbol id="i-{k}" viewBox="0 0 24 24" fill="none" stroke="currentColor">{v}</symbol>' for k, v in S.items()) + \
     '<symbol id="i-battery" viewBox="0 0 28 13" fill="none" stroke="currentColor"><rect x="1" y="1" width="22.5" height="11" rx="3.2" opacity=".4" stroke-width="1.2"/><rect x="3" y="3" width="18.5" height="7" rx="1.6" fill="currentColor" stroke="none"/><path d="M26 4.8v3.4" stroke-width="1.6" opacity=".5"/></symbol></svg>'
 
@@ -96,7 +95,7 @@ MAC = macmod.desktop()
 APPS = {  # slug, fallback tint (shown until website/tools/fetch-apple-assets.sh adds the real icon)
  'Xcode': ('xcode', '#5ac8fa,#007aff'), 'Keynote': ('keynote', '#7fc8ff,#1f6fe5'), 'Pages': ('pages', '#ffcf8a,#ff9500'),
  'Numbers': ('numbers', '#7ee08a,#22a447'), 'Final Cut Pro': ('final-cut-pro', '#4a4a52,#1c1c22'), 'Logic Pro': ('logic-pro', '#5b5b66,#24242b'),
- 'Pixelmator Pro': ('pixelmator-pro', '#ff9b7a,#a259ff'), 'Slack': ('slack', '#c79cff,#7c3aed'),
+ 'Pixelmator Pro': ('pixelmator-pro', '#ff9b7a,#a259ff'), 'Slack': ('slack', '#7a3d7c,#4a154b'),
 }
 def appi(name):
     slug, tint = APPS[name]
@@ -110,19 +109,19 @@ def status_bar(phone=False):
     return f'<div class="sbar"><span>9:41&nbsp;&nbsp;Thu Oct 9</span><span class="sbar__r">{ic("wifi")}<span>100%</span><svg style="width:calc(25*var(--pt));height:calc(12*var(--pt))" aria-hidden="true"><use href="#i-battery"/></svg></span></div>'
 
 def nav_bar(mac, app, mirror_on=True):
-    mirror = f'<span class="anav__btn nav__btn--violet">{ic("mirror-fill")}</span>' if mirror_on else f'<span class="anav__btn">{ic("mirror")}</span>'
+    mirror = f'<span class="anav__btn anav__btn--live">{ic("mirror-fill")}</span>' if mirror_on else f'<span class="anav__btn">{ic("mirror")}</span>'
     return (f'<div class="anav"><div class="anav__title"><span class="anav__name">{mac}</span>'
             f'<span class="anav__status"><i class="anav__dot"></i>{app}</span><span class="anav__session">session 3F2A9C1B</span></div>'
             f'{mirror}<span class="anav__btn">{ic("viewfinder")}{ic("chev-down","sm")}</span>'
-            f'<span class="anav__btn">{ic("gear")}</span><span class="anav__btn nav__btn--red">{ic("minus-circle")}</span></div>')
+            f'<span class="anav__btn">{ic("gear")}</span><span class="anav__btn anav__btn--red">{ic("minus-circle")}</span></div>')
 
 def seg(tab='trackpad'):
     a = ' class="on"' if tab == 'trackpad' else ''
     b = ' class="on"' if tab == 'apps' else ''
     return f'<div class="seg"><span{a}>{ic("hand")}Trackpad</span><span{b}>{ic("grid32")}Apps</span></div><div class="hair"></div>'
 
-GESTURES = [('Scroll','scroll','var(--emerald)'),('Left Click','click','var(--violet)'),('Right Click','click2','var(--violet-soft)'),
-            ('Double Click','click-clock','var(--indigo)'),('Locate','scope','var(--violet)'),('Mission','mission','var(--sky)'),('Desktop','menubar','var(--mint)')]
+GESTURES = [('Scroll','scroll','var(--success)'),('Left Click','click','var(--c-tint)'),('Right Click','click2','var(--c-tint)'),
+            ('Double Click','click-clock','var(--c-tint)'),('Locate','scope','var(--c-tint)'),('Mission','mission','var(--c-tint)'),('Desktop','menubar','var(--c-tint)')]
 def gesture_bar(scroll_on=False):
     out = '<div class="gbar">'
     for i,(label,icon,col) in enumerate(GESTURES):
@@ -139,25 +138,73 @@ def mirror(style, chevrons=True):
     ch = (f'{ic("chevl-dark","mirror2__chev mirror2__chev--l")}{ic("chevr-dark","mirror2__chev mirror2__chev--r")}' if chevrons else '')
     return f'<div class="mirror2" style="{style}">{MAC}{ic("x-dark","mirror2__x")}{ch}</div>'
 
-def surface(capsule=None, ripple=None, hint='Trackpad'):
+def n(v):
+    return f'{v:.2f}'.rstrip('0').rstrip('.')
+
+def dot_path(centers, side, fill, opacity=1.0):
+    """Rounded squares (corner radius 0.3 x side) as a single path: each is an inner
+    square plus a round-joined stroke, drawn with group opacity so they don't double up."""
+    r = side * 0.3; inner = side - 2 * r
+    d = ''.join(f'M{n(x - inner / 2)} {n(y - inner / 2)}h{n(inner)}v{n(inner)}h-{n(inner)}z' for x, y in centers)
+    op = f' opacity="{n(opacity)}"' if opacity < 1 else ''
+    return f'<path d="{d}" fill="{fill}" stroke="{fill}" stroke-width="{n(2 * r)}" stroke-linejoin="round"{op}/>'
+
+# DotField (DeckHandiOS/DotField.swift): a resting grid on a 15pt pitch, and dots
+# within REACH of a finger lit phosphor/ray with a cyan bloom. Positions are in
+# points from the surface's top-left; the resting grid is ui.css's .surface::before.
+PITCH, DOT, REACH = 15, 2.4, 70
+HALO = 3.2  # bloom radius at zero energy; a little wider than the app's so it survives the downscale
+
+def lit_dots(touches, trail=()):
+    """touches: [(x, y)]; trail: [(x, y, fade)] afterglow behind a moving finger."""
+    energy = {}
+    def light(px, py, scale):
+        c0, c1 = int((px - REACH) // PITCH), int((px + REACH) // PITCH) + 1
+        r0, r1 = int((py - REACH) // PITCH), int((py + REACH) // PITCH) + 1
+        for r in range(max(0, r0), r1 + 1):
+            for c in range(max(0, c0), c1 + 1):
+                cx, cy = PITCH / 2 + c * PITCH, PITCH / 2 + r * PITCH
+                d = ((cx - px) ** 2 + (cy - py) ** 2) ** 0.5
+                if d < REACH:
+                    e = (1 - d / REACH) ** 1.5 * scale
+                    if e > energy.get((c, r), 0): energy[(c, r)] = e
+    for x, y in touches: light(x, y, 1)
+    for x, y, fade in trail: light(x, y, fade * 0.75)
+    if not energy: return ''
+    cells = [(c, r, e) for (c, r), e in energy.items() if e > 0.02]
+    x0 = min(c for c, _, _ in cells) * PITCH; y0 = min(r for _, r, _ in cells) * PITCH
+    x1 = (max(c for c, _, _ in cells) + 1) * PITCH; y1 = (max(r for _, r, _ in cells) + 1) * PITCH
+    # Energy is bucketed in 0.05 steps so dots of one brightness share a path.
+    halos, cores = {}, {}
+    for c, r, e in cells:
+        q = round(e / 0.05) * 0.05
+        center = (PITCH / 2 + c * PITCH - x0, PITCH / 2 + r * PITCH - y0)
+        if e > 0.35: halos.setdefault(q, []).append(center)
+        cores.setdefault((q, '#EFFFFC' if e > 0.6 else '#9FF6FF'), []).append(center)
+    glow = ''.join(
+        f'<path fill-opacity="{n(0.3 * q)}" d="' + ''.join(
+            f'M{n(x - HALO * (1 + q))} {n(y)}a{n(HALO * (1 + q))} {n(HALO * (1 + q))} 0 1 0 {n(2 * HALO * (1 + q))} 0a{n(HALO * (1 + q))} {n(HALO * (1 + q))} 0 1 0 {n(-2 * HALO * (1 + q))} 0z'
+            for x, y in pts_) + '"/>' for q, pts_ in sorted(halos.items()))
+    dots = ''.join(dot_path(pts_, DOT + q * 2.4, fill, 0.35 + 0.65 * q) for (q, fill), pts_ in sorted(cores.items()))
+    w, h = x1 - x0, y1 - y0
+    return (f'<svg class="surface__lit" style="left:{{{x0}}};top:{{{y0}}};width:{{{w}}};height:{{{h}}}" viewBox="0 0 {w} {h}" aria-hidden="true">'
+            f'<g fill="#3DE0E0">{glow}</g>{dots}</svg>')
+
+def surface(capsule=None, touches=(), trail=(), hint='Trackpad'):
     cap = ''
     if capsule:
         label, icon, col = capsule
         cap = f'<span class="gcap" style="--g:{col}">{ic(icon)}{label}</span>'
-    rip = ''
-    if ripple:
-        x, y = ripple
-        rip = f'<span class="ripple ripple--fade" style="left:{x};top:{y}"></span><span class="ripple" style="left:{x};top:{y}"></span>'
-    return (f'<div class="surface">{cap}<div class="surface__hint"><b>{hint}</b>'
-            f'<small>Tap • Left  |  Hold • Right  |  2F • Scroll  |  3F • Spaces</small></div>{rip}'
+    return (f'<div class="surface">{lit_dots(touches, trail)}{cap}<div class="surface__hint"><b>{hint}</b>'
+            f'<small>Tap • Left  |  Hold • Right  |  2F • Scroll  |  3F • Spaces</small></div>'
             f'<div class="surface__dots"><i></i><i></i><i></i></div></div>')
 
-def trackpad_screen(theme, mac, app, phone=False, capsule=None, ripple=None, scroll_on=False, mirror_style=None, hint='Trackpad'):
+def trackpad_screen(theme, mac, app, phone=False, capsule=None, touches=(), trail=(), scroll_on=False, mirror_style=None, hint='Trackpad'):
     mir = mirror(mirror_style) if mirror_style else ''
     island = '<span class="island"></span>' if phone else ''
     return (f'<div class="ui ui-{theme}{" phone" if phone else ""}">{island}<div class="ui-col">{status_bar(phone)}'
             f'{nav_bar(mac, app, mirror_on=bool(mirror_style))}{seg()}'
-            f'<div class="tp-tab">{surface(capsule, ripple, hint)}{sensitivity()}{gesture_bar(scroll_on)}{mir}</div></div></div>')
+            f'<div class="tp-tab">{surface(capsule, touches, trail, hint)}{sensitivity()}{gesture_bar(scroll_on)}{mir}</div></div></div>')
 
 def chips(items):
     return '<div class="qchips">' + ''.join(f'<span class="qchip"><b>{k}</b><span>{n}</span></span>' for k, n in items) + '</div>'
@@ -181,13 +228,17 @@ def qab_edit(app):
 XCODE = [('⌘B','Build'),('⌘R','Run'),('⌘.','Stop'),('⌘⇧K','Clean Build'),('⌘⇧O','Open Quickly'),('⌘⇧F','Find in Workspace')]
 
 # ---------- Screens ----------
-HERO = ('<div class="dev-ipad" role="img" aria-label="Deck Hand on an iPad in dark mode: the Trackpad tab with a tap ripple, the sensitivity slider, '
-        'the gesture bar, and the live mirror of the Mac expanded in the corner.">'
-        + trackpad_screen('dark', 'Junaid’s MacBook Pro', 'Xcode', capsule=('Cursor','hand','var(--violet)'), ripple=('27%','44%'),
+HERO = ('<div class="dev-ipad" role="img" aria-label="Deck Hand on an iPad in dark mode: the Trackpad tab with dots lit under a finger moving the cursor, '
+        'the sensitivity slider, the gesture bar, and the live mirror of the Mac expanded in the corner.">'
+        + trackpad_screen('dark', 'Junaid’s MacBook Pro', 'Xcode', capsule=('Cursor','hand','var(--glow)'),
+                          touches=[(318, 236)], trail=[(301, 250, 0.8), (284, 264, 0.6), (267, 278, 0.4), (250, 292, 0.2)],
                           mirror_style='right:{16};bottom:{96};width:{470};aspect-ratio:16/10') + '</div>')
 
-PHONE_TP = ('<div class="dev-iphone" role="img" aria-label="Deck Hand on an iPhone in light mode, scrolling with two fingers: the Scroll button is lit and the trackpad shows a Scrolling badge.">'
-            + trackpad_screen('light', 'Studio Mac', 'Safari', phone=True, capsule=('Scrolling','updown','var(--emerald)'), scroll_on=True, hint='Scroll Mode') + '</div>')
+PHONE_TP = ('<div class="dev-iphone" role="img" aria-label="Deck Hand on an iPhone in light mode, scrolling with two fingers: dots light up under both fingers on the dark trackpad, '
+            'which shows a Scrolling badge, and the Scroll button is lit.">'
+            + trackpad_screen('light', 'Studio Mac', 'Safari', phone=True, capsule=('Scrolling','updown','var(--brand-mint)'), scroll_on=True, hint='Scroll Mode',
+                              touches=[(136, 262), (214, 250)],
+                              trail=[(136, 280, 0.75), (214, 268, 0.75), (136, 298, 0.5), (214, 286, 0.5), (136, 316, 0.25), (214, 304, 0.25)]) + '</div>')
 
 MIRROR_IPAD = ('<div class="dev-ipad" role="img" aria-label="The live mirror pinched up to most of the iPad screen, with arrows to switch Spaces on the Mac.">'
                + trackpad_screen('dark', 'Junaid’s MacBook Pro', 'Xcode', mirror_style='left:{120};top:{150};width:{900};aspect-ratio:16/10') + '</div>')
@@ -224,16 +275,40 @@ PEERS = ('<div class="dev-iphone" role="img" aria-label="The Deck Hand picker on
          f'<div class="peer" style="opacity:.4"><span class="peer__icon"><svg aria-hidden="true" style="width:calc(22*var(--pt));height:calc(20*var(--pt))" stroke="url(#litg)" fill="none" stroke-width="2"><use href="#i-desktop"/></svg></span><span class="peer__text"><span class="peer__name">Studio Mac</span><span class="peer__where"><i></i>Nearby</span></span>{ic("chev-r","peer__chev")}</div>'
          f'</div></div><div class="picker__foot">{ic("wifi")}Both devices on the same Wi-Fi</div></div></div>')
 
-def perm(title, detail):
-    return f'<div class="mperm">{ic("check-fill","", "color:var(--success);width:calc(13*var(--pt));height:calc(13*var(--pt))")}<div><b>{title}</b><span>{detail}</span></div></div>'
-POPOVER = ('<div class="macbar" aria-hidden="true"><span class="macbar__item">' + ic('rays') + '</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="6" rx="3"/><circle cx="16" cy="8" r="1.6" fill="currentColor"/><rect x="3" y="13" width="18" height="6" rx="3"/><circle cx="8" cy="16" r="1.6" fill="currentColor"/></svg><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M2 9a14.5 14.5 0 0120 0M5.2 12.4a9.6 9.6 0 0113.6 0M8.6 15.8a4.8 4.8 0 016.8 0"/><circle cx="12" cy="19.2" r="1.5" fill="currentColor" stroke="none"/></svg><span class="macbar__time">9:41 AM</span></div>'
-           '<div class="mpop-wrap"><div class="mpop ui" role="img" aria-label="The Deck Hand menu on the Mac showing a pending request from Junaid’s iPad with approve and decline buttons, and all permissions granted.">'
-           f'<div class="mpop__head"><span class="mpop__logo">{ic("rays")}</span><div><b>Deck Hand</b><small>Ready to receive</small></div></div><div class="mpop__div"></div>'
+# The pointing hand from the icon (DeckHand/Shared/PixelArt.swift, PixelArt.hand):
+# X is the lit outline, o the violet fill. 17 x 18.
+HAND = [
+ ".....XX..........", "....XooX.........", "....XooX.........", "....XooX.........", "....XooX.........",
+ "....XooXXX.XX....", "....XooXooXooXX..", "....XooXooXooXoX.", ".XX.XooXooXooXoX.", "XooXXooXooXooXoX.",
+ "XoooXooooooooooX.", ".XooXooooooooooX.", "..XoooooooooooX..", "..XoooooooooooX..", "...XooooooooooX..",
+ "....XooooooooX...", "....XooooooooX...", "....XXXXXXXXXX...",
+]
+
+def pixel_mono(rows, color='#fff', fill_opacity=0.35, ratio=0.7):
+    """A bitmap in one color, the way the app draws template and status glyphs
+    (PixelPalette.solid): the outline at full strength, the fill faint."""
+    def cells(kind):
+        return [(x + 0.5, y + 0.5) for y, row in enumerate(rows) for x, ch in enumerate(row) if ch == kind]
+    return (f'<svg viewBox="0 0 {len(rows[0])} {len(rows)}" aria-hidden="true">'
+            + dot_path(cells('o'), ratio, color, fill_opacity) + dot_path(cells('X'), ratio, color) + '</svg>')
+
+def perm(title, detail, granted=True):
+    if granted:
+        icon = ic("check-fill", "", "color:var(--success)")
+        fix = ''
+    else:
+        icon = ic("warn-fill", "", "color:var(--warning)")
+        fix = '<span class="mperm__fix">Fix…</span>'
+    return f'<div class="mperm">{icon}<div><b>{title}</b><span>{detail}</span></div>{fix}</div>'
+POPOVER = ('<div class="macbar" aria-hidden="true"><span class="macbar__item">' + pixel_mono(HAND, fill_opacity=0.3, ratio=0.8) + '</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="6" rx="3"/><circle cx="16" cy="8" r="1.6" fill="currentColor"/><rect x="3" y="13" width="18" height="6" rx="3"/><circle cx="8" cy="16" r="1.6" fill="currentColor"/></svg><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M2 9a14.5 14.5 0 0120 0M5.2 12.4a9.6 9.6 0 0113.6 0M8.6 15.8a4.8 4.8 0 016.8 0"/><circle cx="12" cy="19.2" r="1.5" fill="currentColor" stroke="none"/></svg><span class="macbar__time">9:41 AM</span></div>'
+           '<div class="mpop-wrap"><div class="mpop ui" role="img" aria-label="The Deck Hand menu on the Mac: a pending request from Junaid’s iPad with Allow and Deny buttons, '
+           'Accessibility and Screen Recording granted, and Notifications turned off with a Fix link.">'
+           f'<div class="mpop__head"><span class="mpop__logo">{pixel_mono(HAND, fill_opacity=0.35)}</span><div><b>Deck Hand</b><small>Ready to receive</small></div></div><div class="mpop__div"></div>'
            '<div class="mpop__h mpop__h--warn">PENDING REQUESTS</div>'
-           f'<div class="mrow"><span class="mrow__icon" style="color:#F59E0B">{ic("ipad")}</span><span class="mrow__text"><b>Junaid’s iPad</b><span>Requesting mouse access</span><small>Pending 12 sec ago</small></span>'
-           f'<span class="mrow__acts"><span style="color:var(--success)">{ic("check-fill")}</span><span style="color:var(--danger)">{ic("xc-fill")}</span></span></div>'
+           f'<div class="mrow"><span class="mrow__icon" style="color:var(--warning)">{ic("ipad")}</span><span class="mrow__text"><b>Junaid’s iPad</b><span>Requesting mouse access</span><small>Pending 12 sec ago</small></span>'
+           '<span class="mrow__acts"><span class="mbtn mbtn--deny">Deny</span><span class="mbtn mbtn--allow">Allow</span></span></div>'
            '<div class="mpop__div" style="margin-top:calc(6*var(--pt))"></div><div class="mpop__h">PERMISSIONS</div>'
-           + perm('Accessibility','Mouse, keyboard, and dialog control') + perm('Screen Recording','Screenshots and live mirror') + perm('Notifications','Connection approval alerts') +
+           + perm('Accessibility','Mouse, keyboard, and dialog control') + perm('Screen Recording','Screenshots and live mirror') + perm('Notifications','Connection approval alerts', granted=False) +
            '<div class="mpop__div" style="margin-top:calc(6*var(--pt))"></div><div class="mpop__quit">Quit Deck Hand</div></div></div>')
 
 # ---------- Patch index.html ----------
@@ -301,7 +376,7 @@ def frame(cls, inner, extra=''):
 
 replace_element('<div class="device" role="img"', pts(HERO))
 replace_element('<ul class="verbs">', VERBS)
-replace_element('<div class="frame frame--violet reveal"', frame('frame--violet frame--phone', pts(PHONE_TP)))
+replace_element('<div class="frame frame--accent reveal"', frame('frame--accent frame--phone', pts(PHONE_TP)))
 replace_element('<div class="frame frame--teal reveal"', frame('frame--teal frame--ipad', pts(MIRROR_IPAD)))
 replace_element('<div class="frame frame--muted reveal"', frame('frame--muted frame--ipad', pts(CAPTURE)))
 replace_element('<div class="menu-arrow" aria-hidden="true">\n                <div class="menu">', BENTO_MENU)
