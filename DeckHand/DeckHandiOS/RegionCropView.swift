@@ -16,7 +16,7 @@
 //      Mac still has access to the native pixel grid.
 //
 //  Visual: white outline + white square handles (with a 1pt black inner
-//  stroke for visibility on light backgrounds). Brand violet only appears
+//  stroke for visibility on light backgrounds). Brand cobalt only appears
 //  on the "Capture region" affordance.
 //
 
@@ -184,7 +184,7 @@ struct RegionCropView: View {
                     .padding(.horizontal, 18)
                     .padding(.vertical, 12)
                     .background(
-                        Capsule().fill(canConfirm ? DeckHandTheme.violet : Color.gray.opacity(0.5))
+                        Capsule().fill(canConfirm ? DeckHandTheme.Brand.cobalt : Color.gray.opacity(0.5))
                     )
             }
             .disabled(!canConfirm)

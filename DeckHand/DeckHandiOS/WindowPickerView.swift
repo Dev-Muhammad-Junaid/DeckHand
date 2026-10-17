@@ -130,9 +130,9 @@ struct WindowPickerView: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
                     .background(
-                        Capsule().fill(DeckHandTheme.violet.opacity(0.18))
+                        Capsule().fill(DeckHandTheme.accent.opacity(0.18))
                     )
-                    .foregroundStyle(DeckHandTheme.violet)
+                    .foregroundStyle(DeckHandTheme.accent)
             }
             .buttonStyle(.plain)
         }

@@ -11,7 +11,7 @@ struct DeckHandLoadingStateView: View {
     var subtitle: String?
     var verticalPadding: CGFloat = 60
     var progressScale: CGFloat = 1.22
-    var progressTint: Color = DeckHandTheme.violet
+    var progressTint: Color = DeckHandTheme.accent
     var titleColor: Color = .secondary
     var subtitleColor: Color?
 

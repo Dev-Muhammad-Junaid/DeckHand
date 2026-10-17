@@ -272,7 +272,7 @@ struct ControlView: View {
                               ? "rectangle.fill.on.rectangle.fill"
                               : "rectangle.on.rectangle")
                     }
-                    .tint(isMirrorActive ? DeckHandTheme.violet : nil)
+                    .tint(isMirrorActive ? DeckHandTheme.mint : nil)
                     .accessibilityLabel(isMirrorActive ? "Stop live mirror" : "Start live mirror")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -305,7 +305,7 @@ struct ControlView: View {
                     Button(action: onDisconnect) {
                         Image(systemName: "minus.circle")
                     }
-                    .tint(.red)
+                    .tint(DeckHandTheme.danger)
                     .accessibilityLabel("Disconnect")
                 }
             }
@@ -892,7 +892,7 @@ private struct HostCapabilityBanner: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 13))
-                .foregroundStyle(.orange)
+                .foregroundStyle(DeckHandTheme.warning)
             Text(text)
                 .font(.system(size: 12))
                 .foregroundStyle(.primary)
@@ -901,7 +901,7 @@ private struct HostCapabilityBanner: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .background(.orange.opacity(0.12))
+        .background(DeckHandTheme.warning.opacity(0.12))
         .transition(.opacity)
     }
 }

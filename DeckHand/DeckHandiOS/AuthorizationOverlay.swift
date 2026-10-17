@@ -11,6 +11,7 @@ struct AuthorizationOverlay: View {
     let onDisconnect: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// True when the only sensible action is to dismiss the overlay (the
     /// connection is already gone). Drives both the button label and its
@@ -141,7 +142,7 @@ struct AuthorizationOverlay: View {
             Group {
                 if pulse {
                     Image(systemName: systemImage)
-                        .symbolEffect(.pulse, options: .repeating)
+                        .symbolEffect(.pulse, options: .repeating, isActive: !reduceMotion)
                 } else {
                     Image(systemName: systemImage)
                 }

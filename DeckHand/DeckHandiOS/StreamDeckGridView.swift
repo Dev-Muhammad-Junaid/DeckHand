@@ -330,8 +330,8 @@ private struct AppButton: View {
     private var activeRing: some View {
         if isActive {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(DeckHandTheme.violet, lineWidth: 2.5)
-                .shadow(color: DeckHandTheme.violet.opacity(0.55), radius: 6)
+                .strokeBorder(DeckHandTheme.accent, lineWidth: 2.5)
+                .shadow(color: DeckHandTheme.accent.opacity(0.55), radius: 6)
                 .padding(-3)
         }
     }

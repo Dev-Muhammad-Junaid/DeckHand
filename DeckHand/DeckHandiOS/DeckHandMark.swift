@@ -32,9 +32,9 @@ struct DeckHandMark: View {
         }
         .frame(width: size, height: size)
         .rotationEffect(.degrees(-7))
-        // The device sits on the dark brand canvas, so it gets a violet bloom
-        // rather than a drop shadow.
-        .shadow(color: DeckHandTheme.Brand.glow.opacity(0.45), radius: size * 0.16)
+        // The device sits on the dark brand canvas, so it gets a bloom in the
+        // icon's tile color rather than a drop shadow.
+        .shadow(color: DeckHandTheme.Brand.cobalt.opacity(0.55), radius: size * 0.16)
         .scaleEffect(hasAppeared ? 1 : 0.94)
         .opacity(hasAppeared ? 1 : 0)
         .onAppear {
@@ -214,7 +214,7 @@ private enum MarkArtwork {
             layer.fill(
                 screenPath,
                 with: .radialGradient(
-                    Gradient(colors: [Color(hex: "1C2C80"), Color(hex: "060A2A")]),
+                    Gradient(colors: [DeckHandTheme.Brand.screenHigh, DeckHandTheme.Brand.screen]),
                     center: CGPoint(x: 0, y: screen.minY + screen.height * 0.35),
                     startRadius: 0,
                     endRadius: screen.width * 0.8
@@ -226,8 +226,8 @@ private enum MarkArtwork {
                 glow.addFilter(.blur(radius: 7))
                 forEachDot { rect, kind in
                     switch kind {
-                    case .edge: glow.fill(dotPath(rect), with: .color(Color(hex: "3DE0E0")))
-                    case .mint: glow.fill(dotPath(rect.insetBy(dx: -3, dy: -3)), with: .color(Color(hex: "3DE0B0")))
+                    case .edge: glow.fill(dotPath(rect), with: .color(DeckHandTheme.Brand.glow))
+                    case .mint: glow.fill(dotPath(rect.insetBy(dx: -3, dy: -3)), with: .color(DeckHandTheme.Brand.mint))
                     default: break
                     }
                 }
@@ -236,10 +236,10 @@ private enum MarkArtwork {
             forEachDot { rect, kind in
                 let path = dotPath(rect)
                 switch kind {
-                case .edge: layer.fill(path, with: .color(Color(hex: "EFFFFC")))
-                case .fill: layer.fill(path, with: .color(Color(hex: "8E70FF")))
-                case .mint: layer.fill(path, with: .color(Color(hex: "3DE0B0")))
-                case .off: layer.fill(path, with: .color(Color(hex: "2B3C99").opacity(0.5)))
+                case .edge: layer.fill(path, with: .color(DeckHandTheme.Brand.phosphor))
+                case .fill: layer.fill(path, with: .color(DeckHandTheme.Brand.pixelViolet))
+                case .mint: layer.fill(path, with: .color(DeckHandTheme.Brand.mint))
+                case .off: layer.fill(path, with: .color(DeckHandTheme.Brand.dotOff))
                 case .nearRay, .farRay: break // drawn by `drawRays`
                 }
             }
@@ -270,14 +270,14 @@ private enum MarkArtwork {
                 glow.addFilter(.blur(radius: 7))
                 forEachDot { rect, kind in
                     if kind == .nearRay || kind == .farRay {
-                        glow.fill(dotPath(rect), with: .color(Color(hex: "3DE0E0").opacity(kind == .nearRay ? 1 : 0.7)))
+                        glow.fill(dotPath(rect), with: .color(DeckHandTheme.Brand.glow.opacity(kind == .nearRay ? 1 : 0.7)))
                     }
                 }
             }
             forEachDot { rect, kind in
                 switch kind {
-                case .nearRay: layer.fill(dotPath(rect), with: .color(Color(hex: "9FF6FF")))
-                case .farRay: layer.fill(dotPath(rect), with: .color(Color(hex: "9FF6FF").opacity(0.7)))
+                case .nearRay: layer.fill(dotPath(rect), with: .color(DeckHandTheme.Brand.ray))
+                case .farRay: layer.fill(dotPath(rect), with: .color(DeckHandTheme.Brand.ray.opacity(0.7)))
                 default: break
                 }
             }

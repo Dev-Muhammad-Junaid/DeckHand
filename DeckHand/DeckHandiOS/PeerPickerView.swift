@@ -285,7 +285,7 @@ private struct PeerCard: View {
             .padding(.vertical, 15)
             .background(
                 RoundedRectangle(cornerRadius: DeckHandTheme.Radius.xl, style: .continuous)
-                    .fill(DeckHandTheme.Brand.unlitTileGradient)
+                    .fill(DeckHandTheme.Brand.screenGradient)
                     .overlay(
                         RoundedRectangle(cornerRadius: DeckHandTheme.Radius.xl, style: .continuous)
                             .strokeBorder(
@@ -312,11 +312,11 @@ private struct PeerCard: View {
     private var icon: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .fill(DeckHandTheme.Brand.glow.opacity(0.16))
+                .fill(DeckHandTheme.Brand.cobalt.opacity(0.22))
                 .frame(width: 44, height: 44)
             Image(systemName: "desktopcomputer")
                 .font(.system(size: 20, weight: .regular))
-                .foregroundStyle(DeckHandTheme.Brand.litTileGradient)
+                .foregroundStyle(DeckHandTheme.Brand.tileGradient)
         }
     }
 }

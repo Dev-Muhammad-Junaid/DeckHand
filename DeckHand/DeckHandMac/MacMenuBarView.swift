@@ -80,7 +80,7 @@ struct MacMenuBarView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("PENDING REQUESTS")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(DeckHandTheme.warning)
                         .padding(.horizontal, 16)
                         .padding(.top, 10)
 
@@ -101,7 +101,7 @@ struct MacMenuBarView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "ipad.and.iphone")
                         .font(.system(size: 32))
-                        .foregroundStyle(DeckHandTheme.violet.opacity(0.7))
+                        .foregroundStyle(DeckHandTheme.accent.opacity(0.7))
                     Text("Waiting for Connection Request...")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.secondary)
@@ -239,7 +239,7 @@ private struct PermissionRow: View {
                 if status != .granted {
                     Text("Fix…")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(DeckHandTheme.violet)
+                        .foregroundStyle(DeckHandTheme.accent)
                 }
             }
             .padding(.horizontal, 16)
@@ -261,7 +261,7 @@ private struct PermissionRow: View {
     private var color: Color {
         switch status {
         case .granted: DeckHandTheme.success
-        case .denied: .orange
+        case .denied: DeckHandTheme.warning
         case .unknown: .secondary
         }
     }
@@ -281,7 +281,7 @@ private struct ConnectionRow: View {
             Image(systemName: deviceSystemImage)
                 .font(.system(size: 15, weight: .regular))
                 .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(DeckHandTheme.violet)
+                .foregroundStyle(DeckHandTheme.accent)
                 .frame(width: 24, alignment: .center)
             VStack(alignment: .leading, spacing: 1) {
                 Text(connection.peerName)
@@ -304,7 +304,7 @@ private struct ConnectionRow: View {
                     authManager.removeAndDisconnect(connection: connection, loomContext: loomContext)
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(DeckHandTheme.danger)
                         .font(.system(size: 14))
                 }
                 .buttonStyle(.plain)

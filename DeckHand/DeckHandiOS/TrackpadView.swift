@@ -14,27 +14,29 @@ struct TrackpadView: View {
     // Sensitivity lives in settings so the inline slider and the settings
     // page stay in step, and the choice survives relaunch.
     @EnvironmentObject private var settings: DeckHandSettings
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var scrollMode: Bool = false
     @State private var activeGesture: TrackpadGestureKind?
     @State private var ripplePos: CGPoint?
     @State private var rippleVisible = false
 
     private var bg: Color { DeckHandTheme.canvasBackground(colorScheme) }
-    private var surfaceFill: Color { DeckHandTheme.trackpadSurfaceFill(colorScheme) }
     private var surfaceShadowColor: Color {
-        colorScheme == .dark ? .black.opacity(0.3) : .black.opacity(0.07)
+        colorScheme == .dark ? .black.opacity(0.3) : DeckHandTheme.Brand.screen.opacity(0.22)
     }
 
     var body: some View {
         VStack(spacing: 0) {
             // ── Trackpad surface ──────────────────────────────────────
+            // Always the icon's dark screen, in both appearances, so the
+            // surface reads as a device rather than a page.
             ZStack {
                 // Background glass
-                RoundedRectangle(cornerRadius: DeckHandTheme.Radius.hero)
-                    .fill(surfaceFill)
+                RoundedRectangle(cornerRadius: DeckHandTheme.Radius.hero, style: .continuous)
+                    .fill(DeckHandTheme.trackpadSurface)
                     .overlay(
-                        RoundedRectangle(cornerRadius: DeckHandTheme.Radius.hero)
-                            .strokeBorder(Color.primary.opacity(0.09), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: DeckHandTheme.Radius.hero, style: .continuous)
+                            .strokeBorder(DeckHandTheme.Brand.tileStroke, lineWidth: 1)
                     )
                     .shadow(color: surfaceShadowColor, radius: 16, y: 8)
 
@@ -75,13 +77,13 @@ struct TrackpadView: View {
                     scrollMode: scrollMode,
                     naturalScrolling: settings.naturalScrolling
                 )
-                .clipShape(RoundedRectangle(cornerRadius: DeckHandTheme.Radius.hero))
+                .clipShape(RoundedRectangle(cornerRadius: DeckHandTheme.Radius.hero, style: .continuous))
 
                 // ── Gesture indicator (top-left corner) ──────────────
                 VStack {
                     HStack {
                         if let gesture = activeGesture {
-                            GestureIndicator(gesture: gesture, colorScheme: colorScheme)
+                            GestureIndicator(gesture: gesture, colorScheme: .dark)
                                 .transition(.opacity.combined(with: .scale(scale: 0.85)))
                         }
                         Spacer()
@@ -104,9 +106,10 @@ struct TrackpadView: View {
                 // ── Ripple effect on tap ──────────────────────────────
                 if let pos = ripplePos, rippleVisible {
                     Circle()
-                        .fill(DeckHandTheme.violet.opacity(0.35))
+                        .fill(DeckHandTheme.Brand.ray.opacity(0.3))
                         .frame(width: 60, height: 60)
-                        .scaleEffect(rippleVisible ? 2.0 : 0.5)
+                        // Fade in place under Reduce Motion instead of expanding.
+                        .scaleEffect(reduceMotion ? 1 : (rippleVisible ? 2.0 : 0.5))
                         .opacity(rippleVisible ? 0 : 1)
                         .position(pos)
                         .allowsHitTesting(false)
@@ -130,6 +133,7 @@ struct TrackpadView: View {
                     .padding(.bottom, 14)
                 }
             }
+            .environment(\.colorScheme, .dark)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.horizontal, 20)
             .padding(.top, 16)
@@ -252,9 +256,9 @@ private struct GestureIndicator: View {
 
     private var iconColor: Color {
         switch gesture {
-        case .cursor: DeckHandTheme.violet
-        case .scroll: DeckHandTheme.emerald
-        case .threeFingerSwipe: DeckHandTheme.sky
+        case .cursor: DeckHandTheme.Brand.glow
+        case .scroll: DeckHandTheme.Brand.mint
+        case .threeFingerSwipe: DeckHandTheme.Brand.sky
         }
     }
 }
@@ -271,25 +275,25 @@ struct GestureButtonBar: View {
             // Scroll mode toggle — highlighted when active
             ScrollToggleButton(isActive: $scrollMode, colorScheme: colorScheme)
 
-            GestureButton(label: "Left Click",   icon: "cursorarrow.click",              color: DeckHandTheme.violet, haptic: .medium, colorScheme: colorScheme) {
+            GestureButton(label: "Left Click",   icon: "cursorarrow.click",              color: DeckHandTheme.accent, haptic: .medium, colorScheme: colorScheme) {
                 Task { await sender.sendClick(.left) }
             }
-            GestureButton(label: "Right Click",  icon: "cursorarrow.click.2",            color: DeckHandTheme.violetSoft, haptic: .heavy,  colorScheme: colorScheme) {
+            GestureButton(label: "Right Click",  icon: "cursorarrow.click.2",            color: DeckHandTheme.accent, haptic: .heavy,  colorScheme: colorScheme) {
                 Task { await sender.sendClick(.right) }
             }
-            GestureButton(label: "Double Click", icon: "cursorarrow.click.badge.clock",  color: DeckHandTheme.indigo, haptic: .double, colorScheme: colorScheme) {
+            GestureButton(label: "Double Click", icon: "cursorarrow.click.badge.clock",  color: DeckHandTheme.accent, haptic: .double, colorScheme: colorScheme) {
                 Task { await sender.sendDoubleClick(.left) }
             }
-            // Locate / Find Cursor — pulses a violet crosshair on whichever
+            // Locate / Find Cursor — pulses a cobalt crosshair on whichever
             // Mac display currently holds the cursor. Helpful on multi-display
             // setups when the cursor is buried off-screen for the iPad user.
-            GestureButton(label: "Locate", icon: "scope", color: DeckHandTheme.violet, haptic: .selection, colorScheme: colorScheme) {
+            GestureButton(label: "Locate", icon: "scope", color: DeckHandTheme.accent, haptic: .selection, colorScheme: colorScheme) {
                 Task { await sender.locateCursor() }
             }
-            GestureButton(label: "Mission", icon: "macwindow.on.rectangle", color: DeckHandTheme.sky, haptic: .light, colorScheme: colorScheme) {
+            GestureButton(label: "Mission", icon: "macwindow.on.rectangle", color: DeckHandTheme.accent, haptic: .light, colorScheme: colorScheme) {
                 Task { await sender.sendMacro("missioncontrol_trigger") }
             }
-            GestureButton(label: "Desktop", icon: "menubar.rectangle",       color: DeckHandTheme.mint, haptic: .light, colorScheme: colorScheme) {
+            GestureButton(label: "Desktop", icon: "menubar.rectangle",       color: DeckHandTheme.accent, haptic: .light, colorScheme: colorScheme) {
                 Task { await sender.sendShortcut(["fn", "f11"]) }
             }
         }
@@ -312,18 +316,18 @@ private struct ScrollToggleButton: View {
                 Image(systemName: isActive ? "scroll.fill" : "scroll")
                     .font(.system(size: 28, weight: .thin))
                     .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(isActive ? DeckHandTheme.emerald : DeckHandTheme.emerald.opacity(0.6))
+                    .foregroundStyle(isActive ? DeckHandTheme.mint : DeckHandTheme.mint.opacity(0.6))
                     .frame(height: 34)
                 Text("Scroll")
                     .font(.system(size: 8.5, weight: .medium, design: .rounded))
-                    .foregroundStyle(isActive ? DeckHandTheme.emerald : Color.secondary.opacity(0.8))
+                    .foregroundStyle(isActive ? DeckHandTheme.mint : Color.secondary.opacity(0.8))
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
             .frame(height: 62)
             .background(
                 RoundedRectangle(cornerRadius: DeckHandTheme.Radius.md, style: .continuous)
-                    .fill(isActive ? DeckHandTheme.emerald.opacity(colorScheme == .dark ? 0.15 : 0.1) : Color.clear)
+                    .fill(isActive ? DeckHandTheme.mint.opacity(colorScheme == .dark ? 0.15 : 0.1) : Color.clear)
             )
             .scaleEffect(isActive ? 0.95 : 1.0)
         }

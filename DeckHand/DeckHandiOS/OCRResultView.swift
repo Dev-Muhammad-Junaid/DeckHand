@@ -69,7 +69,7 @@ struct OCRResultView: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(Capsule().fill(DeckHandTheme.violet.opacity(0.9)))
+                        .background(Capsule().fill(DeckHandTheme.accent.opacity(0.92)))
                         .padding(.top, 8)
                         .transition(.opacity)
                 }
@@ -112,7 +112,7 @@ struct OCRResultView: View {
             VStack(spacing: 12) {
                 Image(systemName: "exclamationmark.triangle")
                     .font(.system(size: 38, weight: .thin))
-                    .foregroundStyle(Color.orange)
+                    .foregroundStyle(DeckHandTheme.warning)
                 Text("OCR failed")
                     .font(.system(size: 16, weight: .semibold, design: .rounded))
                 Text(message)

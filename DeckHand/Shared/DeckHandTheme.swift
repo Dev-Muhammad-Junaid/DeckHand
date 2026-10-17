@@ -15,9 +15,16 @@ import AppKit
 
 // MARK: - Hex
 
-extension Color {
+/// sRGB components parsed from a hex string. Kept as plain values so the
+/// dynamic-color providers below can capture them without touching UI types.
+private struct HexRGBA: Sendable {
+    let red: Double
+    let green: Double
+    let blue: Double
+    let opacity: Double
+
     /// Parses `#RGB`, `#RRGGBB`, or `#RRGGBBAA` (with or without `#`).
-    init(hex: String) {
+    init(_ hex: String) {
         let h = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
         var i: UInt64 = 0
         Scanner(string: h).scanHexInt64(&i)
@@ -28,88 +35,160 @@ extension Color {
         case 8:  (a, r, g, b) = (i >> 24, i >> 16 & 0xFF, i >> 8 & 0xFF, i & 0xFF)
         default: (a, r, g, b) = (255, 0, 0, 0)
         }
-        self.init(
-            .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue: Double(b) / 255,
-            opacity: Double(a) / 255
-        )
+        red = Double(r) / 255
+        green = Double(g) / 255
+        blue = Double(b) / 255
+        opacity = Double(a) / 255
+    }
+}
+
+extension Color {
+    /// Parses `#RGB`, `#RRGGBB`, or `#RRGGBBAA` (with or without `#`).
+    init(hex: String) {
+        let c = HexRGBA(hex)
+        self.init(.sRGB, red: c.red, green: c.green, blue: c.blue, opacity: c.opacity)
+    }
+
+    /// A color that resolves to `light` or `dark` with the appearance it is
+    /// drawn in, including `.environment(\.colorScheme, …)` overrides.
+    init(light: String, dark: String) {
+        let l = HexRGBA(light)
+        let d = HexRGBA(dark)
+        #if canImport(UIKit)
+        self.init(uiColor: UIColor { traits in
+            let c = traits.userInterfaceStyle == .dark ? d : l
+            return UIColor(red: c.red, green: c.green, blue: c.blue, alpha: c.opacity)
+        })
+        #elseif canImport(AppKit)
+        self.init(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            let c = isDark ? d : l
+            return NSColor(srgbRed: c.red, green: c.green, blue: c.blue, alpha: c.opacity)
+        })
+        #else
+        self.init(.sRGB, red: l.red, green: l.green, blue: l.blue, opacity: l.opacity)
+        #endif
     }
 }
 
 // MARK: - Deck Hand design tokens
 
+/// Every brand color comes from a part of the app icon: a cobalt tile, a
+/// navy screen, and a pointing hand drawn in lit dots. The roles are fixed so
+/// a color always means the same thing:
+///
+/// - **Cobalt** (`accent`) is the one action color: buttons, selection, tint.
+/// - **Glow** (cyan) is live activity with the Mac: searching, connecting,
+///   touches on the trackpad, the cursor locator.
+/// - **Mint** (`success`) is connected and approved.
+/// - **Pixel violet** is the hand's fill and appears only inside dot art.
+///
+/// The master artwork is `website/brand/concept-b2-ipad.svg`; the website's
+/// `styles.css` uses the same values.
 enum DeckHandTheme {
 
-    // MARK: Brand (SF Symbol accents, ripples, Mac header)
+    // MARK: Accent and status
 
-    static let violet = Color(hex: "6C63FF")
-    static let violetSoft = Color(hex: "A78BFA")
-    static let indigo = Color(hex: "818CF8")
-    static let emerald = Color(hex: "10B981")
-    static let mint = Color(hex: "34D399")
-    static let sky = Color(hex: "38BDF8")
+    /// The action color. Matches `AccentColor` in both asset catalogs; use
+    /// this where a view needs the brand cobalt explicitly (fills behind white
+    /// text, selection rings). Light: 6.0:1 against white. Dark: lifted to
+    /// about 4.4:1 both as text on the dark canvas and behind white text,
+    /// the most one color can manage both ways.
+    static let accent = Color(light: "3A4CF2", dark: "5466FF")
+
+    /// The icon's mint pixel in dark mode, a deep teal in light mode so it
+    /// still reads on white.
+    static let mint = Color(light: "0B7A6C", dark: "3DE0B0")
+
     /// Connected / live / approved status — use everywhere instead of `Color.green`.
-    static let success = Color(hex: "22C55E")
+    static let success = mint
     /// Cautionary / pending status — use instead of bare `Color.orange`
-    /// (host-disconnected overlay, "requesting access" indicators, etc.).
-    static let warning = Color(hex: "F59E0B")
+    /// (host-disconnected overlay, missing permissions, requests waiting on
+    /// the Mac).
+    static let warning = Color(light: "A35F00", dark: "FFB547")
     /// Negative / blocked status — use instead of bare `Color.red`
-    /// (denied overlay, reject buttons, destructive accents).
-    static let danger = Color(hex: "EF4444")
+    /// (denied overlay, disconnect and remove buttons, destructive accents).
+    static let danger = Color(light: "D92D3F", dark: "FF4D5E")
 
     // MARK: Brand surface (sampled from the app icon)
 
-    /// The icon is a 3×3 grid of glass tiles on near-black, lit by a violet
-    /// core and one mint-outlined tile. These are those colors, so the
-    /// first-run surfaces read as an extension of the icon rather than a
-    /// different product.
+    /// Fixed colors from the icon itself. These don't adapt to appearance:
+    /// they're used on surfaces that are always dark (first run, the picker,
+    /// the trackpad) and in the mark's artwork.
     enum Brand {
-        /// Base canvas — near-black with a blue cast, not neutral grey.
-        static let ink = Color(hex: "07070F")
-        /// Slightly lifted ink for tiles and cards sitting on `ink`.
-        static let inkRaised = Color(hex: "10101E")
-        /// The violet core of the lit tile.
-        static let glow = Color(hex: "7C5CFF")
-        /// The cooler periwinkle the lit tile falls off into.
-        static let glowSoft = Color(hex: "6E86FF")
-        /// The mint outline on the top-right tile.
+        /// The icon's tile: the action color at full strength.
+        static let cobalt = Color(hex: "3A4CF2")
+        /// Cobalt lifted for hover, dark backgrounds and gradient tops.
+        static let cobaltHigh = Color(hex: "5466FF")
+        /// The pale top of the icon's tile gradient.
+        static let sky = Color(hex: "86B4FF")
+
+        /// Base canvas — the icon's screen glass, navy rather than neutral black.
+        static let screen = Color(hex: "060A2A")
+        /// The lit center of the screen glass.
+        static let screenHigh = Color(hex: "1C2C80")
+        /// Cards and tiles sitting on `screen`.
+        static let screenRaised = Color(hex: "0E1540")
+
+        /// A lit dot.
+        static let phosphor = Color(hex: "EFFFFC")
+        /// The cyan bloom around lit dots. Live activity with the Mac.
+        static let glow = Color(hex: "3DE0E0")
+        /// The tap rays above the fingertip.
+        static let ray = Color(hex: "9FF6FF")
+        /// The hand's fill. Dot art only, never a control.
+        static let pixelViolet = Color(hex: "8E70FF")
+        /// The mint pixel in the top-right of the screen.
         static let mint = Color(hex: "3DE0B0")
-        /// Hairline stroke on unlit glass tiles.
+        /// An unlit dot.
+        static let dotOff = Color(hex: "2B3C99").opacity(0.5)
+
+        /// Hairline stroke on cards sitting on `screen`.
         static let tileStroke = Color.white.opacity(0.09)
 
-        static var litTileGradient: LinearGradient {
+        /// The icon's tile, for symbols and accents on dark brand surfaces.
+        static var tileGradient: LinearGradient {
             LinearGradient(
-                colors: [Color(hex: "9E7BFF"), glow, glowSoft],
+                colors: [sky, cobaltHigh],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
         }
 
-        static var unlitTileGradient: LinearGradient {
+        /// Primary buttons on dark brand surfaces. Both stops keep white
+        /// text above 4.4:1.
+        static var actionGradient: LinearGradient {
             LinearGradient(
-                colors: [inkRaised, ink],
+                colors: [cobaltHigh, cobalt],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+
+        /// Cards and tiles on the brand background.
+        static var screenGradient: LinearGradient {
+            LinearGradient(
+                colors: [screenRaised, screen],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
         }
     }
 
-    /// Full-bleed brand background: near-black with the icon's two light
-    /// sources — a violet bloom just above center and a cooler mint cast in
-    /// the top-right corner.
+    /// Full-bleed brand background: the icon's navy screen with its two light
+    /// sources — a cobalt bloom just above center and the mint pixel's cast
+    /// in the top-right corner.
     static func brandBackground() -> some View {
         ZStack {
-            Brand.ink
+            Brand.screen
             RadialGradient(
-                colors: [Brand.glow.opacity(0.30), Brand.glow.opacity(0.06), .clear],
+                colors: [Brand.cobalt.opacity(0.34), Brand.cobalt.opacity(0.08), .clear],
                 center: UnitPoint(x: 0.5, y: 0.34),
                 startRadius: 8,
                 endRadius: 420
             )
             RadialGradient(
-                colors: [Brand.mint.opacity(0.14), .clear],
+                colors: [Brand.mint.opacity(0.12), .clear],
                 center: UnitPoint(x: 0.92, y: 0.08),
                 startRadius: 4,
                 endRadius: 260
@@ -223,20 +302,16 @@ enum DeckHandTheme {
         }
     }
 
-    static func trackpadSurfaceFill(_ scheme: ColorScheme) -> Color {
-        switch scheme {
-        case .dark: return .white.opacity(0.06)
-        case .light:
-            #if os(iOS)
-            return Color(UIColor.systemBackground)
-            #elseif os(macOS)
-            return Color(nsColor: .textBackgroundColor)
-            #else
-            return Color(white: 1)
-            #endif
-        @unknown default:
-            return .white.opacity(0.06)
-        }
+    /// The trackpad is the icon's screen in both appearances: a dark slab
+    /// that reads as a device, lit a little toward the top like the icon's
+    /// glass. Content on it is drawn with a forced dark color scheme.
+    static var trackpadSurface: RadialGradient {
+        RadialGradient(
+            colors: [Color(hex: "111A55"), Brand.screen],
+            center: UnitPoint(x: 0.5, y: 0.15),
+            startRadius: 0,
+            endRadius: 720
+        )
     }
 
     static func subtleWellFill(_ scheme: ColorScheme) -> Color {
@@ -259,25 +334,17 @@ enum DeckHandTheme {
     // MARK: Error banner
 
     static func errorBannerFill(_ scheme: ColorScheme) -> Color {
-        switch scheme {
-        case .dark: return Color.red.opacity(0.38)
-        case .light: return Color.red.opacity(0.14)
-        @unknown default: return Color.red.opacity(0.38)
-        }
+        danger.opacity(scheme == .dark ? 0.38 : 0.14)
     }
 
     static func errorBannerLabel(_ scheme: ColorScheme) -> Color {
-        switch scheme {
-        case .dark: return .white
-        case .light: return Color(red: 0.55, green: 0.1, blue: 0.12)
-        @unknown default: return .white
-        }
+        scheme == .dark ? .white : danger
     }
 
     // MARK: Mac menu bar
 
     static var headerGradientColors: [Color] {
-        [violet, violetSoft]
+        [Brand.cobaltHigh, Brand.cobalt]
     }
 
     // MARK: Status icons (auth overlay, pending dialog)
@@ -288,11 +355,12 @@ enum DeckHandTheme {
 
         /// Color pair (primary, secondary) for hierarchical SF Symbol
         /// rendering, keyed by the connection status string used by
-        /// `AuthorizationOverlay` and friends.
+        /// `AuthorizationOverlay` and friends. Waiting on the Mac is a normal
+        /// step, so it uses the accent rather than the warning color.
         static func colors(for status: String) -> (primary: Color, secondary: Color) {
             switch status {
             case "pending":
-                return (DeckHandTheme.violet,  DeckHandTheme.violet.opacity(0.45))
+                return (DeckHandTheme.accent,  DeckHandTheme.accent.opacity(0.45))
             case "host_disconnected":
                 return (DeckHandTheme.warning, DeckHandTheme.warning.opacity(0.5))
             case "denied":
@@ -316,11 +384,11 @@ enum DeckHandTheme {
     /// (`.glass` / `.glassProminent` on iOS 26+, `.bordered` /
     /// `.borderedProminent` on iOS 17). Only the active tint is opinionated.
     enum FAB {
-        /// Keyboard FAB matches brand violet.
-        static let keyboardTint: Color = DeckHandTheme.violet
-        /// Numeric FAB uses a complementary teal so the two toggles read
-        /// distinctly against the same surface.
-        static let numericTint:  Color = Color(hex: "0D9488")
+        /// Keyboard FAB uses the accent.
+        static let keyboardTint: Color = DeckHandTheme.accent
+        /// Numeric FAB uses a deep teal so the two toggles read distinctly
+        /// against the same surface. Dark enough to keep a white glyph legible.
+        static let numericTint:  Color = Color(hex: "0B7A6C")
     }
 
     // MARK: Typography (rounded matches picker / control chrome)

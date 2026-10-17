@@ -139,7 +139,7 @@ struct AppShortcutsSheet: View {
                             .font(.system(size: 13, weight: .medium, design: .rounded))
                         Spacer()
                     }
-                    .foregroundStyle(DeckHandTheme.violet)
+                    .foregroundStyle(DeckHandTheme.accent)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 10)
                     .background(DeckHandTheme.subtleWellFill(colorScheme))
@@ -340,10 +340,10 @@ struct AppShortcutsSheet: View {
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .background(
-                            Capsule().fill(DeckHandTheme.violet.opacity(0.15))
-                                .overlay(Capsule().strokeBorder(DeckHandTheme.violet.opacity(0.3), lineWidth: 1))
+                            Capsule().fill(DeckHandTheme.accent.opacity(0.15))
+                                .overlay(Capsule().strokeBorder(DeckHandTheme.accent.opacity(0.3), lineWidth: 1))
                         )
-                        .foregroundStyle(DeckHandTheme.violet)
+                        .foregroundStyle(DeckHandTheme.accent)
                 }
                 .disabled(isImporting)
             }
@@ -356,7 +356,7 @@ struct AppShortcutsSheet: View {
                     store.restoreCurated(for: app.bundleID)
                 }
                 .font(.system(size: 12, design: .rounded))
-                .foregroundStyle(DeckHandTheme.violet)
+                .foregroundStyle(DeckHandTheme.accent)
             }
         }
         .frame(maxWidth: .infinity)
@@ -424,7 +424,7 @@ private struct ShortcutCard: View {
                 Image(systemName: binding.sfSymbol)
                     .font(.system(size: 15, weight: .regular))
                     .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(DeckHandTheme.violet)
+                    .foregroundStyle(DeckHandTheme.accent)
                     .frame(width: 22, height: 22)
 
                 Text(label)
@@ -549,7 +549,7 @@ struct ShortcutEditor: View {
                 Section("Preview") {
                     HStack {
                         Image(systemName: sfSymbol.isEmpty ? "keyboard" : sfSymbol)
-                            .foregroundStyle(DeckHandTheme.violet)
+                            .foregroundStyle(DeckHandTheme.accent)
                         Text(previewBinding.displayName)
                             .font(.system(.body, design: .rounded))
                         Spacer()
