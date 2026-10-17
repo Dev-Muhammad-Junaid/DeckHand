@@ -525,6 +525,18 @@ struct ControlView: View {
                 }
                 continue
             }
+            // Feature flags and receipts only concern the sender actor; no
+            // UI state changes, so they skip the main-actor hop.
+            switch message {
+            case let .hostFeatures(commandReceipts):
+                await sender?.setHostSendsReceipts(commandReceipts)
+                continue
+            case let .commandReceipt(requestID, delivered):
+                await sender?.receivedReceipt(requestID: requestID, delivered: delivered)
+                continue
+            default:
+                break
+            }
             await MainActor.run {
                 switch message {
                 case .pong:

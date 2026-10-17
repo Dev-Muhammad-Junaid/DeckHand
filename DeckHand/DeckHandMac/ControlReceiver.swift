@@ -50,6 +50,9 @@ final class ControlReceiver {
             // Tell the remote up front what this host can actually do, so
             // it can explain missing permissions instead of failing silently.
             await self?.sendCapabilities(to: connectionHandle)
+            // And which protocol features it understands, so the remote only
+            // asks for delivery receipts from a host that sends them.
+            try? await connectionHandle.send(.hostFeatures(commandReceipts: true))
             await self?.consumeMessages(from: connectionHandle)
             // The message loop has ended (stream finished, task cancelled
             // by revocation, or liveness timeout). Stop any mirror stream
@@ -249,6 +252,19 @@ final class ControlReceiver {
         case .pong:
             break // host never receives pongs
 
+        case let .tracked(requestID, command):
+            // The decoder already rejects nested wrappers; this keeps the
+            // recursion to one level even if that ever changes.
+            if case .tracked = command { break }
+            await dispatch(command, handle: handle)
+            // Sent once the command is handed to injection. Slow commands
+            // (appShortcut, dialog presses) finish in their own tasks, so
+            // this confirms the Mac got it, not what the app did with it.
+            try? await handle.send(.commandReceipt(
+                requestID: requestID,
+                delivered: injector.isAccessibilityGranted
+            ))
+
         case .requestAuthorizationStatus:
             // Resync path: messages are only consumed for *authorized*
             // connections (DeviceAuthorizationManager gates the handoff),
@@ -264,7 +280,7 @@ final class ControlReceiver {
 
         case .authorizationStatus:
             break
-        case .screenshotData, .screenshotError, .activeAppUpdate, .appListResponse, .appMenuShortcutsResponse, .runningAppsUpdate, .uiContextUpdate, .windowListResponse, .mirrorFrame, .displayListUpdate, .hostCapabilities:
+        case .screenshotData, .screenshotError, .activeAppUpdate, .appListResponse, .appMenuShortcutsResponse, .runningAppsUpdate, .uiContextUpdate, .windowListResponse, .mirrorFrame, .displayListUpdate, .hostCapabilities, .hostFeatures, .commandReceipt:
             // Client-bound messages; host doesn't process them locally
             break
         }

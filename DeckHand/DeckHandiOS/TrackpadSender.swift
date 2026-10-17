@@ -8,6 +8,18 @@ import LoomKit
 import os
 import QuartzCore
 
+/// What became of a command sent with `TrackpadSender.sendConfirmed(_:)`.
+enum CommandDelivery: Sendable, Equatable {
+    /// Sent to a host that doesn't send receipts; nothing more is known.
+    case sent
+    /// The Mac received it and handed it to input injection.
+    case confirmed
+    /// The Mac received it but couldn't act (Accessibility isn't granted).
+    case failed
+    /// No receipt arrived in time.
+    case timedOut
+}
+
 /// Actor that owns the active connection handle and throttles outgoing control messages.
 /// Tuned for buttery-smooth 120 Hz trackpad input on iPad Pro (ProMotion).
 actor TrackpadSender {
@@ -55,6 +67,14 @@ actor TrackpadSender {
     // path doesn't flood Console.
     private var mouseSendCount: UInt64 = 0
     private var lastSendErrorLogAt: Double = 0
+
+    // ── Delivery receipts ───────────────────────────────────────────
+    /// Set when the host announces `hostFeatures(commandReceipts:)`.
+    /// Older hosts never do, and never get a `tracked` command.
+    private var hostSendsReceipts = false
+    private var pendingReceipts: [String: CheckedContinuation<CommandDelivery, Never>] = [:]
+    /// How long to wait for a receipt before calling it lost.
+    private static let receiptTimeout: Duration = .milliseconds(1500)
 
     init(handle: LoomConnectionHandle) {
         self.handle = handle
@@ -200,13 +220,6 @@ actor TrackpadSender {
         await send(.mediaCommand(action: action))
     }
 
-    /// Tells the Mac to press the dialog button identified by `id` from the
-    /// latest `uiContextUpdate` snapshot. If the snapshot has since been
-    /// superseded the Mac silently ignores it.
-    func sendContextAction(id: String) async {
-        await send(.triggerContextAction(id: id))
-    }
-
     /// Issues a screenshot request tagged with `requestID` so the iPad can
     /// reject responses that belong to a previous, timed-out request.
     /// `mode` defaults to full-screen so callers that don't care about
@@ -276,6 +289,45 @@ actor TrackpadSender {
         case .up:    await send(.macroButton(id: "missioncontrol_trigger"))
         case .down:  await send(.macroButton(id: "expose_trigger"))
         }
+    }
+
+    // MARK: - Delivery receipts
+
+    func setHostSendsReceipts(_ enabled: Bool) {
+        hostSendsReceipts = enabled
+    }
+
+    /// Sends `message` and waits for the Mac's receipt, for controls that
+    /// show whether the command arrived. Returns `.sent` straight away when
+    /// the host doesn't send receipts. Other traffic isn't held up while it
+    /// waits.
+    func sendConfirmed(_ message: ControlMessage) async -> CommandDelivery {
+        guard hostSendsReceipts else {
+            await send(message)
+            return .sent
+        }
+        let requestID = UUID().uuidString
+        return await withCheckedContinuation { continuation in
+            // Registered before the send goes out, so even an instant
+            // receipt finds its continuation. Every path resumes it exactly
+            // once: the receipt or the timeout, whichever comes first.
+            pendingReceipts[requestID] = continuation
+            Task {
+                await self.send(.tracked(requestID: requestID, command: message))
+            }
+            Task {
+                try? await Task.sleep(for: Self.receiptTimeout)
+                self.finishReceipt(requestID, with: .timedOut)
+            }
+        }
+    }
+
+    func receivedReceipt(requestID: String, delivered: Bool) {
+        finishReceipt(requestID, with: delivered ? .confirmed : .failed)
+    }
+
+    private func finishReceipt(_ requestID: String, with delivery: CommandDelivery) {
+        pendingReceipts.removeValue(forKey: requestID)?.resume(returning: delivery)
     }
 
     // MARK: - Core send

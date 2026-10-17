@@ -128,10 +128,28 @@ public enum ControlMessage: Codable, Sendable {
     /// dialog/menu features; `screenRecording` gates screenshots + mirror.
     case hostCapabilities(accessibility: Bool, screenRecording: Bool)
 
+    // ── Delivery receipts ────────────────────────────────────────────
+    /// Mac → iPad, once per session: optional protocol features this host
+    /// build supports. Older remotes can't decode it and skip it, and older
+    /// hosts never send it, so the remote only ever sends `tracked` to a
+    /// host that can run it. Every flag decodes as `false` when absent, so
+    /// later builds can add more.
+    case hostFeatures(commandReceipts: Bool)
+    /// iPad → Mac: run `command`, then reply `commandReceipt` with the same
+    /// `requestID`. Only sent to hosts that announced `commandReceipts`.
+    /// Doesn't nest: a `tracked` command inside another fails to decode.
+    indirect case tracked(requestID: String, command: ControlMessage)
+    /// Mac → iPad: the host received `requestID`'s command and handed it to
+    /// input injection (`delivered`), or couldn't because Accessibility
+    /// isn't granted. Slow commands such as `appShortcut` finish in their
+    /// own tasks afterwards, so this confirms delivery, not the app's result.
+    case commandReceipt(requestID: String, delivered: Bool)
+
     // MARK: Codable
 
     private enum CodingKeys: String, CodingKey {
         case type, dx, dy, button, keys, bundleID, bundleIDs, id, status, action, data, name, message, apps, shortcuts, snapshot, requestID, mode, quality, windows, phase, fps, maxWidth, seq, accessibility, screenRecording, displayID, displays, selectedDisplayID, direction
+        case commandReceipts, command, delivered
     }
 
     private enum MessageType: String, Codable {
@@ -149,6 +167,7 @@ public enum ControlMessage: Codable, Sendable {
         case requestAuthorizationStatus
         case ping, pong
         case hostCapabilities
+        case hostFeatures, tracked, commandReceipt
     }
 
     public init(from decoder: Decoder) throws {
@@ -277,6 +296,30 @@ public enum ControlMessage: Codable, Sendable {
                 accessibility: try c.decode(Bool.self, forKey: .accessibility),
                 screenRecording: try c.decode(Bool.self, forKey: .screenRecording)
             )
+        case .hostFeatures:
+            self = .hostFeatures(
+                commandReceipts: try c.decodeIfPresent(Bool.self, forKey: .commandReceipts) ?? false
+            )
+        case .tracked:
+            // Check the inner type before decoding it, so hostile input
+            // can't recurse the decoder through nested `tracked` wrappers.
+            let inner = try c.nestedContainer(keyedBy: CodingKeys.self, forKey: .command)
+            if try inner.decode(MessageType.self, forKey: .type) == .tracked {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .command,
+                    in: c,
+                    debugDescription: "tracked commands can't be nested"
+                )
+            }
+            self = .tracked(
+                requestID: try c.decode(String.self, forKey: .requestID),
+                command: try c.decode(ControlMessage.self, forKey: .command)
+            )
+        case .commandReceipt:
+            self = .commandReceipt(
+                requestID: try c.decode(String.self, forKey: .requestID),
+                delivered: try c.decode(Bool.self, forKey: .delivered)
+            )
         }
     }
 
@@ -392,6 +435,17 @@ public enum ControlMessage: Codable, Sendable {
             try c.encode(MessageType.hostCapabilities, forKey: .type)
             try c.encode(accessibility, forKey: .accessibility)
             try c.encode(screenRecording, forKey: .screenRecording)
+        case let .hostFeatures(commandReceipts):
+            try c.encode(MessageType.hostFeatures, forKey: .type)
+            try c.encode(commandReceipts, forKey: .commandReceipts)
+        case let .tracked(requestID, command):
+            try c.encode(MessageType.tracked, forKey: .type)
+            try c.encode(requestID, forKey: .requestID)
+            try c.encode(command, forKey: .command)
+        case let .commandReceipt(requestID, delivered):
+            try c.encode(MessageType.commandReceipt, forKey: .type)
+            try c.encode(requestID, forKey: .requestID)
+            try c.encode(delivered, forKey: .delivered)
         }
     }
 }
