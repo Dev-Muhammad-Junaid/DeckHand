@@ -4,8 +4,13 @@
   X-Frame-Options: DENY
   Permissions-Policy: camera=(), microphone=(), geolocation=()
 
+# Asset filenames are not content-hashed (icon-256.png, og.png and the
+# favicons are replaced in place when the brand changes), so they must not be
+# `immutable`: a browser would keep the old file for a year. A day of freshness
+# with a week of stale-while-revalidate keeps repeat visits instant while a new
+# icon reaches everyone within a day.
 /assets/*
-  Cache-Control: public, max-age=31536000, immutable
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
 
 /*.css
   Cache-Control: public, max-age=3600

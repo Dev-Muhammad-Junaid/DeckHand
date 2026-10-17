@@ -13,9 +13,10 @@
 //       on the envelope.
 //    2. Back-compat decode rules: optional fields added after 1.0
 //       (`phase` on mouseScroll, `mode` and `quality` on
-//       requestScreenshot, `displayID` on startMirror) must keep
-//       their documented defaults when absent.
-//    3. Hostile input: unknown `type` must throw, not crash or misroute.
+//       requestScreenshot, `displayID` on startMirror, the flags on
+//       hostFeatures) must keep their documented defaults when absent.
+//    3. Hostile input: unknown `type` must throw, not crash or misroute,
+//       and `tracked` wrappers can't nest.
 //
 
 import XCTest
@@ -106,6 +107,11 @@ final class ControlMessageContractTests: XCTestCase {
             .ping(seq: 7),
             .pong(seq: 7),
             .hostCapabilities(accessibility: true, screenRecording: false),
+            .hostFeatures(commandReceipts: true),
+            .tracked(requestID: "cmd-1", command: .appShortcut(bundleID: "com.apple.dt.Xcode", keys: ["cmd", "b"])),
+            .tracked(requestID: "cmd-2", command: .triggerContextAction(id: "00deadbeef00cafe|2|Save")),
+            .commandReceipt(requestID: "cmd-1", delivered: true),
+            .commandReceipt(requestID: "cmd-2", delivered: false),
         ]
     }
 
@@ -134,7 +140,7 @@ final class ControlMessageContractTests: XCTestCase {
             let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
             return try XCTUnwrap(obj["type"] as? String)
         })
-        XCTAssertEqual(types.count, 32, "Expected fixtures for all 32 message types, got \(types.sorted())")
+        XCTAssertEqual(types.count, 35, "Expected fixtures for all 35 message types, got \(types.sorted())")
     }
 
     // MARK: - 2. Back-compat decode rules
@@ -178,6 +184,28 @@ final class ControlMessageContractTests: XCTestCase {
         XCTAssertEqual(quality, .standard, "Legacy requests without quality must default to .standard")
     }
 
+    func testHostFeaturesWithoutFlagsDefaultToOff() throws {
+        // A later host may announce features this build doesn't know, or
+        // none at all; anything absent must read as unsupported.
+        let sparse = Data(#"{"type":"hostFeatures"}"#.utf8)
+        let decoded = try decoder.decode(ControlMessage.self, from: sparse)
+        guard case let .hostFeatures(commandReceipts) = decoded else {
+            return XCTFail("Decoded wrong case: \(decoded)")
+        }
+        XCTAssertFalse(commandReceipts, "A host that doesn't say it sends receipts must be treated as not sending them")
+    }
+
+    func testTrackedCarriesItsCommandIntact() throws {
+        let message = ControlMessage.tracked(requestID: "cmd-9", command: .keyboardShortcut(keys: ["cmd", "s"]))
+        let decoded = try decoder.decode(ControlMessage.self, from: try encoder.encode(message))
+        guard case let .tracked(requestID, command) = decoded,
+              case let .keyboardShortcut(keys) = command else {
+            return XCTFail("Decoded wrong case: \(decoded)")
+        }
+        XCTAssertEqual(requestID, "cmd-9")
+        XCTAssertEqual(keys, ["cmd", "s"])
+    }
+
     func testActiveAppUpdateWithNilBundleIDOmitsKey() throws {
         let data = try encoder.encode(ControlMessage.activeAppUpdate(name: "X", bundleID: nil))
         let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
@@ -198,6 +226,19 @@ final class ControlMessageContractTests: XCTestCase {
 
     func testEmptyPayloadThrows() {
         XCTAssertThrowsError(try decoder.decode(ControlMessage.self, from: Data("{}".utf8)))
+    }
+
+    func testNestedTrackedThrows() {
+        let nested = Data(#"{"type":"tracked","requestID":"a","command":{"type":"tracked","requestID":"b","command":{"type":"stopMirror"}}}"#.utf8)
+        XCTAssertThrowsError(
+            try decoder.decode(ControlMessage.self, from: nested),
+            "A tracked command wrapping another must be rejected before the inner one decodes"
+        )
+    }
+
+    func testTrackedWithUnknownCommandThrows() {
+        let unknown = Data(#"{"type":"tracked","requestID":"a","command":{"type":"selfDestruct"}}"#.utf8)
+        XCTAssertThrowsError(try decoder.decode(ControlMessage.self, from: unknown))
     }
 }
 

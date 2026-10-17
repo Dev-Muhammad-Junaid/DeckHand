@@ -114,13 +114,7 @@ struct WindowPickerView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "macwindow.badge.plus")
-                .font(.system(size: 40, weight: .thin))
-                .foregroundStyle(Color.secondary.opacity(0.5))
-            Text("No windows visible.")
-                .font(.system(size: 14, design: .rounded))
-                .foregroundStyle(Color.secondary)
+        DeckHandEmptyState(glyph: PixelArt.mirror, title: "No windows visible.") {
             Button {
                 GestureHaptic.light.trigger()
                 onRefresh()
@@ -130,9 +124,9 @@ struct WindowPickerView: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
                     .background(
-                        Capsule().fill(DeckHandTheme.violet.opacity(0.18))
+                        Capsule().fill(DeckHandTheme.accent.opacity(0.18))
                     )
-                    .foregroundStyle(DeckHandTheme.violet)
+                    .foregroundStyle(DeckHandTheme.accent)
             }
             .buttonStyle(.plain)
         }

@@ -67,7 +67,7 @@ struct OnboardingView: View {
         HStack(spacing: 7) {
             ForEach(pages.indices, id: \.self) { index in
                 Capsule()
-                    .fill(index == page ? DeckHandTheme.Brand.glow : Color.white.opacity(0.22))
+                    .fill(index == page ? DeckHandTheme.Brand.sky : Color.white.opacity(0.22))
                     .frame(width: index == page ? 22 : 7, height: 7)
             }
         }
@@ -90,9 +90,9 @@ struct OnboardingView: View {
                 .frame(height: 54)
                 .background(
                     RoundedRectangle(cornerRadius: DeckHandTheme.Radius.lg, style: .continuous)
-                        .fill(DeckHandTheme.Brand.litTileGradient)
+                        .fill(DeckHandTheme.Brand.actionGradient)
                 )
-                .shadow(color: DeckHandTheme.Brand.glow.opacity(0.45), radius: 18, y: 6)
+                .shadow(color: DeckHandTheme.Brand.cobalt.opacity(0.5), radius: 18, y: 6)
         }
         .buttonStyle(PressableButtonStyle())
     }
@@ -234,22 +234,22 @@ private struct OnboardingPageView: View {
         if let symbol = page.symbol {
             ZStack {
                 Circle()
-                    .fill(DeckHandTheme.Brand.glow.opacity(0.14))
+                    .fill(DeckHandTheme.Brand.cobalt.opacity(0.22))
                     .frame(width: 148, height: 148)
                     .blur(radius: 18)
 
                 RoundedRectangle(cornerRadius: 40, style: .continuous)
-                    .fill(DeckHandTheme.Brand.unlitTileGradient)
+                    .fill(DeckHandTheme.Brand.screenGradient)
                     .overlay(
                         RoundedRectangle(cornerRadius: 40, style: .continuous)
                             .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
                     )
                     .frame(width: 136, height: 136)
-                    .shadow(color: DeckHandTheme.Brand.glow.opacity(0.35), radius: 26)
+                    .shadow(color: DeckHandTheme.Brand.cobalt.opacity(0.4), radius: 26)
 
                 Image(systemName: symbol)
                     .font(.system(size: 54, weight: .light))
-                    .foregroundStyle(DeckHandTheme.Brand.litTileGradient)
+                    .foregroundStyle(DeckHandTheme.Brand.tileGradient)
             }
             .scaleEffect(revealed ? 1 : 0.92)
             .opacity(revealed ? 1 : 0)

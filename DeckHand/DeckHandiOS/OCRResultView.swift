@@ -69,7 +69,7 @@ struct OCRResultView: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(Capsule().fill(DeckHandTheme.violet.opacity(0.9)))
+                        .background(Capsule().fill(DeckHandTheme.accent.opacity(0.92)))
                         .padding(.top, 8)
                         .transition(.opacity)
                 }
@@ -97,22 +97,13 @@ struct OCRResultView: View {
                 }
             }
         case .empty:
-            VStack(spacing: 14) {
-                Image(systemName: "text.viewfinder")
-                    .font(.system(size: 42, weight: .thin))
-                    .foregroundStyle(Color.secondary.opacity(0.5))
-                Text("No text recognized in this image.")
-                    .font(.system(size: 14, design: .rounded))
-                    .foregroundStyle(Color.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            DeckHandEmptyState(glyph: PixelArt.capture, title: "No text recognized in this image.")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         case let .failed(message):
             VStack(spacing: 12) {
                 Image(systemName: "exclamationmark.triangle")
                     .font(.system(size: 38, weight: .thin))
-                    .foregroundStyle(Color.orange)
+                    .foregroundStyle(DeckHandTheme.warning)
                 Text("OCR failed")
                     .font(.system(size: 16, weight: .semibold, design: .rounded))
                 Text(message)

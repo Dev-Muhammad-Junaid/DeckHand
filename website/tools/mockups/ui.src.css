@@ -4,8 +4,17 @@
    Every size is in SwiftUI points: {N} compiles to calc(N * var(--pt)), and each
    mock root sets --pt from its own design width so the UI scales with its frame. */
 
-.ui { --violet: #6C63FF; --violet-soft: #A78BFA; --indigo: #818CF8; --emerald: #10B981; --mint: #34D399; --sky: #38BDF8;
-  --success: #22C55E; --warning: #F59E0B; --danger: #EF4444; --brand-ink: #07070F; --brand-raised: #10101E; --glow: #7C5CFF; --glow-soft: #6E86FF; --brand-mint: #3DE0B0;
+.ui {
+  /* Brand, from DeckHandTheme.Brand: fixed colors sampled from the app icon. Cobalt is the one action
+     color, cyan glow is live activity with the Mac, mint is connected, and pixel violet is the hand's
+     fill (dot art only, never a control). */
+  --cobalt: #3A4CF2; --cobalt-high: #5466FF; --sky: #86B4FF;
+  --screen: #060A2A; --screen-high: #1C2C80; --screen-raised: #0E1540;
+  --phosphor: #EFFFFC; --glow: #3DE0E0; --ray: #9FF6FF; --pixel-violet: #8E70FF; --brand-mint: #3DE0B0;
+  --dot-off: rgba(80, 100, 210, 0.22);
+  --tile-gradient: linear-gradient(135deg, var(--sky), var(--cobalt-high));
+  --action-gradient: linear-gradient(var(--cobalt-high), var(--cobalt));
+  --screen-gradient: linear-gradient(135deg, var(--screen-raised), var(--screen));
   --rounded: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, sans-serif;
   --sf: -apple-system, "SF Pro Text", "Inter", system-ui, sans-serif;
   --sfmono: ui-monospace, "SF Mono", "Google Sans Code", Menlo, monospace;
@@ -13,13 +22,16 @@
   font-family: var(--sf); color: var(--c-primary); background: var(--c-canvas); }
 .ui *, .ui *::before, .ui *::after { box-sizing: border-box; }
 .ui svg { display: block; flex: none; }
+/* --c-tint is AccentColor (DeckHandTheme.accent); --success/--warning/--danger are the status pairs. */
 .ui-dark { --c-canvas: #0A0A0F; --c-primary: #ffffff; --c-secondary: rgba(235, 235, 245, 0.6); --c-tertiary: rgba(235, 235, 245, 0.3);
-  --c-tint: #0A84FF; --c-red: #FF453A; --c-seg: rgba(118, 118, 128, 0.24); --c-seg-sel: #636366; --c-track-fill: rgba(255, 255, 255, 0.06);
-  --c-track-shadow: rgba(0, 0, 0, 0.3); --c-bar: rgba(255, 255, 255, 0.06); --c-bar-border: rgba(255, 255, 255, 0.09); --c-well: rgba(255, 255, 255, 0.07);
+  --c-tint: #5466FF; --success: #3DE0B0; --warning: #FFB547; --danger: #FF4D5E;
+  --c-seg: rgba(118, 118, 128, 0.24); --c-seg-sel: #636366; --c-track-shadow: rgba(0, 0, 0, 0.3);
+  --c-bar: rgba(255, 255, 255, 0.06); --c-bar-border: rgba(255, 255, 255, 0.09); --c-well: rgba(255, 255, 255, 0.07);
   --c-divider: rgba(255, 255, 255, 0.07); --c-press: 0.15; }
 .ui-light { --c-canvas: #F2F2F7; --c-primary: #000000; --c-secondary: rgba(60, 60, 67, 0.6); --c-tertiary: rgba(60, 60, 67, 0.3);
-  --c-tint: #007AFF; --c-red: #FF3B30; --c-seg: rgba(118, 118, 128, 0.12); --c-seg-sel: #ffffff; --c-track-fill: #ffffff;
-  --c-track-shadow: rgba(0, 0, 0, 0.07); --c-bar: rgba(120, 120, 128, 0.2); --c-bar-border: rgba(0, 0, 0, 0.06); --c-well: rgba(0, 0, 0, 0.07);
+  --c-tint: #3A4CF2; --success: #0B7A6C; --warning: #A35F00; --danger: #D92D3F;
+  --c-seg: rgba(118, 118, 128, 0.12); --c-seg-sel: #ffffff; --c-track-shadow: rgba(6, 10, 42, 0.22);
+  --c-bar: rgba(120, 120, 128, 0.2); --c-bar-border: rgba(0, 0, 0, 0.06); --c-well: rgba(0, 0, 0, 0.07);
   --c-divider: rgba(0, 0, 0, 0.08); --c-press: 0.10; }
 .pa { color: color-mix(in srgb, var(--c-primary) var(--a, 100%), transparent); }
 
@@ -36,7 +48,7 @@
 
 /* ---------- Status + nav bars ---------- */
 .ui-col { position: absolute; inset: 0; display: flex; flex-direction: column; }
-.sbar { height: {24}; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 {20}; font: 600 {12}/1 var(--sf); color: var(--c-primary); }
+.sbar { height: {24}; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 {20}; font: 600 {12}/1 var(--sf); color: var(--c-primary); white-space: nowrap; }
 .sbar--phone { height: {54}; padding: {6} {32} 0 {44}; font-size: {16}; }
 .sbar__r { display: flex; align-items: center; gap: {6}; }
 .sbar__r svg { height: {11}; width: auto; }
@@ -44,13 +56,14 @@
 .anav__title { position: absolute; left: 50%; top: 50%; translate: -50% -50%; display: flex; flex-direction: column; align-items: center; gap: {2}; white-space: nowrap; }
 .anav__name { font: 600 {17}/1.1 var(--sf); color: var(--c-primary); }
 .anav__status { display: flex; align-items: center; gap: {4}; font: 400 {11}/1.1 var(--sf); color: var(--c-secondary); }
-.anav__dot { width: {6}; height: {6}; border-radius: 50%; background: var(--success); }
+/* LivePixel: the icon's mint pixel as the live light. */
+.anav__dot { width: {6}; height: {6}; border-radius: {1.5}; background: var(--success); box-shadow: 0 0 {4} color-mix(in srgb, var(--success) 55%, transparent); }
 .anav__session { font: 400 {9}/1 var(--sfmono); color: var(--c-tertiary); }
 .anav__btn { color: var(--c-tint); display: flex; align-items: center; gap: {3}; }
 .anav__btn svg { width: {22}; height: {22}; }
 .anav__btn svg.sm { width: {9}; height: {9}; }
-.anav__btn--violet { color: var(--violet); }
-.anav__btn--red { color: var(--c-red); }
+.anav__btn--live { color: var(--success); }
+.anav__btn--red { color: var(--danger); }
 .phone .anav { gap: {16}; padding: 0 {16}; height: {44}; }
 .phone .anav__title { left: {20}; translate: 0 -50%; align-items: flex-start; }
 .phone .anav__name { font-size: {16}; }
@@ -64,20 +77,24 @@
 
 /* ---------- Trackpad tab ---------- */
 .tp-tab { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
-.surface { flex: 1; min-height: 0; margin: {16} {20} 0; position: relative; border-radius: {28}; background: var(--c-track-fill);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-primary) 9%, transparent), 0 {8} {16} var(--c-track-shadow); overflow: hidden; }
+/* The surface is the icon's dark screen in both appearances, and everything on it renders dark. */
+.surface { flex: 1; min-height: 0; margin: {16} {20} 0; position: relative; border-radius: {28}; overflow: hidden;
+  --c-primary: #ffffff; --c-secondary: rgba(235, 235, 245, 0.6);
+  background: radial-gradient(circle {720} at 50% 15%, #111A55 0%, var(--screen) 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09), 0 {8} {16} var(--c-track-shadow); }
+/* DotField's resting grid: 2.4pt dots on a 15pt pitch, anchored at the top-left so lit dots line up. */
+.surface::before { content: ""; position: absolute; inset: 0; pointer-events: none; background-position: 0 0; background-size: {15} {15};
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 15 15'%3E%3Crect x='6.3' y='6.3' width='2.4' height='2.4' rx='.77' fill='rgba(80,100,210,.22)'/%3E%3C/svg%3E"); }
+.surface__lit { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
 .surface__hint { position: absolute; top: {12}; right: {12}; display: flex; flex-direction: column; align-items: flex-end; gap: {4}; }
 .surface__hint b { font: 600 {13}/1.1 var(--rounded); color: color-mix(in srgb, var(--c-secondary) 70%, transparent); }
 .surface__hint small { font: 500 {9}/1.1 var(--sf); color: color-mix(in srgb, var(--c-secondary) 45%, transparent); white-space: pre; }
 .gcap { position: absolute; top: {12}; left: {12}; display: flex; align-items: center; gap: {6}; padding: {6} {10}; border-radius: 99px;
-  background: color-mix(in srgb, var(--c-primary) 8%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-primary) 8%, transparent);
-  font: 600 {11}/1 var(--rounded); color: color-mix(in srgb, var(--c-primary) 80%, transparent); }
-.ui-dark .gcap { background: rgba(255, 255, 255, 0.10); }
-.gcap svg { width: {12}; height: {12}; color: var(--g, var(--violet)); }
-.ripple { position: absolute; width: {60}; height: {60}; margin: {-30} 0 0 {-30}; border-radius: 50%; background: color-mix(in srgb, var(--violet) 35%, transparent); }
-.ripple--fade { scale: 1.7; opacity: 0.35; }
+  background: rgba(255, 255, 255, 0.10); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  font: 600 {11}/1 var(--rounded); color: rgba(255, 255, 255, 0.8); }
+.gcap svg { width: {12}; height: {12}; color: var(--g, var(--glow)); }
 .surface__dots { position: absolute; left: 50%; bottom: {14}; translate: -50% 0; display: flex; gap: {6}; }
-.surface__dots i { width: {5}; height: {5}; border-radius: 50%; background: color-mix(in srgb, var(--c-primary) 10%, transparent); }
+.surface__dots i { width: {5}; height: {5}; border-radius: 50%; background: rgba(255, 255, 255, 0.1); }
 
 .sens { flex: none; padding: {8} {28} 0; display: flex; flex-direction: column; gap: {2}; }
 .sens__row { display: flex; align-items: center; gap: {8}; color: var(--c-secondary); }
@@ -93,9 +110,10 @@
 .gbtn { height: {62}; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: {5}; border-radius: {14}; }
 .gbtn svg { width: {30}; height: {28}; color: color-mix(in srgb, var(--g) 80%, transparent); }
 .gbtn span { font: 500 {8.5}/1 var(--rounded); color: color-mix(in srgb, var(--c-secondary) 80%, transparent); white-space: nowrap; }
-.gbtn.on { background: color-mix(in srgb, var(--emerald) calc(var(--c-press) * 100%), transparent); scale: 0.95; }
-.gbtn.on svg, .gbtn.on span { color: var(--emerald); }
-.gbtn--scroll svg { color: color-mix(in srgb, var(--emerald) 60%, transparent); }
+/* Every gesture is an action (accent); only the Scroll toggle is a state, in mint. */
+.gbtn.on { background: color-mix(in srgb, var(--success) calc(var(--c-press) * 100%), transparent); scale: 0.95; }
+.gbtn.on svg, .gbtn.on span { color: var(--success); }
+.gbtn--scroll svg { color: color-mix(in srgb, var(--success) 60%, transparent); }
 
 /* ---------- Live mirror ---------- */
 .mirror2 { position: absolute; border-radius: {10}; overflow: hidden; background: #000;
@@ -129,15 +147,15 @@
   color: color-mix(in srgb, var(--c-primary) 85%, transparent); }
 .qedit svg { width: {14}; height: {14}; }
 .qedit span { font: 500 {9}/1.1 var(--rounded); color: color-mix(in srgb, var(--c-primary) 70%, transparent); }
-.qedit--go { background: var(--violet); color: #fff; }
+.qedit--go { background: var(--c-tint); color: #fff; }
 .qedit--go span { color: #fff; }
-.qinfo { flex: none; width: {36}; height: {36}; display: grid; place-items: center; color: var(--violet); }
+.qinfo { flex: none; width: {36}; height: {36}; display: grid; place-items: center; color: var(--c-tint); }
 .qinfo svg { width: {17}; height: {17}; }
 .qspacer { flex: 1; }
 .qdlg { flex: none; padding: {10} {12}; border-radius: {8}; font: 500 {12}/1 var(--rounded); background: var(--c-well); color: var(--c-primary);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-primary) 8%, transparent); display: flex; align-items: center; gap: {6}; }
 .qdlg--cancel { background: transparent; color: var(--c-secondary); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-primary) 14%, transparent); }
-.qdlg--default { background: var(--violet); color: #fff; font-weight: 600; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--violet) 80%, transparent); }
+.qdlg--default { background: var(--c-tint); color: #fff; font-weight: 600; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-tint) 80%, transparent); }
 .qdlg--default small { font-size: {10}; opacity: 0.7; }
 .qhead { font: 600 {11}/1 var(--sf); color: color-mix(in srgb, var(--c-secondary) 70%, transparent); padding: {12} {24} {10}; }
 
@@ -149,14 +167,14 @@
 .atile { display: flex; flex-direction: column; align-items: center; gap: {8}; font: 500 {11}/1.2 var(--rounded); color: var(--c-secondary); text-align: center; }
 .atile i { width: {52}; height: {52}; border-radius: {12}; display: block; box-shadow: 0 {2} {4} rgba(0, 0, 0, 0.2); position: relative; }
 .atile.front { color: var(--c-primary); font-weight: 600; }
-.atile.front i::after { content: ""; position: absolute; inset: {-3}; border-radius: {14}; box-shadow: 0 0 0 {2.5} var(--violet), 0 0 {6} color-mix(in srgb, var(--violet) 55%, transparent); }
+.atile.front i::after { content: ""; position: absolute; inset: {-3}; border-radius: {14}; box-shadow: 0 0 0 {2.5} var(--c-tint), 0 0 {6} color-mix(in srgb, var(--c-tint) 55%, transparent); }
 
 /* ---------- Screenshot preview ---------- */
 .shot { background: #000; }
 .shot__img { position: absolute; left: 0; right: 0; top: 50%; translate: 0 -55%; aspect-ratio: 16 / 10; }
 .shot__img .mac { position: absolute; inset: 0; }
 .shot__x { position: absolute; top: {16}; right: {20}; width: {28}; height: {28}; color: rgba(255, 255, 255, 0.7); z-index: 2; }
-.shot__badge { position: absolute; top: {20}; left: {20}; font: 600 {10}/1 var(--sf); color: rgba(255, 204, 0, 0.9); background: rgba(255, 204, 0, 0.18); padding: {4} {8}; border-radius: 99px; }
+.shot__badge { position: absolute; top: {20}; left: {20}; font: 600 {10}/1 var(--sf); color: var(--sky); background: rgba(134, 180, 255, 0.18); padding: {4} {8}; border-radius: 99px; }
 .shot__bar { position: absolute; left: 0; right: 0; bottom: 0; padding: {12} {16} {20}; display: grid; grid-template-columns: repeat(5, 1fr);
   background: rgba(40, 40, 46, 0.72); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
 .shot__bar span { display: flex; flex-direction: column; align-items: center; gap: {6}; padding: {8} 0; font: 500 {10}/1 var(--rounded); color: rgba(255, 255, 255, 0.65); }
@@ -166,22 +184,24 @@
 .ink { position: absolute; inset: 0; width: 100%; height: 100%; }
 
 /* ---------- Peer picker (always dark, brand background) ---------- */
+/* DeckHandTheme.brandBackground(): the icon's navy screen, a cobalt bloom just above center and the mint pixel's cast. */
 .picker { background:
-    radial-gradient(107% 49% at 50% 34%, rgba(124, 92, 255, 0.30) 0%, rgba(124, 92, 255, 0.06) 51%, transparent 100%),
-    radial-gradient(66% 30.5% at 92% 8%, rgba(61, 224, 176, 0.14) 0%, transparent 100%),
-    var(--brand-ink); --c-primary: #fff; color: #fff; }
+    radial-gradient(circle {420} at 50% 34%, rgba(58, 76, 242, 0.34) 2%, rgba(58, 76, 242, 0.08) 51%, transparent 100%),
+    radial-gradient(circle {260} at 92% 8%, rgba(61, 224, 176, 0.12) 2%, transparent 100%),
+    var(--screen); --c-primary: #fff; color: #fff; }
 .picker__gear { position: absolute; top: {66}; right: {22}; width: {40}; height: {40}; border-radius: 50%; background: rgba(255, 255, 255, 0.06); display: grid; place-items: center; color: rgba(255, 255, 255, 0.55); }
 .picker__gear svg { width: {16}; height: {16}; }
 .picker__col { position: absolute; inset: {54} 0 0; display: flex; flex-direction: column; justify-content: center; }
 .picker__head { display: flex; flex-direction: column; align-items: center; gap: {26}; padding: {32} 0 {40}; text-align: center; }
-.picker__mark { width: {132}; height: {132}; border-radius: {30}; box-shadow: 0 0 {40} rgba(124, 92, 255, 0.45); }
+.picker__mark { width: {132}; height: {132}; border-radius: {30}; box-shadow: 0 0 {42} rgba(58, 76, 242, 0.55); }
 .picker__title { font: 600 {34}/1.1 var(--rounded); color: #fff; }
 .picker__sub { margin-top: {8}; font: 400 {16}/1.2 var(--rounded); color: rgba(255, 255, 255, 0.55); }
 .peers { display: flex; flex-direction: column; gap: {10}; padding: 0 {22}; }
 .peer { display: flex; align-items: center; gap: {15}; padding: {15} {16}; border-radius: {20};
-  background: linear-gradient(135deg, var(--brand-raised), var(--brand-ink)); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09); }
-.peer--busy { box-shadow: inset 0 0 0 1px rgba(124, 92, 255, 0.55), 0 0 {18} rgba(124, 92, 255, 0.32); }
-.peer__icon { width: {44}; height: {44}; border-radius: {13}; background: rgba(124, 92, 255, 0.16); display: grid; place-items: center; }
+  background: var(--screen-gradient); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09); }
+/* Connecting is live activity with the Mac: a cyan stroke and bloom. */
+.peer--busy { box-shadow: inset 0 0 0 1px rgba(61, 224, 224, 0.55), 0 0 {18} rgba(61, 224, 224, 0.32); }
+.peer__icon { width: {44}; height: {44}; border-radius: {13}; background: rgba(58, 76, 242, 0.22); display: grid; place-items: center; }
 .peer__icon svg { width: {22}; height: {20}; }
 .peer__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: {4}; }
 .peer__name { display: flex; align-items: center; gap: {8}; font: 600 {16}/1.1 var(--rounded); color: #fff; white-space: nowrap; }
@@ -195,31 +215,38 @@
 
 /* ---------- Mac menu bar popover ---------- */
 .mpop { --pt: calc(100cqw / 270); container-type: inline-size; width: 100%; border-radius: 14px; overflow: hidden; font-family: var(--sf); color: #fff;
-  background: rgba(36, 34, 46, 0.86); -webkit-backdrop-filter: blur(30px) saturate(1.6); backdrop-filter: blur(30px) saturate(1.6);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), inset 0 0 0 0.5px rgba(255, 255, 255, 0.18); --sec: rgba(235, 235, 245, 0.6); --ter: rgba(235, 235, 245, 0.3); }
+  background: rgba(30, 32, 46, 0.86); -webkit-backdrop-filter: blur(30px) saturate(1.6); backdrop-filter: blur(30px) saturate(1.6);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), inset 0 0 0 0.5px rgba(255, 255, 255, 0.18); --sec: rgba(235, 235, 245, 0.6); --ter: rgba(235, 235, 245, 0.3);
+  --c-tint: #5466FF; --success: #3DE0B0; --warning: #FFB547; --danger: #FF4D5E; }
 .mpop__head { display: flex; align-items: center; gap: {10}; padding: {12} {16}; }
-.mpop__logo { width: {36}; height: {36}; border-radius: 50%; background: linear-gradient(135deg, #6C63FF, #A78BFA); display: grid; place-items: center; color: #fff; }
-.mpop__logo svg { width: {17}; height: {17}; }
+/* The header mark: the icon's tile with the pixel hand in white dots. */
+.mpop__logo { width: {36}; height: {36}; border-radius: {9}; background: linear-gradient(135deg, var(--cobalt-high), var(--cobalt)); display: grid; place-items: center;
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.2); }
+.mpop__logo svg { width: {25.5}; height: {27}; }
 .mpop__head b { display: block; font: 700 {14}/1.15 var(--sf); }
 .mpop__head small { display: block; margin-top: {2}; font: 400 {11}/1.1 var(--sf); color: var(--sec); }
 .mpop__div { height: 1px; background: rgba(255, 255, 255, 0.1); margin: 0 {10}; }
 .mpop__h { padding: {10} {16} {2}; font: 600 {10}/1 var(--sf); color: var(--sec); }
-.mpop__h--warn { color: #FF9F0A; }
-.mrow { display: flex; align-items: center; gap: {8}; padding: {6} {16}; }
+.mpop__h--warn { color: var(--warning); }
+.mrow { display: flex; flex-wrap: wrap; align-items: center; gap: {8}; padding: {6} {16}; }
 .mrow__icon { width: {24}; display: grid; place-items: center; }
 .mrow__icon svg { width: {16}; height: {16}; }
 .mrow__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: {1}; }
 .mrow__text b { font: 600 {12}/1.2 var(--sf); }
-.mrow__text span { font: 400 {10}/1.2 var(--sf); color: var(--sec); }
+.mrow__text span { font: 400 {10}/1.2 var(--sf); color: var(--sec); white-space: nowrap; }
 .mrow__text small { font: 400 {10}/1.2 var(--sf); color: var(--ter); }
 .mrow__text code { font: 400 {9}/1.2 var(--sfmono); color: var(--ter); }
-.mrow__acts { display: flex; gap: {6}; }
-.mrow__acts svg { width: {17}; height: {17}; }
+/* Their own line, as in the app, so a long device name never shares the row. */
+.mrow__acts { display: flex; gap: {4}; width: 100%; justify-content: flex-end; }
+.mbtn { padding: {3} {5.5}; border-radius: {5}; font: 500 {10}/1.15 var(--sf); white-space: nowrap; }
+.mbtn--allow { background: var(--c-tint); color: #fff; box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.25); }
+.mbtn--deny { background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.85); box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.16); }
 .mperm { display: flex; align-items: center; gap: {8}; padding: {5} {16}; }
 .mperm svg { width: {13}; height: {13}; flex: none; }
 .mperm div { flex: 1; display: flex; flex-direction: column; gap: {1}; }
 .mperm b { font: 500 {12}/1.2 var(--sf); }
 .mperm span { font: 400 {10}/1.2 var(--sf); color: var(--sec); }
+.mperm .mperm__fix { flex: none; font: 500 {11}/1 var(--sf); color: var(--c-tint); }
 .mpop__quit { padding: {8} {16} {10}; font: 400 {12}/1 var(--sf); color: var(--sec); }
 
 /* Official app icons, when present, replace the tinted fallback tile. macOS

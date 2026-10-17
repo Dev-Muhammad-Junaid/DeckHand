@@ -18,6 +18,7 @@
 //
 
 import AppKit
+import Combine
 import Loom
 import LoomKit
 import SwiftUI
@@ -30,6 +31,10 @@ final class DeckHandAppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
+    private var iconController: StatusItemIconController?
+    private var pendingRequestsObserver: AnyCancellable?
+    private var pendingRequests = 0
+    private var liveConnections = 0
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Accessory = menu-bar utility, no Dock icon, doesn't steal focus.
@@ -44,21 +49,27 @@ final class DeckHandAppDelegate: NSObject, NSApplicationDelegate {
         item.behavior = []
         item.isVisible = true
         if let button = item.button {
-            let image = NSImage(
-                systemSymbolName: "cursorarrow.rays",
-                accessibilityDescription: "Deck Hand"
-            )
-            image?.isTemplate = true // adapts to the transparent Tahoe menu bar
-            button.image = image
-            // Fallback so the item can never collapse to zero width (and thus
-            // be invisible) if the SF Symbol fails to resolve on this OS.
-            if image == nil {
-                button.title = "Deck Hand"
-            }
+            // The icon's dot hand, drawn as a template image so it adapts to
+            // the transparent Tahoe menu bar. Being drawn rather than looked
+            // up, it can't fail to resolve and collapse the item to zero width.
+            iconController = StatusItemIconController(button: button)
             button.target = self
             button.action = #selector(togglePopover(_:))
         }
         statusItem = item
+
+        pendingRequestsObserver = DeviceAuthorizationManager.shared.$pendingConnections
+            .receive(on: RunLoop.main)
+            .sink { [weak self] pending in
+                MainActor.assumeIsolated {
+                    self?.pendingRequests = pending.count
+                    self?.refreshIcon()
+                }
+            }
+        daemon.receiver.onLiveConnectionsChanged = { [weak self] count in
+            self?.liveConnections = count
+            self?.refreshIcon()
+        }
 
         let popover = NSPopover()
         popover.behavior = .transient // closes when you click away, like a menu-bar panel
@@ -69,6 +80,10 @@ final class DeckHandAppDelegate: NSObject, NSApplicationDelegate {
         hosting.sizingOptions = [.preferredContentSize]
         popover.contentViewController = hosting
         self.popover = popover
+    }
+
+    private func refreshIcon() {
+        iconController?.update(pendingRequests: pendingRequests, liveConnections: liveConnections)
     }
 
     /// Keep the process alive even with no visible windows — it's a resident

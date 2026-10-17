@@ -11,6 +11,16 @@ struct ContentRootView: View {
     @EnvironmentObject private var settings: DeckHandSettings
     @State private var activeConnection: (handle: LoomConnectionHandle, peerName: String)?
     @State private var authStatus: String = "pending"
+    /// Keeps the approval card up for a moment after a grant, so the hand
+    /// can turn into the check while the controls brighten behind it.
+    @State private var isShowingApproval = false
+    /// When the current wait for approval began. A grant that arrives faster
+    /// than a person could click (the user's own iCloud Macs) skips the
+    /// check rather than adding a pause.
+    @State private var pendingSince = Date()
+
+    /// How long the check stays up before the card leaves.
+    private static let approvalHold: Duration = .milliseconds(900)
 
     var body: some View {
         ZStack {
@@ -36,7 +46,19 @@ struct ContentRootView: View {
                         connection: connection.handle,
                         peerName: connection.peerName,
                         onAuthStatusChanged: { status in
-                            withAnimation(.easeInOut(duration: 0.22)) {
+                            let isNewGrant = status == "granted" && authStatus == "pending"
+                            if isNewGrant, Date().timeIntervalSince(pendingSince) > 0.6 {
+                                isShowingApproval = true
+                                Task { @MainActor in
+                                    try? await Task.sleep(for: Self.approvalHold)
+                                    withAnimation(.easeOut(duration: 0.3)) {
+                                        isShowingApproval = false
+                                    }
+                                }
+                            }
+                            // A grant brightens the controls on the slower
+                            // reveal timing, in step with the check forming.
+                            withAnimation(isNewGrant ? DeckHandMotion.reveal : .easeInOut(duration: 0.22)) {
                                 authStatus = status
                             }
                         },
@@ -45,12 +67,13 @@ struct ContentRootView: View {
                             Task { await connection.handle.disconnect() }
                             activeConnection = nil
                             authStatus = "pending"
+                            isShowingApproval = false
                         }
                     )
                     .opacity(authStatus == "granted" ? 1 : 0.38)
                     .disabled(authStatus != "granted")
 
-                    if authStatus != "granted" {
+                    if authStatus != "granted" || isShowingApproval {
                         AuthorizationOverlay(
                             status: authStatus,
                             peerName: connection.peerName
@@ -58,6 +81,7 @@ struct ContentRootView: View {
                             Task { await connection.handle.disconnect() }
                             activeConnection = nil
                             authStatus = "pending"
+                            isShowingApproval = false
                         }
                         .transition(.opacity)
                     }
@@ -65,6 +89,8 @@ struct ContentRootView: View {
                 .transition(.opacity)
                 .task(id: connection.peerName) {
                     authStatus = "pending"
+                    pendingSince = Date()
+                    isShowingApproval = false
 
                     // Only listen for connection-level events (disconnect) here.
                     // All message-level handling is consolidated in ControlView

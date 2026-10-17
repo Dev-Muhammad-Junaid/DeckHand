@@ -99,6 +99,12 @@ final class ContextObserver {
         connections.removeValue(forKey: id)
     }
 
+    /// Whether `id` is a button in the current snapshot, i.e. whether
+    /// `performAction(id:)` would press anything.
+    func hasAction(id: String) -> Bool {
+        buttonElementsByID[id] != nil
+    }
+
     /// Called from `ControlReceiver` when the iPad taps a dialog chip.
     /// Stale IDs (from an older snapshot) are silently ignored, which is
     /// the correct behaviour — the user saw a button that's gone now.

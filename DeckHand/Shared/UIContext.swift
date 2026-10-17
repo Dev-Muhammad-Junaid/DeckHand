@@ -66,7 +66,7 @@ public struct DialogButton: Codable, Hashable, Sendable, Identifiable {
     /// revision). Echoed back in `triggerContextAction`.
     public let id: String
     public let title: String
-    /// `true` for the AX `defaultButton` (⏎). Rendered with violet tint.
+    /// `true` for the AX `defaultButton` (⏎). Rendered with the accent tint.
     public let isDefault: Bool
     /// `true` for the AX `cancelButton` (⎋). Rendered with subtle
     /// destructive styling.

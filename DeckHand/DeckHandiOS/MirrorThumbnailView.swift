@@ -54,6 +54,9 @@ struct MirrorThumbnailView: View {
     /// 0 at tap, 1 when the slide has settled.
     @State private var spaceProgress: CGFloat = 0
 
+    /// Under Reduce Motion a Space switch swaps frames instead of sliding.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     private enum Layout {
         static let compactWidth: CGFloat = 200
         /// Where a tap expands to before the user has pinched to anything.
@@ -307,11 +310,11 @@ struct MirrorThumbnailView: View {
 
     private func performSpaceSwitch(_ direction: SpaceDirection) {
         GestureHaptic.medium.trigger()
-        outgoingSnapshot = image
+        outgoingSnapshot = reduceMotion ? nil : image
         spaceDirection = direction
         spaceProgress = 0
         onSwitchSpace(direction)
-        withAnimation(.spring(response: 0.38, dampingFraction: 0.88)) {
+        withAnimation(DeckHandMotion.resolved(.spring(response: 0.38, dampingFraction: 0.88), reduceMotion: reduceMotion)) {
             spaceProgress = 1
         }
         Task { @MainActor in

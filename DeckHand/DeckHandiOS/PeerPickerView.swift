@@ -145,7 +145,7 @@ struct PeerPickerView: View {
 
     private var searchingState: some View {
         VStack(spacing: 16) {
-            RadarPulse()
+            DotScan()
             Text("Make sure Deck Hand is open on your Mac")
                 .font(.system(size: 14, weight: .regular, design: .rounded))
                 .foregroundStyle(.white.opacity(0.42))
@@ -285,7 +285,7 @@ private struct PeerCard: View {
             .padding(.vertical, 15)
             .background(
                 RoundedRectangle(cornerRadius: DeckHandTheme.Radius.xl, style: .continuous)
-                    .fill(DeckHandTheme.Brand.unlitTileGradient)
+                    .fill(DeckHandTheme.Brand.screenGradient)
                     .overlay(
                         RoundedRectangle(cornerRadius: DeckHandTheme.Radius.xl, style: .continuous)
                             .strokeBorder(
@@ -312,52 +312,11 @@ private struct PeerCard: View {
     private var icon: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .fill(DeckHandTheme.Brand.glow.opacity(0.16))
+                .fill(DeckHandTheme.Brand.cobalt.opacity(0.22))
                 .frame(width: 44, height: 44)
             Image(systemName: "desktopcomputer")
                 .font(.system(size: 20, weight: .regular))
-                .foregroundStyle(DeckHandTheme.Brand.litTileGradient)
+                .foregroundStyle(DeckHandTheme.Brand.tileGradient)
         }
-    }
-}
-
-// MARK: - Radar pulse
-
-/// Expanding rings while no Mac has been found yet. Slow and quiet — this
-/// runs indefinitely, so it can't be attention-grabbing.
-private struct RadarPulse: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isPulsing = false
-
-    var body: some View {
-        ZStack {
-            if !reduceMotion {
-                ForEach(0..<3, id: \.self) { index in
-                    Circle()
-                        .strokeBorder(DeckHandTheme.Brand.glow.opacity(0.35), lineWidth: 1)
-                        .frame(width: 44, height: 44)
-                        .scaleEffect(isPulsing ? 2.6 : 0.9)
-                        .opacity(isPulsing ? 0 : 0.9)
-                        .animation(
-                            .easeOut(duration: 2.4)
-                                .repeatForever(autoreverses: false)
-                                .delay(Double(index) * 0.8),
-                            value: isPulsing
-                        )
-                }
-            }
-
-            Circle()
-                .fill(DeckHandTheme.Brand.glow.opacity(0.18))
-                .frame(width: 44, height: 44)
-                .overlay(
-                    Image(systemName: "antenna.radiowaves.left.and.right")
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(DeckHandTheme.Brand.glow)
-                )
-        }
-        .frame(width: 120, height: 120)
-        .onAppear { isPulsing = true }
-        .accessibilityLabel("Searching for Macs")
     }
 }

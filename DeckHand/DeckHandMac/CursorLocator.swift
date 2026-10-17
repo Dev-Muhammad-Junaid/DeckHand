@@ -7,13 +7,13 @@
 //  cursor is. Triggered by the iPad's "Locate" gesture button.
 //
 //  Visual design — built to survive any wallpaper:
-//    • Outer pulse — violet, expanding + fading. White stroke under it for
+//    • Outer pulse — cobalt, expanding + fading. White stroke under it for
 //      contrast on light backgrounds.
-//    • Solid main ring — thick violet stroke (6pt) with a tighter white
+//    • Solid main ring — thick cobalt stroke (6pt) with a tighter white
 //      halo just outside (2pt). Reads as a "target" silhouette.
-//    • Inner ring — yellow (3pt). Yellow + violet is a high-contrast pair
+//    • Inner ring — cyan (3pt). Cyan + cobalt is a high-contrast pair
 //      that stays visible on both light and dark surfaces.
-//    • Crosshair — 4pt violet arms with a 1.5pt white stroke under, leaving
+//    • Crosshair — 4pt cobalt arms with a 1.5pt white stroke under, leaving
 //      a 22pt clear zone in the middle so the actual cursor stays visible.
 //
 //  Implementation notes:
@@ -114,12 +114,12 @@ final class CursorLocator {
 
 private final class LocatorIndicatorView: NSView {
     private let outerPulseHalo  = CAShapeLayer()   // white halo under outer pulse
-    private let outerPulse      = CAShapeLayer()   // violet outer pulse
+    private let outerPulse      = CAShapeLayer()   // cobalt outer pulse
     private let mainRingHalo    = CAShapeLayer()   // white halo around main ring
-    private let mainRing        = CAShapeLayer()   // violet main ring
-    private let innerRing       = CAShapeLayer()   // yellow target ring
+    private let mainRing        = CAShapeLayer()   // cobalt main ring
+    private let innerRing       = CAShapeLayer()   // cyan target ring
     private let crossHalo       = CAShapeLayer()   // white halo under crosshair
-    private let crossLayer      = CAShapeLayer()   // violet crosshair
+    private let crossLayer      = CAShapeLayer()   // cobalt crosshair
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -132,11 +132,12 @@ private final class LocatorIndicatorView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    private var violet: NSColor {
-        NSColor(red: 0x6C / 255.0, green: 0x63 / 255.0, blue: 0xFF / 255.0, alpha: 1.0)
+    // The icon's tile and the glow around its lit dots (DeckHandTheme.Brand.cobalt / .glow).
+    private var cobalt: NSColor {
+        NSColor(srgbRed: 0x3A / 255.0, green: 0x4C / 255.0, blue: 0xF2 / 255.0, alpha: 1.0)
     }
-    private var yellow: NSColor {
-        NSColor(red: 0xFA / 255.0, green: 0xCC / 255.0, blue: 0x15 / 255.0, alpha: 1.0)
+    private var cyan: NSColor {
+        NSColor(srgbRed: 0x3D / 255.0, green: 0xE0 / 255.0, blue: 0xE0 / 255.0, alpha: 1.0)
     }
     private var halo: NSColor {
         // Slightly softened white so the halos don't clip on light walls.
@@ -170,12 +171,12 @@ private final class LocatorIndicatorView: NSView {
         mainRing.frame = bounds
         mainRing.path = mainPath
         mainRing.fillColor = NSColor.clear.cgColor
-        mainRing.strokeColor = violet.cgColor
+        mainRing.strokeColor = cobalt.cgColor
         mainRing.lineWidth = 6
         mainRing.opacity = 0
         layer.addSublayer(mainRing)
 
-        // ── Inner yellow ring ────────────────────────────────────────────
+        // ── Inner cyan ring ──────────────────────────────────────────────
         let innerRadius: CGFloat = 28
         let innerPath = CGPath(
             ellipseIn: CGRect(
@@ -189,7 +190,7 @@ private final class LocatorIndicatorView: NSView {
         innerRing.frame = bounds
         innerRing.path = innerPath
         innerRing.fillColor = NSColor.clear.cgColor
-        innerRing.strokeColor = yellow.cgColor
+        innerRing.strokeColor = cyan.cgColor
         innerRing.lineWidth = 3
         innerRing.opacity = 0
         layer.addSublayer(innerRing)
@@ -207,7 +208,7 @@ private final class LocatorIndicatorView: NSView {
         outerPulse.frame = bounds
         outerPulse.path = pulsePath
         outerPulse.fillColor = NSColor.clear.cgColor
-        outerPulse.strokeColor = violet.withAlphaComponent(0.85).cgColor
+        outerPulse.strokeColor = cobalt.withAlphaComponent(0.85).cgColor
         outerPulse.lineWidth = 7
         outerPulse.opacity = 0
         layer.addSublayer(outerPulse)
@@ -235,7 +236,7 @@ private final class LocatorIndicatorView: NSView {
 
         crossLayer.frame = bounds
         crossLayer.path = crossPath
-        crossLayer.strokeColor = violet.cgColor
+        crossLayer.strokeColor = cobalt.cgColor
         crossLayer.lineWidth = 4
         crossLayer.lineCap = .round
         crossLayer.opacity = 0
@@ -257,8 +258,8 @@ private final class LocatorIndicatorView: NSView {
             l.add(fade, forKey: "fadeIn")
         }
 
-        // Inner yellow ring gets a small "attention beat" scale pulse so
-        // it punctuates the violet outer ring.
+        // Inner cyan ring gets a small "attention beat" scale pulse so
+        // it punctuates the cobalt outer ring.
         let innerPulse = CABasicAnimation(keyPath: "transform.scale")
         innerPulse.fromValue = 0.85
         innerPulse.toValue = 1.0
@@ -267,7 +268,7 @@ private final class LocatorIndicatorView: NSView {
         innerRing.add(innerPulse, forKey: "innerPulse")
 
         // Outer pulse: opacity ramps in then out, scale grows. We animate
-        // halo + violet stroke as a group so they expand together.
+        // halo + cobalt stroke as a group so they expand together.
         let pulseDuration: CFTimeInterval = 0.95
         for (index, l) in [outerPulseHalo, outerPulse].enumerated() {
             let group = CAAnimationGroup()
@@ -275,7 +276,7 @@ private final class LocatorIndicatorView: NSView {
             group.repeatCount = 1.0
 
             let fade = CAKeyframeAnimation(keyPath: "opacity")
-            // Halo is a touch dimmer than the violet so it reads as a
+            // Halo is a touch dimmer than the cobalt so it reads as a
             // contrasting underline rather than competing for the eye.
             let peak = (index == 0) ? 0.55 : 0.85
             fade.values = [0.0, peak, 0.0]

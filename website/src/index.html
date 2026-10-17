@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Deck Hand</title>
 <meta name="description" content="Deck Hand turns an iPad or iPhone into a control surface for your Mac: a precision trackpad, a live view of the screen, captures, and shortcuts that follow the app in front. Peer to peer, over your own Wi-Fi.">
-<meta name="theme-color" content="#07070f">
+<meta name="theme-color" content="#060a2a">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Deck Hand — your iPad, now a control surface for your Mac">
 <meta property="og:description" content="A precision trackpad, a live view of your Mac, captures, and shortcuts that follow the app in front. Peer to peer, over your own Wi-Fi.">
@@ -20,7 +20,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=Google+Sans:wght@400;500;600&family=Google+Sans+Code&display=swap">
 <link rel="stylesheet" href="styles.css">
-<script>document.documentElement.classList.add('js')</script>
+<script>(function (d) { d.classList.add('js'); try { if (!matchMedia('(prefers-reduced-motion: reduce)').matches) { d.classList.add('boot'); setTimeout(function () { d.classList.remove('boot'); }, 3500); } } catch (e) {} })(document.documentElement)</script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -82,7 +82,7 @@
                   <span class="touch" style="left:42%;top:40%"></span>
                   <span class="touch" style="left:50%;top:46%"></span>
                   <div class="mirror">
-                    <div class="mac" aria-hidden="true"><div class="mac__menubar"><span></span>Xcode<span style="font-weight:400">File</span><span style="font-weight:400">Edit</span><span style="font-weight:400">Product</span></div><div class="mac__win"><div class="mac__chrome"><i></i><i></i><i></i></div><div class="mac__rail"><i style="--w:70%"></i><i class="is-sel" style="--w:85%"></i><i style="--w:60%"></i><i style="--w:75%"></i><i style="--w:50%"></i></div><div class="mac__code"><i style="--w:40%;--c:#c9b8ff"></i><i style="--w:70%;--x:8%"></i><i style="--w:55%;--x:8%;--c:#a6ecd6"></i><i style="--w:62%;--x:16%"></i><i style="--w:30%;--x:8%;--c:#ffc2b3"></i><i style="--w:12%"></i><i style="--w:48%;--c:#c9b8ff"></i><i style="--w:66%;--x:8%"></i></div><div class="mac__sheet">Save changes to “Package.swift”?<span><i>Don’t Save</i><i>Cancel</i><i>Save</i></span></div></div><div class="mac__dock"><i style="background:linear-gradient(150deg,#5ac8fa,#007aff)"></i><i style="background:linear-gradient(150deg,#e8f1ff,#9cc3ff)"></i><i style="background:linear-gradient(150deg,#7af0cf,#1fb88b)"></i><i style="background:linear-gradient(150deg,#ffd479,#ff9f0a)"></i><i style="background:linear-gradient(150deg,#c7c7cc,#8e8e93)"></i></div></div>
+                    <div class="mac" aria-hidden="true"><div class="mac__menubar"><span></span>Xcode<span style="font-weight:400">File</span><span style="font-weight:400">Edit</span><span style="font-weight:400">Product</span></div><div class="mac__win"><div class="mac__chrome"><i></i><i></i><i></i></div><div class="mac__rail"><i style="--w:70%"></i><i class="is-sel" style="--w:85%"></i><i style="--w:60%"></i><i style="--w:75%"></i><i style="--w:50%"></i></div><div class="mac__code"><i style="--w:40%;--c:#b8d0ff"></i><i style="--w:70%;--x:8%"></i><i style="--w:55%;--x:8%;--c:#a6ecd6"></i><i style="--w:62%;--x:16%"></i><i style="--w:30%;--x:8%;--c:#ffc2b3"></i><i style="--w:12%"></i><i style="--w:48%;--c:#b8d0ff"></i><i style="--w:66%;--x:8%"></i></div><div class="mac__sheet">Save changes to “Package.swift”?<span><i>Don’t Save</i><i>Cancel</i><i>Save</i></span></div></div><div class="mac__dock"><i style="background:linear-gradient(150deg,#5ac8fa,#007aff)"></i><i style="background:linear-gradient(150deg,#e8f1ff,#9cc3ff)"></i><i style="background:linear-gradient(150deg,#7af0cf,#1fb88b)"></i><i style="background:linear-gradient(150deg,#ffd479,#ff9f0a)"></i><i style="background:linear-gradient(150deg,#c7c7cc,#8e8e93)"></i></div></div>
                     <span class="mirror__badge">30 fps</span>
                   </div>
                   <span class="trackpad__hint">Two fingers to scroll · Three to switch Spaces</span>
@@ -97,7 +97,7 @@
                     <span class="tile tile--lit"><i></i>Terminal</span>
                     <span class="tile"><i style="background:linear-gradient(150deg,#c7c7cc,#8e8e93)"></i>Finder</span>
                     <span class="tile"><i style="background:linear-gradient(150deg,#ff8aa0,#ff375f)"></i>Music</span>
-                    <span class="tile"><i style="background:linear-gradient(150deg,#b89cff,#7c5cff)"></i>Slack</span>
+                    <span class="tile"><i style="background:linear-gradient(150deg,#7a3d7c,#4a154b)"></i>Slack</span>
                     <span class="tile"><i style="background:linear-gradient(150deg,#a1e3ff,#30b0ff)"></i>Mail</span>
                   </div>
                 </div>
@@ -162,7 +162,7 @@
         <div class="rows after-heading">
           <article class="row">
             <div class="row__text">
-              <span class="pill pill--violet pill--sm reveal"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 2.5 19 13l-6.2.9 3.6 6.6-2.6 1.4-3.6-6.7L5 19.5z"/></svg>Trackpad</span>
+              <span class="pill pill--accent pill--sm reveal"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 2.5 19 13l-6.2.9 3.6 6.6-2.6 1.4-3.6-6.7L5 19.5z"/></svg>Trackpad</span>
               <h3 class="row__title reveal" style="--delay:80ms">Scrolling that feels like the glass is on your desk.</h3>
               <p class="row__body reveal" style="--delay:160ms">Deck Hand sends real scroll phase and momentum, so your Mac rubber-bands like it would under a Magic Trackpad instead of stepping through wheel ticks.</p>
               <ul class="check reveal" style="--delay:240ms">
@@ -171,7 +171,7 @@
                 <li><span class="check__dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg></span>Sends at 120 Hz to match ProMotion</li>
               </ul>
             </div>
-            <div class="frame frame--violet reveal" style="--delay:120ms">
+            <div class="frame frame--accent reveal" style="--delay:120ms">
               <div class="frame__stage">
                 <div class="tp" role="img" aria-label="Two fingers scrolling on the trackpad, with a momentum curve easing out after the fingers lift.">
                   <div class="tp__readout"><span>2 fingers</span><span>phase: momentum</span></div>
@@ -181,7 +181,7 @@
                   <span class="touch" style="left:50%;top:48%"></span>
                   <div class="tp__curve">
                     <p>Scroll velocity after lift-off</p>
-                    <svg viewBox="0 0 200 70" aria-hidden="true"><path d="M0 69.5H200" stroke="rgba(255,255,255,0.15)" fill="none"/><path d="M0 8C30 9 48 30 70 46S130 66 200 68" stroke="#9e7bff" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="0" cy="8" r="4" fill="#3de0b0"/></svg>
+                    <svg viewBox="0 0 200 70" aria-hidden="true"><path d="M0 69.5H200" stroke="rgba(255,255,255,0.15)" fill="none"/><path d="M0 8C30 9 48 30 70 46S130 66 200 68" stroke="#86b4ff" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="0" cy="8" r="4" fill="#3de0b0"/></svg>
                   </div>
                 </div>
               </div>
@@ -202,9 +202,9 @@
             <div class="frame frame--teal reveal" style="--delay:120ms">
               <div class="frame__stage">
                 <div class="tiers" role="img" aria-label="The mirror at three sizes, 640, 1280 and 1920 pixels wide, getting sharper as it grows.">
-                  <div class="tier"><div class="tier__shot" style="--blur:1.2px"><div class="mac" aria-hidden="true"><div class="mac__menubar"><span></span>Xcode<span style="font-weight:400">File</span><span style="font-weight:400">Edit</span><span style="font-weight:400">Product</span></div><div class="mac__win"><div class="mac__chrome"><i></i><i></i><i></i></div><div class="mac__rail"><i style="--w:70%"></i><i class="is-sel" style="--w:85%"></i><i style="--w:60%"></i><i style="--w:75%"></i><i style="--w:50%"></i></div><div class="mac__code"><i style="--w:40%;--c:#c9b8ff"></i><i style="--w:70%;--x:8%"></i><i style="--w:55%;--x:8%;--c:#a6ecd6"></i><i style="--w:62%;--x:16%"></i><i style="--w:30%;--x:8%;--c:#ffc2b3"></i><i style="--w:12%"></i><i style="--w:48%;--c:#c9b8ff"></i><i style="--w:66%;--x:8%"></i></div><div class="mac__sheet">Save changes to “Package.swift”?<span><i>Don’t Save</i><i>Cancel</i><i>Save</i></span></div></div><div class="mac__dock"><i style="background:linear-gradient(150deg,#5ac8fa,#007aff)"></i><i style="background:linear-gradient(150deg,#e8f1ff,#9cc3ff)"></i><i style="background:linear-gradient(150deg,#7af0cf,#1fb88b)"></i><i style="background:linear-gradient(150deg,#ffd479,#ff9f0a)"></i><i style="background:linear-gradient(150deg,#c7c7cc,#8e8e93)"></i></div></div></div><span class="tier__label">640 px</span></div>
-                  <div class="tier"><div class="tier__shot" style="--blur:.5px"><div class="mac" aria-hidden="true"><div class="mac__menubar"><span></span>Xcode<span style="font-weight:400">File</span><span style="font-weight:400">Edit</span><span style="font-weight:400">Product</span></div><div class="mac__win"><div class="mac__chrome"><i></i><i></i><i></i></div><div class="mac__rail"><i style="--w:70%"></i><i class="is-sel" style="--w:85%"></i><i style="--w:60%"></i><i style="--w:75%"></i><i style="--w:50%"></i></div><div class="mac__code"><i style="--w:40%;--c:#c9b8ff"></i><i style="--w:70%;--x:8%"></i><i style="--w:55%;--x:8%;--c:#a6ecd6"></i><i style="--w:62%;--x:16%"></i><i style="--w:30%;--x:8%;--c:#ffc2b3"></i><i style="--w:12%"></i><i style="--w:48%;--c:#c9b8ff"></i><i style="--w:66%;--x:8%"></i></div><div class="mac__sheet">Save changes to “Package.swift”?<span><i>Don’t Save</i><i>Cancel</i><i>Save</i></span></div></div><div class="mac__dock"><i style="background:linear-gradient(150deg,#5ac8fa,#007aff)"></i><i style="background:linear-gradient(150deg,#e8f1ff,#9cc3ff)"></i><i style="background:linear-gradient(150deg,#7af0cf,#1fb88b)"></i><i style="background:linear-gradient(150deg,#ffd479,#ff9f0a)"></i><i style="background:linear-gradient(150deg,#c7c7cc,#8e8e93)"></i></div></div></div><span class="tier__label">1280 px</span></div>
-                  <div class="tier"><div class="tier__shot"><div class="mac" aria-hidden="true"><div class="mac__menubar"><span></span>Xcode<span style="font-weight:400">File</span><span style="font-weight:400">Edit</span><span style="font-weight:400">Product</span></div><div class="mac__win"><div class="mac__chrome"><i></i><i></i><i></i></div><div class="mac__rail"><i style="--w:70%"></i><i class="is-sel" style="--w:85%"></i><i style="--w:60%"></i><i style="--w:75%"></i><i style="--w:50%"></i></div><div class="mac__code"><i style="--w:40%;--c:#c9b8ff"></i><i style="--w:70%;--x:8%"></i><i style="--w:55%;--x:8%;--c:#a6ecd6"></i><i style="--w:62%;--x:16%"></i><i style="--w:30%;--x:8%;--c:#ffc2b3"></i><i style="--w:12%"></i><i style="--w:48%;--c:#c9b8ff"></i><i style="--w:66%;--x:8%"></i></div><div class="mac__sheet">Save changes to “Package.swift”?<span><i>Don’t Save</i><i>Cancel</i><i>Save</i></span></div></div><div class="mac__dock"><i style="background:linear-gradient(150deg,#5ac8fa,#007aff)"></i><i style="background:linear-gradient(150deg,#e8f1ff,#9cc3ff)"></i><i style="background:linear-gradient(150deg,#7af0cf,#1fb88b)"></i><i style="background:linear-gradient(150deg,#ffd479,#ff9f0a)"></i><i style="background:linear-gradient(150deg,#c7c7cc,#8e8e93)"></i></div></div></div><span class="tier__label">1920 px</span></div>
+                  <div class="tier"><div class="tier__shot" style="--blur:1.2px"><div class="mac" aria-hidden="true"><div class="mac__menubar"><span></span>Xcode<span style="font-weight:400">File</span><span style="font-weight:400">Edit</span><span style="font-weight:400">Product</span></div><div class="mac__win"><div class="mac__chrome"><i></i><i></i><i></i></div><div class="mac__rail"><i style="--w:70%"></i><i class="is-sel" style="--w:85%"></i><i style="--w:60%"></i><i style="--w:75%"></i><i style="--w:50%"></i></div><div class="mac__code"><i style="--w:40%;--c:#b8d0ff"></i><i style="--w:70%;--x:8%"></i><i style="--w:55%;--x:8%;--c:#a6ecd6"></i><i style="--w:62%;--x:16%"></i><i style="--w:30%;--x:8%;--c:#ffc2b3"></i><i style="--w:12%"></i><i style="--w:48%;--c:#b8d0ff"></i><i style="--w:66%;--x:8%"></i></div><div class="mac__sheet">Save changes to “Package.swift”?<span><i>Don’t Save</i><i>Cancel</i><i>Save</i></span></div></div><div class="mac__dock"><i style="background:linear-gradient(150deg,#5ac8fa,#007aff)"></i><i style="background:linear-gradient(150deg,#e8f1ff,#9cc3ff)"></i><i style="background:linear-gradient(150deg,#7af0cf,#1fb88b)"></i><i style="background:linear-gradient(150deg,#ffd479,#ff9f0a)"></i><i style="background:linear-gradient(150deg,#c7c7cc,#8e8e93)"></i></div></div></div><span class="tier__label">640 px</span></div>
+                  <div class="tier"><div class="tier__shot" style="--blur:.5px"><div class="mac" aria-hidden="true"><div class="mac__menubar"><span></span>Xcode<span style="font-weight:400">File</span><span style="font-weight:400">Edit</span><span style="font-weight:400">Product</span></div><div class="mac__win"><div class="mac__chrome"><i></i><i></i><i></i></div><div class="mac__rail"><i style="--w:70%"></i><i class="is-sel" style="--w:85%"></i><i style="--w:60%"></i><i style="--w:75%"></i><i style="--w:50%"></i></div><div class="mac__code"><i style="--w:40%;--c:#b8d0ff"></i><i style="--w:70%;--x:8%"></i><i style="--w:55%;--x:8%;--c:#a6ecd6"></i><i style="--w:62%;--x:16%"></i><i style="--w:30%;--x:8%;--c:#ffc2b3"></i><i style="--w:12%"></i><i style="--w:48%;--c:#b8d0ff"></i><i style="--w:66%;--x:8%"></i></div><div class="mac__sheet">Save changes to “Package.swift”?<span><i>Don’t Save</i><i>Cancel</i><i>Save</i></span></div></div><div class="mac__dock"><i style="background:linear-gradient(150deg,#5ac8fa,#007aff)"></i><i style="background:linear-gradient(150deg,#e8f1ff,#9cc3ff)"></i><i style="background:linear-gradient(150deg,#7af0cf,#1fb88b)"></i><i style="background:linear-gradient(150deg,#ffd479,#ff9f0a)"></i><i style="background:linear-gradient(150deg,#c7c7cc,#8e8e93)"></i></div></div></div><span class="tier__label">1280 px</span></div>
+                  <div class="tier"><div class="tier__shot"><div class="mac" aria-hidden="true"><div class="mac__menubar"><span></span>Xcode<span style="font-weight:400">File</span><span style="font-weight:400">Edit</span><span style="font-weight:400">Product</span></div><div class="mac__win"><div class="mac__chrome"><i></i><i></i><i></i></div><div class="mac__rail"><i style="--w:70%"></i><i class="is-sel" style="--w:85%"></i><i style="--w:60%"></i><i style="--w:75%"></i><i style="--w:50%"></i></div><div class="mac__code"><i style="--w:40%;--c:#b8d0ff"></i><i style="--w:70%;--x:8%"></i><i style="--w:55%;--x:8%;--c:#a6ecd6"></i><i style="--w:62%;--x:16%"></i><i style="--w:30%;--x:8%;--c:#ffc2b3"></i><i style="--w:12%"></i><i style="--w:48%;--c:#b8d0ff"></i><i style="--w:66%;--x:8%"></i></div><div class="mac__sheet">Save changes to “Package.swift”?<span><i>Don’t Save</i><i>Cancel</i><i>Save</i></span></div></div><div class="mac__dock"><i style="background:linear-gradient(150deg,#5ac8fa,#007aff)"></i><i style="background:linear-gradient(150deg,#e8f1ff,#9cc3ff)"></i><i style="background:linear-gradient(150deg,#7af0cf,#1fb88b)"></i><i style="background:linear-gradient(150deg,#ffd479,#ff9f0a)"></i><i style="background:linear-gradient(150deg,#c7c7cc,#8e8e93)"></i></div></div></div><span class="tier__label">1920 px</span></div>
                 </div>
               </div>
             </div>
@@ -225,7 +225,7 @@
               <div class="frame__stage">
                 <div class="cap" role="img" aria-label="A capture of the Mac with a region selected and an annotation arrow, above buttons for Region, Annotate, Recognize Text and Save to Photos.">
                   <div class="cap__shot">
-                    <div class="mac" aria-hidden="true"><div class="mac__menubar"><span></span>Xcode<span style="font-weight:400">File</span><span style="font-weight:400">Edit</span><span style="font-weight:400">Product</span></div><div class="mac__win"><div class="mac__chrome"><i></i><i></i><i></i></div><div class="mac__rail"><i style="--w:70%"></i><i class="is-sel" style="--w:85%"></i><i style="--w:60%"></i><i style="--w:75%"></i><i style="--w:50%"></i></div><div class="mac__code"><i style="--w:40%;--c:#c9b8ff"></i><i style="--w:70%;--x:8%"></i><i style="--w:55%;--x:8%;--c:#a6ecd6"></i><i style="--w:62%;--x:16%"></i><i style="--w:30%;--x:8%;--c:#ffc2b3"></i><i style="--w:12%"></i><i style="--w:48%;--c:#c9b8ff"></i><i style="--w:66%;--x:8%"></i></div><div class="mac__sheet">Save changes to “Package.swift”?<span><i>Don’t Save</i><i>Cancel</i><i>Save</i></span></div></div><div class="mac__dock"><i style="background:linear-gradient(150deg,#5ac8fa,#007aff)"></i><i style="background:linear-gradient(150deg,#e8f1ff,#9cc3ff)"></i><i style="background:linear-gradient(150deg,#7af0cf,#1fb88b)"></i><i style="background:linear-gradient(150deg,#ffd479,#ff9f0a)"></i><i style="background:linear-gradient(150deg,#c7c7cc,#8e8e93)"></i></div></div>
+                    <div class="mac" aria-hidden="true"><div class="mac__menubar"><span></span>Xcode<span style="font-weight:400">File</span><span style="font-weight:400">Edit</span><span style="font-weight:400">Product</span></div><div class="mac__win"><div class="mac__chrome"><i></i><i></i><i></i></div><div class="mac__rail"><i style="--w:70%"></i><i class="is-sel" style="--w:85%"></i><i style="--w:60%"></i><i style="--w:75%"></i><i style="--w:50%"></i></div><div class="mac__code"><i style="--w:40%;--c:#b8d0ff"></i><i style="--w:70%;--x:8%"></i><i style="--w:55%;--x:8%;--c:#a6ecd6"></i><i style="--w:62%;--x:16%"></i><i style="--w:30%;--x:8%;--c:#ffc2b3"></i><i style="--w:12%"></i><i style="--w:48%;--c:#b8d0ff"></i><i style="--w:66%;--x:8%"></i></div><div class="mac__sheet">Save changes to “Package.swift”?<span><i>Don’t Save</i><i>Cancel</i><i>Save</i></span></div></div><div class="mac__dock"><i style="background:linear-gradient(150deg,#5ac8fa,#007aff)"></i><i style="background:linear-gradient(150deg,#e8f1ff,#9cc3ff)"></i><i style="background:linear-gradient(150deg,#7af0cf,#1fb88b)"></i><i style="background:linear-gradient(150deg,#ffd479,#ff9f0a)"></i><i style="background:linear-gradient(150deg,#c7c7cc,#8e8e93)"></i></div></div>
                     <span class="cap__region"></span>
                     <svg class="cap__arrow" viewBox="0 0 100 60" fill="none" aria-hidden="true"><path d="M6 52C30 50 56 38 82 14" stroke="#ff4d5e" stroke-width="6" stroke-linecap="round"/><path d="M66 12 86 10 82 30" stroke="#ff4d5e" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                   </div>
@@ -292,7 +292,7 @@
                 <span class="is-running" style="background:linear-gradient(150deg,#7af0cf,#1fb88b)"></span>
                 <span class="is-running" style="background:linear-gradient(150deg,#ffd479,#ff9f0a)"></span>
                 <span style="background:linear-gradient(150deg,#ff8aa0,#ff375f)"></span>
-                <span style="background:linear-gradient(150deg,#b89cff,#7c5cff)"></span>
+                <span style="background:linear-gradient(150deg,#7a3d7c,#4a154b)"></span>
                 <span style="background:linear-gradient(150deg,#a1e3ff,#30b0ff)"></span>
                 <span style="background:linear-gradient(150deg,#c7c7cc,#8e8e93)"></span>
                 <span class="launcher__label">Running, in Cmd-Tab order</span>
@@ -376,24 +376,24 @@
 
   <div class="link-diagram reveal">
     <svg viewBox="0 0 820 200" role="img" aria-label="An iPad and a Mac connected directly over local Wi-Fi, with the Bonjour service _deckhand._tcp between them and no cloud in the path.">
-      <rect x="20" y="40" width="170" height="128" rx="16" fill="#10101e" stroke="rgba(255,255,255,0.18)"/>
-      <rect x="32" y="52" width="146" height="104" rx="8" fill="#1b1550"/>
-      <rect x="46" y="66" width="80" height="76" rx="6" fill="rgba(124,92,255,0.35)"/>
-      <rect x="134" y="66" width="30" height="30" rx="5" fill="#7c5cff"/>
+      <rect x="20" y="40" width="170" height="128" rx="16" fill="#0e1540" stroke="rgba(255,255,255,0.18)"/>
+      <rect x="32" y="52" width="146" height="104" rx="8" fill="#0b1450"/>
+      <rect x="46" y="66" width="80" height="76" rx="6" fill="rgba(58,76,242,0.35)"/>
+      <rect x="134" y="66" width="30" height="30" rx="5" fill="#3a4cf2"/>
       <rect x="134" y="104" width="30" height="30" rx="5" fill="none" stroke="#3de0b0"/>
       <text x="105" y="194" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="14">iPad remote</text>
 
-      <rect x="620" y="36" width="180" height="116" rx="10" fill="#10101e" stroke="rgba(255,255,255,0.18)"/>
-      <rect x="632" y="48" width="156" height="92" rx="5" fill="#2a2170"/>
+      <rect x="620" y="36" width="180" height="116" rx="10" fill="#0e1540" stroke="rgba(255,255,255,0.18)"/>
+      <rect x="632" y="48" width="156" height="92" rx="5" fill="#111a5e"/>
       <rect x="648" y="60" width="104" height="64" rx="5" fill="rgba(255,255,255,0.85)"/>
-      <path d="M598 152h224l-14 14H612z" fill="#23212e"/>
+      <path d="M598 152h224l-14 14H612z" fill="#181d3d"/>
       <text x="710" y="194" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="14">Mac host</text>
 
-      <path d="M210 104H600" stroke="rgba(207,198,255,0.55)" stroke-width="2" stroke-dasharray="2 8" stroke-linecap="round" fill="none"/>
-      <circle class="packet" cx="300" cy="104" r="5" fill="#9e7bff"/>
+      <path d="M210 104H600" stroke="rgba(134,180,255,0.55)" stroke-width="2" stroke-dasharray="2 8" stroke-linecap="round" fill="none"/>
+      <circle class="packet" cx="300" cy="104" r="5" fill="#3de0e0"/>
       <circle class="packet" cx="520" cy="104" r="5" fill="#3de0b0"/>
-      <rect x="318" y="82" width="184" height="44" rx="22" fill="#0b0a1c" stroke="rgba(255,255,255,0.12)"/>
-      <text x="410" y="109" text-anchor="middle" fill="#cfc6ff" font-size="14" font-family="Google Sans Code, ui-monospace, monospace">_deckhand._tcp</text>
+      <rect x="318" y="82" width="184" height="44" rx="22" fill="#060a2a" stroke="rgba(255,255,255,0.12)"/>
+      <text x="410" y="109" text-anchor="middle" fill="#86b4ff" font-size="14" font-family="Google Sans Code, ui-monospace, monospace">_deckhand._tcp</text>
       <text x="410" y="152" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-size="13">Same Wi-Fi · direct connection</text>
 
       <g transform="translate(410 22)">
@@ -429,17 +429,17 @@
       </div>
       <ol class="steps after-heading">
         <li class="step reveal">
-          <span class="pill pill--violet pill--sm">01</span>
+          <span class="pill pill--accent pill--sm">01</span>
           <h3>Open Deck Hand on your Mac</h3>
           <p>It lives in the menu bar. Grant Accessibility and Screen Recording when it asks.</p>
         </li>
         <li class="step reveal" style="--delay:80ms">
-          <span class="pill pill--violet pill--sm">02</span>
+          <span class="pill pill--accent pill--sm">02</span>
           <h3>Join the same Wi-Fi</h3>
           <p>Open the remote on your iPad or iPhone. Your Mac appears in the list on its own.</p>
         </li>
         <li class="step reveal" style="--delay:160ms">
-          <span class="pill pill--violet pill--sm">03</span>
+          <span class="pill pill--accent pill--sm">03</span>
           <h3>Approve the iPad</h3>
           <p>Click Approve in the Mac’s menu bar and the trackpad, mirror, and shortcuts are live.</p>
         </li>
@@ -456,7 +456,7 @@
       <div class="req-grid after-heading">
         <article class="req req--dark reveal">
           <div class="req__head">
-            <div class="req__name">Mac host <span class="badge badge--violet">Menu bar</span></div>
+            <div class="req__name">Mac host <span class="badge badge--accent">Menu bar</span></div>
             <p class="req__desc">Captures the screen and drives the pointer.</p>
           </div>
           <div class="req__body">

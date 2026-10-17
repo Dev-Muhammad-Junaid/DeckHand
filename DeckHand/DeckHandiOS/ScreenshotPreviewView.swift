@@ -85,10 +85,10 @@ struct ScreenshotPreviewView: View {
                     if annotatedImage != nil {
                         Text("Annotated")
                             .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Color.yellow.opacity(0.9))
+                            .foregroundStyle(DeckHandTheme.Brand.sky)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(Capsule().fill(Color.yellow.opacity(0.18)))
+                            .background(Capsule().fill(DeckHandTheme.Brand.sky.opacity(0.18)))
                     }
 
                     Spacer()

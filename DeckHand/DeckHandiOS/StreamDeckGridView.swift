@@ -120,6 +120,11 @@ struct StreamDeckGridView: View {
                     .padding(.bottom, 40)
                 } else if installedApps.isEmpty {
                     DeckHandLoadingStateView(title: "Loading apps from Mac…")
+                } else if !searchText.isEmpty {
+                    // Without this a search with no matches left a blank page.
+                    DeckHandEmptyState(glyph: PixelArt.launch, title: "No apps match “\(searchText)”.")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 60)
                 }
             }
         }
@@ -330,8 +335,8 @@ private struct AppButton: View {
     private var activeRing: some View {
         if isActive {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(DeckHandTheme.violet, lineWidth: 2.5)
-                .shadow(color: DeckHandTheme.violet.opacity(0.55), radius: 6)
+                .strokeBorder(DeckHandTheme.accent, lineWidth: 2.5)
+                .shadow(color: DeckHandTheme.accent.opacity(0.55), radius: 6)
                 .padding(-3)
         }
     }

@@ -27,6 +27,10 @@ final class ControlReceiver {
     /// Sampled counter for high-rate input logging (see consumeMessages).
     private var inputMessageCount = 0
 
+    /// Fired with the number of authorized connections being served whenever
+    /// one starts or ends. Drives the menu bar icon's connected state.
+    var onLiveConnectionsChanged: ((Int) -> Void)?
+
     /// Connections silent for longer than this (after having pinged at
     /// least once — i.e. provably heartbeat-capable) are declared dead.
     /// The iPad pings every 2 s, so 8 s = four missed beats.
@@ -37,6 +41,7 @@ final class ControlReceiver {
         let key = connectionHandle.id
         connectionHandles[key] = connectionHandle
         lastActivityAt[key] = Date()
+        onLiveConnectionsChanged?(connectionHandles.count)
         startLivenessSweepIfNeeded()
         connectionTasks[key] = Task { [weak self] in
             ActiveAppMonitor.shared.addConnection(connectionHandle, id: key)
@@ -70,6 +75,7 @@ final class ControlReceiver {
     private func cleanupConnection(_ key: UUID) {
         connectionTasks.removeValue(forKey: key)
         connectionHandles.removeValue(forKey: key)
+        onLiveConnectionsChanged?(connectionHandles.count)
         lastActivityAt.removeValue(forKey: key)
         hasPinged.remove(key)
         ActiveAppMonitor.shared.removeConnection(id: key)
@@ -243,6 +249,23 @@ final class ControlReceiver {
         case .pong:
             break // host never receives pongs
 
+        case let .tracked(requestID, command):
+            // The decoder already rejects nested wrappers; this keeps the
+            // recursion to one level even if that ever changes.
+            if case .tracked = command { break }
+            var delivered = injector.isAccessibilityGranted
+            // A press for a dialog button from a superseded snapshot is
+            // dropped, so it mustn't read as confirmed on the remote.
+            // Checked now, before the press is queued in its own task.
+            if case let .triggerContextAction(id) = command {
+                delivered = delivered && ContextObserver.shared.hasAction(id: id)
+            }
+            await dispatch(command, handle: handle)
+            // Sent once the command is handed to injection. Slow commands
+            // (appShortcut, dialog presses) finish in their own tasks, so
+            // this confirms the Mac got it, not what the app did with it.
+            try? await handle.send(.commandReceipt(requestID: requestID, delivered: delivered))
+
         case .requestAuthorizationStatus:
             // Resync path: messages are only consumed for *authorized*
             // connections (DeviceAuthorizationManager gates the handoff),
@@ -258,7 +281,7 @@ final class ControlReceiver {
 
         case .authorizationStatus:
             break
-        case .screenshotData, .screenshotError, .activeAppUpdate, .appListResponse, .appMenuShortcutsResponse, .runningAppsUpdate, .uiContextUpdate, .windowListResponse, .mirrorFrame, .displayListUpdate, .hostCapabilities:
+        case .screenshotData, .screenshotError, .activeAppUpdate, .appListResponse, .appMenuShortcutsResponse, .runningAppsUpdate, .uiContextUpdate, .windowListResponse, .mirrorFrame, .displayListUpdate, .hostCapabilities, .hostFeatures, .commandReceipt:
             // Client-bound messages; host doesn't process them locally
             break
         }
@@ -404,6 +427,10 @@ final class ControlReceiver {
             accessibility: injector.isAccessibilityGranted,
             screenRecording: CGPreflightScreenCaptureAccess()
         ))
+        // Which protocol features this host understands, so the remote only
+        // asks for delivery receipts from a host that sends them. Repeated
+        // with every capability report, so a lost one heals within ~10 s.
+        try? await handle.send(.hostFeatures(commandReceipts: true))
     }
 
     private func sendError(requestID: String, to handle: LoomConnectionHandle, message: String) async {

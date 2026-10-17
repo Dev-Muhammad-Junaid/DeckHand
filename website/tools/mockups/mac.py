@@ -80,15 +80,16 @@ def desktop():
 CSS = """
 /* ---------- macOS desktop (1440x900 mac points) ---------- */
 .mac { --mp: calc(100cqw / 1440); position: relative; width: 100%; height: 100%; container-type: inline-size; overflow: hidden; font-family: -apple-system, "SF Pro Text", "Inter", system-ui, sans-serif; letter-spacing: 0; text-align: left;
-  background: radial-gradient(80% 60% at 70% 110%, #f2b9a3 0%, transparent 60%), radial-gradient(70% 70% at 15% 0%, #3a3fb8 0%, transparent 70%), linear-gradient(170deg, #1d1f5e 0%, #5a54c9 48%, #b98fd6 78%, #f1c1ae 100%); }
+  /* Wallpaper: the site's night sky, navy through cobalt to a pale sky horizon. */
+  background: radial-gradient(80% 60% at 70% 110%, #cfe0ff 0%, transparent 60%), radial-gradient(70% 70% at 15% 0%, #2f44de 0%, transparent 70%), linear-gradient(170deg, #0b1450 0%, #2f44de 48%, #6f9cf5 78%, #c6dcff 100%); }
 .mac svg { display: block; flex: none; }
-.mac__bar { height: <30>; display: flex; align-items: center; gap: <18>; padding: 0 <16>; color: #fff; font-size: <13>; font-weight: 400; background: rgba(20, 18, 50, 0.18); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+.mac__bar { height: <30>; display: flex; align-items: center; gap: <18>; padding: 0 <16>; color: #fff; font-size: <13>; font-weight: 400; background: rgba(6, 10, 42, 0.18); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
 .mac__bar > svg:first-child { width: <14>; height: <17>; margin-right: <4>; }
 .mac__bar b { font-weight: 700; }
 .mac__bar > svg:not(:first-child) { width: <16>; height: <16>; }
 .mac__sp { flex: 1; }
 .mac__win { position: absolute; left: <110>; top: <62>; width: <1220>; height: <800>; border-radius: <18>; overflow: hidden; display: flex; background: #fff;
-  box-shadow: 0 <30> <80> rgba(10, 8, 40, 0.42), 0 0 0 <0.5> rgba(0, 0, 0, 0.25); }
+  box-shadow: 0 <30> <80> rgba(6, 10, 42, 0.42), 0 0 0 <0.5> rgba(0, 0, 0, 0.25); }
 .mac__side { width: <250>; flex: none; background: #ececf0; border-right: <1> solid #dcdce0; padding: <16> <10>; }
 .mac__lights { display: flex; gap: <8>; padding: <2> <8> <20>; }
 .mac__lights i { width: <13>; height: <13>; border-radius: 50%; background: #ff5f57; box-shadow: inset 0 0 0 <0.5> rgba(0, 0, 0, 0.15); }

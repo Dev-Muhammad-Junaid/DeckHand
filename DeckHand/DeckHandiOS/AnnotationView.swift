@@ -126,7 +126,7 @@ struct AnnotationView: View {
                 onFinish(exportAnnotatedImage())
             }
             .font(.system(size: 15, weight: .semibold))
-            .foregroundStyle(DeckHandTheme.violet)
+            .foregroundStyle(DeckHandTheme.Brand.sky)
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 10)

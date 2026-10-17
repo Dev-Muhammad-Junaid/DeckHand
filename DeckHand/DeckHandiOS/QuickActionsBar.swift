@@ -163,7 +163,7 @@ struct QuickActionsBar: View {
                 ForEach(ctx.buttons) { button in
                     DialogButtonChip(button: button, colorScheme: colorScheme) {
                         (button.isDefault ? GestureHaptic.medium : .light).trigger()
-                        Task { await sender.sendContextAction(id: button.id) }
+                        return await sender.sendConfirmed(.triggerContextAction(id: button.id))
                     }
                 }
             }
@@ -276,12 +276,9 @@ struct QuickActionsBar: View {
                 ForEach(contextualBindings) { binding in
                     ShortcutChip(binding: binding, colorScheme: colorScheme) {
                         GestureHaptic.medium.trigger()
-                        Task {
-                            await sender.sendAppShortcut(
-                                bundleID: binding.bundleID,
-                                keys: binding.keys
-                            )
-                        }
+                        return await sender.sendConfirmed(
+                            .appShortcut(bundleID: binding.bundleID, keys: binding.keys)
+                        )
                     }
                 }
             }
@@ -423,12 +420,16 @@ private struct IdlePill: View {
 private struct ShortcutChip: View {
     let binding: AppShortcutBinding
     let colorScheme: ColorScheme
-    let onTap: () -> Void
+    /// Sends the shortcut and reports whether the Mac confirmed it.
+    let onTap: @MainActor () async -> CommandDelivery
 
     @State private var isPressed = false
+    @State private var delivery = DeliveryTracker()
 
     var body: some View {
-        Button(action: onTap) {
+        Button {
+            Task { await DeliveryTracker.run($delivery, send: onTap) }
+        } label: {
             VStack(spacing: 2) {
                 Text(binding.keyGlyphs)
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
@@ -446,6 +447,7 @@ private struct ShortcutChip: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(DeckHandTheme.subtleWellFill(colorScheme))
             )
+            .deliveryDots(delivery.state)
             .scaleEffect(isPressed ? 0.93 : 1.0)
             .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isPressed)
         }
@@ -627,7 +629,7 @@ private struct TextFieldAction: Identifiable {
     let symbol: String
     let label: String
     let keys: [String]
-    let isPrimary: Bool  // Return — violet-filled like the default dialog button
+    let isPrimary: Bool  // Return — accent-filled like the default dialog button
 
     static func actions(for kind: TextFieldContext.Kind) -> [TextFieldAction] {
         switch kind {
@@ -707,7 +709,7 @@ private struct TextFieldChip: View {
     }
 
     private var background: Color {
-        action.isPrimary ? DeckHandTheme.violet : DeckHandTheme.subtleWellFill(colorScheme)
+        action.isPrimary ? DeckHandTheme.accent : DeckHandTheme.subtleWellFill(colorScheme)
     }
 }
 
@@ -791,13 +793,13 @@ private struct NumpadChip: View {
     }
 
     private var background: Color {
-        key.isPrimary ? DeckHandTheme.violet : DeckHandTheme.subtleWellFill(colorScheme)
+        key.isPrimary ? DeckHandTheme.accent : DeckHandTheme.subtleWellFill(colorScheme)
     }
 }
 
 // MARK: - Dialog Info Button (tap-to-reveal tooltip)
 
-/// Compact violet alert icon shown inside the takeover bar. Tap to pop
+/// Compact accent alert icon shown inside the takeover bar. Tap to pop
 /// over the dialog's title + full message, so long AX copy doesn't steal
 /// horizontal space from the action buttons. Hidden entirely when AX
 /// surfaced neither a title nor a message — in that case the actions
@@ -822,7 +824,7 @@ private struct DialogInfoButton: View {
                 Image(systemName: "exclamationmark.bubble.fill")
                     .font(.system(size: 15, weight: .medium))
                     .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(DeckHandTheme.violet)
+                    .foregroundStyle(DeckHandTheme.accent)
                     .frame(width: 36, height: 36)
                     .contentShape(Rectangle())
             }
@@ -865,12 +867,16 @@ private struct DialogInfoPopover: View {
 private struct DialogButtonChip: View {
     let button: DialogButton
     let colorScheme: ColorScheme
-    let onTap: () -> Void
+    /// Presses the button on the Mac and reports whether it confirmed.
+    let onTap: @MainActor () async -> CommandDelivery
 
     @State private var isPressed = false
+    @State private var delivery = DeliveryTracker()
 
     var body: some View {
-        Button(action: onTap) {
+        Button {
+            Task { await DeliveryTracker.run($delivery, send: onTap) }
+        } label: {
             HStack(spacing: 5) {
                 Text(button.title)
                     .font(.system(size: 12, weight: button.isDefault ? .semibold : .medium, design: .rounded))
@@ -892,6 +898,7 @@ private struct DialogButtonChip: View {
                             .strokeBorder(stroke, lineWidth: 1)
                     )
             )
+            .deliveryDots(delivery.state)
             .scaleEffect(isPressed ? 0.93 : 1.0)
             .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isPressed)
         }
@@ -910,13 +917,13 @@ private struct DialogButtonChip: View {
     }
 
     private var background: Color {
-        if button.isDefault { return DeckHandTheme.violet }
+        if button.isDefault { return DeckHandTheme.accent }
         if button.isCancel  { return Color.clear }
         return DeckHandTheme.subtleWellFill(colorScheme)
     }
 
     private var stroke: Color {
-        if button.isDefault { return DeckHandTheme.violet.opacity(0.8) }
+        if button.isDefault { return DeckHandTheme.accent.opacity(0.8) }
         if button.isCancel  { return Color.primary.opacity(0.14) }
         return Color.primary.opacity(0.08)
     }

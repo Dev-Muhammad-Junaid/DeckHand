@@ -44,6 +44,9 @@ struct TrackpadCallbacks {
     var onLongPress: (CGPoint) -> Void = { _ in }
     /// Reports the active gesture kind for the UI indicator (nil = idle).
     var onGestureChanged: (TrackpadGestureKind?) -> Void = { _ in }
+    /// Every finger on the surface, in the view's coordinates, whenever one
+    /// lands, moves or lifts. Drives the dot field; empty when all have lifted.
+    var onTouchesChanged: ([CGPoint]) -> Void = { _ in }
 }
 
 // MARK: - SwiftUI bridge
@@ -157,6 +160,7 @@ final class TouchTrackingView: UIView {
 
         // Report gesture kind
         callbacks.onGestureChanged(gestureKind(for: count))
+        reportTouches()
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -228,6 +232,7 @@ final class TouchTrackingView: UIView {
         default:
             break
         }
+        reportTouches()
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -278,6 +283,7 @@ final class TouchTrackingView: UIView {
             lastCentroid = centroid(of: activeTouches)
             callbacks.onGestureChanged(gestureKind(for: activeTouches.count))
         }
+        reportTouches()
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -294,9 +300,14 @@ final class TouchTrackingView: UIView {
             threeFingerFired = false
             callbacks.onGestureChanged(nil)
         }
+        reportTouches()
     }
 
     // MARK: - Helpers
+
+    private func reportTouches() {
+        callbacks.onTouchesChanged(activeTouches.map { $0.location(in: self) })
+    }
 
     private func centroid(of touches: [UITouch]) -> CGPoint {
         guard !touches.isEmpty else { return .zero }
