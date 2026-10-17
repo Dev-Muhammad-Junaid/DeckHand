@@ -102,13 +102,14 @@ struct PixelMorph: View {
         .onChange(of: glyph) { old, _ in
             // Under Reduce Motion the new glyph simply replaces the old one.
             guard !reduceMotion else { return }
-            previous = old
-            changedAt = Date.timeIntervalSinceReferenceDate
+            // `self.`: the body's local snapshots above shadow these names.
+            self.previous = old
+            self.changedAt = Date.timeIntervalSinceReferenceDate
             changeCount += 1
             let change = changeCount
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(Self.duration))
-                if changeCount == change { previous = nil }
+                if changeCount == change { self.previous = nil }
             }
         }
         .accessibilityHidden(true)
