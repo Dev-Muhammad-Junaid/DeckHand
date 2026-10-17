@@ -1,9 +1,10 @@
 name: Publish DocC
 
+# Manual only. GitHub Pages isn't enabled for this repository (and isn't
+# available to private repositories on the Free plan), so a run on every push
+# failed at "Configure GitHub Pages" and still billed macOS minutes. Enable
+# Pages in Settings → Pages with "GitHub Actions" as the source before running.
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:

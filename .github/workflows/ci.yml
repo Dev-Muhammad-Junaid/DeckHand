@@ -1,12 +1,26 @@
 name: CI
 
+# Only the Loom package is built here, so changes to the apps, the website or
+# the docs don't spend macOS minutes on it.
 on:
   push:
     branches:
       - main
+    paths:
+      - Sources/**
+      - Tests/**
+      - Package.swift
+      - Package.resolved
+      - .github/workflows/ci.yml
   pull_request:
     branches:
       - main
+    paths:
+      - Sources/**
+      - Tests/**
+      - Package.swift
+      - Package.resolved
+      - .github/workflows/ci.yml
   workflow_dispatch:
 
 permissions:
@@ -26,14 +40,17 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      # One build for both steps: building into a different scratch path than
+      # the tests use compiles the whole package twice.
       - name: Build all targets
-        run: swift build
+        run: swift build --build-tests --scratch-path .build-local
 
       - name: Run tests
+        # A hang fails here instead of running out the job.
+        timeout-minutes: 8
         # invalidResumeOffsetIsRejected and liveSamePeerConnectionOutsideWindowIsDropped
         # hang rather than fail — pre-existing, unrelated to Deck Hand (see README).
-        # Skipping them keeps CI inside the job timeout.
         run: |
-          swift test --scratch-path .build-local \
+          swift test --skip-build --scratch-path .build-local \
             --skip invalidResumeOffsetIsRejected \
             --skip liveSamePeerConnectionOutsideWindowIsDropped
