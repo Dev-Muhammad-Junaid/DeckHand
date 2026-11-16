@@ -113,7 +113,10 @@ enum DeckHandDiagnostics {
     /// Drops identifying names before an event leaves the device.
     private static func scrub(_ event: Event) -> Event {
         event.serverName = nil
-        event.user = nil
+        // Keep only the user ID: Sentry fills it with a random per-install
+        // ID, which is what lets it count affected installs. Nothing else
+        // (IP, name, email) should ever be there.
+        event.user = event.user?.userId.map { User(userId: $0) }
         if var device = event.context?["device"] {
             device.removeValue(forKey: "name")
             event.context?["device"] = device

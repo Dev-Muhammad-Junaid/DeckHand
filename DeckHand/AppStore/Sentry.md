@@ -6,8 +6,8 @@ Sentry through `Shared/DeckHandDiagnostics.swift`. Users can turn it off: the
 and is a checkbox at the bottom of the Mac menu-bar panel. It defaults to on.
 
 What is never sent: screenshots, view hierarchy, session replay, device or
-computer names, user/IP data (`sendDefaultPii = false`, plus a `beforeSend`
-scrub). Keep it that way. The privacy policy, both `PrivacyInfo.xcprivacy`
+computer names, IP address, name or email (`sendDefaultPii = false`, plus a
+`beforeSend` scrub). The only identifier is Sentry's random per-install ID. Keep it that way. The privacy policy, both `PrivacyInfo.xcprivacy`
 files and the App Store privacy answers all assume it.
 
 ## One-time setup (owner)
@@ -65,5 +65,5 @@ Run a **Debug** build with the DSN filled in, then in Sentry:
 - **Environment** filter shows `development` for Debug and `production` for
   Release builds.
 - Open an event and check **Device**: it shows the model and OS but **no
-  name**. Check **User**: empty. Check **Attachments**: none.
+  name**. Check **User**: only an `id` (Sentry's random per-install ID), no IP, name or email. Check **Attachments**: none.
 - Turn the switch off, crash again: nothing should arrive.
