@@ -1,0 +1,13 @@
+# Cloudflare Pages configuration for pixelhand.app.
+# Deploy from this folder with:  npx wrangler pages deploy --branch main
+# This file is the source of truth for the project's bindings; the dashboard
+# shows them read-only while it exists.
+name = "pixelhand"
+pages_build_output_dir = "public"
+compatibility_date = "2026-11-01"
+
+# Waitlist signups (functions/api/waitlist.js). Production only, so preview
+# deployments don't write test signups into the real list.
+[[env.production.kv_namespaces]]
+binding = "WAITLIST"
+id = "8526305879cf4afeb69cbee66745c008"

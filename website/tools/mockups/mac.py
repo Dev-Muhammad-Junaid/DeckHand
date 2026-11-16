@@ -36,10 +36,10 @@ FOLDER = '<svg viewBox="0 0 16 13" aria-hidden="true"><path fill="#1E8CFF" d="M1
 SWIFT = '<svg viewBox="0 0 13 15" aria-hidden="true"><path fill="#fff" stroke="#c7c7cc" stroke-width=".8" d="M1.4.4h7l4.2 4.2v8.8c0 .6-.5 1.2-1.1 1.2H1.4C.8 14.6.4 14 .4 13.4V1.6C.4 1 .8.4 1.4.4z"/><path fill="#F05138" d="M3 7.5h7v4.2H3z" rx="1"/></svg>'
 
 TREE = [
-    (0, 'folder', 'DeckHand', ''), (1, 'folder', 'DeckHandMac', ''), (1, 'folder', 'DeckHandiOS', ''), (1, 'folder', 'Shared', ''),
+    (0, 'folder', 'PixelHand', ''), (1, 'folder', 'PixelHandMac', ''), (1, 'folder', 'PixelHandiOS', ''), (1, 'folder', 'Shared', ''),
     (2, 'swift', 'AppShortcut.swift', ''), (2, 'swift', 'CaptureMode.swift', ''), (2, 'swift', 'ControlMessage.swift', 'sel'),
-    (2, 'swift', 'CuratedShortcuts.swift', ''), (2, 'swift', 'DeckHandCloud.swift', ''), (2, 'swift', 'DeckHandTheme.swift', ''),
-    (1, 'folder', 'DeckHandTests', ''), (0, 'folder', 'Loom', ''), (1, 'swift', 'Package.swift', 'mod'),
+    (2, 'swift', 'CuratedShortcuts.swift', ''), (2, 'swift', 'PixelHandCloud.swift', ''), (2, 'swift', 'PixelHandTheme.swift', ''),
+    (1, 'folder', 'PixelHandTests', ''), (0, 'folder', 'Loom', ''), (1, 'swift', 'Package.swift', 'mod'),
 ]
 
 def tree():
@@ -73,7 +73,7 @@ def desktop():
     menus = ''.join(f'<span>{m}</span>' for m in ['File', 'Edit', 'View', 'Find', 'Navigate', 'Editor', 'Product', 'Debug', 'Window', 'Help'])
     return (f'<div class="mac" aria-hidden="true"><div class="mac__bar">{APPLE}<b>Xcode</b>{menus}<span class="mac__sp"></span>{WIFI}<span>Thu Oct 9&nbsp;&nbsp;9:41 AM</span></div>'
             '<div class="mac__win"><div class="mac__side"><span class="mac__lights"><i></i><i></i><i></i></span>' + tree() + '</div>'
-            '<div class="mac__main"><div class="mac__tool"><b>DeckHand</b><span class="mac__scheme">DeckHandMac <s>›</s> My Mac</span><span class="mac__status">Build Succeeded&nbsp;&nbsp;|&nbsp;&nbsp;Today at 9:40 AM</span></div>'
+            '<div class="mac__main"><div class="mac__tool"><b>PixelHand</b><span class="mac__scheme">PixelHandMac <s>›</s> My Mac</span><span class="mac__status">Build Succeeded&nbsp;&nbsp;|&nbsp;&nbsp;Today at 9:40 AM</span></div>'
             '<div class="mac__tabs"><span class="on">' + SWIFT + 'ControlMessage.swift</span><span>' + SWIFT + 'Package.swift</span></div>'
             + code() + '</div>' + alert() + '</div></div>')
 
