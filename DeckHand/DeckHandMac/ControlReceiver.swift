@@ -115,13 +115,20 @@ final class ControlReceiver {
             // connection is revoked or timed out, even with a backlog.
             if Task.isCancelled { return }
             lastActivityAt[connectionHandle.id] = Date()
-            let message: ControlMessage
+            let decoded: ControlMessage
             do {
-                message = try ControlMessageCoding.decoder.decode(ControlMessage.self, from: data)
+                decoded = try ControlMessageCoding.decoder.decode(ControlMessage.self, from: data)
             } catch {
                 #if DEBUG
                 print("Pixel Hand: ⚠️ Failed to decode ControlMessage (\(data.count)B): \(error)")
                 #endif
+                continue
+            }
+            // Every number from the remote is checked here, once, before
+            // any handler sees it: non-finite values drop the message and
+            // the rest are clamped (PH-031).
+            guard let message = RemoteInputValidation.sanitize(decoded) else {
+                DeckHandLog.input.error("Dropped a message with an invalid number from \(connectionHandle.id, privacy: .public)")
                 continue
             }
             // Arrival visibility: when the iPad "does nothing", the first
