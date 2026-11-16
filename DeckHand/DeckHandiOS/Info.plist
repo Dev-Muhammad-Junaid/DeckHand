@@ -18,6 +18,13 @@
     <string>$(MARKETING_VERSION)</string>
     <key>CFBundleVersion</key>
     <string>$(CURRENT_PROJECT_VERSION)</string>
+    <!-- Export compliance. All encryption is Loom's session security
+         (P-256 ECDH, HKDF-SHA256, ChaCha20-Poly1305, P-256 ECDSA), done
+         with Apple's CryptoKit — standard algorithms provided by the OS,
+         no proprietary or bundled crypto. See
+         DeckHand/AppStore/ExportCompliance.md before changing this. -->
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
     <key>UILaunchScreen</key>
     <dict/>
     <key>UISupportedInterfaceOrientations</key>
