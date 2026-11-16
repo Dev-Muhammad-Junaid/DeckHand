@@ -12,10 +12,12 @@
 //
 //  Performance / memory invariants:
 //
-//   • LATEST-FRAME-WINS. While a frame is being encoded or is in flight on
-//     the wire, new frames are dropped at the top of the sample handler —
-//     nothing is ever queued, so a slow Wi-Fi link degrades to a lower
-//     effective frame rate instead of ballooning memory and latency.
+//   • LATEST-FRAME-WINS. While a frame is being encoded, new frames are
+//     dropped at the top of the sample handler, and a subscriber whose
+//     previous frame is still on the wire skips the next one — nothing is
+//     ever queued, so a slow Wi-Fi link degrades to a lower effective frame
+//     rate for that remote only, instead of ballooning memory and latency
+//     or stalling the other remotes.
 //   • The GPU does the downsample inside ScreenCaptureKit (the stream
 //     configuration is sized to the *target* output), so we never touch
 //     native-resolution pixels on the CPU. A ~480px frame encodes to
@@ -70,6 +72,13 @@ final class MirrorStreamService: NSObject {
     /// here too, keeping all pixel work off the main thread.
     private let sampleQueue = DispatchQueue(label: "com.widgetsflow.pixelhand.mirror.frames", qos: .userInteractive)
     private var screenObserver: NSObjectProtocol?
+    /// Start, stop and display changes run one at a time. These methods
+    /// await, so without this two `startMirror`s interleaved: both saw no
+    /// stream, both built one, and the orphan kept capturing.
+    private let lifecycle = SerialTaskQueue()
+    /// Subscribers with a frame send still in flight. Each gets at most one
+    /// at a time, and one stuck peer no longer holds up everyone else.
+    private var sendingTo: Set<UUID> = []
 
     private override init() {
         super.init()
@@ -82,7 +91,10 @@ final class MirrorStreamService: NSObject {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
-                await self?.handleScreensChanged()
+                // Serialized with start/stop, which also replace the stream.
+                await self?.lifecycle.run {
+                    await MirrorStreamService.shared.handleScreensChanged()
+                }
             }
         }
     }
@@ -95,6 +107,24 @@ final class MirrorStreamService: NSObject {
     /// one display. The first subscriber's fps/width preferences win until
     /// the stream restarts.
     func start(
+        subscriberID: UUID,
+        handle: LoomConnectionHandle,
+        fps: Int,
+        maxWidth: Int,
+        displayID: UInt32?
+    ) async {
+        await lifecycle.run { [weak self] in
+            await self?.performStart(
+                subscriberID: subscriberID,
+                handle: handle,
+                fps: fps,
+                maxWidth: maxWidth,
+                displayID: displayID
+            )
+        }
+    }
+
+    private func performStart(
         subscriberID: UUID,
         handle: LoomConnectionHandle,
         fps: Int,
@@ -137,10 +167,17 @@ final class MirrorStreamService: NSObject {
 
     /// Removes a subscriber; tears the stream down when none remain.
     /// Safe to call redundantly (disconnect path + explicit stopMirror).
+    ///
+    /// Queued behind any start still in progress (so a start can't re-add a
+    /// subscriber that already left) but doesn't wait for it: the caller is
+    /// a connection's cleanup, which must not hang on ScreenCaptureKit.
     func stop(subscriberID: UUID) async {
-        guard subscribers.removeValue(forKey: subscriberID) != nil else { return }
-        if subscribers.isEmpty {
-            await teardownStream()
+        lifecycle.enqueue { [weak self] in
+            guard let self,
+                  self.subscribers.removeValue(forKey: subscriberID) != nil else { return }
+            if self.subscribers.isEmpty {
+                await self.teardownStream()
+            }
         }
     }
 
@@ -167,13 +204,15 @@ final class MirrorStreamService: NSObject {
 
         let filter = SCContentFilter(display: display, excludingWindows: [])
 
-        let output = MirrorFrameOutput { [weak self] jpegData, seq in
+        let output = MirrorFrameOutput { [weak self] source, jpegData, seq in
             // Called on `sampleQueue` after encode. Hop to the MainActor to
-            // read the subscriber table and send. `output.busy` stays true
-            // until the sends complete — that's the backpressure.
+            // hand the frame to each subscriber that's ready, then free the
+            // encoder. The flag cleared is the one on the output that made
+            // this frame: clearing `self.output`'s instead let an old
+            // stream's frame unblock (or never unblock) a new one.
             Task { @MainActor [weak self] in
-                await self?.broadcast(jpegData, seq: seq)
-                self?.output?.finishFrame()
+                self?.broadcast(jpegData, seq: seq, from: source)
+                source.finishFrame()
             }
         }
 
@@ -244,13 +283,19 @@ final class MirrorStreamService: NSObject {
         }
     }
 
-    private func broadcast(_ data: Data, seq: UInt64) async {
-        // Sequential sends: with one subscriber (the normal case) this is
-        // exactly the in-flight backpressure we want; with several, the
-        // slowest peer paces the shared stream, which keeps total uplink
-        // bounded.
-        for handle in subscribers.values {
-            try? await handle.send(.mirrorFrame(seq: seq, data: data))
+    /// Latest-frame-wins per subscriber: a subscriber whose previous frame
+    /// is still on the wire skips this one. Sends used to run one after
+    /// another while the encoder waited, so a single hung `send` froze the
+    /// mirror for every remote.
+    private func broadcast(_ data: Data, seq: UInt64, from source: MirrorFrameOutput) {
+        // Drop frames from a stream that has since been replaced or stopped.
+        guard source === output else { return }
+        for (id, handle) in subscribers where !sendingTo.contains(id) {
+            sendingTo.insert(id)
+            Task { @MainActor [weak self] in
+                try? await handle.send(.mirrorFrame(seq: seq, data: data))
+                self?.sendingTo.remove(id)
+            }
         }
     }
 }
@@ -260,10 +305,11 @@ final class MirrorStreamService: NSObject {
 /// Receives frames on the sample-handler queue, encodes, and forwards.
 /// `@unchecked Sendable` because all mutable state is confined to the
 /// sample-handler queue except `busy`, which is lock-protected (it's
-/// cleared from the MainActor when the wire send completes).
+/// cleared from the MainActor once the frame is handed to the senders).
 private final class MirrorFrameOutput: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
-    /// Called with encoded JPEG + sequence number, on the sample queue.
-    private let onFrame: (Data, UInt64) -> Void
+    /// Called with this output, the encoded JPEG and its sequence number,
+    /// on the sample queue.
+    private let onFrame: (MirrorFrameOutput, Data, UInt64) -> Void
 
     private let lock = NSLock()
     private var busy = false
@@ -273,7 +319,7 @@ private final class MirrorFrameOutput: NSObject, SCStreamOutput, SCStreamDelegat
     /// resources 20× per second.
     private let ciContext = CIContext(options: [.cacheIntermediates: false])
 
-    init(onFrame: @escaping (Data, UInt64) -> Void) {
+    init(onFrame: @escaping (MirrorFrameOutput, Data, UInt64) -> Void) {
         self.onFrame = onFrame
     }
 
@@ -302,7 +348,7 @@ private final class MirrorFrameOutput: NSObject, SCStreamOutput, SCStreamDelegat
         }
 
         seq &+= 1
-        onFrame(frameData, seq)
+        onFrame(self, frameData, seq)
     }
 
     func stream(_ stream: SCStream, didStopWithError error: Error) {
