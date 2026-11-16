@@ -65,10 +65,16 @@ public struct LoomWakeOnLANInfo: Codable, Hashable, Sendable {
     }
 }
 
+/// Optional control-channel capabilities published by a peer.
+public enum LoomBootstrapControlCapability: String, Codable, Hashable, Sendable {
+    /// Peer accepts authenticated opaque bootstrap control commands.
+    case commands
+}
+
 /// Bootstrap capability metadata stored with peer records.
 public struct LoomBootstrapMetadata: Codable, Hashable, Sendable {
     /// Metadata version for forward-compatible decoding.
-    public static let currentVersion = 4
+    public static let currentVersion = 7
 
     /// Metadata schema version.
     public let version: Int
@@ -82,6 +88,12 @@ public struct LoomBootstrapMetadata: Codable, Hashable, Sendable {
     public let sshPort: UInt16?
     /// Optional bootstrap control port for daemon handoff.
     public let controlPort: UInt16?
+    /// Shared secret used to encrypt pre-login daemon control requests.
+    public let controlAuthSecret: String?
+    /// Optional authenticated control-channel capabilities.
+    public let controlCapabilities: Set<LoomBootstrapControlCapability>
+    /// Pinned SHA256 fingerprints for SSH host-key validation.
+    public let sshHostKeyFingerprints: [String]
     /// Wake-on-LAN metadata when available.
     public let wakeOnLAN: LoomWakeOnLANInfo?
 
@@ -94,6 +106,9 @@ public struct LoomBootstrapMetadata: Codable, Hashable, Sendable {
     ///   - endpoints: Candidate endpoints for bootstrap connection attempts.
     ///   - sshPort: Preferred SSH port.
     ///   - controlPort: Preferred daemon control port.
+    ///   - controlAuthSecret: Shared secret used to encrypt daemon control requests.
+    ///   - controlCapabilities: Optional authenticated control-channel capabilities.
+    ///   - sshHostKeyFingerprints: Pinned SHA256 host-key fingerprints accepted for SSH bootstrap.
     ///   - wakeOnLAN: Optional Wake-on-LAN payload data.
     ///
     /// Example:
@@ -104,6 +119,7 @@ public struct LoomBootstrapMetadata: Codable, Hashable, Sendable {
     ///     endpoints: [.init(host: "192.168.1.10", port: 22, source: .auto)],
     ///     sshPort: 22,
     ///     controlPort: 9849,
+    ///     sshHostKeyFingerprints: ["SHA256:..."],
     ///     wakeOnLAN: .init(macAddress: "AA:BB:CC:DD:EE:FF", broadcastAddresses: ["192.168.1.255"])
     /// )
     /// ```
@@ -114,6 +130,9 @@ public struct LoomBootstrapMetadata: Codable, Hashable, Sendable {
         endpoints: [LoomBootstrapEndpoint],
         sshPort: UInt16?,
         controlPort: UInt16?,
+        controlAuthSecret: String? = nil,
+        controlCapabilities: Set<LoomBootstrapControlCapability> = [],
+        sshHostKeyFingerprints: [String] = [],
         wakeOnLAN: LoomWakeOnLANInfo?
     ) {
         self.version = version
@@ -122,6 +141,93 @@ public struct LoomBootstrapMetadata: Codable, Hashable, Sendable {
         self.endpoints = endpoints
         self.sshPort = sshPort
         self.controlPort = controlPort
+        self.controlAuthSecret = controlAuthSecret
+        self.controlCapabilities = controlCapabilities
+        self.sshHostKeyFingerprints = sshHostKeyFingerprints
         self.wakeOnLAN = wakeOnLAN
+    }
+
+    public init(
+        version: Int = LoomBootstrapMetadata.currentVersion,
+        enabled: Bool,
+        supportsPreloginDaemon: Bool,
+        endpoints: [LoomBootstrapEndpoint],
+        sshPort: UInt16?,
+        controlPort: UInt16?,
+        controlAuthSecret: String? = nil,
+        sshHostKeyFingerprints: [String] = [],
+        wakeOnLAN: LoomWakeOnLANInfo?
+    ) {
+        self.init(
+            version: version,
+            enabled: enabled,
+            supportsPreloginDaemon: supportsPreloginDaemon,
+            endpoints: endpoints,
+            sshPort: sshPort,
+            controlPort: controlPort,
+            controlAuthSecret: controlAuthSecret,
+            controlCapabilities: [],
+            sshHostKeyFingerprints: sshHostKeyFingerprints,
+            wakeOnLAN: wakeOnLAN
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case version
+        case enabled
+        case supportsPreloginDaemon
+        case endpoints
+        case sshPort
+        case controlPort
+        case controlAuthSecret
+        case controlCapabilities
+        case sshHostKeyFingerprints
+        case wakeOnLAN
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decodeIfPresent(Int.self, forKey: .version) ?? Self.currentVersion
+        enabled = try container.decode(Bool.self, forKey: .enabled)
+        supportsPreloginDaemon = try container.decode(Bool.self, forKey: .supportsPreloginDaemon)
+        endpoints = try container.decode([LoomBootstrapEndpoint].self, forKey: .endpoints)
+        sshPort = try container.decodeIfPresent(UInt16.self, forKey: .sshPort)
+        controlPort = try container.decodeIfPresent(UInt16.self, forKey: .controlPort)
+        controlAuthSecret = try container.decodeIfPresent(String.self, forKey: .controlAuthSecret)
+        controlCapabilities = try container.decodeIfPresent(
+            Set<LoomBootstrapControlCapability>.self,
+            forKey: .controlCapabilities
+        ) ?? []
+        sshHostKeyFingerprints = try container.decodeIfPresent(
+            [String].self,
+            forKey: .sshHostKeyFingerprints
+        ) ?? []
+        wakeOnLAN = try container.decodeIfPresent(LoomWakeOnLANInfo.self, forKey: .wakeOnLAN)
+    }
+
+    public static func == (lhs: LoomBootstrapMetadata, rhs: LoomBootstrapMetadata) -> Bool {
+        lhs.version == rhs.version &&
+            lhs.enabled == rhs.enabled &&
+            lhs.supportsPreloginDaemon == rhs.supportsPreloginDaemon &&
+            lhs.endpoints == rhs.endpoints &&
+            lhs.sshPort == rhs.sshPort &&
+            lhs.controlPort == rhs.controlPort &&
+            lhs.controlAuthSecret == rhs.controlAuthSecret &&
+            lhs.controlCapabilities == rhs.controlCapabilities &&
+            lhs.sshHostKeyFingerprints == rhs.sshHostKeyFingerprints &&
+            lhs.wakeOnLAN == rhs.wakeOnLAN
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(version)
+        hasher.combine(enabled)
+        hasher.combine(supportsPreloginDaemon)
+        hasher.combine(endpoints)
+        hasher.combine(sshPort)
+        hasher.combine(controlPort)
+        hasher.combine(controlAuthSecret)
+        hasher.combine(controlCapabilities)
+        hasher.combine(sshHostKeyFingerprints)
+        hasher.combine(wakeOnLAN)
     }
 }

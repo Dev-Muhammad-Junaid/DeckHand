@@ -6,7 +6,72 @@
 //
 
 import Foundation
+#if canImport(Network)
 import Network
+#endif
+
+private final class LoomPreauthenticationOperationGate<Value: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Value, any Error>?
+    private var tasks: [Task<Void, Never>] = []
+    private var isResolved = false
+
+    init(continuation: CheckedContinuation<Value, any Error>) {
+        self.continuation = continuation
+    }
+
+    func install(tasks: [Task<Void, Never>]) {
+        lock.lock()
+        if isResolved {
+            lock.unlock()
+            tasks.forEach { $0.cancel() }
+            return
+        }
+        self.tasks = tasks
+        lock.unlock()
+    }
+
+    func resolve(_ result: Result<Value, any Error>) {
+        lock.lock()
+        guard !isResolved, let continuation else {
+            lock.unlock()
+            return
+        }
+        isResolved = true
+        self.continuation = nil
+        let tasks = self.tasks
+        self.tasks.removeAll(keepingCapacity: false)
+        lock.unlock()
+
+        tasks.forEach { $0.cancel() }
+        continuation.resume(with: result)
+    }
+}
+
+private final class LoomPreauthenticationCancellationRelay<Value: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var gate: LoomPreauthenticationOperationGate<Value>?
+    private var isCancelled = false
+
+    func install(_ gate: LoomPreauthenticationOperationGate<Value>) {
+        lock.lock()
+        if isCancelled {
+            lock.unlock()
+            gate.resolve(.failure(CancellationError()))
+            return
+        }
+        self.gate = gate
+        lock.unlock()
+    }
+
+    func cancel() {
+        lock.lock()
+        isCancelled = true
+        let gate = gate
+        lock.unlock()
+        gate?.resolve(.failure(CancellationError()))
+    }
+}
 
 /// Lifecycle state for an authenticated Loom session.
 public enum LoomAuthenticatedSessionState: Sendable, Equatable, Codable {
@@ -23,6 +88,7 @@ public struct LoomAuthenticatedSessionContext: Sendable, Codable, Equatable {
     public let peerAdvertisement: LoomPeerAdvertisement
     public let trustEvaluation: LoomTrustEvaluation
     public let transportKind: LoomTransportKind
+    public let transportDiagnostics: LoomTransportDiagnostics
     public let negotiatedFeatures: [String]
     public let sessionEncrypted: Bool
 
@@ -31,6 +97,7 @@ public struct LoomAuthenticatedSessionContext: Sendable, Codable, Equatable {
         peerAdvertisement: LoomPeerAdvertisement,
         trustEvaluation: LoomTrustEvaluation,
         transportKind: LoomTransportKind,
+        transportDiagnostics: LoomTransportDiagnostics? = nil,
         negotiatedFeatures: [String],
         sessionEncrypted: Bool = true
     ) {
@@ -38,8 +105,221 @@ public struct LoomAuthenticatedSessionContext: Sendable, Codable, Equatable {
         self.peerAdvertisement = peerAdvertisement
         self.trustEvaluation = trustEvaluation
         self.transportKind = transportKind
+        self.transportDiagnostics = transportDiagnostics ?? LoomTransportDiagnostics(
+            selectedTransportKind: transportKind,
+            usableDatagramSize: nil,
+            serviceClass: nil,
+            receiveSemantics: "unknown"
+        )
         self.negotiatedFeatures = negotiatedFeatures
         self.sessionEncrypted = sessionEncrypted
+    }
+}
+
+/// Transport capability and selection diagnostics captured at authenticated-session setup.
+public struct LoomTransportDiagnostics: Sendable, Codable, Equatable {
+    public let selectedTransportKind: LoomTransportKind
+    public let usableDatagramSize: Int?
+    public let serviceClass: String?
+    public let receiveSemantics: String
+
+    public init(
+        selectedTransportKind: LoomTransportKind,
+        usableDatagramSize: Int?,
+        serviceClass: String?,
+        receiveSemantics: String
+    ) {
+        self.selectedTransportKind = selectedTransportKind
+        self.usableDatagramSize = usableDatagramSize
+        self.serviceClass = serviceClass
+        self.receiveSemantics = receiveSemantics
+    }
+}
+
+/// Queue profile for ordered unreliable sends on a multiplexed Loom stream.
+///
+/// Use ``interactiveMedia`` for latency-sensitive media where small transport
+/// buffers help prevent stale packets from accumulating. Use
+/// ``highThroughputMedia`` for large independent media frames on fast local
+/// paths where multiple complete frames must fit in the transport window. Use
+/// ``proximityRealtimeDisplay`` for deadline-paced display/video traffic on
+/// bursty peer-to-peer proximity links with independent media receive lanes,
+/// and ``proximityRealtimeDisplaySingleLane`` when the transport shares one
+/// receive lane but still needs realtime display send-side pacing. Use
+/// ``interactiveAudio`` and ``proximityInteractiveAudio`` for low-latency audio lanes. Use
+/// ``priorityInputRealtime``, ``priorityInputRealtimeSequenced``,
+/// ``priorityInputContinuous``, and ``priorityInputProtected`` for first-class
+/// input lanes that must not sit behind media stream traffic. Use
+/// ``throughputProbe`` when you need to intentionally overdrive a path and
+/// observe where loss begins, such as an explicit network-capacity test.
+public enum LoomQueuedUnreliableSendProfile: String, Sendable, Codable, CaseIterable {
+    /// Keeps the underlying ordered unreliable queue shallow to favor latency.
+    case interactiveMedia
+    /// Fits several large independent media frames in the transport window without probe-sized buffering.
+    case highThroughputMedia
+    /// Bounds media backlog more aggressively for bursty proximity links such as AWDL.
+    case proximityInteractiveMedia
+    /// Keeps realtime display/video backlog below a short playout window on bursty proximity links.
+    case proximityRealtimeDisplay
+    /// Keeps realtime display/video pacing on single-lane proximity transports.
+    case proximityRealtimeDisplaySingleLane
+    /// Keeps the audio lane shallow without using the display/video queue.
+    case interactiveAudio
+    /// Keeps proximity audio backlog tighter than generic media on bursty proximity links.
+    case proximityInteractiveAudio
+    /// Keeps only the newest pending input payload when the transport is busy.
+    case priorityInputRealtime
+    /// Preserves a short FIFO window of realtime input while bounding stale backlog.
+    case priorityInputRealtimeSequenced
+    /// Preserves compact continuous-input batches without replacing queued packets.
+    case priorityInputContinuous
+    /// Preserves protected input ordering with a shallow independent queue.
+    case priorityInputProtected
+    /// Allows a much deeper queue so throughput probes can saturate fast paths.
+    case throughputProbe
+
+    /// Recommended queue limits for this profile.
+    ///
+    /// Products that keep their own enqueue budget in front of Loom should use
+    /// these values so app-level pacing and Loom's internal queue depth stay in
+    /// sync for the selected send profile.
+    public var recommendedLimits: LoomQueuedUnreliableSendLimits {
+        switch self {
+        case .interactiveMedia:
+            LoomQueuedUnreliableSendLimits(
+                maxOutstandingPackets: 1024,
+                maxOutstandingBytes: 2 * 1024 * 1024
+            )
+        case .highThroughputMedia:
+            LoomQueuedUnreliableSendLimits(
+                maxOutstandingPackets: 4096,
+                maxOutstandingBytes: 8 * 1024 * 1024,
+                maxQueuedPackets: 256
+            )
+        case .proximityInteractiveMedia:
+            LoomQueuedUnreliableSendLimits(
+                maxOutstandingPackets: 384,
+                maxOutstandingBytes: 768 * 1024,
+                maxQueuedPackets: 128
+            )
+        case .proximityRealtimeDisplay,
+             .proximityRealtimeDisplaySingleLane:
+            LoomQueuedUnreliableSendLimits(
+                maxOutstandingPackets: 96,
+                maxOutstandingBytes: 192 * 1024,
+                maxQueuedPackets: 32
+            )
+        case .interactiveAudio:
+            LoomQueuedUnreliableSendLimits(
+                maxOutstandingPackets: 256,
+                maxOutstandingBytes: 256 * 1024,
+                maxQueuedPackets: 96
+            )
+        case .proximityInteractiveAudio:
+            LoomQueuedUnreliableSendLimits(
+                maxOutstandingPackets: 128,
+                maxOutstandingBytes: 128 * 1024,
+                maxQueuedPackets: 48
+            )
+        case .priorityInputRealtime:
+            LoomQueuedUnreliableSendLimits(
+                maxOutstandingPackets: 1,
+                maxOutstandingBytes: 64 * 1024
+            )
+        case .priorityInputRealtimeSequenced:
+            LoomQueuedUnreliableSendLimits(
+                maxOutstandingPackets: 8,
+                maxOutstandingBytes: 128 * 1024,
+                maxQueuedPackets: 8
+            )
+        case .priorityInputContinuous:
+            LoomQueuedUnreliableSendLimits(
+                maxOutstandingPackets: 64,
+                maxOutstandingBytes: 512 * 1024
+            )
+        case .priorityInputProtected:
+            LoomQueuedUnreliableSendLimits(
+                maxOutstandingPackets: 64,
+                maxOutstandingBytes: 256 * 1024
+            )
+        case .throughputProbe:
+            LoomQueuedUnreliableSendLimits(
+                maxOutstandingPackets: 262_144,
+                maxOutstandingBytes: 512 * 1024 * 1024
+            )
+        }
+    }
+
+    package var requiresIndependentUnreliableLane: Bool {
+        switch self {
+        case .proximityRealtimeDisplay:
+            true
+        case .proximityRealtimeDisplaySingleLane,
+             .interactiveMedia, .highThroughputMedia, .proximityInteractiveMedia,
+             .interactiveAudio, .proximityInteractiveAudio,
+             .priorityInputRealtime, .priorityInputRealtimeSequenced, .priorityInputContinuous,
+             .priorityInputProtected, .throughputProbe:
+            false
+        }
+    }
+
+    package var usesRealtimeDisplaySendPolicy: Bool {
+        switch self {
+        case .proximityRealtimeDisplay,
+             .proximityRealtimeDisplaySingleLane:
+            true
+        case .interactiveMedia,
+             .highThroughputMedia,
+             .proximityInteractiveMedia,
+             .interactiveAudio,
+             .proximityInteractiveAudio,
+             .priorityInputRealtime,
+             .priorityInputRealtimeSequenced,
+             .priorityInputContinuous,
+             .priorityInputProtected,
+             .throughputProbe:
+            false
+        }
+    }
+}
+
+/// Recommended queue window for a ``LoomQueuedUnreliableSendProfile``.
+public struct LoomQueuedUnreliableSendLimits: Sendable, Equatable, Codable {
+    public let maxOutstandingPackets: Int
+    public let maxOutstandingBytes: Int
+    public let maxQueuedPackets: Int?
+
+    public init(
+        maxOutstandingPackets: Int,
+        maxOutstandingBytes: Int,
+        maxQueuedPackets: Int? = nil
+    ) {
+        self.maxOutstandingPackets = maxOutstandingPackets
+        self.maxOutstandingBytes = maxOutstandingBytes
+        self.maxQueuedPackets = maxQueuedPackets
+    }
+}
+
+private final class LoomQueuedUnreliableBatchCompletionGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var completed: [Bool]
+    private let completions: [@Sendable (Error?) -> Void]
+
+    init(completions: [@Sendable (Error?) -> Void]) {
+        self.completions = completions
+        completed = Array(repeating: false, count: completions.count)
+    }
+
+    func complete(index: Int, error: Error?) {
+        lock.lock()
+        guard completed.indices.contains(index), !completed[index] else {
+            lock.unlock()
+            return
+        }
+        completed[index] = true
+        let completion = completions[index]
+        lock.unlock()
+        completion(error)
     }
 }
 
@@ -50,37 +330,178 @@ public final class LoomMultiplexedStream: @unchecked Sendable, Hashable {
     public let incomingBytes: AsyncStream<Data>
 
     private let lock = NSLock()
-    private var continuation: AsyncStream<Data>.Continuation?
+    private let incomingDataBuffer: LoomBoundedIncomingDataBuffer
+    private let maximumBufferedIncomingBytes: Int
+    private let maximumBufferedIncomingPayloads: Int
+    private let incomingBatchRetainedCapacityBudget: LoomIncomingRetainedCapacityBudget
+    private let onIncomingBufferOverflow: @Sendable () -> Void
+    private var incomingByteBatchDispatcher: LoomIncomingByteBatchDispatcher?
     private let sendHandler: @Sendable (Data) async throws -> Void
+    private let hardDeadlineSendHandler:
+        @Sendable (Data, ContinuousClock.Instant) async throws -> Void
     private let unreliableSendHandler: @Sendable (Data) async throws -> Void
-    private let queuedUnreliableSendHandler: @Sendable (Data, @escaping @Sendable (Error?) -> Void) async -> Void
+    private let queuedUnreliableSendHandler:
+        @Sendable (
+            Data,
+            LoomQueuedUnreliableSendProfile,
+            LoomQueuedUnreliableSendOptions,
+            @escaping @Sendable (Error?) -> Void
+        ) async -> Void
+    private let queuedUnreliableBatchSendHandler:
+        @Sendable (
+            [LoomQueuedUnreliableBatchItem],
+            LoomQueuedUnreliableSendProfile,
+            TimeInterval
+        ) async -> Void
+    private let queuedUnreliableResetHandler:
+        @Sendable (LoomQueuedUnreliableSendProfile) async -> Void
+    private let queuedUnreliableDiagnosticsHandler:
+        @Sendable (LoomQueuedUnreliableSendProfile) async -> LoomQueuedUnreliableSendDiagnostics?
     private let closeHandler: @Sendable () async throws -> Void
     private let queuedUnreliableSubmitter = LoomOrderedAsyncSubmitter()
+    private let realtimeDisplayQueuedUnreliableSubmitter = LoomOrderedAsyncSubmitter()
+    private var didClose = false
+    private var didReportIncomingBufferOverflow = false
 
     package init(
         id: UInt16,
         label: String?,
         sendHandler: @escaping @Sendable (Data) async throws -> Void,
+        hardDeadlineSendHandler:
+            @escaping @Sendable (Data, ContinuousClock.Instant) async throws -> Void,
         unreliableSendHandler: @escaping @Sendable (Data) async throws -> Void,
-        queuedUnreliableSendHandler: @escaping @Sendable (Data, @escaping @Sendable (Error?) -> Void) async -> Void,
+        queuedUnreliableSendHandler:
+            @escaping @Sendable (
+                Data,
+                LoomQueuedUnreliableSendProfile,
+                LoomQueuedUnreliableSendOptions,
+                @escaping @Sendable (Error?) -> Void
+            ) async -> Void,
+        queuedUnreliableBatchSendHandler:
+            (@Sendable (
+                [LoomQueuedUnreliableBatchItem],
+                LoomQueuedUnreliableSendProfile,
+                TimeInterval
+            ) async -> Void)? = nil,
+        queuedUnreliableResetHandler:
+            @escaping @Sendable (LoomQueuedUnreliableSendProfile) async -> Void,
+        queuedUnreliableDiagnosticsHandler:
+            @escaping @Sendable (LoomQueuedUnreliableSendProfile) async -> LoomQueuedUnreliableSendDiagnostics? = { _ in nil },
+        maximumBufferedIncomingBytes: Int = LoomMessageLimits.maxReceiveBufferBytes,
+        maximumBufferedIncomingPayloads: Int = LoomMessageLimits.maxBufferedPayloadsPerStream,
+        sharedIncomingRetainedCapacityBudget: LoomIncomingRetainedCapacityBudget? = nil,
+        incomingRetainedCapacityBudget: LoomIncomingRetainedCapacityBudget? = nil,
+        onIncomingBufferOverflow: @escaping @Sendable () -> Void = {},
         closeHandler: @escaping @Sendable () async throws -> Void
     ) {
         self.id = id
         self.label = label
         self.sendHandler = sendHandler
+        self.hardDeadlineSendHandler = hardDeadlineSendHandler
         self.unreliableSendHandler = unreliableSendHandler
         self.queuedUnreliableSendHandler = queuedUnreliableSendHandler
+        if let queuedUnreliableBatchSendHandler {
+            self.queuedUnreliableBatchSendHandler = queuedUnreliableBatchSendHandler
+        } else {
+            self.queuedUnreliableBatchSendHandler = { items, profile, _ in
+                for item in items {
+                    await queuedUnreliableSendHandler(
+                        item.data,
+                        profile,
+                        item.options,
+                        item.onComplete
+                    )
+                }
+            }
+        }
+        self.queuedUnreliableResetHandler = queuedUnreliableResetHandler
+        self.queuedUnreliableDiagnosticsHandler = queuedUnreliableDiagnosticsHandler
+        let maximumBufferedIncomingBytes = max(1, maximumBufferedIncomingBytes)
+        self.maximumBufferedIncomingBytes = maximumBufferedIncomingBytes
+        let maximumBufferedIncomingPayloads = max(1, maximumBufferedIncomingPayloads)
+        self.maximumBufferedIncomingPayloads = maximumBufferedIncomingPayloads
+        incomingBatchRetainedCapacityBudget = incomingRetainedCapacityBudget ??
+            LoomIncomingRetainedCapacityBudget(
+                maximumBytes: maximumBufferedIncomingBytes,
+                maximumPayloadCount: maximumBufferedIncomingPayloads,
+                maximumBatchCount: maximumBufferedIncomingPayloads,
+                parent: sharedIncomingRetainedCapacityBudget
+            )
+        self.onIncomingBufferOverflow = onIncomingBufferOverflow
         self.closeHandler = closeHandler
-        let (stream, continuation) = AsyncStream.makeStream(of: Data.self)
-        incomingBytes = stream
-        self.continuation = continuation
+        let incomingDataBuffer = LoomBoundedIncomingDataBuffer(
+            maximumBufferedBytes: maximumBufferedIncomingBytes,
+            maximumBufferedItems: maximumBufferedIncomingPayloads,
+            retainedCapacityBudget: incomingBatchRetainedCapacityBudget
+        )
+        self.incomingDataBuffer = incomingDataBuffer
+        incomingBytes = incomingDataBuffer.makeStream()
+    }
+
+    deinit {
+        incomingByteBatchDispatcher?.abort()
+        incomingDataBuffer.abort()
+    }
+
+    package convenience init(
+        id: UInt16,
+        label: String?,
+        sendHandler: @escaping @Sendable (Data) async throws -> Void,
+        hardDeadlineSendHandler:
+            @escaping @Sendable (Data, ContinuousClock.Instant) async throws -> Void,
+        unreliableSendHandler: @escaping @Sendable (Data) async throws -> Void,
+        queuedUnreliableSendHandler:
+            @escaping @Sendable (
+                Data,
+                LoomQueuedUnreliableSendProfile,
+                LoomQueuedUnreliableSendOptions,
+                @escaping @Sendable (Error?) -> Void
+            ) async -> Void,
+        queuedUnreliableResetHandler:
+            @escaping @Sendable (LoomQueuedUnreliableSendProfile) async -> Void,
+        closeHandler: @escaping @Sendable () async throws -> Void
+    ) {
+        self.init(
+            id: id,
+            label: label,
+            sendHandler: sendHandler,
+            hardDeadlineSendHandler: hardDeadlineSendHandler,
+            unreliableSendHandler: unreliableSendHandler,
+            queuedUnreliableSendHandler: queuedUnreliableSendHandler,
+            queuedUnreliableResetHandler: queuedUnreliableResetHandler,
+            queuedUnreliableDiagnosticsHandler: { _ in nil },
+            closeHandler: closeHandler
+        )
     }
 
     public func send(_ data: Data) async throws {
+        guard !data.isEmpty else {
+            throw LoomError.protocolError("Loom stream data payloads must not be empty.")
+        }
         try await sendHandler(data)
     }
 
+    /// Sends reliable ordered bytes with a destructive monotonic deadline.
+    ///
+    /// A deadline that is already expired before send admission returns a timeout
+    /// without changing the session. Once admission begins, expiration closes the
+    /// authenticated session and waits for the attempted write to terminate before
+    /// returning. A partially accepted reliable write is never skipped or retried
+    /// independently because doing so would violate stream ordering.
+    public func send(
+        _ data: Data,
+        hardDeadline: ContinuousClock.Instant
+    ) async throws {
+        guard !data.isEmpty else {
+            throw LoomError.protocolError("Loom stream data payloads must not be empty.")
+        }
+        try await hardDeadlineSendHandler(data, hardDeadline)
+    }
+
     public func sendUnreliable(_ data: Data) async throws {
+        guard !data.isEmpty else {
+            throw LoomError.protocolError("Loom stream data payloads must not be empty.")
+        }
         try await unreliableSendHandler(data)
     }
 
@@ -90,29 +511,268 @@ public final class LoomMultiplexedStream: @unchecked Sendable, Hashable {
     /// Completion runs later on transport acceptance or failure.
     public func sendUnreliableQueued(
         _ data: Data,
+        profile: LoomQueuedUnreliableSendProfile = .interactiveMedia,
         onComplete: @escaping @Sendable (Error?) -> Void = { _ in }
     ) {
-        queuedUnreliableSubmitter.enqueue(
-            operation: { [queuedUnreliableSendHandler] markQueued in
+        sendUnreliableQueued(
+            data,
+            profile: profile,
+            options: .none,
+            onComplete: onComplete
+        )
+    }
+
+    /// Queues an unreliable payload with caller-provided realtime scheduling metadata.
+    ///
+    /// Completion runs later on transport acceptance, transport failure, or an
+    /// intentional nonfatal ``LoomQueuedUnreliableSendDrop``.
+    public func sendUnreliableQueued(
+        _ data: Data,
+        profile: LoomQueuedUnreliableSendProfile = .interactiveMedia,
+        options: LoomQueuedUnreliableSendOptions,
+        onComplete: @escaping @Sendable (Error?) -> Void = { _ in }
+    ) {
+        enqueueUnreliableQueuedBatch(
+            [LoomQueuedUnreliableBatchItem(data: data, options: options, onComplete: onComplete)],
+            profile: profile,
+            onAdmission: {}
+        )
+    }
+
+    /// Queues an ordered payload batch using one stream and authenticated-session admission.
+    ///
+    /// Loom preserves the input order through envelope encryption and transport
+    /// queue admission. The method returns after the batch has been admitted to
+    /// the transport-owned queue, without waiting for underlying socket sends.
+    /// Each item completion runs exactly once on transport
+    /// acceptance, failure, or an intentional nonfatal
+    /// ``LoomQueuedUnreliableSendDrop``. Empty payloads are rejected individually
+    /// and are not admitted with the rest of the batch.
+    public func sendUnreliableQueuedBatch(
+        _ items: [LoomQueuedUnreliableBatchItem],
+        profile: LoomQueuedUnreliableSendProfile = .interactiveMedia
+    ) async {
+        await withCheckedContinuation { continuation in
+            enqueueUnreliableQueuedBatch(
+                items,
+                profile: profile,
+                onAdmission: {
+                    continuation.resume()
+                }
+            )
+        }
+    }
+
+    private func enqueueUnreliableQueuedBatch(
+        _ items: [LoomQueuedUnreliableBatchItem],
+        profile: LoomQueuedUnreliableSendProfile,
+        onAdmission: @escaping @Sendable () -> Void
+    ) {
+        let submittedAt = ProcessInfo.processInfo.systemUptime
+        guard !items.isEmpty else {
+            onAdmission()
+            return
+        }
+
+        var validItems: [LoomQueuedUnreliableBatchItem] = []
+        validItems.reserveCapacity(items.count)
+        for item in items {
+            guard !item.data.isEmpty else {
+                item.onComplete(LoomError.protocolError("Loom stream data payloads must not be empty."))
+                continue
+            }
+            validItems.append(item)
+        }
+        guard !validItems.isEmpty else {
+            onAdmission()
+            return
+        }
+        let completionGate = LoomQueuedUnreliableBatchCompletionGate(
+            completions: validItems.map(\.onComplete)
+        )
+        let admittedItems = validItems.enumerated().map { index, item in
+            LoomQueuedUnreliableBatchItem(
+                data: item.data,
+                options: item.options,
+                onComplete: { error in
+                    completionGate.complete(index: index, error: error)
+                }
+            )
+        }
+        let queuedItems = admittedItems
+
+        let submitter = profile.usesRealtimeDisplaySendPolicy
+            ? realtimeDisplayQueuedUnreliableSubmitter
+            : queuedUnreliableSubmitter
+        let expirableDeadlines = queuedItems.compactMap { item -> TimeInterval? in
+            guard item.options.dropsWhenExpired else { return nil }
+            return item.options.deadlineUptime
+        }
+        let batchDropsWhenExpired = queuedItems.allSatisfy(\.options.dropsWhenExpired) &&
+            expirableDeadlines.count == queuedItems.count
+        let batchDropsWhenQueueFull = queuedItems.allSatisfy(\.options.dropsWhenQueueFull)
+        let queueFullDropPriority = queuedItems
+            .map(\.options.importance.queueFullDropPriority)
+            .max() ?? Int.max
+        submitter.enqueue(
+            operation: { [queuedUnreliableBatchSendHandler, profile] markQueued in
                 Task {
-                    await queuedUnreliableSendHandler(data, onComplete)
+                    await queuedUnreliableBatchSendHandler(queuedItems, profile, submittedAt)
+                    onAdmission()
                     markQueued()
                 }
             },
+            deadlineUptime: batchDropsWhenExpired ? expirableDeadlines.min() : nil,
+            dropsWhenExpired: batchDropsWhenExpired,
+            maxPendingOperations: profile.recommendedLimits.maxQueuedPackets,
+            dropsWhenQueueFull: batchDropsWhenQueueFull,
+            queueFullDropPriority: queueFullDropPriority,
+            onExpired: {
+                for item in queuedItems {
+                    item.onComplete(LoomQueuedUnreliableSendDrop(
+                        reason: .deadlineExpired,
+                        profile: profile,
+                        frameID: item.options.frameID,
+                        fragmentIndex: item.options.fragmentIndex,
+                        fragmentCount: item.options.fragmentCount
+                    ))
+                }
+                onAdmission()
+            },
+            onQueueLimit: {
+                for item in queuedItems {
+                    item.onComplete(LoomQueuedUnreliableSendDrop(
+                        reason: .queueLimit,
+                        profile: profile,
+                        frameID: item.options.frameID,
+                        fragmentIndex: item.options.fragmentIndex,
+                        fragmentCount: item.options.fragmentCount
+                    ))
+                }
+                onAdmission()
+            },
             onDropped: {
-                onComplete(
-                    LoomError.connectionFailed(
+                for item in queuedItems {
+                    item.onComplete(LoomError.connectionFailed(
                         LoomConnectionFailure(reason: .cancelled, detail: "Unreliable send queue cancelled.")
-                    )
-                )
+                    ))
+                }
+                onAdmission()
             }
         )
     }
 
+    /// Cancels queued unreliable sends for one profile without closing the stream.
+    ///
+    /// This is intended for explicit throughput probes that want to discard
+    /// stale queued traffic after crossing an overload boundary.
+    public func resetQueuedUnreliableSends(
+        profile: LoomQueuedUnreliableSendProfile
+    ) async {
+        await queuedUnreliableResetHandler(profile)
+    }
+
+    /// Consumes structured diagnostics for one queued-unreliable send profile.
+    public func consumeQueuedUnreliableSendDiagnostics(
+        profile: LoomQueuedUnreliableSendProfile
+    ) async -> LoomQueuedUnreliableSendDiagnostics? {
+        await queuedUnreliableDiagnosticsHandler(profile)
+    }
+
+    /// Installs an exclusive batched inbound payload handler for high-rate streams.
+    ///
+    /// When a batch handler is installed, newly received payloads are delivered
+    /// to the handler instead of `incomingBytes`. This keeps existing stream
+    /// consumers source-compatible while allowing media pipelines to avoid a
+    /// per-payload `AsyncStream` resume on hot paths.
+    public func setIncomingBytesBatchHandler(
+        maxBatchSize: Int = 32,
+        maxDelay: Duration = .milliseconds(1),
+        handler: @escaping @Sendable ([Data]) async -> Void
+    ) {
+        let dispatcher = LoomIncomingByteBatchDispatcher(
+            maxBatchSize: maxBatchSize,
+            maxDelay: maxDelay,
+            maximumBufferedBytes: maximumBufferedIncomingBytes,
+            maximumBufferedPayloadCount: maximumBufferedIncomingPayloads,
+            maximumBufferedBatchCount: maximumBufferedIncomingPayloads,
+            retainedCapacityBudget: incomingBatchRetainedCapacityBudget,
+            onOverflow: { [weak self] in
+                self?.reportIncomingBufferOverflowIfNeeded()
+            },
+            handler: handler
+        )
+
+        lock.lock()
+        let previousDispatcher = incomingByteBatchDispatcher
+        incomingByteBatchDispatcher = dispatcher
+        lock.unlock()
+
+        previousDispatcher?.finish()
+    }
+
+    /// Installs an exclusive synchronous inbound payload handler for hot media streams.
+    ///
+    /// Unlike `setIncomingBytesBatchHandler`, this handler runs on the receive
+    /// delivery path and does not hop through an `AsyncStream` worker task. It
+    /// flushes when `maxBatchSize` is reached or when the handler is cleared.
+    /// Keep the handler lightweight and hand work off to a stream-owned queue.
+    public func setIncomingBytesImmediateBatchHandler(
+        maxBatchSize: Int = 32,
+        handler: @escaping @Sendable ([Data]) -> Void
+    ) {
+        let dispatcher = LoomIncomingByteBatchDispatcher(
+            maxBatchSize: maxBatchSize,
+            maximumBufferedBytes: maximumBufferedIncomingBytes,
+            maximumBufferedPayloadCount: maximumBufferedIncomingPayloads,
+            maximumBufferedBatchCount: maximumBufferedIncomingPayloads,
+            retainedCapacityBudget: incomingBatchRetainedCapacityBudget,
+            onOverflow: { [weak self] in
+                self?.reportIncomingBufferOverflowIfNeeded()
+            },
+            immediateHandler: handler
+        )
+
+        lock.lock()
+        let previousDispatcher = incomingByteBatchDispatcher
+        incomingByteBatchDispatcher = dispatcher
+        lock.unlock()
+
+        previousDispatcher?.finish()
+    }
+
+    /// Removes any installed batched inbound payload handler.
+    public func clearIncomingBytesBatchHandler() {
+        lock.lock()
+        let dispatcher = incomingByteBatchDispatcher
+        incomingByteBatchDispatcher = nil
+        lock.unlock()
+
+        dispatcher?.finish()
+    }
+
     public func close() async throws {
+        guard markClosed() else {
+            return
+        }
+
+        defer {
+            finishQueuedOutbound()
+            finishInbound()
+        }
         try await closeHandler()
-        finishQueuedOutbound()
-        finishInbound()
+    }
+
+    private func markClosed() -> Bool {
+        lock.lock()
+        defer {
+            lock.unlock()
+        }
+        guard !didClose else {
+            return false
+        }
+        didClose = true
+        return true
     }
 
     public static func == (lhs: LoomMultiplexedStream, rhs: LoomMultiplexedStream) -> Bool {
@@ -123,23 +783,140 @@ public final class LoomMultiplexedStream: @unchecked Sendable, Hashable {
         hasher.combine(ObjectIdentifier(self))
     }
 
-    package func yield(_ data: Data) {
+    @discardableResult
+    package func yield(_ data: Data) -> Bool {
         lock.lock()
-        let continuation = continuation
+        let dispatcher = incomingByteBatchDispatcher
         lock.unlock()
-        continuation?.yield(data)
+
+        return yield(data, initiallyUsing: dispatcher, alreadyRetained: false)
+    }
+
+    @discardableResult
+    package func yieldPreRetained(_ data: Data) -> Bool {
+        lock.lock()
+        let dispatcher = incomingByteBatchDispatcher
+        lock.unlock()
+
+        return yield(data, initiallyUsing: dispatcher, alreadyRetained: true)
+    }
+
+    private func yield(
+        _ data: Data,
+        initiallyUsing initialDispatcher: LoomIncomingByteBatchDispatcher?,
+        alreadyRetained: Bool
+    ) -> Bool {
+        var dispatcher = initialDispatcher
+
+        while let attemptedDispatcher = dispatcher {
+            switch attemptedDispatcher.yieldResult(data, alreadyRetained: alreadyRetained) {
+            case .accepted:
+                return true
+            case .overflow:
+                if alreadyRetained {
+                    incomingBatchRetainedCapacityBudget.release(
+                        bytes: data.count,
+                        payloadCount: 1,
+                        batchCount: 1
+                    )
+                }
+                return false
+            case .terminated:
+                lock.lock()
+                let replacementDispatcher = incomingByteBatchDispatcher
+                lock.unlock()
+                guard replacementDispatcher !== attemptedDispatcher else {
+                    if alreadyRetained {
+                        incomingBatchRetainedCapacityBudget.release(
+                            bytes: data.count,
+                            payloadCount: 1,
+                            batchCount: 1
+                        )
+                    }
+                    return false
+                }
+                dispatcher = replacementDispatcher
+            }
+        }
+
+        switch incomingDataBuffer.yield(data, alreadyRetained: alreadyRetained) {
+        case .accepted:
+            return true
+        case .invalid:
+            if alreadyRetained {
+                incomingBatchRetainedCapacityBudget.release(
+                    bytes: data.count,
+                    payloadCount: 1,
+                    batchCount: 1
+                )
+            }
+            reportIncomingBufferOverflowIfNeeded()
+            return false
+        case .overflow:
+            if alreadyRetained {
+                incomingBatchRetainedCapacityBudget.release(
+                    bytes: data.count,
+                    payloadCount: 1,
+                    batchCount: 1
+                )
+            }
+            reportIncomingBufferOverflowIfNeeded()
+            return false
+        case .terminated:
+            if alreadyRetained {
+                incomingBatchRetainedCapacityBudget.release(
+                    bytes: data.count,
+                    payloadCount: 1,
+                    batchCount: 1
+                )
+            }
+            return false
+        }
+    }
+
+    func yieldForTesting(
+        _ data: Data,
+        initiallyUsing dispatcher: LoomIncomingByteBatchDispatcher?
+    ) -> Bool {
+        yield(data, initiallyUsing: dispatcher, alreadyRetained: false)
+    }
+
+    var retainedIncomingBatchBytesForTesting: Int {
+        incomingBatchRetainedCapacityBudget.retainedBytesForTesting
     }
 
     package func finishInbound() {
         lock.lock()
-        let continuation = continuation
-        self.continuation = nil
+        let dispatcher = incomingByteBatchDispatcher
+        incomingByteBatchDispatcher = nil
         lock.unlock()
-        continuation?.finish()
+        dispatcher?.finish()
+        incomingDataBuffer.finish()
+    }
+
+    package func abortInbound() {
+        lock.lock()
+        let dispatcher = incomingByteBatchDispatcher
+        incomingByteBatchDispatcher = nil
+        lock.unlock()
+        dispatcher?.abort()
+        incomingDataBuffer.abort()
+    }
+
+    private func reportIncomingBufferOverflowIfNeeded() {
+        lock.lock()
+        guard !didReportIncomingBufferOverflow else {
+            lock.unlock()
+            return
+        }
+        didReportIncomingBufferOverflow = true
+        lock.unlock()
+        onIncomingBufferOverflow()
     }
 
     package func finishQueuedOutbound() {
         queuedUnreliableSubmitter.close()
+        realtimeDisplayQueuedUnreliableSubmitter.close()
     }
 }
 
@@ -159,11 +936,103 @@ public enum LoomHandshakeTrustStatus: UInt8, Codable, Sendable {
     case denied = 2
 }
 
+private struct LoomSessionKeyConfirmationMessage: Codable, Sendable {
+    enum Kind: String, Codable, Sendable {
+        case receiverChallenge
+        case initiatorResponse
+        case receiverAcknowledgement
+    }
+
+    let kind: Kind
+    let challenge: Data
+}
+
+private struct LoomQueuedUnreliableBatchPhaseAccumulator {
+    private(set) var batchCount: UInt64 = 0
+    private(set) var itemCount: UInt64 = 0
+    private var sessionWaitSamplesMs: [Double] = []
+    private var envelopeEncodeSamplesMs: [Double] = []
+    private var sealSamplesMs: [Double] = []
+    private var transportAdmissionSamplesMs: [Double] = []
+    private var totalAdmissionSamplesMs: [Double] = []
+
+    mutating func record(
+        itemCount: Int,
+        sessionWaitMs: Double,
+        envelopeEncodeMs: Double,
+        sealMs: Double,
+        transportAdmissionMs: Double,
+        totalAdmissionMs: Double
+    ) {
+        batchCount &+= 1
+        self.itemCount &+= UInt64(itemCount)
+        Self.record(sessionWaitMs, into: &sessionWaitSamplesMs)
+        Self.record(envelopeEncodeMs, into: &envelopeEncodeSamplesMs)
+        Self.record(sealMs, into: &sealSamplesMs)
+        Self.record(transportAdmissionMs, into: &transportAdmissionSamplesMs)
+        Self.record(totalAdmissionMs, into: &totalAdmissionSamplesMs)
+    }
+
+    mutating func consume() -> LoomQueuedUnreliableBatchPhaseDiagnostics? {
+        guard batchCount > 0 else { return nil }
+        let diagnostics = LoomQueuedUnreliableBatchPhaseDiagnostics(
+            batchCount: batchCount,
+            itemCount: itemCount,
+            sessionWaitP50Ms: percentile(sessionWaitSamplesMs, 0.50),
+            sessionWaitP95Ms: percentile(sessionWaitSamplesMs, 0.95),
+            sessionWaitP99Ms: percentile(sessionWaitSamplesMs, 0.99),
+            envelopeEncodeP50Ms: percentile(envelopeEncodeSamplesMs, 0.50),
+            envelopeEncodeP95Ms: percentile(envelopeEncodeSamplesMs, 0.95),
+            envelopeEncodeP99Ms: percentile(envelopeEncodeSamplesMs, 0.99),
+            sealP50Ms: percentile(sealSamplesMs, 0.50),
+            sealP95Ms: percentile(sealSamplesMs, 0.95),
+            sealP99Ms: percentile(sealSamplesMs, 0.99),
+            transportAdmissionP50Ms: percentile(transportAdmissionSamplesMs, 0.50),
+            transportAdmissionP95Ms: percentile(transportAdmissionSamplesMs, 0.95),
+            transportAdmissionP99Ms: percentile(transportAdmissionSamplesMs, 0.99),
+            totalAdmissionP50Ms: percentile(totalAdmissionSamplesMs, 0.50),
+            totalAdmissionP95Ms: percentile(totalAdmissionSamplesMs, 0.95),
+            totalAdmissionP99Ms: percentile(totalAdmissionSamplesMs, 0.99)
+        )
+        self = LoomQueuedUnreliableBatchPhaseAccumulator()
+        return diagnostics
+    }
+
+    private static func record(_ sample: Double, into samples: inout [Double]) {
+        guard sample.isFinite, sample >= 0 else { return }
+        samples.append(sample)
+        if samples.count > 256 {
+            samples.removeFirst(samples.count - 256)
+        }
+    }
+
+    private func percentile(_ samples: [Double], _ percentile: Double) -> Double {
+        guard !samples.isEmpty else { return 0 }
+        let sorted = samples.sorted()
+        let clamped = min(max(percentile, 0), 1)
+        let index = Int((Double(sorted.count - 1) * clamped).rounded(.up))
+        return sorted[min(max(index, 0), sorted.count - 1)]
+    }
+}
+
 /// Authenticated Loom session that provides generic multiplexed streams.
 public actor LoomAuthenticatedSession: LoomSessionProtocol {
+    private enum EnvelopeReceiveLane {
+        case reliable
+        case unreliable
+    }
+
+    private struct PendingUnopenedUnreliableStreamData {
+        var payloads: [Data]
+        var totalBytes: Int
+        var firstBufferedAt: CFAbsoluteTime
+        var lastBufferedAt: CFAbsoluteTime
+        let retainedCapacityBudget: LoomIncomingRetainedCapacityBudget
+        var expirationTask: Task<Void, Never>?
+    }
+
     /// Stable authenticated-session identifier for app-owned bookkeeping.
     public nonisolated let id: UUID
-    public let rawSession: LoomSession
     public let role: LoomSessionRole
     public let transportKind: LoomTransportKind
 
@@ -171,51 +1040,161 @@ public actor LoomAuthenticatedSession: LoomSessionProtocol {
 
     public private(set) var state: LoomAuthenticatedSessionState = .idle
     public private(set) var context: LoomAuthenticatedSessionContext?
+    public private(set) var bootstrapProgress = LoomAuthenticatedSessionBootstrapProgress(phase: .idle)
 
     /// Called on the initiator (client) when the receiver (host) signals
     /// that trust evaluation is pending manual approval.
     public var onTrustPending: (@Sendable @MainActor () -> Void)?
+
+    /// Called when authenticated-session bootstrap advances before the session becomes ready.
+    public var onBootstrapProgress: (@Sendable (LoomAuthenticatedSessionBootstrapProgress) -> Void)?
 
     /// Sets the trust-pending callback from outside the actor.
     public func setOnTrustPending(_ handler: (@Sendable @MainActor () -> Void)?) {
         onTrustPending = handler
     }
 
+    /// Sets the bootstrap-progress callback from outside the actor.
+    public func setOnBootstrapProgress(
+        _ handler: (@Sendable (LoomAuthenticatedSessionBootstrapProgress) -> Void)?
+    ) {
+        onBootstrapProgress = handler
+    }
+
+    private let backendConnection: any LoomNetworkConnection
     private let transport: any LoomSessionTransport
+    private let reliableSendAdmission = LoomReliableSendAdmission()
     private let incomingStreamContinuation: AsyncStream<LoomMultiplexedStream>.Continuation
-    // Replay opened streams to late subscribers: the receiver's
-    // `LoomConnectionHandle` subscribes its observer slightly after the
-    // session's read loop starts, so a stream `.open` that arrives first
-    // would otherwise be lost (B1 — "stuck awaiting authorization").
-    private let incomingStreamObservers = LoomAsyncBroadcaster<LoomMultiplexedStream>(retainsHistory: true)
-    private let stateObservers = LoomAsyncBroadcaster<LoomAuthenticatedSessionState>()
-    private let pathObservers = LoomAsyncBroadcaster<LoomSessionNetworkPathSnapshot>()
+    private let incomingStreamObservers: LoomAsyncBroadcaster<LoomMultiplexedStream>
+    private let stateObservers = LoomAsyncBroadcaster<LoomAuthenticatedSessionState>(
+        bufferingPolicy: .bufferingNewest(1)
+    )
+    private let bootstrapProgressObservers = LoomAsyncBroadcaster<LoomAuthenticatedSessionBootstrapProgress>(
+        bufferingPolicy: .bufferingNewest(8)
+    )
+    private let pathObservers = LoomAsyncBroadcaster<LoomSessionNetworkPathSnapshot>(
+        bufferingPolicy: .bufferingNewest(1)
+    )
     private var streams: [UInt16: LoomMultiplexedStream] = [:]
+    private var reportedUnreliableIncomingOverflowStreamIDs: Set<UInt16> = []
+    private var openedRemoteStreamIDs: Set<UInt16> = []
+    private let maximumConcurrentStreams: Int
+    private let maximumBufferedIncomingBytesPerStream: Int
+    private let maximumBufferedIncomingPayloadsPerStream: Int
+    private let incomingRetainedCapacityBudget: LoomIncomingRetainedCapacityBudget
     private var nextOutgoingStreamID: UInt16
     private var readTask: Task<Void, Never>?
     private var unreliableReadTask: Task<Void, Never>?
+    private var preauthenticationOperationLimiter: LoomOutstandingOperationLimiter?
     private var securityContext: LoomSessionSecurityContext?
     private var encryptionEnabled = false
-    private var currentRemoteEndpoint: NWEndpoint?
+    private var currentRemoteEndpoint: LoomNetworkEndpoint?
     private var currentPathSnapshot: LoomSessionNetworkPathSnapshot?
     private var transportObserversConfigured = false
+    private var queuedUnreliableBatchPhaseAccumulators:
+        [LoomQueuedUnreliableSendProfile: LoomQueuedUnreliableBatchPhaseAccumulator] = [:]
+    private var queuedUnreliableBatchPhaseLastLogAt:
+        [LoomQueuedUnreliableSendProfile: TimeInterval] = [:]
+    private var pendingUnopenedUnreliableDataByStreamID: [UInt16: PendingUnopenedUnreliableStreamData] = [:]
+    private let pendingUnopenedUnreliableDataTTL: CFAbsoluteTime = 2.0
+    private let pendingUnopenedUnreliableDataMaxStreams = 8
+    private let pendingUnopenedUnreliableDataMaxPayloadsPerStream = 768
+    private let pendingUnopenedUnreliableDataMaxBytesPerStream = 2 * 1024 * 1024
+    private var recentlyClosedStreamIDs: [UInt16: CFAbsoluteTime] = [:]
+    private let recentlyClosedStreamTTL: CFAbsoluteTime = 2.0
+    private let recentlyClosedStreamMaxCount = 64
+    private let transportEndpointDescription: String
+    private let transportServiceClassDescription: String?
+    private let transportUsableDatagramSize: Int?
 
+    #if canImport(Network)
     public init(
-        rawSession: LoomSession,
+        connection: LoomConnection,
         role: LoomSessionRole,
-        transportKind: LoomTransportKind
+        remoteEndpoint: NWEndpoint? = nil,
+        serviceClass: NWParameters.ServiceClass? = nil,
+        maximumConcurrentStreams: Int = 256,
+        maximumBufferedIncomingBytesPerStream: Int = LoomMessageLimits.maxReceiveBufferBytes,
+        maximumBufferedIncomingPayloadsPerStream: Int = LoomMessageLimits.maxBufferedPayloadsPerStream,
+        maximumBufferedIncomingBytesPerSession: Int = LoomMessageLimits.maxBufferedIncomingBytesPerSession,
+        maximumBufferedIncomingPayloadsPerSession: Int = LoomMessageLimits.maxBufferedPayloadsPerSession
+    ) {
+        self.init(
+            backendConnection: connection.backendConnection,
+            role: role,
+            remoteEndpoint: remoteEndpoint.flatMap(LoomNetworkEndpoint.init),
+            serviceClass: serviceClass.map(LoomNetworkServiceClass.init),
+            maximumConcurrentStreams: maximumConcurrentStreams,
+            maximumBufferedIncomingBytesPerStream: maximumBufferedIncomingBytesPerStream,
+            maximumBufferedIncomingPayloadsPerStream: maximumBufferedIncomingPayloadsPerStream,
+            maximumBufferedIncomingBytesPerSession: maximumBufferedIncomingBytesPerSession,
+            maximumBufferedIncomingPayloadsPerSession: maximumBufferedIncomingPayloadsPerSession
+        )
+    }
+    #endif
+
+    /// Creates an authenticated session over a backend-independent connection.
+    public init(
+        backendConnection: any LoomNetworkConnection,
+        role: LoomSessionRole,
+        remoteEndpoint: LoomNetworkEndpoint? = nil,
+        serviceClass: LoomNetworkServiceClass? = nil,
+        maximumConcurrentStreams: Int = 256,
+        maximumBufferedIncomingBytesPerStream: Int = LoomMessageLimits.maxReceiveBufferBytes,
+        maximumBufferedIncomingPayloadsPerStream: Int = LoomMessageLimits.maxBufferedPayloadsPerStream,
+        maximumBufferedIncomingBytesPerSession: Int = LoomMessageLimits.maxBufferedIncomingBytesPerSession,
+        maximumBufferedIncomingPayloadsPerSession: Int = LoomMessageLimits.maxBufferedPayloadsPerSession
     ) {
         id = UUID()
-        self.rawSession = rawSession
+        self.backendConnection = backendConnection
         self.role = role
-        self.transportKind = transportKind
-        switch transportKind {
-        case .tcp, .quic:
-            transport = LoomFramedConnection(connection: rawSession.connection)
+        self.maximumConcurrentStreams = max(1, maximumConcurrentStreams)
+        self.maximumBufferedIncomingBytesPerStream = max(1, maximumBufferedIncomingBytesPerStream)
+        self.maximumBufferedIncomingPayloadsPerStream = max(1, maximumBufferedIncomingPayloadsPerStream)
+        incomingRetainedCapacityBudget = LoomIncomingRetainedCapacityBudget(
+            maximumBytes: maximumBufferedIncomingBytesPerSession,
+            maximumPayloadCount: maximumBufferedIncomingPayloadsPerSession,
+            maximumBatchCount: maximumBufferedIncomingPayloadsPerSession
+        )
+        let incomingStreamEventBuffer = self.maximumConcurrentStreams
+        // DeckHand fork: replay opened streams to late subscribers. The
+        // receiver's `LoomConnectionHandle` subscribes slightly after the read
+        // loop starts, so an `.open` that arrives first would otherwise be lost
+        // ("stuck awaiting authorization").
+        incomingStreamObservers = LoomAsyncBroadcaster(
+            bufferingPolicy: .bufferingNewest(incomingStreamEventBuffer),
+            retainsHistory: true
+        )
+        switch backendConnection.transportKind {
+        case .tcp:
+            transportKind = .tcp
+            transport = LoomFramedConnection(
+                connection: backendConnection,
+                retainedCapacityBudget: incomingRetainedCapacityBudget
+            )
+            transportEndpointDescription = (
+                remoteEndpoint ?? backendConnection.remoteEndpoint
+            ).description
+            transportServiceClassDescription = serviceClass?.rawValue
+            transportUsableDatagramSize = nil
         case .udp:
-            transport = LoomReliableChannel(connection: rawSession.connection)
+            transportKind = .udp
+            transport = LoomReliableChannel(
+                connection: backendConnection,
+                retainedCapacityBudget: incomingRetainedCapacityBudget
+            )
+            transportEndpointDescription = (
+                remoteEndpoint ?? backendConnection.remoteEndpoint
+            ).description
+            transportServiceClassDescription = serviceClass?.rawValue
+            transportUsableDatagramSize = Loom.defaultMaxPacketSize
+        case .quic:
+            preconditionFailure("QUIC transport has been removed.")
         }
-        let (stream, continuation) = AsyncStream.makeStream(of: LoomMultiplexedStream.self)
+        let (stream, continuation) = AsyncStream.makeStream(
+            of: LoomMultiplexedStream.self,
+            bufferingPolicy: .bufferingNewest(incomingStreamEventBuffer)
+        )
         incomingStreams = stream
         incomingStreamContinuation = continuation
         nextOutgoingStreamID = role == .initiator ? 1 : 2
@@ -225,6 +1204,7 @@ public actor LoomAuthenticatedSession: LoomSessionProtocol {
         incomingStreamContinuation.finish()
         incomingStreamObservers.finish()
         stateObservers.finish()
+        bootstrapProgressObservers.finish()
         pathObservers.finish()
         readTask?.cancel()
         unreliableReadTask?.cancel()
@@ -240,14 +1220,46 @@ public actor LoomAuthenticatedSession: LoomSessionProtocol {
         stateObservers.makeStream(initialValue: state)
     }
 
+    /// Creates an observation stream for bootstrap progress before the session becomes ready.
+    public func makeBootstrapProgressObserver() -> AsyncStream<LoomAuthenticatedSessionBootstrapProgress> {
+        bootstrapProgressObservers.makeStream(initialValue: bootstrapProgress)
+    }
+
+    /// Returns the latest backend-independent remote endpoint observed for the transport.
+    public var backendRemoteEndpoint: LoomNetworkEndpoint? {
+        currentRemoteEndpoint ??
+            currentPathSnapshot?.backendRemoteEndpoint ??
+            backendConnection.remoteEndpoint
+    }
+
+#if canImport(Network)
     /// Returns the latest remote endpoint observed for this session's transport.
     public var remoteEndpoint: NWEndpoint? {
-        currentRemoteEndpoint ?? currentPathSnapshot?.remoteEndpoint ?? rawSession.endpoint
+        backendRemoteEndpoint?.nwEndpoint
     }
+#endif
 
     /// Returns the latest transport-path snapshot observed for this session.
     public var pathSnapshot: LoomSessionNetworkPathSnapshot? {
         currentPathSnapshot
+    }
+
+    private func transportDiagnosticsSnapshot() -> LoomTransportDiagnostics {
+        LoomTransportDiagnostics(
+            selectedTransportKind: transportKind,
+            usableDatagramSize: transportUsableDatagramSize,
+            serviceClass: transportServiceClassDescription,
+            receiveSemantics: Self.receiveSemanticsDescription(transport.receiveSemantics)
+        )
+    }
+
+    private static func receiveSemanticsDescription(_ semantics: LoomSessionReceiveSemantics) -> String {
+        switch semantics {
+        case .singleLane:
+            "single-lane"
+        case .independentReliableAndUnreliable:
+            "independent-reliable-unreliable"
+        }
     }
 
     /// Creates an observation stream for transport-path changes on the underlying connection.
@@ -261,6 +1273,10 @@ public actor LoomAuthenticatedSession: LoomSessionProtocol {
         trustProvider: (any LoomTrustProvider)? = nil,
         helloValidator: LoomSessionHelloValidator = LoomSessionHelloValidator(),
         encryptionPolicy: LoomSessionEncryptionPolicy = .required,
+        expectedPeerIdentityKeyID: String? = nil,
+        expectedPeerIdentityPublicKey: Data? = nil,
+        handshakeTimeout: Duration = .seconds(10),
+        trustTimeout: Duration = .seconds(120),
         queue: DispatchQueue = .global(qos: .userInitiated)
     ) async throws -> LoomAuthenticatedSessionContext {
         guard case .idle = state else {
@@ -270,95 +1286,253 @@ public actor LoomAuthenticatedSession: LoomSessionProtocol {
             throw LoomError.protocolError("Authenticated Loom session has already started.")
         }
 
-        updateState(.handshaking)
-        try await transport.startAndAwaitReady(queue: queue)
-
-        let preparedHello = try await MainActor.run {
-            try LoomSessionHelloValidator.makePreparedSignedHello(
-                from: localHello,
-                identityManager: identityManager
-            )
-        }
-        let helloData = try JSONEncoder().encode(preparedHello.hello)
-        try await transport.sendMessage(helloData)
-
-        let remoteHelloData = try await transport.receiveMessage(
-            maxBytes: LoomMessageLimits.maxHelloFrameBytes
-        )
-        let remoteHello = try JSONDecoder().decode(LoomSessionHello.self, from: remoteHelloData)
-        let validatedHello = try await helloValidator.validateDetailed(
-            remoteHello,
-            endpointDescription: rawSession.endpoint.debugDescription
-        )
-        let peerIdentity = validatedHello.peerIdentity
-
-        let negotiatedFeatures = Array(
-            Set(localHello.supportedFeatures).intersection(remoteHello.supportedFeatures)
-        )
-        .sorted()
-
-        let encryptionNegotiated = negotiatedFeatures.contains("loom.session-encryption.v1")
-        switch encryptionPolicy {
-        case .required:
-            guard encryptionNegotiated else {
-                updateState(.failed("missing-session-encryption"))
-                rawSession.cancel()
-                throw LoomError.protocolError("Peer does not support Loom authenticated session encryption.")
+        do {
+            updateState(.handshaking)
+            let preauthenticationDeadline = ContinuousClock.now + max(.milliseconds(1), handshakeTimeout)
+            updateBootstrapProgress(phase: .transportStarting)
+            let preparedHello = try await performPreauthenticationOperation(
+                deadline: preauthenticationDeadline
+            ) {
+                try await MainActor.run {
+                    try LoomSessionHelloValidator.makePreparedSignedHello(
+                        from: localHello,
+                        identityManager: identityManager
+                    )
+                }
             }
-        case .optional:
-            break
-        }
+            let helloData = try JSONEncoder().encode(preparedHello.hello)
+            try await performPreauthenticationOperation(deadline: preauthenticationDeadline) { [transport] in
+                try await transport.startAndAwaitReady(queue: queue)
+            }
+            updateBootstrapProgress(phase: .transportReady)
+            try await performPreauthenticationOperation(deadline: preauthenticationDeadline) { [transport] in
+                try await transport.sendHandshakeMessage(helloData)
+            }
+            updateBootstrapProgress(phase: .localHelloSent)
 
-        let trustEvaluation: LoomTrustEvaluation
-        if role == .receiver {
-            trustEvaluation = try await resolveAndSignalTrust(
-                for: peerIdentity,
-                trustProvider: trustProvider
+            let remoteHello = try await receiveRemoteHello(deadline: preauthenticationDeadline)
+            let endpointDescription = transportEndpointDescription
+            let validatedHello = try await performPreauthenticationOperation(
+                deadline: preauthenticationDeadline
+            ) {
+                try await helloValidator.validateDetailed(
+                    remoteHello,
+                    endpointDescription: endpointDescription
+                )
+            }
+            let peerIdentity = validatedHello.peerIdentity
+            try Self.validateExpectedPeerIdentity(
+                peerIdentity,
+                expectedKeyID: expectedPeerIdentityKeyID,
+                expectedPublicKey: expectedPeerIdentityPublicKey
             )
-        } else {
-            trustEvaluation = try await receiveHostTrustStatus()
+            updateBootstrapProgress(phase: .remoteHelloReceived)
+
+            let negotiatedFeatures = Array(
+                Set(localHello.supportedFeatures).intersection(remoteHello.supportedFeatures)
+            )
+            .sorted()
+
+            let encryptionNegotiated = negotiatedFeatures.contains("loom.session-encryption.v1")
+            let sessionSecurityV2Negotiated = negotiatedFeatures.contains(
+                LoomSessionHelloRequest.sessionSecurityV2Feature
+            )
+            switch encryptionPolicy {
+            case .required:
+                guard encryptionNegotiated else {
+                    finishSession(
+                        state: .failed("missing-session-encryption"),
+                        cancelUnderlyingConnection: true
+                    )
+                    throw LoomError.protocolError("Peer does not support Loom authenticated session encryption.")
+                }
+            case .optional:
+                break
+            }
+
+            let trustEvaluation: LoomTrustEvaluation
+            let trustDeadline = ContinuousClock.now + max(.milliseconds(1), trustTimeout)
+            if role == .receiver {
+                trustEvaluation = try await resolveAndSignalTrust(
+                    for: peerIdentity,
+                    trustProvider: trustProvider,
+                    deadline: trustDeadline
+                )
+            } else {
+                trustEvaluation = try await receiveHostTrustStatus(deadline: trustDeadline)
+            }
+            if trustEvaluation.decision != .trusted {
+                finishSession(state: .failed("denied"), cancelUnderlyingConnection: true)
+                throw LoomError.authenticationFailed
+            }
+
+            if encryptionNegotiated {
+                let establishedSecurityContext = try LoomSessionSecurityContext(
+                    role: role,
+                    localHello: preparedHello.hello,
+                    remoteHello: validatedHello.hello,
+                    localEphemeralPrivateKey: preparedHello.ephemeralPrivateKey,
+                    cipherMode: sessionSecurityV2Negotiated ? .sequencedV2 : .legacyRandomNonce
+                )
+                securityContext = establishedSecurityContext
+                if sessionSecurityV2Negotiated {
+                    try await performSessionKeyConfirmation(
+                        using: establishedSecurityContext,
+                        deadline: trustDeadline
+                    )
+                }
+            }
+            encryptionEnabled = encryptionNegotiated
+
+            let context = LoomAuthenticatedSessionContext(
+                peerIdentity: peerIdentity,
+                peerAdvertisement: validatedHello.hello.advertisement,
+                trustEvaluation: trustEvaluation,
+                transportKind: transportKind,
+                transportDiagnostics: transportDiagnosticsSnapshot(),
+                negotiatedFeatures: negotiatedFeatures,
+                sessionEncrypted: encryptionNegotiated
+            )
+            self.context = context
+            await configureTransportObserversIfNeeded()
+            if transport.receiveSemantics == .independentReliableAndUnreliable {
+                try await performPreauthenticationOperation(
+                    deadline: trustDeadline,
+                    timeoutDetail: "Authenticated Loom session receive preparation timed out."
+                ) { [transport] in
+                    try await transport.prepareUnreliableReceive(maxBytes: LoomMessageLimits.maxFrameBytes)
+                }
+            }
+            updateBootstrapProgress(phase: .ready)
+            updateState(.ready)
+            readTask = Task { [weak self] in
+                await self?.runReadLoop()
+            }
+            if transport.receiveSemantics == .independentReliableAndUnreliable {
+                unreliableReadTask = Task { [weak self] in
+                    await self?.runUnreliableReadLoop()
+                }
+            }
+            return context
+        } catch {
+            updateBootstrapFailure(reason: error.localizedDescription)
+            finishSession(
+                state: .failed(error.localizedDescription),
+                cancelUnderlyingConnection: true
+            )
+            throw error
         }
-        if trustEvaluation.decision == .denied {
-            updateState(.failed("denied"))
-            rawSession.cancel()
+    }
+
+    private func performPreauthenticationOperation<Value: Sendable>(
+        deadline: ContinuousClock.Instant,
+        timeoutDetail: String = "Authenticated Loom session preauthentication timed out.",
+        operation: @escaping @Sendable () async throws -> Value
+    ) async throws -> Value {
+        let preauthenticationOperationLimiter = preauthenticationOperationLimiter
+        let cancellationRelay = LoomPreauthenticationCancellationRelay<Value>()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                let gate = LoomPreauthenticationOperationGate(continuation: continuation)
+                cancellationRelay.install(gate)
+                let operationTask = Task {
+                    do {
+                        let value: Value
+                        if let preauthenticationOperationLimiter {
+                            value = try await preauthenticationOperationLimiter.run(operation)
+                        } else {
+                            value = try await operation()
+                        }
+                        gate.resolve(.success(value))
+                    } catch {
+                        gate.resolve(.failure(error))
+                    }
+                }
+                let timeoutTask = Task {
+                    do {
+                        try await Task.sleep(until: deadline, clock: .continuous)
+                    } catch {
+                        return
+                    }
+                    gate.resolve(
+                        .failure(
+                            LoomError.connectionFailed(
+                                LoomConnectionFailure(
+                                    reason: .timedOut,
+                                    detail: timeoutDetail
+                                )
+                            )
+                        )
+                    )
+                }
+                gate.install(tasks: [operationTask, timeoutTask])
+            }
+        } onCancel: {
+            cancellationRelay.cancel()
+        }
+    }
+
+    private func receiveRemoteHello(deadline: ContinuousClock.Instant) async throws -> LoomSessionHello {
+        let remoteHelloData = try await performPreauthenticationOperation(deadline: deadline) { [transport] in
+            try await transport.receiveHandshakeMessage(
+                maxBytes: LoomMessageLimits.maxHelloFrameBytes
+            )
+        }
+        do {
+            return try JSONDecoder().decode(LoomSessionHello.self, from: remoteHelloData)
+        } catch {
+            guard transportKind == .udp else {
+                throw LoomError.decodingError(error)
+            }
+            throw LoomError.connectionFailed(
+                LoomConnectionFailure(
+                    reason: .transportLoss,
+                    detail: "Received malformed Loom session hello over UDP: \(error.localizedDescription)"
+                )
+            )
+        }
+    }
+
+    private static func validateExpectedPeerIdentity(
+        _ peerIdentity: LoomPeerIdentity,
+        expectedKeyID: String?,
+        expectedPublicKey: Data?
+    ) throws {
+        if let expectedKeyID,
+           peerIdentity.identityKeyID != expectedKeyID {
             throw LoomError.authenticationFailed
         }
-
-        if encryptionNegotiated {
-            securityContext = try LoomSessionSecurityContext(
-                role: role,
-                localHello: preparedHello.hello,
-                remoteHello: validatedHello.hello,
-                localEphemeralPrivateKey: preparedHello.ephemeralPrivateKey
-            )
+        if let expectedPublicKey,
+           peerIdentity.identityPublicKey != expectedPublicKey {
+            throw LoomError.authenticationFailed
         }
-        encryptionEnabled = encryptionNegotiated
-
-        let context = LoomAuthenticatedSessionContext(
-            peerIdentity: peerIdentity,
-            peerAdvertisement: validatedHello.hello.advertisement,
-            trustEvaluation: trustEvaluation,
-            transportKind: transportKind,
-            negotiatedFeatures: negotiatedFeatures,
-            sessionEncrypted: encryptionNegotiated
-        )
-        self.context = context
-        configureTransportObserversIfNeeded()
-        updateState(.ready)
-        readTask = Task { [weak self] in
-            await self?.runReadLoop()
-        }
-        if transport.receiveSemantics == .independentReliableAndUnreliable {
-            unreliableReadTask = Task { [weak self] in
-                await self?.runUnreliableReadLoop()
-            }
-        }
-        return context
     }
 
     public func openStream(label: String? = nil) async throws -> LoomMultiplexedStream {
+        try await openStream(label: label) { [weak self] stream in
+            guard let self else {
+                throw LoomError.protocolError("Authenticated Loom session no longer exists.")
+            }
+            try await self.sendEnvelope(
+                LoomSessionStreamEnvelope(
+                    kind: .open,
+                    streamID: stream.id,
+                    label: stream.label,
+                    payload: nil
+                )
+            )
+        }
+    }
+
+    private func openStream(
+        label: String?,
+        sendOpen: @escaping @Sendable (LoomMultiplexedStream) async throws -> Void
+    ) async throws -> LoomMultiplexedStream {
         guard case .ready = state else {
             throw LoomError.protocolError("Authenticated Loom session is not ready.")
+        }
+        guard streams.count < maximumConcurrentStreams else {
+            throw LoomError.protocolError("Authenticated Loom session reached its concurrent stream limit.")
         }
         if let label {
             let labelLength = label.lengthOfBytes(using: .utf8)
@@ -380,29 +1554,133 @@ public actor LoomAuthenticatedSession: LoomSessionProtocol {
         }
         let stream = makeStream(id: streamID, label: label)
         streams[streamID] = stream
-        try await sendEnvelope(
-            LoomSessionStreamEnvelope(
-                kind: .open,
-                streamID: streamID,
-                label: label,
-                payload: nil
-            )
-        )
+        do {
+            try await sendOpen(stream)
+        } catch {
+            if streams[streamID] === stream {
+                streams.removeValue(forKey: streamID)
+                markRecentlyClosedStream(streamID)
+            }
+            stream.finishQueuedOutbound()
+            stream.abortInbound()
+            throw error
+        }
         return stream
+    }
+
+    /// Creates a direct local datagram priority input endpoint for this
+    /// authenticated session.
+    public func makePriorityInputEndpoint() throws -> LoomPriorityInputEndpoint {
+        guard case .ready = state else {
+            throw LoomError.protocolError("Authenticated Loom session is not ready.")
+        }
+        // TODO: Enable the priority input lane for remote transports after
+        // congestion, NAT traversal, and path-health behavior are validated.
+        guard transportKind == .udp,
+              transport.receiveSemantics == .independentReliableAndUnreliable else {
+            throw LoomError.protocolError("Priority input lane is only available on local datagram transports.")
+        }
+        guard Self.isLocalPriorityInputPath(
+            pathSnapshot: currentPathSnapshot,
+            remoteEndpoint: backendRemoteEndpoint
+        ) else {
+            throw LoomError.protocolError("Priority input lane is only available on local datagram transports.")
+        }
+        guard encryptionEnabled, let securityContext else {
+            throw LoomError.protocolError("Priority input lane requires Loom session encryption.")
+        }
+        return LoomPriorityInputEndpoint(
+            securityContext: securityContext,
+            sendFrame: { [transport] frame, profile, onComplete in
+                await transport.sendUnreliableQueued(
+                    frame,
+                    profile: profile,
+                    onComplete: onComplete
+                )
+            },
+            receiveFrame: { [transport] maxBytes in
+                try await transport.receivePriorityUnreliable(maxBytes: maxBytes)
+            },
+            retainedCapacityBudget: incomingRetainedCapacityBudget
+        )
+    }
+
+    private static func isLocalPriorityInputPath(
+        pathSnapshot: LoomSessionNetworkPathSnapshot?,
+        remoteEndpoint: LoomNetworkEndpoint?
+    ) -> Bool {
+        if let pathSnapshot {
+            let usesLocalInterface = pathSnapshot.usesWiFi ||
+                pathSnapshot.usesWiredEthernet ||
+                pathSnapshot.usesLoopback ||
+                pathSnapshot.interfaceNames.contains(where: Self.isLocalProximityInterfaceName(_:))
+            guard usesLocalInterface else { return false }
+            return isLocalPriorityInputHost(remoteEndpoint ?? pathSnapshot.backendRemoteEndpoint)
+        }
+
+        return isLocalPriorityInputHost(remoteEndpoint)
+    }
+
+    private static func isLocalProximityInterfaceName(_ name: String) -> Bool {
+        let normalized = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return normalized.hasPrefix("anpi") ||
+            normalized.hasPrefix("awdl") ||
+            normalized.hasPrefix("llw") ||
+            normalized.hasPrefix("bridge")
+    }
+
+    private static func isLocalPriorityInputHost(_ endpoint: LoomNetworkEndpoint?) -> Bool {
+        guard case let .hostPort(host, _) = endpoint else { return false }
+        let normalized = host.rawValue.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalized == "localhost" || normalized == "::1" || normalized == "[::1]" { return true }
+        if normalized.contains(".local") { return true }
+        if normalized.hasPrefix("fe80:") || normalized.hasPrefix("[fe80:") { return true }
+        if normalized.hasPrefix("fc") || normalized.hasPrefix("[fc") { return true }
+        if normalized.hasPrefix("fd") || normalized.hasPrefix("[fd") { return true }
+
+        let tokens = normalized.split(separator: ".", omittingEmptySubsequences: false)
+        guard tokens.count == 4,
+              let first = UInt8(tokens[0]),
+              let second = UInt8(tokens[1]) else {
+            return false
+        }
+
+        if first == 127 { return true }
+        if first == 10 { return true }
+        if first == 192, second == 168 { return true }
+        if first == 172, (16 ... 31).contains(second) { return true }
+        if first == 169, second == 254 { return true }
+        return false
     }
 
     public func cancel() async {
         finishSession(state: .cancelled, cancelUnderlyingConnection: true)
     }
 
+    /// Destructively closes transport admission for an owner that can no longer service this
+    /// session, such as a broker IPC socket disappearing while a reliable request is suspended.
+    package func hardCancelReliableSends(reason: String) async {
+        reliableSendAdmission.close()
+        finishSession(
+            state: .failed(reason),
+            cancelUnderlyingConnection: true,
+            schedulesTransportCleanup: false
+        )
+        await transport.hardCloseTransport()
+        await reliableSendAdmission.waitForQuiescence()
+    }
+
     private func runReadLoop() async {
         do {
             while !Task.isCancelled {
-                let data = try await transport.receiveMessage(
-                    maxBytes: LoomMessageLimits.maxFrameBytes
+                let batch = try await transport.receiveMessageBatch(
+                    maxBytes: LoomMessageLimits.maxFrameBytes,
+                    maximumMessages: 64
                 )
-                let envelope = try decryptEnvelope(data)
-                try await handleEnvelope(envelope)
+                for data in batch {
+                    let envelope = try decryptEnvelope(data)
+                    try await handleEnvelope(envelope, lane: .reliable)
+                }
             }
         } catch {
             if case .cancelled = state {
@@ -416,41 +1694,374 @@ public actor LoomAuthenticatedSession: LoomSessionProtocol {
     }
 
     private func runUnreliableReadLoop() async {
-        do {
-            while !Task.isCancelled {
-                let data = try await transport.receiveUnreliable(
-                    maxBytes: LoomMessageLimits.maxFrameBytes
+        while !Task.isCancelled {
+            let batch: [Data]
+            do {
+                batch = try await transport.receiveUnreliableBatch(
+                    maxBytes: LoomMessageLimits.maxFrameBytes,
+                    maximumMessages: 64
                 )
-                let envelope = try decryptEnvelope(data)
-                try await handleEnvelope(envelope)
+            } catch {
+                if case .cancelled = state { return }
+                if case .failed = state { return }
+                return
             }
-        } catch {
-            if case .cancelled = state { return }
-            if case .failed = state { return }
+
+            for data in batch {
+                do {
+                    let envelope = try decryptEnvelope(data)
+                    try await handleEnvelope(envelope, lane: .unreliable)
+                } catch {
+                    finishSession(
+                        state: .failed(error.localizedDescription),
+                        cancelUnderlyingConnection: true
+                    )
+                    return
+                }
+            }
         }
     }
 
-    private func handleEnvelope(_ envelope: LoomSessionStreamEnvelope) async throws {
+    private func handleEnvelope(
+        _ envelope: LoomSessionStreamEnvelope,
+        lane: EnvelopeReceiveLane
+    ) async throws {
         switch envelope.kind {
         case .open:
+            try validateRemoteStreamOpen(streamID: envelope.streamID, label: envelope.label)
             let stream = makeStream(id: envelope.streamID, label: envelope.label)
             streams[envelope.streamID] = stream
-            incomingStreamContinuation.yield(stream)
-            incomingStreamObservers.yield(stream)
+            openedRemoteStreamIDs.insert(envelope.streamID)
+            let primaryStreamAccepted: Bool
+            switch incomingStreamContinuation.yield(stream) {
+            case .enqueued:
+                primaryStreamAccepted = true
+            case .dropped, .terminated:
+                primaryStreamAccepted = false
+            @unknown default:
+                primaryStreamAccepted = false
+            }
+            let observersAccepted = incomingStreamObservers.yield(stream)
+            guard primaryStreamAccepted, observersAccepted else {
+                let error = LoomError.protocolError(
+                    "Authenticated Loom incoming stream notification buffer exceeded its limit."
+                )
+                finishSession(
+                    state: .failed(error.localizedDescription),
+                    cancelUnderlyingConnection: true
+                )
+                throw error
+            }
+            try flushPendingUnopenedUnreliablePayloads(
+                for: envelope.streamID,
+                to: stream
+            )
         case .data:
-            guard let stream = streams[envelope.streamID], let payload = envelope.payload else {
+            guard let payload = envelope.payload else {
+                throw LoomError.protocolError(
+                    "Received data envelope with no payload for Loom stream \(envelope.streamID)."
+                )
+            }
+            guard !payload.isEmpty else {
+                throw LoomError.protocolError(
+                    "Received empty data envelope for Loom stream \(envelope.streamID)."
+                )
+            }
+            guard let stream = streams[envelope.streamID] else {
+                if recentlyClosedStreamContains(envelope.streamID) {
+                    discardPendingUnopenedUnreliablePayloads(
+                        for: envelope.streamID,
+                        reason: "late-data-after-close"
+                    )
+                    return
+                }
+                if lane == .unreliable,
+                   transport.receiveSemantics == .independentReliableAndUnreliable {
+                    try validateRemoteOwnedStreamID(envelope.streamID)
+                    bufferPendingUnopenedUnreliablePayload(
+                        payload,
+                        for: envelope.streamID
+                    )
+                    return
+                }
                 throw LoomError.protocolError("Received data for unknown Loom stream \(envelope.streamID).")
             }
-            stream.yield(payload)
+            guard stream.yield(payload) else {
+                if lane == .unreliable {
+                    if reportedUnreliableIncomingOverflowStreamIDs.insert(envelope.streamID).inserted {
+                        LoomLogger.transport(
+                            "Dropped unreliable payload after incoming buffer overflow " +
+                                "stream=\(envelope.streamID) label=\(stream.label ?? "unlabeled") " +
+                                "payloadBytes=\(payload.count) maxBytes=\(maximumBufferedIncomingBytesPerStream) " +
+                                "maxPayloads=\(maximumBufferedIncomingPayloadsPerStream)"
+                        )
+                    }
+                    return
+                }
+                let error = LoomError.protocolError(
+                    "Authenticated Loom stream \(envelope.streamID) incoming payload buffer exceeded its limit " +
+                        "(label=\(stream.label ?? "unlabeled"), payloadBytes=\(payload.count), " +
+                        "maxBytes=\(maximumBufferedIncomingBytesPerStream), " +
+                        "maxPayloads=\(maximumBufferedIncomingPayloadsPerStream))."
+                )
+                finishSession(
+                    state: .failed(error.localizedDescription),
+                    cancelUnderlyingConnection: true
+                )
+                throw error
+            }
         case .close:
+            discardPendingUnopenedUnreliablePayloads(
+                for: envelope.streamID,
+                reason: "stream-closed-before-open"
+            )
             guard let stream = streams.removeValue(forKey: envelope.streamID) else {
                 return
             }
+            reportedUnreliableIncomingOverflowStreamIDs.remove(envelope.streamID)
+            markRecentlyClosedStream(envelope.streamID)
             stream.finishInbound()
         }
     }
 
+    private func validateRemoteStreamOpen(streamID: UInt16, label: String?) throws {
+        try validateRemoteOwnedStreamID(streamID)
+        guard streams[streamID] == nil else {
+            throw LoomError.protocolError("Remote Loom stream identifier collides with an active stream.")
+        }
+        guard !openedRemoteStreamIDs.contains(streamID),
+              !recentlyClosedStreamContains(streamID) else {
+            throw LoomError.protocolError("Remote Loom stream identifier was already used in this session.")
+        }
+        guard streams.count < maximumConcurrentStreams else {
+            throw LoomError.protocolError("Authenticated Loom session reached its concurrent stream limit.")
+        }
+        if let label,
+           label.lengthOfBytes(using: .utf8) > LoomMessageLimits.maxStreamLabelBytes {
+            throw LoomError.protocolError(
+                "Authenticated Loom stream labels must not exceed \(LoomMessageLimits.maxStreamLabelBytes) UTF-8 bytes."
+            )
+        }
+    }
+
+    private func validateRemoteOwnedStreamID(_ streamID: UInt16) throws {
+        guard streamID != 0 else {
+            throw LoomError.protocolError("Remote Loom stream identifier must not be zero.")
+        }
+        let isEvenStreamID = streamID.isMultiple(of: 2)
+        let isRemoteOwnedStreamID = role == .receiver ? !isEvenStreamID : isEvenStreamID
+        guard isRemoteOwnedStreamID else {
+            throw LoomError.protocolError("Remote Loom stream identifier has invalid role parity.")
+        }
+    }
+
+    private func bufferPendingUnopenedUnreliablePayload(_ payload: Data, for streamID: UInt16) {
+        let now = CFAbsoluteTimeGetCurrent()
+        evictExpiredPendingUnopenedUnreliablePayloads(now: now)
+
+        var buffer = pendingUnopenedUnreliableDataByStreamID[streamID] ??
+            PendingUnopenedUnreliableStreamData(
+                payloads: [],
+                totalBytes: 0,
+                firstBufferedAt: now,
+                lastBufferedAt: now,
+                retainedCapacityBudget: LoomIncomingRetainedCapacityBudget(
+                    maximumBytes: pendingUnopenedUnreliableDataMaxBytesPerStream,
+                    maximumPayloadCount: pendingUnopenedUnreliableDataMaxPayloadsPerStream,
+                    maximumBatchCount: pendingUnopenedUnreliableDataMaxPayloadsPerStream,
+                    parent: incomingRetainedCapacityBudget
+                ),
+                expirationTask: nil
+            )
+        let nextPayloadCount = buffer.payloads.count + 1
+        let nextTotalBytes = buffer.totalBytes + payload.count
+        let maximumPayloadCount = min(
+            pendingUnopenedUnreliableDataMaxPayloadsPerStream,
+            maximumBufferedIncomingPayloadsPerStream
+        )
+        let maximumByteCount = min(
+            pendingUnopenedUnreliableDataMaxBytesPerStream,
+            maximumBufferedIncomingBytesPerStream
+        )
+        guard nextPayloadCount <= maximumPayloadCount,
+              nextTotalBytes <= maximumByteCount,
+              buffer.retainedCapacityBudget.reserve(
+                  bytes: payload.count,
+                  payloadCount: 1,
+                  startsNewBatch: true
+              ) else {
+            discardPendingUnopenedUnreliablePayloads(
+                for: streamID,
+                reason: "capacity-exceeded payloads=\(nextPayloadCount) bytes=\(nextTotalBytes)"
+            )
+            return
+        }
+
+        buffer.payloads.append(payload)
+        buffer.totalBytes = nextTotalBytes
+        buffer.lastBufferedAt = now
+        buffer.expirationTask?.cancel()
+        let pendingUnopenedUnreliableDataTTL = pendingUnopenedUnreliableDataTTL
+        buffer.expirationTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(pendingUnopenedUnreliableDataTTL))
+            } catch {
+                return
+            }
+            await self?.discardPendingUnopenedUnreliablePayloads(
+                for: streamID,
+                reason: "expired-before-open"
+            )
+        }
+        pendingUnopenedUnreliableDataByStreamID[streamID] = buffer
+        evictOldestPendingUnopenedUnreliablePayloadsIfNeeded()
+
+        if buffer.payloads.count == 1 {
+            LoomLogger.transport(
+                "Buffered unreliable payload for unopened Loom stream \(streamID) bytes=\(payload.count)"
+            )
+        }
+    }
+
+    private func flushPendingUnopenedUnreliablePayloads(
+        for streamID: UInt16,
+        to stream: LoomMultiplexedStream
+    ) throws {
+        guard let buffer = pendingUnopenedUnreliableDataByStreamID.removeValue(forKey: streamID) else {
+            return
+        }
+        buffer.expirationTask?.cancel()
+
+        guard buffer.payloads.count <= maximumBufferedIncomingPayloadsPerStream,
+              buffer.totalBytes <= maximumBufferedIncomingBytesPerStream else {
+            buffer.retainedCapacityBudget.release(
+                bytes: buffer.totalBytes,
+                payloadCount: buffer.payloads.count,
+                batchCount: buffer.payloads.count
+            )
+            throw LoomError.protocolError(
+                "Buffered pre-open payloads exceed the destination Loom stream's incoming limit."
+            )
+        }
+
+        for (index, payload) in buffer.payloads.enumerated() {
+            guard stream.yieldPreRetained(payload) else {
+                let unconsumedPayloads = buffer.payloads.dropFirst(index + 1)
+                if !unconsumedPayloads.isEmpty {
+                    buffer.retainedCapacityBudget.release(
+                        bytes: unconsumedPayloads.reduce(0) { $0 + $1.count },
+                        payloadCount: unconsumedPayloads.count,
+                        batchCount: unconsumedPayloads.count
+                    )
+                }
+                throw LoomError.protocolError(
+                    "Authenticated Loom stream incoming payload buffer exceeded its limit."
+                )
+            }
+        }
+
+        let ageMs = Int((CFAbsoluteTimeGetCurrent() - buffer.firstBufferedAt) * 1000)
+        LoomLogger.transport(
+            "Delivered buffered unreliable payloads for Loom stream \(streamID) count=\(buffer.payloads.count) bytes=\(buffer.totalBytes) ageMs=\(ageMs)"
+        )
+    }
+
+    private func evictExpiredPendingUnopenedUnreliablePayloads(now: CFAbsoluteTime) {
+        guard !pendingUnopenedUnreliableDataByStreamID.isEmpty else { return }
+
+        let expiredStreamIDs = pendingUnopenedUnreliableDataByStreamID.compactMap { streamID, buffer in
+            now - buffer.lastBufferedAt >= pendingUnopenedUnreliableDataTTL ? streamID : nil
+        }
+        for streamID in expiredStreamIDs {
+            discardPendingUnopenedUnreliablePayloads(for: streamID, reason: "expired-before-open")
+        }
+    }
+
+    private func evictOldestPendingUnopenedUnreliablePayloadsIfNeeded() {
+        let overflow = pendingUnopenedUnreliableDataByStreamID.count - pendingUnopenedUnreliableDataMaxStreams
+        guard overflow > 0 else { return }
+
+        let oldestStreamIDs = pendingUnopenedUnreliableDataByStreamID
+            .sorted { lhs, rhs in
+                lhs.value.firstBufferedAt < rhs.value.firstBufferedAt
+            }
+            .prefix(overflow)
+            .map(\.key)
+        for streamID in oldestStreamIDs {
+            discardPendingUnopenedUnreliablePayloads(for: streamID, reason: "stream-cap-exceeded")
+        }
+    }
+
+    private func discardPendingUnopenedUnreliablePayloads(for streamID: UInt16, reason: String) {
+        guard let buffer = pendingUnopenedUnreliableDataByStreamID.removeValue(forKey: streamID) else {
+            return
+        }
+        buffer.expirationTask?.cancel()
+        buffer.retainedCapacityBudget.release(
+            bytes: buffer.totalBytes,
+            payloadCount: buffer.payloads.count,
+            batchCount: buffer.payloads.count
+        )
+
+        let ageMs = Int((CFAbsoluteTimeGetCurrent() - buffer.firstBufferedAt) * 1000)
+        LoomLogger.transport(
+            "Discarded buffered unreliable payloads for unopened Loom stream \(streamID) reason=\(reason) count=\(buffer.payloads.count) bytes=\(buffer.totalBytes) ageMs=\(ageMs)"
+        )
+    }
+
+    private func markRecentlyClosedStream(_ streamID: UInt16) {
+        let now = CFAbsoluteTimeGetCurrent()
+        evictExpiredRecentlyClosedStreams(now: now)
+        recentlyClosedStreamIDs[streamID] = now
+        evictOldestRecentlyClosedStreamsIfNeeded()
+    }
+
+    private func recentlyClosedStreamContains(_ streamID: UInt16) -> Bool {
+        let now = CFAbsoluteTimeGetCurrent()
+        evictExpiredRecentlyClosedStreams(now: now)
+        guard let closedAt = recentlyClosedStreamIDs[streamID] else {
+            return false
+        }
+        if now - closedAt >= recentlyClosedStreamTTL {
+            recentlyClosedStreamIDs.removeValue(forKey: streamID)
+            return false
+        }
+        return true
+    }
+
+    private func evictExpiredRecentlyClosedStreams(now: CFAbsoluteTime) {
+        guard !recentlyClosedStreamIDs.isEmpty else { return }
+
+        let expiredStreamIDs = recentlyClosedStreamIDs.compactMap { streamID, closedAt in
+            now - closedAt >= recentlyClosedStreamTTL ? streamID : nil
+        }
+        for streamID in expiredStreamIDs {
+            recentlyClosedStreamIDs.removeValue(forKey: streamID)
+        }
+    }
+
+    private func evictOldestRecentlyClosedStreamsIfNeeded() {
+        let overflow = recentlyClosedStreamIDs.count - recentlyClosedStreamMaxCount
+        guard overflow > 0 else { return }
+
+        let oldestStreamIDs = recentlyClosedStreamIDs
+            .sorted { lhs, rhs in
+                lhs.value < rhs.value
+            }
+            .prefix(overflow)
+            .map(\.key)
+        for streamID in oldestStreamIDs {
+            recentlyClosedStreamIDs.removeValue(forKey: streamID)
+        }
+    }
+
     private func makeStream(id: UInt16, label: String?) -> LoomMultiplexedStream {
+        let pendingRetainedCapacityBudget = pendingUnopenedUnreliableDataByStreamID[id]?.retainedCapacityBudget
+        pendingRetainedCapacityBudget?.updateLimits(
+            maximumBytes: maximumBufferedIncomingBytesPerStream,
+            maximumPayloadCount: maximumBufferedIncomingPayloadsPerStream,
+            maximumBatchCount: maximumBufferedIncomingPayloadsPerStream
+        )
         let envelopeForData: @Sendable (Data) -> LoomSessionStreamEnvelope = { data in
             LoomSessionStreamEnvelope(kind: .data, streamID: id, label: nil, payload: data)
         }
@@ -463,21 +2074,65 @@ public actor LoomAuthenticatedSession: LoomSessionProtocol {
                 }
                 try await self.sendEnvelope(envelopeForData(data), reliable: true)
             },
+            hardDeadlineSendHandler: { [weak self] data, deadline in
+                guard let self else {
+                    throw LoomError.protocolError("Authenticated Loom session no longer exists.")
+                }
+                try await self.sendEnvelope(
+                    envelopeForData(data),
+                    reliableHardDeadline: deadline
+                )
+            },
             unreliableSendHandler: { [weak self] data in
                 guard let self else {
                     throw LoomError.protocolError("Authenticated Loom session no longer exists.")
                 }
                 try await self.sendEnvelope(envelopeForData(data), reliable: false)
             },
-            queuedUnreliableSendHandler: { [weak self] data, onComplete in
+            queuedUnreliableSendHandler: { [weak self] data, profile, options, onComplete in
                 guard let self else {
                     onComplete(
                         LoomError.protocolError("Authenticated Loom session no longer exists.")
                     )
                     return
                 }
-                await self.sendEnvelopeQueued(envelopeForData(data), onComplete: onComplete)
+                await self.sendEnvelopeQueued(
+                    envelopeForData(data),
+                    profile: profile,
+                    options: options,
+                    onComplete: onComplete
+                )
             },
+            queuedUnreliableBatchSendHandler: { [weak self] items, profile, submittedAt in
+                guard let self else {
+                    let error = LoomError.protocolError("Authenticated Loom session no longer exists.")
+                    for item in items {
+                        item.onComplete(error)
+                    }
+                    return
+                }
+                await self.sendEnvelopeQueuedBatch(
+                    items,
+                    streamID: id,
+                    profile: profile,
+                    submittedAt: submittedAt
+                )
+            },
+            queuedUnreliableResetHandler: { [weak self] profile in
+                guard let self else { return }
+                await self.transport.resetQueuedUnreliableSends(profile: profile)
+            },
+            queuedUnreliableDiagnosticsHandler: { [weak self] profile in
+                guard let self else { return nil }
+                return await self.consumeQueuedUnreliableSendDiagnostics(profile: profile)
+            },
+            maximumBufferedIncomingBytes: maximumBufferedIncomingBytesPerStream,
+            maximumBufferedIncomingPayloads: maximumBufferedIncomingPayloadsPerStream,
+            sharedIncomingRetainedCapacityBudget: incomingRetainedCapacityBudget,
+            incomingRetainedCapacityBudget: pendingRetainedCapacityBudget,
+            // Overflow is handled synchronously by handleEnvelope so unreliable
+            // payload loss can remain stream-scoped instead of killing the session.
+            onIncomingBufferOverflow: {},
             closeHandler: { [weak self] in
                 guard let self else {
                     throw LoomError.protocolError("Authenticated Loom session no longer exists.")
@@ -496,32 +2151,280 @@ public actor LoomAuthenticatedSession: LoomSessionProtocol {
     }
 
     private func removeStream(id: UInt16) {
-        streams.removeValue(forKey: id)
+        guard streams.removeValue(forKey: id) != nil else {
+            return
+        }
+        reportedUnreliableIncomingOverflowStreamIDs.remove(id)
+        markRecentlyClosedStream(id)
     }
 
     private func sendEnvelope(
         _ envelope: LoomSessionStreamEnvelope,
-        reliable: Bool = true
+        reliable: Bool = true,
+        reliableHardDeadline: ContinuousClock.Instant? = nil
     ) async throws {
+        try Task.checkCancellation()
+        let ordinaryReliableLease: LoomReliableSendAdmission.Lease?
+        let deadlineLeaseTransfer: LoomReliableSendLeaseTransfer?
+        if reliable, let reliableHardDeadline {
+            switch reliableSendAdmission.acquire(before: reliableHardDeadline) {
+            case let .admitted(lease):
+                // The transfer bridges synchronous sealing and asynchronous task startup without
+                // allowing an untracked authenticated nonce to outlive a deadline race.
+                deadlineLeaseTransfer = LoomReliableSendLeaseTransfer(lease)
+            case .expired:
+                // No lease or nonce exists, so a pre-admission timeout is non-destructive.
+                throw LoomError.timeout
+            case .closed:
+                throw LoomError.protocolError("Authenticated Loom session is closed to reliable sends.")
+            }
+            ordinaryReliableLease = nil
+        } else if reliable {
+            guard let lease = reliableSendAdmission.acquire() else {
+                throw LoomError.protocolError("Authenticated Loom session is closed to reliable sends.")
+            }
+            ordinaryReliableLease = lease
+            deadlineLeaseTransfer = nil
+        } else {
+            ordinaryReliableLease = nil
+            deadlineLeaseTransfer = nil
+        }
+        defer {
+            ordinaryReliableLease?.release()
+            deadlineLeaseTransfer?.releaseIfOperationHasNotStarted()
+        }
         let wireFrame = try encodeWireFrame(for: envelope)
 
         if reliable {
-            try await transport.sendMessage(wireFrame)
+            if let reliableHardDeadline {
+                try await withLoomQuiescingHardDeadline(
+                    reliableHardDeadline,
+                    closeAdmission: { [reliableSendAdmission] in
+                        reliableSendAdmission.close()
+                    },
+                    releaseUnstartedOperation: {
+                        deadlineLeaseTransfer?.releaseIfOperationHasNotStarted()
+                    },
+                    quiesce: { [self] in
+                        await terminateForReliableSendHardCut()
+                    },
+                    operation: { [transport] in
+                        guard let lease = deadlineLeaseTransfer?.takeForOperation() else {
+                            // The hard-cut winner released a task that had not entered transport.
+                            throw CancellationError()
+                        }
+                        defer { lease.release() }
+                        try await transport.sendMessage(wireFrame)
+                    }
+                )
+            } else {
+                try await transport.sendMessage(wireFrame)
+            }
         } else {
             try await transport.sendUnreliable(wireFrame)
         }
     }
 
+    private func terminateForReliableSendHardCut() async {
+        reliableSendAdmission.close()
+        finishSession(
+            state: .failed("Reliable Loom stream send was hard-cut before completion."),
+            cancelUnderlyingConnection: true,
+            schedulesTransportCleanup: false
+        )
+        await transport.hardCloseTransport()
+        await reliableSendAdmission.waitForQuiescence()
+    }
+
     private func sendEnvelopeQueued(
         _ envelope: LoomSessionStreamEnvelope,
+        profile: LoomQueuedUnreliableSendProfile,
+        options: LoomQueuedUnreliableSendOptions,
         onComplete: @escaping @Sendable (Error?) -> Void
     ) async {
+        if profile.requiresIndependentUnreliableLane,
+           transport.receiveSemantics != .independentReliableAndUnreliable {
+            onComplete(
+                LoomQueuedUnreliableSendDrop(
+                    reason: .unsupportedTransport,
+                    profile: profile,
+                    frameID: options.frameID,
+                    fragmentIndex: options.fragmentIndex,
+                    fragmentCount: options.fragmentCount
+                )
+            )
+            return
+        }
+
         do {
             let wireFrame = try encodeWireFrame(for: envelope)
-            await transport.sendUnreliableQueued(wireFrame, onComplete: onComplete)
+            await transport.sendUnreliableQueued(
+                wireFrame,
+                profile: profile,
+                options: options,
+                onComplete: onComplete
+            )
         } catch {
             onComplete(error)
         }
+    }
+
+    private func sendEnvelopeQueuedBatch(
+        _ items: [LoomQueuedUnreliableBatchItem],
+        streamID: UInt16,
+        profile: LoomQueuedUnreliableSendProfile,
+        submittedAt: TimeInterval
+    ) async {
+        guard !items.isEmpty else { return }
+        let sessionStartedAt = ProcessInfo.processInfo.systemUptime
+        var envelopeEncodeMs = 0.0
+        var sealMs = 0.0
+        var transportAdmissionMs = 0.0
+        defer {
+            let completedAt = ProcessInfo.processInfo.systemUptime
+            recordQueuedUnreliableBatchPhases(
+                profile: profile,
+                itemCount: items.count,
+                sessionWaitMs: max(0, sessionStartedAt - submittedAt) * 1_000,
+                envelopeEncodeMs: envelopeEncodeMs,
+                sealMs: sealMs,
+                transportAdmissionMs: transportAdmissionMs,
+                totalAdmissionMs: max(0, completedAt - submittedAt) * 1_000,
+                completedAt: completedAt
+            )
+        }
+        if profile.requiresIndependentUnreliableLane,
+           transport.receiveSemantics != .independentReliableAndUnreliable {
+            for item in items {
+                item.onComplete(LoomQueuedUnreliableSendDrop(
+                    reason: .unsupportedTransport,
+                    profile: profile,
+                    frameID: item.options.frameID,
+                    fragmentIndex: item.options.fragmentIndex,
+                    fragmentCount: item.options.fragmentCount
+                ))
+            }
+            return
+        }
+
+        let envelopeEncodeStartedAt = ProcessInfo.processInfo.systemUptime
+        var encodedEnvelopes: [Data] = []
+        encodedEnvelopes.reserveCapacity(items.count)
+        for item in items {
+            encodedEnvelopes.append(LoomSessionStreamEnvelope.encodeDataPayload(
+                item.data,
+                streamID: streamID
+            ))
+        }
+        envelopeEncodeMs = max(
+            0,
+            ProcessInfo.processInfo.systemUptime - envelopeEncodeStartedAt
+        ) * 1_000
+
+        let wireFrames: [Data]
+        let sealStartedAt = ProcessInfo.processInfo.systemUptime
+        do {
+            if encryptionEnabled {
+                guard let securityContext else {
+                    throw LoomError.protocolError(
+                        "Authenticated Loom session encryption context is unavailable."
+                    )
+                }
+                let encryptedPayloads = try securityContext.sealBatch(
+                    encodedEnvelopes,
+                    trafficClass: .data
+                )
+                wireFrames = encryptedPayloads.map { encryptedPayload in
+                    var wireFrame = Data(capacity: encryptedPayload.count + 1)
+                    wireFrame.append(LoomSessionTrafficClass.data.rawValue)
+                    wireFrame.append(encryptedPayload)
+                    return wireFrame
+                }
+            } else {
+                wireFrames = encodedEnvelopes.map { encodedEnvelope in
+                    var wireFrame = Data(capacity: encodedEnvelope.count + 1)
+                    wireFrame.append(0x00)
+                    wireFrame.append(encodedEnvelope)
+                    return wireFrame
+                }
+            }
+        } catch {
+            sealMs = max(0, ProcessInfo.processInfo.systemUptime - sealStartedAt) * 1_000
+            for item in items {
+                item.onComplete(error)
+            }
+            return
+        }
+        sealMs = max(0, ProcessInfo.processInfo.systemUptime - sealStartedAt) * 1_000
+
+        let wireItems = zip(items, wireFrames).map { item, wireFrame in
+            LoomQueuedUnreliableBatchItem(
+                data: wireFrame,
+                options: item.options,
+                onComplete: item.onComplete
+            )
+        }
+
+        let transportAdmissionStartedAt = ProcessInfo.processInfo.systemUptime
+        await transport.sendUnreliableQueuedBatch(wireItems, profile: profile)
+        transportAdmissionMs = max(
+            0,
+            ProcessInfo.processInfo.systemUptime - transportAdmissionStartedAt
+        ) * 1_000
+    }
+
+    private func recordQueuedUnreliableBatchPhases(
+        profile: LoomQueuedUnreliableSendProfile,
+        itemCount: Int,
+        sessionWaitMs: Double,
+        envelopeEncodeMs: Double,
+        sealMs: Double,
+        transportAdmissionMs: Double,
+        totalAdmissionMs: Double,
+        completedAt: TimeInterval
+    ) {
+        var accumulator = queuedUnreliableBatchPhaseAccumulators[profile] ??
+            LoomQueuedUnreliableBatchPhaseAccumulator()
+        accumulator.record(
+            itemCount: itemCount,
+            sessionWaitMs: sessionWaitMs,
+            envelopeEncodeMs: envelopeEncodeMs,
+            sealMs: sealMs,
+            transportAdmissionMs: transportAdmissionMs,
+            totalAdmissionMs: totalAdmissionMs
+        )
+        queuedUnreliableBatchPhaseAccumulators[profile] = accumulator
+
+        guard LoomLogger.isEnabled(.transport), totalAdmissionMs >= 8 else { return }
+        let lastLogAt = queuedUnreliableBatchPhaseLastLogAt[profile] ?? 0
+        guard lastLogAt == 0 || completedAt - lastLogAt >= 1 else { return }
+        queuedUnreliableBatchPhaseLastLogAt[profile] = completedAt
+        LoomLogger.transport(
+            "Queued unreliable batch phases profile=\(profile.rawValue) items=\(itemCount) " +
+                "sessionWait=\(sessionWaitMs.formatted(.number.precision(.fractionLength(2))))ms " +
+                "envelopeEncode=\(envelopeEncodeMs.formatted(.number.precision(.fractionLength(2))))ms " +
+                "seal=\(sealMs.formatted(.number.precision(.fractionLength(2))))ms " +
+                "transportAdmission=\(transportAdmissionMs.formatted(.number.precision(.fractionLength(2))))ms " +
+                "totalAdmission=\(totalAdmissionMs.formatted(.number.precision(.fractionLength(2))))ms"
+        )
+    }
+
+    private func consumeQueuedUnreliableSendDiagnostics(
+        profile: LoomQueuedUnreliableSendProfile
+    ) async -> LoomQueuedUnreliableSendDiagnostics? {
+        let batchPhases: LoomQueuedUnreliableBatchPhaseDiagnostics?
+        if var accumulator = queuedUnreliableBatchPhaseAccumulators[profile] {
+            batchPhases = accumulator.consume()
+            queuedUnreliableBatchPhaseAccumulators[profile] = accumulator
+        } else {
+            batchPhases = nil
+        }
+        let transportDiagnostics = await transport.consumeQueuedUnreliableSendDiagnostics(
+            profile: profile
+        )
+        guard transportDiagnostics != nil || batchPhases != nil else { return nil }
+        return (transportDiagnostics ?? LoomQueuedUnreliableSendDiagnostics(profile: profile))
+            .replacingBatchPhases(batchPhases)
     }
 
     private func encodeWireFrame(for envelope: LoomSessionStreamEnvelope) throws -> Data {
@@ -578,20 +2481,106 @@ public actor LoomAuthenticatedSession: LoomSessionProtocol {
         return try LoomSessionStreamEnvelope.decode(from: plaintext)
     }
 
-    private func resolveTrustEvaluation(
-        for peerIdentity: LoomPeerIdentity,
-        trustProvider: (any LoomTrustProvider)?
-    ) async -> LoomTrustEvaluation {
-        guard let trustProvider else {
-            return LoomTrustEvaluation(
-                decision: .requiresApproval,
-                shouldShowAutoTrustNotice: false
+    // MARK: - Handshake Trust Status Signaling
+
+    private func performSessionKeyConfirmation(
+        using securityContext: LoomSessionSecurityContext,
+        deadline: ContinuousClock.Instant
+    ) async throws {
+        switch role {
+        case .receiver:
+            let challenge = Self.randomKeyConfirmationChallenge()
+            try await sendKeyConfirmationMessage(
+                LoomSessionKeyConfirmationMessage(
+                    kind: .receiverChallenge,
+                    challenge: challenge
+                ),
+                using: securityContext,
+                deadline: deadline
             )
+            let response = try await receiveKeyConfirmationMessage(
+                using: securityContext,
+                deadline: deadline
+            )
+            guard response.kind == .initiatorResponse,
+                  response.challenge == challenge else {
+                throw LoomError.authenticationFailed
+            }
+            try await sendKeyConfirmationMessage(
+                LoomSessionKeyConfirmationMessage(
+                    kind: .receiverAcknowledgement,
+                    challenge: challenge
+                ),
+                using: securityContext,
+                deadline: deadline
+            )
+        case .initiator:
+            let challengeMessage = try await receiveKeyConfirmationMessage(
+                using: securityContext,
+                deadline: deadline
+            )
+            guard challengeMessage.kind == .receiverChallenge,
+                  challengeMessage.challenge.count == 32 else {
+                throw LoomError.authenticationFailed
+            }
+            try await sendKeyConfirmationMessage(
+                LoomSessionKeyConfirmationMessage(
+                    kind: .initiatorResponse,
+                    challenge: challengeMessage.challenge
+                ),
+                using: securityContext,
+                deadline: deadline
+            )
+            let acknowledgement = try await receiveKeyConfirmationMessage(
+                using: securityContext,
+                deadline: deadline
+            )
+            guard acknowledgement.kind == .receiverAcknowledgement,
+                  acknowledgement.challenge == challengeMessage.challenge else {
+                throw LoomError.authenticationFailed
+            }
         }
-        return await trustProvider.evaluateTrustOutcome(for: peerIdentity)
     }
 
-    // MARK: - Handshake Trust Status Signaling
+    private func sendKeyConfirmationMessage(
+        _ message: LoomSessionKeyConfirmationMessage,
+        using securityContext: LoomSessionSecurityContext,
+        deadline: ContinuousClock.Instant
+    ) async throws {
+        let plaintext = try JSONEncoder().encode(message)
+        let ciphertext = try securityContext.seal(
+            plaintext,
+            trafficClass: .keyConfirmation
+        )
+        try await performPreauthenticationOperation(
+            deadline: deadline,
+            timeoutDetail: "Authenticated Loom session key confirmation timed out."
+        ) { [transport] in
+            try await transport.sendMessage(ciphertext)
+        }
+    }
+
+    private func receiveKeyConfirmationMessage(
+        using securityContext: LoomSessionSecurityContext,
+        deadline: ContinuousClock.Instant
+    ) async throws -> LoomSessionKeyConfirmationMessage {
+        let ciphertext = try await performPreauthenticationOperation(
+            deadline: deadline,
+            timeoutDetail: "Authenticated Loom session key confirmation timed out."
+        ) { [transport] in
+            try await transport.receiveMessage(maxBytes: 1_024)
+        }
+        let plaintext = try securityContext.open(
+            ciphertext,
+            trafficClass: .keyConfirmation
+        )
+        return try JSONDecoder().decode(LoomSessionKeyConfirmationMessage.self, from: plaintext)
+    }
+
+    private nonisolated static func randomKeyConfirmationChallenge() -> Data {
+        var generator = SystemRandomNumberGenerator()
+        return Data((0 ..< 32).map { _ in UInt8.random(in: .min ... .max, using: &generator) })
+    }
 
     /// Receiver (host) side: evaluate trust, signaling the peer if approval is pending.
     ///
@@ -600,90 +2589,60 @@ public actor LoomAuthenticatedSession: LoomSessionProtocol {
     /// frame is sent first so the client can show a waiting indicator.
     private func resolveAndSignalTrust(
         for peerIdentity: LoomPeerIdentity,
-        trustProvider: (any LoomTrustProvider)?
+        trustProvider: (any LoomTrustProvider)?,
+        deadline: ContinuousClock.Instant
     ) async throws -> LoomTrustEvaluation {
-        let evaluation: LoomTrustEvaluation = await withTaskGroup(
-            of: LoomTrustEvaluation?.self
-        ) { group in
-            group.addTask {
-                await self.resolveTrustEvaluation(
-                    for: peerIdentity,
-                    trustProvider: trustProvider
-                )
+        let pendingStatusTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: .milliseconds(500))
+            } catch {
+                return
             }
+            guard !Task.isCancelled, let self else { return }
+            await self.updateBootstrapProgress(phase: .trustPendingApproval)
+            try? await self.sendTrustStatus(.pendingApproval, deadline: deadline)
+        }
+        defer { pendingStatusTask.cancel() }
 
-            group.addTask { [weak self] in
-                try? await Task.sleep(for: .milliseconds(500))
-                guard !Task.isCancelled, let self else { return nil }
-                try? await self.sendTrustStatus(.pendingApproval)
-                return nil
-            }
-
-            // Expire pending approvals after a bounded window so host apps do
-            // not accumulate stale request dialogs/notifications indefinitely.
-            group.addTask {
-                try? await Task.sleep(for: Self.pendingTrustApprovalTimeout)
-                guard !Task.isCancelled else { return nil }
+        let evaluation = try await performPreauthenticationOperation(
+            deadline: deadline,
+            timeoutDetail: "Authenticated Loom session trust approval timed out."
+        ) {
+            guard let trustProvider else {
                 return LoomTrustEvaluation(
-                    decision: .denied,
+                    decision: .requiresApproval,
                     shouldShowAutoTrustNotice: false
                 )
             }
-
-            // Cancel the trust evaluation if the remote peer disconnects
-            // while the approval dialog is open.
-            group.addTask { [weak self] in
-                guard let self else { return nil }
-                for await sessionState in await self.makeStateObserver() {
-                    switch sessionState {
-                    case .failed, .cancelled:
-                        return LoomTrustEvaluation(
-                            decision: .denied,
-                            shouldShowAutoTrustNotice: false
-                        )
-                    default:
-                        continue
-                    }
-                }
-                return nil
-            }
-
-            var result: LoomTrustEvaluation?
-            for await value in group {
-                if let value {
-                    result = value
-                    group.cancelAll()
-                    break
-                }
-            }
-            return result ?? LoomTrustEvaluation(
-                decision: .denied,
-                shouldShowAutoTrustNotice: false
-            )
+            return await trustProvider.evaluateTrustOutcome(for: peerIdentity)
         }
 
         let finalStatus: LoomHandshakeTrustStatus =
-            evaluation.decision == .denied ? .denied : .trusted
-        try await sendTrustStatus(finalStatus)
+            evaluation.decision == .trusted ? .trusted : .denied
+        try await sendTrustStatus(finalStatus, deadline: deadline)
         return evaluation
     }
 
-    /// Maximum time a host-side trust request is allowed to remain pending
-    /// before Loom auto-denies it as expired.
-    private static let pendingTrustApprovalTimeout: Duration = .seconds(45)
-
     /// Initiator (client) side: receive trust status frames from the host.
-    private func receiveHostTrustStatus() async throws -> LoomTrustEvaluation {
+    private func receiveHostTrustStatus(
+        deadline: ContinuousClock.Instant
+    ) async throws -> LoomTrustEvaluation {
         while true {
-            let data = try await transport.receiveMessage(
-                maxBytes: LoomMessageLimits.maxTrustStatusFrameBytes
-            )
+            let data = try await performPreauthenticationOperation(
+                deadline: deadline,
+                timeoutDetail: "Authenticated Loom session trust approval timed out."
+            ) { [transport] in
+                try await transport.receiveMessage(
+                    maxBytes: LoomMessageLimits.maxTrustStatusFrameBytes
+                )
+            }
             let status = try JSONDecoder().decode(
                 LoomHandshakeTrustStatus.self,
                 from: data
             )
             switch status {
             case .pendingApproval:
+                updateBootstrapProgress(phase: .trustPendingApproval)
                 await onTrustPending?()
                 continue
             case .trusted:
@@ -700,9 +2659,17 @@ public actor LoomAuthenticatedSession: LoomSessionProtocol {
         }
     }
 
-    private func sendTrustStatus(_ status: LoomHandshakeTrustStatus) async throws {
+    private func sendTrustStatus(
+        _ status: LoomHandshakeTrustStatus,
+        deadline: ContinuousClock.Instant
+    ) async throws {
         let data = try JSONEncoder().encode(status)
-        try await transport.sendMessage(data)
+        try await performPreauthenticationOperation(
+            deadline: deadline,
+            timeoutDetail: "Authenticated Loom session trust status delivery timed out."
+        ) { [transport] in
+            try await transport.sendMessage(data)
+        }
     }
 
     private func updateState(_ newState: LoomAuthenticatedSessionState) {
@@ -710,62 +2677,72 @@ public actor LoomAuthenticatedSession: LoomSessionProtocol {
         stateObservers.yield(newState)
     }
 
-    private func configureTransportObserversIfNeeded() {
+    private func updateBootstrapProgress(
+        phase: LoomAuthenticatedSessionBootstrapPhase,
+        failureReason: String? = nil
+    ) {
+        let progress = LoomAuthenticatedSessionBootstrapProgress(
+            phase: phase,
+            failureReason: failureReason
+        )
+        bootstrapProgress = progress
+        bootstrapProgressObservers.yield(progress)
+        onBootstrapProgress?(progress)
+    }
+
+    private func updateBootstrapFailure(reason: String) {
+        guard bootstrapProgress.phase != .ready else { return }
+        updateBootstrapProgress(
+            phase: bootstrapProgress.phase == .idle ? .transportStarting : bootstrapProgress.phase,
+            failureReason: reason
+        )
+    }
+
+    private func configureTransportObserversIfNeeded() async {
         guard !transportObserversConfigured else { return }
         transportObserversConfigured = true
-        currentRemoteEndpoint = rawSession.endpoint
-
-        if let path = rawSession.connection.currentPath {
-            applyTransportPathSnapshot(LoomSessionNetworkPathSnapshot(path: path))
+        currentRemoteEndpoint = backendConnection.remoteEndpoint
+        if let currentPath = await backendConnection.currentPath {
+            applyTransportPathSnapshot(LoomSessionNetworkPathSnapshot(backendPath: currentPath))
         }
-
-        rawSession.connection.pathUpdateHandler = { [weak self] path in
+        await transport.setObservationHandler { [weak self] observation in
             guard let self else { return }
             Task {
-                await self.handleTransportPathUpdate(path)
-            }
-        }
-        rawSession.connection.stateUpdateHandler = { [weak self] state in
-            guard let self else { return }
-            Task {
-                await self.handleUnderlyingConnectionState(state)
+                await self.handleTransportObservation(observation)
             }
         }
     }
 
-    private func handleTransportPathUpdate(_ path: NWPath) {
-        applyTransportPathSnapshot(LoomSessionNetworkPathSnapshot(path: path))
-    }
-
-    private func applyTransportPathSnapshot(_ snapshot: LoomSessionNetworkPathSnapshot) {
-        currentPathSnapshot = snapshot
-        if let remoteEndpoint = snapshot.remoteEndpoint {
-            currentRemoteEndpoint = remoteEndpoint
-        }
-        pathObservers.yield(snapshot)
-    }
-
-    private func handleUnderlyingConnectionState(_ connectionState: NWConnection.State) {
-        switch connectionState {
-        case let .failed(error):
+    private func handleTransportObservation(_ observation: LoomSessionTransportObservation) {
+        switch observation {
+        case let .path(path):
+            applyTransportPathSnapshot(LoomSessionNetworkPathSnapshot(backendPath: path))
+        case let .failed(reason):
             if case .failed = state { return }
             if case .cancelled = state { return }
             finishSession(
-                state: .failed(error.localizedDescription),
+                state: .failed(reason),
                 cancelUnderlyingConnection: false
             )
         case .cancelled:
             if case .cancelled = state { return }
             if case .failed = state { return }
             finishSession(state: .cancelled, cancelUnderlyingConnection: false)
-        default:
-            break
         }
+    }
+
+    private func applyTransportPathSnapshot(_ snapshot: LoomSessionNetworkPathSnapshot) {
+        currentPathSnapshot = snapshot
+        if let remoteEndpoint = snapshot.backendPath.remoteEndpoint {
+            currentRemoteEndpoint = remoteEndpoint
+        }
+        pathObservers.yield(snapshot)
     }
 
     private func finishSession(
         state newState: LoomAuthenticatedSessionState,
-        cancelUnderlyingConnection: Bool
+        cancelUnderlyingConnection: Bool,
+        schedulesTransportCleanup: Bool = true
     ) {
         switch state {
         case .cancelled, .failed:
@@ -774,28 +2751,122 @@ public actor LoomAuthenticatedSession: LoomSessionProtocol {
             break
         }
 
+        reliableSendAdmission.close()
         updateState(newState)
         readTask?.cancel()
         unreliableReadTask?.cancel()
-        Task {
-            await transport.cancelPendingUnreliableSends()
-        }
         for stream in streams.values {
             stream.finishQueuedOutbound()
-            stream.finishInbound()
+            stream.abortInbound()
         }
         streams.removeAll(keepingCapacity: false)
+        openedRemoteStreamIDs.removeAll(keepingCapacity: false)
+        for buffer in pendingUnopenedUnreliableDataByStreamID.values {
+            buffer.expirationTask?.cancel()
+            buffer.retainedCapacityBudget.release(
+                bytes: buffer.totalBytes,
+                payloadCount: buffer.payloads.count,
+                batchCount: buffer.payloads.count
+            )
+        }
+        pendingUnopenedUnreliableDataByStreamID.removeAll(keepingCapacity: false)
+        recentlyClosedStreamIDs.removeAll(keepingCapacity: false)
         incomingStreamContinuation.finish()
         incomingStreamObservers.finish()
         stateObservers.finish()
+        bootstrapProgressObservers.finish()
         pathObservers.finish()
+        guard schedulesTransportCleanup else { return }
         if cancelUnderlyingConnection {
-            rawSession.cancel()
+            Task {
+                await transport.closeTransport()
+            }
+        } else {
+            Task {
+                await transport.cancelPendingUnreliableSends()
+            }
         }
     }
 
     package func setNextOutgoingStreamIDForTesting(_ value: UInt16) {
         nextOutgoingStreamID = value
+    }
+
+    package func setPreauthenticationOperationLimiter(
+        _ limiter: LoomOutstandingOperationLimiter
+    ) {
+        guard case .idle = state else { return }
+        preauthenticationOperationLimiter = limiter
+    }
+
+    @discardableResult
+    package nonisolated func setParentIncomingRetainedCapacityBudget(
+        _ budget: LoomIncomingRetainedCapacityBudget
+    ) -> Bool {
+        incomingRetainedCapacityBudget.setParentIfEmpty(budget)
+    }
+
+    package func openStreamForTesting(
+        label: String? = nil,
+        sendOpen: @escaping @Sendable (LoomMultiplexedStream) async throws -> Void
+    ) async throws -> LoomMultiplexedStream {
+        try await openStream(label: label, sendOpen: sendOpen)
+    }
+
+    package var activeStreamCountForTesting: Int {
+        streams.count
+    }
+
+    package var retainedIncomingBytesForTesting: Int {
+        incomingRetainedCapacityBudget.retainedBytesForTesting
+    }
+
+    package func injectUnreliableDataForTesting(streamID: UInt16, payload: Data) async throws {
+        try await handleEnvelope(
+            LoomSessionStreamEnvelope(
+                kind: .data,
+                streamID: streamID,
+                label: nil,
+                payload: payload
+            ),
+            lane: .unreliable
+        )
+    }
+
+    package func injectReliableDataForTesting(streamID: UInt16, payload: Data) async throws {
+        try await handleEnvelope(
+            LoomSessionStreamEnvelope(
+                kind: .data,
+                streamID: streamID,
+                label: nil,
+                payload: payload
+            ),
+            lane: .reliable
+        )
+    }
+
+    package func injectOpenForTesting(streamID: UInt16, label: String? = nil) async throws {
+        try await handleEnvelope(
+            LoomSessionStreamEnvelope(
+                kind: .open,
+                streamID: streamID,
+                label: label,
+                payload: nil
+            ),
+            lane: .reliable
+        )
+    }
+
+    package func injectCloseForTesting(streamID: UInt16) async throws {
+        try await handleEnvelope(
+            LoomSessionStreamEnvelope(
+                kind: .close,
+                streamID: streamID,
+                label: nil,
+                payload: nil
+            ),
+            lane: .reliable
+        )
     }
 }
 
@@ -810,6 +2881,17 @@ private struct LoomSessionStreamEnvelope: Sendable {
     let streamID: UInt16
     let label: String?
     let payload: Data?
+
+    static func encodeDataPayload(_ payload: Data, streamID: UInt16) -> Data {
+        let payloadLength = UInt32(clamping: payload.count)
+        var data = Data(capacity: 9 + payload.count)
+        data.append(LoomSessionStreamEnvelopeKind.data.rawValue)
+        data.append(contentsOf: streamID.littleEndianBytes)
+        data.append(contentsOf: UInt16(0).littleEndianBytes)
+        data.append(contentsOf: payloadLength.littleEndianBytes)
+        data.append(payload)
+        return data
+    }
 
     func encode() throws -> Data {
         let labelBytes = label?.data(using: .utf8) ?? Data()

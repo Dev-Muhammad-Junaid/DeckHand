@@ -22,11 +22,13 @@ Add both of these keys to your app target's `Info.plist`:
 <string>This app uses the local network to discover and connect to nearby devices.</string>
 ```
 
-Replace `_yourapp._tcp` with the Bonjour service type you pass to ``LoomNetworkConfiguration`` or ``LoomDiscovery``. If you use the Loom default, that is `_loom._tcp`.
+Replace `_yourapp._tcp` with the Bonjour service type you pass to ``LoomNetworkConfiguration`` or ``LoomDiscovery``. If you use the Loom default, that is `_loom-default._tcp`.
 
 `NSBonjourServices` tells the system which service types the app is allowed to browse and advertise. `NSLocalNetworkUsageDescription` provides the user-facing explanation shown in the local network permission prompt.
 
 Both keys are required. If either is missing, the system denies Bonjour operations and `NWBrowser` transitions to a failed state with error `-65555 (kDNSServiceErr_NoAuth)`.
+
+When browsing fails for that reason, `LoomDiscovery` reports the denial through its `localNetworkAccessDenied` state and `onLocalNetworkAccessDeniedChanged` callback so clients can switch from onboarding into recovery UI.
 
 ## App Store Distribution
 
@@ -36,7 +38,7 @@ Apps distributed through the App Store or using App Sandbox need an additional e
 com.apple.developer.networking.multicast
 ```
 
-Request this entitlement through your Apple Developer account. Without it, Bonjour discovery may be blocked on end-user devices even if the Info.plist keys are correct.
+Request this entitlement through your Apple Developer account. Without it, Bonjour discovery and UDP broadcast features such as Wake-on-LAN may be blocked on iOS, iPadOS, and visionOS devices even if the Info.plist keys are correct.
 
 ## Resetting Permissions During Development
 

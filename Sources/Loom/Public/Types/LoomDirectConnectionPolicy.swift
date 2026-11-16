@@ -19,8 +19,15 @@ public enum LoomDirectPathKind: String, Codable, CaseIterable, Sendable {
 public struct LoomDirectConnectionPolicy: Sendable, Hashable {
     /// Preferred order for nearby path categories when direct path hints are available.
     public var preferredLocalPathOrder: [LoomDirectPathKind]
-    /// Preferred order for direct transport protocols published by remote signaling.
-    public var preferredRemoteTransportOrder: [LoomTransportKind]
+    /// Preferred order for direct transport protocols.
+    public var preferredTransportOrder: [LoomTransportKind]
+    /// Optional host override for nearby Bonjour-discovered direct transports.
+    ///
+    /// This is intended for app-owned local runtimes such as an iOS Simulator
+    /// peer connecting back to a host process on the same Mac. It preserves
+    /// discovery metadata, transport ports, authentication, and trust checks;
+    /// only the host component of the direct endpoint is replaced.
+    public var localDiscoveryHostOverride: String?
     /// Whether nearby direct candidates should be treated as a race set by the coordinator.
     public var racesLocalCandidates: Bool
     /// Whether remote direct candidates should be treated as a race set by the coordinator.
@@ -29,12 +36,14 @@ public struct LoomDirectConnectionPolicy: Sendable, Hashable {
     /// Creates a direct connection policy for Loom-owned path and transport ranking.
     public init(
         preferredLocalPathOrder: [LoomDirectPathKind] = [.wired, .wifi, .awdl, .other],
-        preferredRemoteTransportOrder: [LoomTransportKind] = [.udp, .quic, .tcp],
+        preferredTransportOrder: [LoomTransportKind] = [.udp, .tcp],
+        localDiscoveryHostOverride: String? = nil,
         racesLocalCandidates: Bool = true,
         racesRemoteCandidates: Bool = true
     ) {
         self.preferredLocalPathOrder = preferredLocalPathOrder
-        self.preferredRemoteTransportOrder = preferredRemoteTransportOrder
+        self.preferredTransportOrder = preferredTransportOrder
+        self.localDiscoveryHostOverride = localDiscoveryHostOverride
         self.racesLocalCandidates = racesLocalCandidates
         self.racesRemoteCandidates = racesRemoteCandidates
     }

@@ -84,6 +84,89 @@ struct LoomIdentityX963Tests {
         }
     }
 
+    @Test("Synchronizable write failures can fall back to local storage when enabled")
+    func synchronizableWriteFailuresCanFallbackToLocalStorage() {
+        let error = LoomIdentityError.keychainWriteFailed(status: errSecMissingEntitlement)
+
+        #expect(LoomIdentityManager.shouldFallbackToNonSynchronizableStorage(
+            synchronizable: true,
+            fallbackEnabled: true,
+            error: error
+        ))
+        #expect(LoomIdentityManager.keychainWriteStatus(from: error) == errSecMissingEntitlement)
+    }
+
+    @Test("Identity fallback stays disabled for non-write failures")
+    func identityFallbackStaysDisabledForNonWriteFailures() {
+        #expect(!LoomIdentityManager.shouldFallbackToNonSynchronizableStorage(
+            synchronizable: true,
+            fallbackEnabled: true,
+            error: LoomIdentityError.keychainReadFailed(status: errSecInteractionNotAllowed)
+        ))
+        #expect(!LoomIdentityManager.shouldFallbackToNonSynchronizableStorage(
+            synchronizable: true,
+            fallbackEnabled: false,
+            error: LoomIdentityError.keychainWriteFailed(status: errSecMissingEntitlement)
+        ))
+        #expect(!LoomIdentityManager.shouldFallbackToNonSynchronizableStorage(
+            synchronizable: false,
+            fallbackEnabled: true,
+            error: LoomIdentityError.keychainWriteFailed(status: errSecMissingEntitlement)
+        ))
+    }
+
+    @MainActor
+    @Test("In-memory identity manager keeps identity process-local")
+    func inMemoryIdentityManagerKeepsIdentityProcessLocal() throws {
+        let firstManager = LoomIdentityManager.inMemory()
+        let secondManager = LoomIdentityManager.inMemory()
+
+        let firstIdentity = try firstManager.currentIdentity()
+        let repeatedIdentity = try firstManager.currentIdentity()
+        let secondIdentity = try secondManager.currentIdentity()
+
+        #expect(firstIdentity == repeatedIdentity)
+        #expect(firstIdentity != secondIdentity)
+    }
+
+    @MainActor
+    @Test("In-memory identity manager signs and rotates without persistent storage")
+    func inMemoryIdentityManagerSignsAndRotatesWithoutPersistentStorage() throws {
+        let manager = LoomIdentityManager.inMemory()
+        let payload = Data("loom-in-memory-identity".utf8)
+
+        let firstIdentity = try manager.currentIdentity()
+        let signature = try manager.sign(payload)
+
+        #expect(LoomIdentityManager.verify(
+            signature: signature,
+            payload: payload,
+            publicKey: firstIdentity.publicKey
+        ))
+
+        let rotatedIdentity = try manager.rotateIdentity()
+
+        #expect(rotatedIdentity != firstIdentity)
+        #expect(try manager.currentIdentity() == rotatedIdentity)
+    }
+
+    @MainActor
+    @Test("Unreadable protected identity storage fails without regenerating a key")
+    func unreadableStorageFailsClosed() {
+        let manager = LoomIdentityManager(
+            service: "com.loom.tests.identity.unreadable",
+            account: "p256-signing",
+            synchronizable: false,
+            fallbackToNonSynchronizableStorage: false,
+            storage: .keychain,
+            identityKeyStorage: UnreadableIdentityKeyStorage()
+        )
+
+        #expect(throws: LoomIdentityKeyStorageError.self) {
+            _ = try manager.currentIdentity()
+        }
+    }
+
     @MainActor
     private func makeIdentityManager() -> LoomIdentityManager {
         LoomIdentityManager(
@@ -101,4 +184,19 @@ struct LoomIdentityX963Tests {
         }
         .joined()
     }
+}
+
+private struct UnreadableIdentityKeyStorage: LoomIdentityKeyStorage {
+    func loadPrivateKey() throws -> Data? {
+        throw LoomIdentityKeyStorageError.unreadable(
+            code: 13,
+            detail: "Synthetic protected-file failure."
+        )
+    }
+
+    func storePrivateKey(_ privateKey: Data) throws {
+        Issue.record("Identity manager must not replace an unreadable protected key.")
+    }
+
+    func deletePrivateKey() throws {}
 }

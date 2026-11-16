@@ -5,7 +5,6 @@
 //  Created by Ethan Lipnik on 3/10/26.
 //
 
-import CloudKit
 import Foundation
 import Loom
 import LoomCloudKit
@@ -85,7 +84,7 @@ actor LoomStore {
     private let trustStore: LoomTrustStore
     private let cloudKitManager: LoomCloudKitManager?
     private let peerProvider: LoomCloudKitPeerProvider?
-    private let shareManager: LoomCloudKitShareManager?
+    private let peerManager: LoomCloudKitPeerManager?
     private let signalingClient: LoomRemoteSignalingClient?
     private let connectionCoordinator: LoomConnectionCoordinator
     private let hostClient: LoomHostClient?
@@ -128,7 +127,7 @@ actor LoomStore {
         trustStore: LoomTrustStore,
         cloudKitManager: LoomCloudKitManager?,
         peerProvider: LoomCloudKitPeerProvider?,
-        shareManager: LoomCloudKitShareManager?,
+        peerManager: LoomCloudKitPeerManager?,
         signalingClient: LoomRemoteSignalingClient?,
         connectionCoordinator: LoomConnectionCoordinator,
         hostClient: LoomHostClient? = nil,
@@ -142,7 +141,7 @@ actor LoomStore {
         self.trustStore = trustStore
         self.cloudKitManager = cloudKitManager
         self.peerProvider = peerProvider
-        self.shareManager = shareManager
+        self.peerManager = peerManager
         self.signalingClient = signalingClient
         self.connectionCoordinator = connectionCoordinator
         self.hostClient = hostClient
@@ -187,8 +186,8 @@ actor LoomStore {
             if let cloudKitManager {
                 await cloudKitManager.initialize()
             }
-            if let shareManager {
-                await shareManager.setup()
+            if let peerManager {
+                await peerManager.setup()
             }
 
             let discovery = await MainActor.run {
@@ -416,8 +415,7 @@ actor LoomStore {
         let overlayPeer = localPeer == nil ? overlayPeersByID[resolvedPeer.id] : nil
         let signalingSessionID = LoomConnectionCoordinator.signalingFallbackSessionID(
             advertisedSignalingSessionID: resolvedPeer.signalingSessionID,
-            localPeer: localPeer,
-            overlayPeer: overlayPeer
+            localPeer: localPeer
         )
 
         guard localPeer != nil || overlayPeer != nil || signalingSessionID != nil else {
@@ -560,21 +558,6 @@ actor LoomStore {
             state: sshResult.unlocked ? .ready : .unavailable,
             message: sshResult.unlocked ? "SSH bootstrap completed." : "SSH bootstrap did not report a ready session."
         )
-    }
-
-    func createShare() async throws -> CKShare {
-        guard let shareManager else {
-            throw LoomStoreError.cloudKitUnavailable
-        }
-        return try await shareManager.createShare()
-    }
-
-    func acceptShare(_ metadata: CKShare.Metadata) async throws {
-        guard let shareManager else {
-            throw LoomStoreError.cloudKitUnavailable
-        }
-        try await shareManager.acceptShare(metadata)
-        await refreshCloudPeers()
     }
 
     func updateConnectionState(
@@ -945,8 +928,8 @@ actor LoomStore {
                     advertisement: advertisement,
                     ttlSeconds: 360
                 )
-                if let shareManager {
-                    await shareManager.updateLastSeen()
+                if let peerManager {
+                    await peerManager.updateLastSeen()
                 }
             } catch let signalingError as LoomRemoteSignalingError {
                 await record(signalingError)
@@ -963,7 +946,7 @@ actor LoomStore {
     }
 
     private func publishCurrentPeer() async throws {
-        guard let shareManager,
+        guard let peerManager,
               let cloudKitManager else {
             return
         }
@@ -978,7 +961,7 @@ actor LoomStore {
         let identity = try await MainActor.run {
             try (node.identityManager ?? LoomIdentityManager.shared).currentIdentity()
         }
-        try await shareManager.registerPeer(
+        try await peerManager.registerPeer(
             deviceID: deviceID,
             name: configuration.serviceName,
             advertisement: advertisement,
@@ -1008,8 +991,7 @@ actor LoomStore {
 
         await peerProvider.fetchPeers()
         let cloudPeers = await MainActor.run {
-            return (peerProvider.ownPeers + peerProvider.sharedPeers)
-                .filter { $0.deviceID != deviceID }
+            peerProvider.ownPeers.filter { $0.deviceID != deviceID }
         }
         cloudPeersByID = Dictionary(
             uniqueKeysWithValues: cloudPeers.map { ($0.id, $0) }
@@ -1135,7 +1117,6 @@ actor LoomStore {
             let session = try await connectionCoordinator.connect(
                 hello: hello,
                 localPeer: localPeer,
-                overlayPeer: overlayPeer,
                 signalingSessionID: signalingSessionID
             )
             let peerSnapshot = try await resolveConnectedPeer(
@@ -1221,19 +1202,38 @@ actor LoomStore {
             return currentPeerSnapshot
         }
 
+        return Self.fallbackPeerSnapshot(
+            from: sessionContext,
+            signalingSessionID: signalingSessionID
+        )
+    }
+
+    nonisolated static func fallbackPeerSnapshot(
+        from sessionContext: LoomAuthenticatedSessionContext,
+        signalingSessionID: String?
+    ) -> LoomPeerSnapshot {
+        let advertisement = sessionContext.peerAdvertisement
+        let peerIdentity = sessionContext.peerIdentity
+
         return LoomPeerSnapshot(
-            id: sessionContext.peerIdentity.deviceID,
-            name: sessionContext.peerIdentity.name,
-            deviceType: sessionContext.peerIdentity.deviceType,
+            id: peerIdentity.deviceID,
+            name: peerIdentity.name,
+            deviceType: peerIdentity.deviceType,
             sources: signalingSessionID == nil ? [] : [.remoteSignaling],
             isNearby: false,
-            isShared: false,
             remoteAccessEnabled: signalingSessionID != nil,
             signalingSessionID: signalingSessionID,
             advertisement: LoomPeerAdvertisement(
-                deviceID: sessionContext.peerIdentity.deviceID,
-                identityKeyID: sessionContext.peerIdentity.identityKeyID,
-                deviceType: sessionContext.peerIdentity.deviceType
+                protocolVersion: advertisement.protocolVersion,
+                deviceID: advertisement.deviceID ?? peerIdentity.deviceID,
+                identityKeyID: advertisement.identityKeyID ?? peerIdentity.identityKeyID,
+                deviceType: advertisement.deviceType ?? peerIdentity.deviceType,
+                modelIdentifier: advertisement.modelIdentifier,
+                iconName: advertisement.iconName,
+                machineFamily: advertisement.machineFamily,
+                hostName: advertisement.hostName,
+                directTransports: advertisement.directTransports,
+                metadata: advertisement.metadata
             ),
             bootstrapMetadata: nil,
             lastSeen: Date()
@@ -1417,7 +1417,7 @@ actor LoomStore {
             sources.append(.overlay)
         }
         if let cloudPeer {
-            sources.append(cloudPeer.isShared ? .cloudKitShared : .cloudKitOwn)
+            sources.append(.cloudKitOwn)
             if cloudPeer.signalingSessionID != nil {
                 sources.append(.remoteSignaling)
             }
@@ -1439,7 +1439,6 @@ actor LoomStore {
             deviceType: deviceType,
             sources: sources,
             isNearby: localPeer != nil,
-            isShared: cloudPeer?.isShared ?? false,
             remoteAccessEnabled: cloudPeer?.remoteAccessEnabled ?? false,
             signalingSessionID: cloudPeer?.signalingSessionID,
             advertisement: advertisement,
@@ -1520,12 +1519,10 @@ actor LoomStore {
                 case .nearby: .nearby
                 case .overlay: .overlay
                 case .cloudKitOwn: .cloudKitOwn
-                case .cloudKitShared: .cloudKitShared
                 case .remoteSignaling: .remoteSignaling
                 }
             },
             isNearby: record.isNearby,
-            isShared: record.isShared,
             remoteAccessEnabled: record.remoteAccessEnabled,
             signalingSessionID: record.signalingSessionID,
             advertisement: record.advertisement,

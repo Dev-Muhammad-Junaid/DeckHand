@@ -5,18 +5,26 @@
 //  Created by Ethan Lipnik on 3/10/26.
 //
 
+#if canImport(CryptoKit)
 import CryptoKit
+#else
+import Crypto
+#endif
 import Foundation
 import Security
 
-package enum LoomSessionTrafficClass: UInt8, Sendable {
+package enum LoomSessionTrafficClass: UInt8, Sendable, Hashable {
     case control = 1
     case data = 2
+    case priorityInput = 3
+    case keyConfirmation = 4
 }
 
 package enum LoomSessionSecurityError: LocalizedError, Sendable {
     case invalidRemoteEphemeralKey
     case decryptFailed
+    case replayDetected
+    case sequenceExhausted
 
     package var errorDescription: String? {
         switch self {
@@ -24,7 +32,75 @@ package enum LoomSessionSecurityError: LocalizedError, Sendable {
             "The peer presented an invalid ephemeral session key."
         case .decryptFailed:
             "Failed to decrypt the Loom session payload."
+        case .replayDetected:
+            "The encrypted Loom session payload was already received."
+        case .sequenceExhausted:
+            "The encrypted Loom session sequence space is exhausted."
         }
+    }
+}
+
+package enum LoomSessionCipherMode: Sendable, Equatable {
+    case legacyRandomNonce
+    case sequencedV2
+}
+
+private final class LoomSessionCipherState: @unchecked Sendable {
+    private struct ReceiveWindow {
+        var highestSequence: UInt64?
+        var acceptedSequences: Set<UInt64> = []
+    }
+
+    private let lock = NSLock()
+    private var nextSendSequenceByTrafficClass: [LoomSessionTrafficClass: UInt64] = [:]
+    private var receiveWindowByTrafficClass: [LoomSessionTrafficClass: ReceiveWindow] = [:]
+    private static let maximumReorderingWindow: UInt64 = 4_096
+
+    func nextSendSequence(for trafficClass: LoomSessionTrafficClass) throws -> UInt64 {
+        try reserveSendSequences(count: 1, for: trafficClass).lowerBound
+    }
+
+    func reserveSendSequences(
+        count: Int,
+        for trafficClass: LoomSessionTrafficClass
+    ) throws -> Range<UInt64> {
+        guard let sequenceCount = UInt64(exactly: count) else {
+            throw LoomSessionSecurityError.sequenceExhausted
+        }
+        lock.lock()
+        defer { lock.unlock() }
+        let firstSequence = nextSendSequenceByTrafficClass[trafficClass] ?? 0
+        guard sequenceCount <= UInt64.max - firstSequence else {
+            throw LoomSessionSecurityError.sequenceExhausted
+        }
+        let endSequence = firstSequence + sequenceCount
+        nextSendSequenceByTrafficClass[trafficClass] = endSequence
+        return firstSequence ..< endSequence
+    }
+
+    func recordReceivedSequence(_ sequence: UInt64, for trafficClass: LoomSessionTrafficClass) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+
+        var window = receiveWindowByTrafficClass[trafficClass] ?? ReceiveWindow()
+        if window.acceptedSequences.contains(sequence) {
+            return false
+        }
+        if let highestSequence = window.highestSequence,
+           highestSequence >= Self.maximumReorderingWindow,
+           sequence <= highestSequence - Self.maximumReorderingWindow {
+            return false
+        }
+
+        window.acceptedSequences.insert(sequence)
+        window.highestSequence = max(window.highestSequence ?? sequence, sequence)
+        if let highestSequence = window.highestSequence,
+           highestSequence >= Self.maximumReorderingWindow {
+            let minimumSequence = highestSequence - Self.maximumReorderingWindow + 1
+            window.acceptedSequences = window.acceptedSequences.filter { $0 >= minimumSequence }
+        }
+        receiveWindowByTrafficClass[trafficClass] = window
+        return true
     }
 }
 
@@ -33,6 +109,12 @@ package struct LoomSessionSecurityContext: Sendable {
     private let controlReceiveKey: SymmetricKey
     private let dataSendKey: SymmetricKey
     private let dataReceiveKey: SymmetricKey
+    private let priorityInputSendKey: SymmetricKey
+    private let priorityInputReceiveKey: SymmetricKey
+    private let keyConfirmationSendKey: SymmetricKey
+    private let keyConfirmationReceiveKey: SymmetricKey
+    private let cipherMode: LoomSessionCipherMode
+    private let cipherState = LoomSessionCipherState()
 
     private static let nonceSize = 12
     private static let authTagSize = 16
@@ -41,8 +123,10 @@ package struct LoomSessionSecurityContext: Sendable {
         role: LoomSessionRole,
         localHello: LoomSessionHello,
         remoteHello: LoomSessionHello,
-        localEphemeralPrivateKey: P256.KeyAgreement.PrivateKey
+        localEphemeralPrivateKey: P256.KeyAgreement.PrivateKey,
+        cipherMode: LoomSessionCipherMode = .legacyRandomNonce
     ) throws {
+        self.cipherMode = cipherMode
         let remoteEphemeralKey: P256.KeyAgreement.PublicKey
         do {
             remoteEphemeralKey = try P256.KeyAgreement.PublicKey(
@@ -80,53 +164,177 @@ package struct LoomSessionSecurityContext: Sendable {
             salt: salt,
             label: role == .initiator ? "loom-session-data-receiver-v1" : "loom-session-data-initiator-v1"
         )
+        priorityInputSendKey = Self.deriveKey(
+            sharedSecret: sharedSecret,
+            salt: salt,
+            label: role == .initiator
+                ? "loom-session-priority-input-initiator-v1"
+                : "loom-session-priority-input-receiver-v1"
+        )
+        priorityInputReceiveKey = Self.deriveKey(
+            sharedSecret: sharedSecret,
+            salt: salt,
+            label: role == .initiator
+                ? "loom-session-priority-input-receiver-v1"
+                : "loom-session-priority-input-initiator-v1"
+        )
+        keyConfirmationSendKey = Self.deriveKey(
+            sharedSecret: sharedSecret,
+            salt: salt,
+            label: role == .initiator
+                ? "loom-session-key-confirmation-initiator-v2"
+                : "loom-session-key-confirmation-receiver-v2"
+        )
+        keyConfirmationReceiveKey = Self.deriveKey(
+            sharedSecret: sharedSecret,
+            salt: salt,
+            label: role == .initiator
+                ? "loom-session-key-confirmation-receiver-v2"
+                : "loom-session-key-confirmation-initiator-v2"
+        )
     }
 
-    /// Encrypt plaintext with a random nonce.
-    /// Returns `[nonce: 12][ciphertext][tag: 16]`.
+    /// Encrypt plaintext using the negotiated cipher mode.
+    /// Legacy mode returns `[nonce: 12][ciphertext][tag: 16]`; sequenced v2
+    /// returns `[sequence: 8][ciphertext][tag: 16]`.
     package func seal(
         _ plaintext: Data,
         trafficClass: LoomSessionTrafficClass
     ) throws -> Data {
         let key = sendKey(for: trafficClass)
-        let nonce = try ChaChaPoly.Nonce(data: Self.randomNonce())
         let aad = Data([trafficClass.rawValue])
-        let sealed = try ChaChaPoly.seal(
+        let nonceData: Data
+        let sequence: UInt64?
+        switch cipherMode {
+        case .legacyRandomNonce:
+            nonceData = Self.randomNonce()
+            sequence = nil
+        case .sequencedV2:
+            let nextSequence = try cipherState.nextSendSequence(for: trafficClass)
+            nonceData = Self.nonce(for: nextSequence)
+            sequence = nextSequence
+        }
+        return try Self.seal(
+            plaintext,
+            using: key,
+            nonceData: nonceData,
+            sequence: sequence,
+            aad: aad
+        )
+    }
+
+    /// Encrypts a caller-ordered payload batch while reserving the sequenced-v2
+    /// nonce range in one cipher-state critical section.
+    package func sealBatch(
+        _ plaintexts: [Data],
+        trafficClass: LoomSessionTrafficClass
+    ) throws -> [Data] {
+        guard !plaintexts.isEmpty else { return [] }
+
+        let key = sendKey(for: trafficClass)
+        let aad = Data([trafficClass.rawValue])
+        let firstSequence: UInt64?
+        switch cipherMode {
+        case .legacyRandomNonce:
+            firstSequence = nil
+        case .sequencedV2:
+            firstSequence = try cipherState.reserveSendSequences(
+                count: plaintexts.count,
+                for: trafficClass
+            ).lowerBound
+        }
+
+        var encryptedPayloads: [Data] = []
+        encryptedPayloads.reserveCapacity(plaintexts.count)
+        for (index, plaintext) in plaintexts.enumerated() {
+            let sequence = firstSequence.map { $0 + UInt64(index) }
+            let nonceData = sequence.map(Self.nonce(for:)) ?? Self.randomNonce()
+            encryptedPayloads.append(try Self.seal(
+                plaintext,
+                using: key,
+                nonceData: nonceData,
+                sequence: sequence,
+                aad: aad
+            ))
+        }
+        return encryptedPayloads
+    }
+
+    private static func seal(
+        _ plaintext: Data,
+        using key: SymmetricKey,
+        nonceData: Data,
+        sequence: UInt64?,
+        aad: Data
+    ) throws -> Data {
+        let nonce = try AES.GCM.Nonce(data: nonceData)
+        let sealed = try AES.GCM.seal(
             plaintext,
             using: key,
             nonce: nonce,
             authenticating: aad
         )
-        return Data(nonce) + sealed.ciphertext + sealed.tag
+        var encryptedPayload = Data(capacity: nonceData.count + sealed.ciphertext.count + sealed.tag.count)
+        if let sequence {
+            encryptedPayload.append(Self.encode(sequence: sequence))
+        } else {
+            encryptedPayload.append(nonceData)
+        }
+        encryptedPayload.append(sealed.ciphertext)
+        encryptedPayload.append(sealed.tag)
+        return encryptedPayload
     }
 
-    /// Decrypt payload of the form `[nonce: 12][ciphertext][tag: 16]`.
+    /// Decrypt a payload in the negotiated cipher mode and reject sequenced-v2 replays.
     package func open(
         _ nonceAndCiphertextAndTag: Data,
         trafficClass: LoomSessionTrafficClass
     ) throws -> Data {
-        guard nonceAndCiphertextAndTag.count >= Self.nonceSize + Self.authTagSize else {
+        let minimumHeaderSize = cipherMode == .sequencedV2 ? MemoryLayout<UInt64>.size : Self.nonceSize
+        guard nonceAndCiphertextAndTag.count >= minimumHeaderSize + Self.authTagSize else {
             throw LoomSessionSecurityError.decryptFailed
         }
 
         let key = receiveKey(for: trafficClass)
-        let nonceData = nonceAndCiphertextAndTag.prefix(Self.nonceSize)
-        let nonce = try ChaChaPoly.Nonce(data: nonceData)
-        let rest = nonceAndCiphertextAndTag.dropFirst(Self.nonceSize)
+        let sequence: UInt64?
+        let headerSize: Int
+        let nonceData: Data
+        switch cipherMode {
+        case .legacyRandomNonce:
+            sequence = nil
+            headerSize = Self.nonceSize
+            nonceData = Data(nonceAndCiphertextAndTag.prefix(Self.nonceSize))
+        case .sequencedV2:
+            guard let decodedSequence = Self.decodeSequence(from: nonceAndCiphertextAndTag) else {
+                throw LoomSessionSecurityError.decryptFailed
+            }
+            sequence = decodedSequence
+            headerSize = MemoryLayout<UInt64>.size
+            nonceData = Self.nonce(for: decodedSequence)
+        }
+        let nonce = try AES.GCM.Nonce(data: nonceData)
+        let rest = nonceAndCiphertextAndTag.dropFirst(headerSize)
         let ciphertext = rest.dropLast(Self.authTagSize)
         let tag = rest.suffix(Self.authTagSize)
 
-        let box = try ChaChaPoly.SealedBox(
+        let box = try AES.GCM.SealedBox(
             nonce: nonce,
-            ciphertext: ciphertext,
-            tag: tag
+            ciphertext: Data(ciphertext),
+            tag: Data(tag)
         )
         do {
-            return try ChaChaPoly.open(
+            let plaintext = try AES.GCM.open(
                 box,
                 using: key,
                 authenticating: Data([trafficClass.rawValue])
             )
+            if let sequence,
+               !cipherState.recordReceivedSequence(sequence, for: trafficClass) {
+                throw LoomSessionSecurityError.replayDetected
+            }
+            return plaintext
+        } catch let error as LoomSessionSecurityError {
+            throw error
         } catch {
             throw LoomSessionSecurityError.decryptFailed
         }
@@ -136,6 +344,8 @@ package struct LoomSessionSecurityContext: Sendable {
         switch trafficClass {
         case .control: controlSendKey
         case .data: dataSendKey
+        case .priorityInput: priorityInputSendKey
+        case .keyConfirmation: keyConfirmationSendKey
         }
     }
 
@@ -143,6 +353,8 @@ package struct LoomSessionSecurityContext: Sendable {
         switch trafficClass {
         case .control: controlReceiveKey
         case .data: dataReceiveKey
+        case .priorityInput: priorityInputReceiveKey
+        case .keyConfirmation: keyConfirmationReceiveKey
         }
     }
 
@@ -153,6 +365,22 @@ package struct LoomSessionSecurityContext: Sendable {
             throw LoomSessionSecurityError.decryptFailed
         }
         return Data(bytes)
+    }
+
+    private static func nonce(for sequence: UInt64) -> Data {
+        Data(repeating: 0, count: nonceSize - MemoryLayout<UInt64>.size) + encode(sequence: sequence)
+    }
+
+    private static func encode(sequence: UInt64) -> Data {
+        var value = sequence.bigEndian
+        return withUnsafeBytes(of: &value) { Data($0) }
+    }
+
+    private static func decodeSequence(from data: Data) -> UInt64? {
+        guard data.count >= MemoryLayout<UInt64>.size else { return nil }
+        return data.prefix(MemoryLayout<UInt64>.size).reduce(UInt64(0)) { partial, byte in
+            (partial << 8) | UInt64(byte)
+        }
     }
 
     private static func deriveKey(

@@ -5,6 +5,7 @@
 //  Created by Ethan Lipnik on 3/22/26.
 //
 
+#if canImport(Network)
 import Foundation
 import Network
 
@@ -25,12 +26,15 @@ package enum LoomEndpointResolver {
     ///
     /// Non-local hostnames and raw IP addresses pass through unchanged.
     /// Resolution is raced against `timeout` to avoid blocking forever.
+    /// If pre-resolution fails, the unresolved `.local` hostname is returned
+    /// so Network.framework can still attempt service discovery itself.
     /// Results are cached in memory with a 5-minute TTL; set the
     /// `LOOM_SKIP_ENDPOINT_CACHE` environment variable to bypass.
     package static func resolveHostPort(
         host: String,
         port: UInt16,
-        timeout: Duration = .seconds(5)
+        timeout: Duration = .seconds(5),
+        resolver: @Sendable (String, Duration) async throws -> NWEndpoint.Host = resolveWithTimeout
     ) async throws -> NWEndpoint {
         guard let nwPort = NWEndpoint.Port(rawValue: port) else {
             throw LoomError.protocolError("Invalid port \(port)")
@@ -51,7 +55,19 @@ package enum LoomEndpointResolver {
             return .hostPort(host: entry.host, port: nwPort)
         }
 
-        let resolved = try await resolveWithTimeout(host: host, timeout: timeout)
+        let resolved: NWEndpoint.Host
+        do {
+            resolved = try await resolver(host, timeout)
+        } catch {
+            if error is CancellationError {
+                throw error
+            }
+            LoomLogger.transport(
+                "Failed to pre-resolve \(host): \(error.localizedDescription); " +
+                    "falling back to Network.framework resolution"
+            )
+            return .hostPort(host: NWEndpoint.Host(host), port: nwPort)
+        }
 
         if !skipCache {
             cache.setObject(
@@ -61,6 +77,15 @@ package enum LoomEndpointResolver {
         }
 
         return .hostPort(host: resolved, port: nwPort)
+    }
+
+    package static func shouldPreResolveLocalHost(
+        _ host: String,
+        enablePeerToPeer: Bool
+    ) -> Bool {
+        guard !enablePeerToPeer else { return false }
+        let lowered = host.lowercased()
+        return lowered.hasSuffix(".local") || lowered.hasSuffix(".local.")
     }
 
     /// Removes all cached hostname resolutions.
@@ -126,24 +151,22 @@ package enum LoomEndpointResolver {
         while let entry = cursor {
             switch entry.pointee.ai_family {
             case AF_INET:
-                var addr = entry.pointee.ai_addr.withMemoryRebound(
+                let addr = entry.pointee.ai_addr.withMemoryRebound(
                     to: sockaddr_in.self,
                     capacity: 1
                 ) { $0.pointee }
-                let ipv4Data = Data(bytes: &addr.sin_addr, count: MemoryLayout<in_addr>.size)
-                if let ipv4 = IPv4Address(ipv4Data) {
-                    LoomLogger.transport("Resolved \(hostname) → \(ipv4)")
-                    return .ipv4(ipv4)
+                if let host = LoomSocketAddressConverter.host(fromIPv4: addr) {
+                    LoomLogger.transport("Resolved \(hostname) → \(host)")
+                    return host
                 }
             case AF_INET6:
                 if ipv6Fallback == nil {
-                    var addr = entry.pointee.ai_addr.withMemoryRebound(
+                    let addr = entry.pointee.ai_addr.withMemoryRebound(
                         to: sockaddr_in6.self,
                         capacity: 1
                     ) { $0.pointee }
-                    let data = Data(bytes: &addr.sin6_addr, count: MemoryLayout<in6_addr>.size)
-                    if let ipv6 = IPv6Address(data) {
-                        ipv6Fallback = .ipv6(ipv6)
+                    if let host = LoomSocketAddressConverter.host(fromIPv6: addr) {
+                        ipv6Fallback = host
                     }
                 }
             default:
@@ -174,3 +197,5 @@ private final class HostCacheEntry: @unchecked Sendable {
         self.timestamp = CFAbsoluteTimeGetCurrent()
     }
 }
+
+#endif

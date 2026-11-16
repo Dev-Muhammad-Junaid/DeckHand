@@ -8,6 +8,7 @@
 //
 
 @testable import Loom
+import Darwin
 import Foundation
 import NIOSSH
 import Testing
@@ -25,6 +26,9 @@ struct LoomBootstrapMetadataTests {
             ],
             sshPort: 22,
             controlPort: 9851,
+            controlAuthSecret: "daemon-secret",
+            controlCapabilities: [.commands],
+            sshHostKeyFingerprints: ["SHA256:test-fingerprint"],
             wakeOnLAN: LoomWakeOnLANInfo(
                 macAddress: "AA:BB:CC:DD:EE:FF",
                 broadcastAddresses: ["10.0.0.255", "192.168.1.255"]
@@ -37,7 +41,31 @@ struct LoomBootstrapMetadataTests {
         #expect(decoded == metadata)
         #expect(decoded.version == LoomBootstrapMetadata.currentVersion)
         #expect(decoded.endpoints.count == 2)
+        #expect(decoded.controlAuthSecret == "daemon-secret")
+        #expect(decoded.controlCapabilities == [.commands])
+        #expect(decoded.sshHostKeyFingerprints == ["SHA256:test-fingerprint"])
         #expect(decoded.wakeOnLAN?.broadcastAddresses.count == 2)
+    }
+
+    @Test("Bootstrap metadata decodes missing optional capability lists as empty")
+    func bootstrapMetadataDecodesMissingOptionalCapabilityListsAsEmpty() throws {
+        let json = """
+        {
+          "version": 4,
+          "enabled": true,
+          "supportsPreloginDaemon": false,
+          "endpoints": [],
+          "sshPort": 22,
+          "controlPort": null,
+          "wakeOnLAN": null
+        }
+        """.data(using: .utf8)!
+
+        let metadata = try JSONDecoder().decode(LoomBootstrapMetadata.self, from: json)
+
+        #expect(metadata.controlCapabilities.isEmpty)
+        #expect(metadata.sshHostKeyFingerprints.isEmpty)
+        #expect(metadata.controlCapabilities.isEmpty)
     }
 
     @Test("Wake-on-LAN magic packet format")
@@ -68,6 +96,40 @@ struct LoomBootstrapMetadataTests {
         } catch {
             Issue.record("Expected LoomWakeOnLANError, got \(error.localizedDescription).")
         }
+    }
+
+    @Test("Wake-on-LAN parses IPv4 broadcast targets")
+    func wakeOnLANParsesIPv4BroadcastTargets() throws {
+        let address = try LoomDefaultWakeOnLANClient.ipv4Address(for: "192.168.1.255")
+        let octets = withUnsafeBytes(of: address.s_addr) { Array($0) }
+
+        #expect(octets == [192, 168, 1, 255])
+    }
+
+    @Test("Wake-on-LAN rejects invalid IPv4 broadcast targets")
+    func wakeOnLANRejectsInvalidIPv4BroadcastTargets() {
+        do {
+            _ = try LoomDefaultWakeOnLANClient.ipv4Address(for: "host.local")
+            Issue.record("Expected invalid IPv4 broadcast target rejection.")
+        } catch let error as LoomWakeOnLANError {
+            switch error {
+            case let .sendFailed(detail):
+                #expect(detail.contains("invalid IPv4 broadcast target"))
+            default:
+                Issue.record("Expected sendFailed, got \(error.localizedDescription).")
+            }
+        } catch {
+            Issue.record("Expected LoomWakeOnLANError, got \(error.localizedDescription).")
+        }
+    }
+
+    @Test("Wake-on-LAN permission denied detail explains broadcast permission")
+    func wakeOnLANPermissionDeniedDetailExplainsBroadcastPermission() {
+        let detail = LoomDefaultWakeOnLANClient.sendFailureDetail(for: POSIXError(.EACCES))
+
+        #expect(detail.contains("permission denied sending UDP broadcast"))
+        #expect(detail.contains("Local Network access"))
+        #expect(detail.contains("multicast networking entitlement"))
     }
 
     @Test("Bootstrap endpoint resolution order and dedupe")
@@ -153,6 +215,25 @@ struct LoomBootstrapMetadataTests {
         } catch let error as LoomSSHServerTrustError {
             #expect(error == .missingHostCertificate)
         }
+    }
+
+    @Test("SSH validator accepts pinned raw host keys")
+    func sshValidatorAcceptsPinnedRawHostKey() throws {
+        let rawHostKey = try NIOSSHPublicKey(openSSHPublicKey: LoomSSHTestFixtures.rawHostKey)
+        let fingerprint = try LoomSSHServerTrustValidator.hostKeyFingerprint(for: rawHostKey)
+        #expect(fingerprint.hasPrefix("SHA256:"))
+        #expect(!fingerprint.hasSuffix("="))
+        let validator = try LoomSSHServerTrustValidator(
+            configuration: LoomSSHServerTrustConfiguration(
+                trustedHostAuthorities: [],
+                requiredPrincipal: "",
+                trustedHostKeyFingerprints: [fingerprint]
+            )
+        )
+
+        let validatedHost = try validator.validate(hostKey: rawHostKey)
+
+        #expect(validatedHost.hostKeyFingerprint == fingerprint)
     }
 
     @Test("SSH validator rejects wrong principal certificates")
@@ -269,5 +350,19 @@ struct LoomBootstrapMetadataTests {
         #expect(decodedResponse.requestID == request.requestID)
         #expect(decodedResponse.success)
         #expect(decodedResponse.availability == .ready)
+
+        let command = LoomBootstrapEncryptedCommandPayload(combined: Data([0x42, 0x43]))
+        let commandRequest = LoomBootstrapControlRequest(
+            operation: .performCommand,
+            auth: auth,
+            commandPayload: command
+        )
+        let commandRequestData = try JSONEncoder().encode(commandRequest)
+        let decodedCommandRequest = try JSONDecoder().decode(
+            LoomBootstrapControlRequest.self,
+            from: commandRequestData
+        )
+        #expect(decodedCommandRequest.operation == .performCommand)
+        #expect(decodedCommandRequest.commandPayload == command)
     }
 }

@@ -5,6 +5,7 @@
 //  Created by Ethan Lipnik on 3/12/26.
 //
 
+#if canImport(Network)
 import Foundation
 import Network
 
@@ -39,36 +40,179 @@ struct BonjourServiceIdentity: Hashable {
     }
 }
 
-final class BonjourTXTRecordMonitor: NSObject, NetServiceBrowserDelegate, NetServiceDelegate {
+final class BonjourTXTRecordMonitor: NSObject, NetServiceBrowserDelegate, NetServiceDelegate, @unchecked Sendable {
     var onTXTRecordChanged: (@MainActor (BonjourServiceIdentity, [String: String]) -> Void)?
+    var onServiceResolved: (@MainActor (BonjourServiceIdentity, [NWEndpoint.Host]) -> Void)?
     var onServiceRemoved: (@MainActor (BonjourServiceIdentity) -> Void)?
 
-    private let browser = NetServiceBrowser()
     private let serviceType: String
     private let enablePeerToPeer: Bool
+    // MainActor callers request start/stop without blocking on the monitor thread's QoS.
+    private let stateQueue = DispatchQueue(label: "com.mirage.loom.bonjour-txt-monitor.state")
 
+    private var browser: NetServiceBrowser?
+    private var workerThread: Thread?
+    private var monitorRunLoop: CFRunLoop?
+    private var shouldStopWorker = false
+    private var didStopOnMonitorThread = false
+    private var didFinishWorkerThread = true
     private var servicesByIdentity: [BonjourServiceIdentity: NetService] = [:]
+    private var stopCompletions: [@Sendable () -> Void] = []
 
     init(serviceType: String, enablePeerToPeer: Bool) {
         self.serviceType = serviceType
         self.enablePeerToPeer = enablePeerToPeer
         super.init()
-        browser.delegate = self
-        browser.includesPeerToPeer = enablePeerToPeer
     }
 
     func start() {
-        browser.searchForServices(ofType: serviceType, inDomain: "")
+        stateQueue.async { [weak self] in
+            guard let self, self.workerThread == nil else {
+                return
+            }
+
+            self.shouldStopWorker = false
+            self.didStopOnMonitorThread = false
+            self.didFinishWorkerThread = false
+            let thread = Thread(target: self, selector: #selector(Self.runMonitorThread), object: nil)
+            thread.name = "Loom Bonjour TXT monitor"
+            self.workerThread = thread
+
+            thread.start()
+        }
     }
 
-    func stop() {
-        browser.stop()
+    func stop(onStopped: (@Sendable () -> Void)? = nil) {
+        stateQueue.async { [self] in
+            if let onStopped {
+                stopCompletions.append(onStopped)
+            }
+            self.shouldStopWorker = true
+
+            guard let thread = self.workerThread else {
+                let completions = self.drainStopCompletionsOnStateQueue()
+                completions.forEach { $0() }
+                return
+            }
+
+            if thread.isFinished {
+                self.didFinishWorkerThread = true
+                self.clearWorkerReferencesOnStateQueue()
+                let completions = self.drainStopCompletionsOnStateQueue()
+                completions.forEach { $0() }
+                return
+            }
+
+            guard let runLoop = self.monitorRunLoop else {
+                return
+            }
+
+            CFRunLoopPerformBlock(runLoop, CFRunLoopMode.defaultMode.rawValue) { [self] in
+                self.stopOnMonitorThread()
+            }
+            CFRunLoopWakeUp(runLoop)
+        }
+    }
+
+    @objc private func runMonitorThread() {
+        autoreleasepool {
+            defer {
+                finishWorkerThread()
+            }
+
+            let runLoop = RunLoop.current
+            let cfRunLoop = CFRunLoopGetCurrent()
+
+            let shouldStop = stateQueue.sync {
+                if shouldStopWorker {
+                    return true
+                }
+                monitorRunLoop = cfRunLoop
+                return false
+            }
+            if shouldStop {
+                return
+            }
+
+            let browser = NetServiceBrowser()
+            browser.delegate = self
+            browser.includesPeerToPeer = enablePeerToPeer
+            browser.schedule(in: runLoop, forMode: .default)
+            self.browser = browser
+            browser.searchForServices(ofType: serviceType, inDomain: "")
+
+            while shouldContinueRunning {
+                _ = autoreleasepool {
+                    runLoop.run(mode: .default, before: Date(timeIntervalSinceNow: 0.25))
+                }
+            }
+
+            stopOnMonitorThread()
+        }
+    }
+
+    @objc private func stopOnMonitorThread() {
+        let shouldStop = stateQueue.sync {
+            guard !didStopOnMonitorThread else {
+                return false
+            }
+            didStopOnMonitorThread = true
+            shouldStopWorker = true
+            return true
+        }
+        guard shouldStop else {
+            return
+        }
+
+        let runLoop = RunLoop.current
+        browser?.stop()
+        browser?.remove(from: runLoop, forMode: .default)
+        browser?.delegate = nil
+        browser = nil
+
         for service in servicesByIdentity.values {
             service.stopMonitoring()
             service.stop()
+            service.remove(from: runLoop, forMode: .default)
             service.delegate = nil
         }
         servicesByIdentity.removeAll()
+
+        CFRunLoopStop(CFRunLoopGetCurrent())
+    }
+
+    private func finishWorkerThread() {
+        let completions = stateQueue.sync {
+            didFinishWorkerThread = true
+            clearWorkerReferencesOnStateQueue()
+            return drainStopCompletionsOnStateQueue()
+        }
+        for completion in completions {
+            completion()
+        }
+    }
+
+    private func clearWorkerReferencesOnStateQueue() {
+        workerThread = nil
+        monitorRunLoop = nil
+    }
+
+    private func drainStopCompletionsOnStateQueue() -> [@Sendable () -> Void] {
+        let completions = stopCompletions
+        stopCompletions.removeAll()
+        return completions
+    }
+
+    private var shouldContinueRunning: Bool {
+        stateQueue.sync {
+            !shouldStopWorker
+        }
+    }
+
+    package var hasFinishedWorkerThreadForTesting: Bool {
+        stateQueue.sync {
+            didFinishWorkerThread
+        }
     }
 
     func netServiceBrowser(_ browser: NetServiceBrowser, didFind service: NetService, moreComing: Bool) {
@@ -76,12 +220,14 @@ final class BonjourTXTRecordMonitor: NSObject, NetServiceBrowserDelegate, NetSer
         if let existingService = servicesByIdentity[identity], existingService !== service {
             existingService.stopMonitoring()
             existingService.stop()
+            existingService.remove(from: RunLoop.current, forMode: .default)
             existingService.delegate = nil
         }
 
         servicesByIdentity[identity] = service
         service.delegate = self
         service.includesPeerToPeer = enablePeerToPeer
+        service.schedule(in: RunLoop.current, forMode: .default)
         service.resolve(withTimeout: 5)
         service.startMonitoring()
 
@@ -95,6 +241,7 @@ final class BonjourTXTRecordMonitor: NSObject, NetServiceBrowserDelegate, NetSer
         servicesByIdentity.removeValue(forKey: identity)
         service.stopMonitoring()
         service.stop()
+        service.remove(from: RunLoop.current, forMode: .default)
         service.delegate = nil
 
         Task { @MainActor [onServiceRemoved] in
@@ -103,6 +250,14 @@ final class BonjourTXTRecordMonitor: NSObject, NetServiceBrowserDelegate, NetSer
     }
 
     func netServiceDidResolveAddress(_ sender: NetService) {
+        let identity = BonjourServiceIdentity(service: sender)
+        let hosts = Self.resolvedHosts(from: sender)
+        if !hosts.isEmpty {
+            Task { @MainActor [onServiceResolved] in
+                onServiceResolved?(identity, hosts)
+            }
+        }
+
         guard let txtData = sender.txtRecordData() else {
             return
         }
@@ -129,4 +284,40 @@ final class BonjourTXTRecordMonitor: NSObject, NetServiceBrowserDelegate, NetSer
             result[entry.key] = value
         }
     }
+
+    /// Extracts resolved IP addresses from a `NetService`'s address list,
+    /// preferring IPv4 addresses first.
+    private static func resolvedHosts(from service: NetService) -> [NWEndpoint.Host] {
+        guard let addresses = service.addresses, !addresses.isEmpty else {
+            return []
+        }
+
+        var ipv4Hosts: [NWEndpoint.Host] = []
+        var ipv6Hosts: [NWEndpoint.Host] = []
+
+        for addressData in addresses {
+            addressData.withUnsafeBytes { buffer in
+                guard let base = buffer.baseAddress else { return }
+                let family = base.assumingMemoryBound(to: sockaddr.self).pointee.sa_family
+                switch Int32(family) {
+                case AF_INET:
+                    let addr = base.assumingMemoryBound(to: sockaddr_in.self).pointee
+                    if let host = LoomSocketAddressConverter.host(fromIPv4: addr) {
+                        ipv4Hosts.append(host)
+                    }
+                case AF_INET6:
+                    let addr = base.assumingMemoryBound(to: sockaddr_in6.self).pointee
+                    if let host = LoomSocketAddressConverter.host(fromIPv6: addr) {
+                        ipv6Hosts.append(host)
+                    }
+                default:
+                    break
+                }
+            }
+        }
+
+        return ipv4Hosts + ipv6Hosts
+    }
 }
+
+#endif

@@ -88,8 +88,9 @@ public struct LoomDefaultSSHBootstrapClient: LoomSSHBootstrapClient {
 
     /// Executes the default SSH bootstrap probe.
     ///
-    /// The default implementation authenticates and runs `/usr/bin/true` to validate credentials
-    /// and endpoint reachability before returning `unlocked = true`.
+    /// The default implementation authenticates with password credentials. A successful
+    /// authentication followed by an immediate disconnect is treated as expected progress
+    /// for macOS FileVault pre-login SSH unlock.
     public func unlockVolumeOverSSH(
         endpoint: LoomBootstrapEndpoint,
         username: String,
@@ -159,7 +160,7 @@ private extension LoomDefaultSSHBootstrapClient {
         let serverAuthDelegate = HostKeyValidationDelegate(trustValidator: trustValidator)
 
         do {
-            let bootstrap = ClientBootstrap(group: eventLoopGroup)
+            let baseBootstrap = ClientBootstrap(group: eventLoopGroup)
                 .channelInitializer { channel in
                     channel.eventLoop.makeCompletedFuture {
                         let sshHandler = NIOSSHHandler(
@@ -176,6 +177,10 @@ private extension LoomDefaultSSHBootstrapClient {
                     }
                 }
                 .channelOption(ChannelOptions.connectTimeout, value: .seconds(10))
+#if os(Windows)
+            let bootstrap = baseBootstrap
+#else
+            let bootstrap = baseBootstrap
                 .channelOption(ChannelOptions.socket(
                     SocketOptionLevel(SOL_SOCKET),
                     SO_REUSEADDR
@@ -184,13 +189,13 @@ private extension LoomDefaultSSHBootstrapClient {
                     SocketOptionLevel(IPPROTO_TCP),
                     TCP_NODELAY
                 ), value: 1)
+#endif
 
             let channel = try await bootstrap.connect(host: host, port: port).get()
             defer {
                 _ = channel.close(mode: .all)
             }
 
-            let exitStatusPromise = channel.eventLoop.makePromise(of: Int32.self)
             let childChannel = try await channel.pipeline.handler(type: NIOSSHHandler.self).flatMap { sshHandler in
                 let childPromise = channel.eventLoop.makePromise(of: Channel.self)
                 sshHandler.createChannel(childPromise, channelType: .session) { childChannel, channelType in
@@ -199,32 +204,29 @@ private extension LoomDefaultSSHBootstrapClient {
                             LoomSSHBootstrapError.connectionFailed("Unexpected SSH channel type.")
                         )
                     }
-
-                    let handler = SSHExecRequestHandler(
-                        command: "/usr/bin/true",
-                        exitStatusPromise: exitStatusPromise
-                    )
-                    return childChannel.pipeline.addHandler(handler)
+                    return childChannel.eventLoop.makeSucceededFuture(())
                 }
                 return childPromise.futureResult
             }.get()
 
-            let exitStatus = try await exitStatusPromise.futureResult.get()
-            _ = try? await childChannel.closeFuture.get()
-
+            try? await childChannel.close(mode: .all).get()
             try await shutdownEventLoopGroup(eventLoopGroup)
-            guard exitStatus == 0 else {
-                throw LoomSSHBootstrapError.connectionFailed(
-                    "SSH bootstrap probe command returned status \(exitStatus)."
-                )
-            }
             return LoomSSHBootstrapResult(unlocked: true)
         } catch let error as LoomSSHBootstrapError {
             try? await shutdownEventLoopGroup(eventLoopGroup)
+            if authDelegate.didOfferPassword,
+               Self.isExpectedFileVaultDisconnect(error) {
+                return LoomSSHBootstrapResult(unlocked: true)
+            }
             throw error
         } catch {
             try? await shutdownEventLoopGroup(eventLoopGroup)
-            throw mapToBootstrapError(error)
+            let mappedError = mapToBootstrapError(error)
+            if authDelegate.didOfferPassword,
+               Self.isExpectedFileVaultDisconnect(mappedError) {
+                return LoomSSHBootstrapResult(unlocked: true)
+            }
+            throw mappedError
         }
     }
 
@@ -304,7 +306,19 @@ private extension LoomDefaultSSHBootstrapClient {
         return .connectionFailed(nsError.localizedDescription)
     }
 
+    static func isExpectedFileVaultDisconnect(_ error: LoomSSHBootstrapError) -> Bool {
+        switch error {
+        case .connectionFailed:
+            return true
+        case .unsupported, .authenticationFailed, .timedOut, .invalidEndpoint, .invalidServerTrustConfiguration:
+            return false
+        }
+    }
+
     static func isAuthenticationPOSIXError(_ code: CInt) -> Bool {
+#if os(Windows)
+        return code == 10013
+#else
         guard let posix = POSIXErrorCode(rawValue: code) else { return false }
         switch posix {
         case .EACCES, .EPERM:
@@ -312,13 +326,18 @@ private extension LoomDefaultSSHBootstrapClient {
         default:
             return false
         }
+#endif
     }
 
     static func isTimeoutPOSIXError(_ code: CInt) -> Bool {
+#if os(Windows)
+        return code == 10060
+#else
         if let posix = POSIXErrorCode(rawValue: code), posix == .ETIMEDOUT {
             return true
         }
         return false
+#endif
     }
 }
 
@@ -350,6 +369,10 @@ private final class SinglePasswordAuthenticationDelegate: NIOSSHClientUserAuthen
     private var password: String?
     private let lock = NIOLock()
     private var offeredPassword = false
+
+    var didOfferPassword: Bool {
+        lock.withLock { offeredPassword }
+    }
 
     init(username: String, password: String) {
         self.username = username
@@ -384,80 +407,6 @@ private final class SinglePasswordAuthenticationDelegate: NIOSSHClientUserAuthen
                     )
                 )
             }
-        }
-    }
-}
-
-private final class SSHExecRequestHandler: ChannelInboundHandler, @unchecked Sendable {
-    typealias InboundIn = SSHChannelData
-
-    private let command: String
-    private let exitStatusPromise: EventLoopPromise<Int32>
-    private let lock = NIOLock()
-    private var completed = false
-
-    init(command: String, exitStatusPromise: EventLoopPromise<Int32>) {
-        self.command = command
-        self.exitStatusPromise = exitStatusPromise
-    }
-
-    func channelActive(context: ChannelHandlerContext) {
-        let event = SSHChannelRequestEvent.ExecRequest(command: command, wantReply: true)
-        context.triggerUserOutboundEvent(event).assumeIsolated().whenFailure { [weak self] error in
-            self?.complete(with: error)
-            context.close(promise: nil)
-        }
-        context.fireChannelActive()
-    }
-
-    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-        _ = unwrapInboundIn(data)
-    }
-
-    func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
-        switch event {
-        case let status as SSHChannelRequestEvent.ExitStatus:
-            complete(with: Int32(status.exitStatus))
-            context.close(promise: nil)
-        case let signal as SSHChannelRequestEvent.ExitSignal:
-            complete(
-                with: LoomSSHBootstrapError.connectionFailed(
-                    "SSH remote exited with signal \(signal.signalName)."
-                )
-            )
-            context.close(promise: nil)
-        default:
-            context.fireUserInboundEventTriggered(event)
-        }
-    }
-
-    func errorCaught(context: ChannelHandlerContext, error: Error) {
-        complete(with: error)
-        context.close(promise: nil)
-    }
-
-    func handlerRemoved(context: ChannelHandlerContext) {
-        complete(
-            with: LoomSSHBootstrapError.connectionFailed(
-                "SSH channel closed before command exit status was received."
-            )
-        )
-        context.fireChannelInactive()
-    }
-
-    private func complete(with status: Int32) {
-        lock.withLock {
-            guard !completed else { return }
-            completed = true
-            exitStatusPromise.succeed(status)
-        }
-    }
-
-    private func complete(with error: Error) {
-        lock.withLock {
-            guard !completed else { return }
-            completed = true
-            exitStatusPromise.fail(error)
         }
     }
 }

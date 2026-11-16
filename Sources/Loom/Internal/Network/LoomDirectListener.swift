@@ -6,99 +6,58 @@
 //
 
 import Foundation
-import Network
+import LoomNetworking
 
-package actor LoomDirectListener {
-    private var listener: NWListener?
-    private let transportKind: LoomTransportKind
-    private let enablePeerToPeer: Bool
-    private let quicALPN: [String]
+package typealias LoomDirectConnectionHandler = @Sendable (any LoomNetworkConnection) async -> Void
 
-    package init(
-        transportKind: LoomTransportKind,
-        enablePeerToPeer: Bool,
-        quicALPN: [String] = []
-    ) {
-        self.transportKind = transportKind
-        self.enablePeerToPeer = enablePeerToPeer
-        self.quicALPN = quicALPN
+package protocol LoomDirectTransportListener: Sendable {
+    func start(
+        port: UInt16,
+        onConnection: @escaping LoomDirectConnectionHandler
+    ) async throws -> UInt16
+
+    func stop() async
+}
+
+package actor LoomDirectListener: LoomDirectTransportListener {
+    private let listener: any LoomNetworkListener
+    private var acceptTask: Task<Void, Never>?
+
+    package init(listener: any LoomNetworkListener) {
+        self.listener = listener
     }
 
     package func start(
         port: UInt16 = 0,
-        onConnection: @escaping @Sendable (NWConnection) -> Void
+        onConnection: @escaping LoomDirectConnectionHandler
     ) async throws -> UInt16 {
-        let parameters = try LoomTransportParametersFactory.makeParameters(
-            for: transportKind,
-            enablePeerToPeer: enablePeerToPeer,
-            quicALPN: quicALPN
-        )
-        let actualPort: NWEndpoint.Port = port == 0 ? .any : NWEndpoint.Port(rawValue: port) ?? .any
-        parameters.allowLocalEndpointReuse = true
-        listener = try NWListener(using: parameters, on: actualPort)
-        listener?.newConnectionHandler = onConnection
-        guard let listener else {
-            throw LoomError.protocolError("Failed to create Loom direct listener.")
-        }
-
-        return try await withCheckedThrowingContinuation { continuation in
-            let continuationBox = ContinuationBox<UInt16>(continuation)
-            listener.stateUpdateHandler = { state in
-                switch state {
-                case .ready:
-                    if let port = listener.port?.rawValue {
-                        continuationBox.resume(returning: port)
-                    }
-                case let .failed(error):
-                    continuationBox.resume(throwing: error)
-                case .cancelled:
-                    continuationBox.resume(throwing: LoomError.protocolError("Direct listener cancelled."))
-                default:
+        let connectionStream = await listener.makeConnectionStream()
+        acceptTask = Task { [listener] in
+            for await connection in connectionStream {
+                guard !Task.isCancelled else {
+                    await connection.cancel()
                     break
                 }
+                await onConnection(connection)
             }
-            listener.start(queue: .global(qos: .userInitiated))
+            if Task.isCancelled {
+                await listener.cancel()
+            }
+        }
+
+        do {
+            return try await listener.start(port: port)
+        } catch {
+            acceptTask?.cancel()
+            acceptTask = nil
+            await listener.cancel()
+            throw error
         }
     }
 
-    package func stop() {
-        listener?.cancel()
-        listener = nil
+    package func stop() async {
+        acceptTask?.cancel()
+        acceptTask = nil
+        await listener.cancel()
     }
 }
-
-package enum LoomTransportParametersFactory {
-    package static func makeParameters(
-        for transportKind: LoomTransportKind,
-        enablePeerToPeer: Bool,
-        requiredInterfaceType: NWInterface.InterfaceType? = nil,
-        quicALPN: [String] = []
-    ) throws -> NWParameters {
-        let parameters: NWParameters
-        switch transportKind {
-        case .tcp:
-            parameters = NWParameters.tcp
-            parameters.includePeerToPeer = enablePeerToPeer
-            if let tcpOptions = parameters.defaultProtocolStack.transportProtocol as? NWProtocolTCP.Options {
-                tcpOptions.noDelay = true
-                tcpOptions.enableKeepalive = true
-                tcpOptions.keepaliveInterval = 5
-            }
-        case .quic:
-            let options = quicALPN.isEmpty
-                ? NWProtocolQUIC.Options()
-                : NWProtocolQUIC.Options(alpn: quicALPN)
-            parameters = NWParameters(quic: options)
-            parameters.includePeerToPeer = enablePeerToPeer
-        case .udp:
-            parameters = NWParameters.udp
-            parameters.includePeerToPeer = enablePeerToPeer
-            parameters.serviceClass = .signaling
-        }
-        if let requiredInterfaceType {
-            parameters.requiredInterfaceType = requiredInterfaceType
-        }
-        return parameters
-    }
-}
-

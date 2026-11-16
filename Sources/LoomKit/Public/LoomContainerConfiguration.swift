@@ -15,8 +15,6 @@ public enum LoomTrustMode: String, Codable, Sendable {
     case manualOnly
     /// Auto-trust peers that resolve to the same iCloud account.
     case sameAccountAutoTrust
-    /// Auto-trust peers that are visible through an accepted CloudKit share.
-    case shareAwareAutoTrust
 }
 
 /// Configuration for a shared LoomKit runtime container.
@@ -30,7 +28,7 @@ public struct LoomContainerConfiguration: Sendable {
     public let serviceName: String
     /// Optional shared `UserDefaults` suite used for stable device identity and trust state.
     public let deviceIDSuiteName: String?
-    /// Optional CloudKit configuration used to merge shared peers into the runtime.
+    /// Optional CloudKit configuration used to merge same-account peers into the runtime.
     public let cloudKit: LoomCloudKitConfiguration?
     /// Optional overlay directory configuration used for off-LAN peer discovery.
     public let overlayDirectory: LoomOverlayDirectoryConfiguration?
@@ -38,10 +36,19 @@ public struct LoomContainerConfiguration: Sendable {
     public let remoteSignaling: LoomRemoteSignalingConfiguration?
     /// Optional macOS App Group configuration used to share one Loom runtime across multiple apps.
     public let appGroup: LoomAppGroupConfiguration?
+    /// Optional app-owned trust provider used instead of LoomKit's default local or CloudKit trust providers.
+    public let trustProvider: (any LoomTrustProvider)?
     /// Trust policy applied when evaluating nearby and CloudKit-backed peers.
     public let trust: LoomTrustMode
     /// Enables Bonjour peer-to-peer discovery when available on the platform.
     public let enablePeerToPeer: Bool
+    /// Direct transports this container should listen on and advertise.
+    public let enabledDirectTransports: Set<LoomTransportKind>
+    /// Listener ports requested by this container.
+    ///
+    /// Direct listener ports always map into Loom's network configuration. The overlay probe port is used
+    /// when ``overlayDirectory`` is enabled and its configuration omits an explicit `probePort`.
+    public let ports: LoomKitPortConfiguration
     /// App-defined metadata published with the local advertisement.
     public let advertisementMetadata: [String: String]
     /// Feature flags advertised for compatibility filtering.
@@ -68,8 +75,11 @@ public struct LoomContainerConfiguration: Sendable {
         overlayDirectory: LoomOverlayDirectoryConfiguration? = nil,
         remoteSignaling: LoomRemoteSignalingConfiguration? = nil,
         appGroup: LoomAppGroupConfiguration? = nil,
+        trustProvider: (any LoomTrustProvider)? = nil,
         trust: LoomTrustMode = .manualOnly,
         enablePeerToPeer: Bool = true,
+        enabledDirectTransports: Set<LoomTransportKind> = Set(LoomTransportKind.allCases),
+        ports: LoomKitPortConfiguration = .default,
         advertisementMetadata: [String: String] = [:],
         supportedFeatures: [String] = [],
         bootstrapMetadataProvider: BootstrapMetadataProvider? = nil,
@@ -86,8 +96,11 @@ public struct LoomContainerConfiguration: Sendable {
         self.overlayDirectory = overlayDirectory
         self.remoteSignaling = remoteSignaling
         self.appGroup = appGroup
+        self.trustProvider = trustProvider
         self.trust = trust
         self.enablePeerToPeer = enablePeerToPeer
+        self.enabledDirectTransports = enabledDirectTransports
+        self.ports = ports
         self.advertisementMetadata = advertisementMetadata
         self.supportedFeatures = Array(
             Set(

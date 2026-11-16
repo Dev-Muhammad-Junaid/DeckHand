@@ -32,7 +32,8 @@ struct LoomKitIntegrationTests {
         )
         async let serverContext = pair.server.start(
             localHello: pair.serverHello,
-            identityManager: pair.serverIdentityManager
+            identityManager: pair.serverIdentityManager,
+            trustProvider: pair.serverTrustProvider
         )
         _ = try await (clientContext, serverContext)
 
@@ -101,7 +102,8 @@ struct LoomKitIntegrationTests {
         )
         async let serverContext = pair.server.start(
             localHello: pair.serverHello,
-            identityManager: pair.serverIdentityManager
+            identityManager: pair.serverIdentityManager,
+            trustProvider: pair.serverTrustProvider
         )
         _ = try await (clientContext, serverContext)
 
@@ -156,7 +158,8 @@ struct LoomKitIntegrationTests {
         )
         async let serverContext = pair.server.start(
             localHello: pair.serverHello,
-            identityManager: pair.serverIdentityManager
+            identityManager: pair.serverIdentityManager,
+            trustProvider: pair.serverTrustProvider
         )
         _ = try await (clientContext, serverContext)
 
@@ -283,7 +286,8 @@ struct LoomKitIntegrationTests {
         )
         async let firstServerContext = firstPair.server.start(
             localHello: firstPair.serverHello,
-            identityManager: firstPair.serverIdentityManager
+            identityManager: firstPair.serverIdentityManager,
+            trustProvider: firstPair.serverTrustProvider
         )
         async let secondClientContext = secondPair.client.start(
             localHello: secondPair.clientHello,
@@ -291,7 +295,8 @@ struct LoomKitIntegrationTests {
         )
         async let secondServerContext = secondPair.server.start(
             localHello: secondPair.serverHello,
-            identityManager: secondPair.serverIdentityManager
+            identityManager: secondPair.serverIdentityManager,
+            trustProvider: secondPair.serverTrustProvider
         )
         _ = try await (
             firstClientContext,
@@ -381,7 +386,6 @@ struct LoomKitIntegrationTests {
             deviceType: .iPad,
             sources: [.nearby, .remoteSignaling],
             isNearby: true,
-            isShared: false,
             remoteAccessEnabled: true,
             signalingSessionID: "studio-ipad",
             advertisement: LoomPeerAdvertisement(
@@ -416,7 +420,6 @@ struct LoomKitIntegrationTests {
             deviceType: .iPhone,
             sources: [.nearby],
             isNearby: true,
-            isShared: false,
             remoteAccessEnabled: false,
             signalingSessionID: nil,
             advertisement: LoomPeerAdvertisement(
@@ -447,7 +450,6 @@ struct LoomKitIntegrationTests {
                 deviceType: peerDeviceType,
                 sources: [.nearby],
                 isNearby: true,
-                isShared: false,
                 remoteAccessEnabled: false,
                 signalingSessionID: nil,
                 advertisement: LoomPeerAdvertisement(
@@ -470,6 +472,7 @@ private struct LoomKitLoopbackSessionPair {
     let listener: NWListener
     let clientIdentityManager: LoomIdentityManager
     let serverIdentityManager: LoomIdentityManager
+    let serverTrustProvider: AlwaysTrustProvider
     let clientHello: LoomSessionHelloRequest
     let serverHello: LoomSessionHelloRequest
     let client: LoomAuthenticatedSession
@@ -535,14 +538,12 @@ private func makeLoopbackPair(
     }))
 
     let client = LoomAuthenticatedSession(
-        rawSession: LoomSession(connection: clientConnection),
-        role: .initiator,
-        transportKind: .tcp
+        connection: .tcp(clientConnection),
+        role: .initiator
     )
     let server = LoomAuthenticatedSession(
-        rawSession: LoomSession(connection: serverConnection),
-        role: .receiver,
-        transportKind: .tcp
+        connection: .tcp(serverConnection),
+        role: .receiver
     )
 
     let clientHello = LoomSessionHelloRequest(
@@ -562,11 +563,27 @@ private func makeLoopbackPair(
         listener: listener,
         clientIdentityManager: clientIdentityManager,
         serverIdentityManager: serverIdentityManager,
+        serverTrustProvider: AlwaysTrustProvider(),
         clientHello: clientHello,
         serverHello: serverHello,
         client: client,
         server: server
     )
+}
+
+@MainActor
+private final class AlwaysTrustProvider: LoomTrustProvider {
+    func evaluateTrust(for peer: LoomPeerIdentity) async -> LoomTrustDecision {
+        .trusted
+    }
+
+    func evaluateTrustOutcome(for peer: LoomPeerIdentity) async -> LoomTrustEvaluation {
+        LoomTrustEvaluation(decision: .trusted, shouldShowAutoTrustNotice: false)
+    }
+
+    func grantTrust(to peer: LoomPeerIdentity) async throws {}
+
+    func revokeTrust(for deviceID: UUID) async throws {}
 }
 
 private actor AsyncBox<Value: Sendable> {

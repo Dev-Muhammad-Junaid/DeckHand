@@ -7,6 +7,7 @@
 //  Direct STUN probe utilities for remote connectivity preflight.
 //
 
+#if canImport(Network)
 import Foundation
 import Network
 
@@ -72,7 +73,7 @@ public enum LoomSTUNProbe {
     /// is symmetric and a relay is required.
     ///
     /// - Parameters:
-    ///   - localPort: The QUIC listener port to probe from.
+    ///   - localPort: The datagram listener port to probe from.
     ///   - timeout: Per-probe timeout.
     /// - Returns: Detected NAT mapping type.
     public static func detectNATType(
@@ -427,3 +428,5 @@ private func readUInt32(_ data: Data, at offset: Int) -> UInt32 {
     let fourth = UInt32(data[offset + 3])
     return (first << 24) | (second << 16) | (third << 8) | fourth
 }
+
+#endif

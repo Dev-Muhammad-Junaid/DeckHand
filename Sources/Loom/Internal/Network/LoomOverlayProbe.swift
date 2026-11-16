@@ -5,6 +5,7 @@
 //  Created by Ethan Lipnik on 3/11/26.
 //
 
+#if canImport(Network)
 import Foundation
 import Network
 
@@ -24,14 +25,26 @@ package struct LoomOverlayProbeResponse: Codable, Sendable, Equatable {
 
 package actor LoomOverlayProbeServer {
     private let port: UInt16
+    private let requestTimeout: Duration
+    private let maxPendingConnections: Int
+    private let outstandingOperationLimiter: LoomOutstandingOperationLimiter
     private let payloadProvider: @Sendable () async throws -> LoomOverlayProbeResponse
     private var listener: NWListener?
+    private var pendingConnectionCount = 0
 
     package init(
         port: UInt16,
+        requestTimeout: Duration = .seconds(10),
+        maxPendingConnections: Int = 16,
         payloadProvider: @escaping @Sendable () async throws -> LoomOverlayProbeResponse
     ) {
         self.port = port
+        self.requestTimeout = max(.milliseconds(1), requestTimeout)
+        let maxPendingConnections = max(1, maxPendingConnections)
+        self.maxPendingConnections = maxPendingConnections
+        outstandingOperationLimiter = LoomOutstandingOperationLimiter(
+            maximumConcurrentOperations: maxPendingConnections
+        )
         self.payloadProvider = payloadProvider
     }
 
@@ -52,7 +65,7 @@ package actor LoomOverlayProbeServer {
         listener.newConnectionHandler = { [weak self] connection in
             guard let self else { return }
             Task {
-                await self.handle(connection: connection)
+                await self.accept(connection: connection)
             }
         }
         self.listener = listener
@@ -80,6 +93,31 @@ package actor LoomOverlayProbeServer {
     package func stop() {
         listener?.cancel()
         listener = nil
+    }
+
+    private func accept(connection: NWConnection) async {
+        guard pendingConnectionCount < maxPendingConnections else {
+            LoomLogger.transport("Rejected overlay probe connection: admission limit reached")
+            connection.cancel()
+            return
+        }
+        pendingConnectionCount += 1
+        do {
+            try await withLoomThrowingTimeout(
+                requestTimeout,
+                onTimeout: {
+                    connection.cancel()
+                }
+            ) { [weak self] in
+                guard let self else { return }
+                try await self.outstandingOperationLimiter.run {
+                    await self.handle(connection: connection)
+                }
+            }
+        } catch {
+            connection.cancel()
+        }
+        pendingConnectionCount = max(0, pendingConnectionCount - 1)
     }
 
     private func handle(connection: NWConnection) async {
@@ -124,7 +162,12 @@ package enum LoomOverlayProbeClient {
         let framedConnection = LoomFramedConnection(connection: connection)
 
         do {
-            let responseData = try await withThrowingTimeout(timeout) {
+            let responseData = try await withLoomThrowingTimeout(
+                timeout,
+                onTimeout: {
+                    connection.cancel()
+                }
+            ) {
                 try await framedConnection.startAndAwaitReady(queue: .global(qos: .userInitiated))
                 let request = LoomOverlayProbeRequest()
                 try await framedConnection.sendFrame(JSONEncoder().encode(request))
@@ -142,21 +185,4 @@ package enum LoomOverlayProbeClient {
     }
 }
 
-private func withThrowingTimeout<T: Sendable>(
-    _ timeout: Duration,
-    operation: @escaping @Sendable () async throws -> T
-) async throws -> T {
-    try await withThrowingTaskGroup(of: T.self) { group in
-        group.addTask {
-            try await operation()
-        }
-        group.addTask {
-            try await Task.sleep(for: timeout)
-            throw LoomError.connectionFailed(CancellationError())
-        }
-
-        let value = try await group.next()!
-        group.cancelAll()
-        return value
-    }
-}
+#endif

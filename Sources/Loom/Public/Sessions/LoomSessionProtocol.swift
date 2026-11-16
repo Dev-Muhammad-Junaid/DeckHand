@@ -34,6 +34,8 @@ public protocol LoomSessionProtocol: Sendable {
     /// Implementations that don't expose a real network path may return an
     /// immediately-finishing stream.
     func makePathObserver() async -> AsyncStream<LoomSessionNetworkPathSnapshot>
+    /// Creates an observation stream for bootstrap progress before the session becomes ready.
+    func makeBootstrapProgressObserver() async -> AsyncStream<LoomAuthenticatedSessionBootstrapProgress>
 
     /// Opens a logical bidirectional stream on the session.
     func openStream(label: String?) async throws -> LoomMultiplexedStream

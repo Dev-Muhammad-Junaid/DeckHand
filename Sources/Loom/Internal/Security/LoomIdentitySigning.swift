@@ -52,7 +52,7 @@ package enum LoomIdentitySigning {
         negotiation: LoomProtocolNegotiation,
         requestNonce: String,
         mediaEncryptionEnabled: Bool,
-        udpRegistrationToken: Data,
+        datagramRegistrationToken: Data,
         keyID: String,
         publicKey: Data,
         timestampMs: Int64,
@@ -68,7 +68,7 @@ package enum LoomIdentitySigning {
             ("negotiation", try stableJSONBase64(negotiation)),
             ("requestNonce", requestNonce),
             ("mediaEncryptionEnabled", mediaEncryptionEnabled ? "1" : "0"),
-            ("udpRegistrationToken", udpRegistrationToken.base64EncodedString()),
+            ("datagramRegistrationToken", datagramRegistrationToken.base64EncodedString()),
             ("keyID", keyID),
             ("publicKey", publicKey.base64EncodedString()),
             ("timestampMs", "\(timestampMs)"),
@@ -82,9 +82,10 @@ package enum LoomIdentitySigning {
         bodySHA256: String,
         keyID: String,
         timestampMs: Int64,
-        nonce: String
+        nonce: String,
+        sessionID: String? = nil
     ) throws -> Data {
-        try canonicalData([
+        var fields = [
             ("type", "worker-request-v1"),
             ("method", method.uppercased()),
             ("path", path),
@@ -92,7 +93,12 @@ package enum LoomIdentitySigning {
             ("keyID", keyID),
             ("timestampMs", "\(timestampMs)"),
             ("nonce", nonce),
-        ])
+        ]
+        if let sessionID {
+            fields[0] = ("type", "worker-request-v2")
+            fields.append(("sessionID", sessionID))
+        }
+        return try canonicalData(fields)
     }
 
     package static func bootstrapControlPayload(
