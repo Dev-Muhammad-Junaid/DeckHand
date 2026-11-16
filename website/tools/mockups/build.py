@@ -228,13 +228,13 @@ def qab_edit(app):
 XCODE = [('⌘B','Build'),('⌘R','Run'),('⌘.','Stop'),('⌘⇧K','Clean Build'),('⌘⇧O','Open Quickly'),('⌘⇧F','Find in Workspace')]
 
 # ---------- Screens ----------
-HERO = ('<div class="dev-ipad" role="img" aria-label="Deck Hand on an iPad in dark mode: the Trackpad tab with dots lit under a finger moving the cursor, '
+HERO = ('<div class="dev-ipad" role="img" aria-label="Pixel Hand on an iPad in dark mode: the Trackpad tab with dots lit under a finger moving the cursor, '
         'the sensitivity slider, the gesture bar, and the live mirror of the Mac expanded in the corner.">'
         + trackpad_screen('dark', 'Junaid’s MacBook Pro', 'Xcode', capsule=('Cursor','hand','var(--glow)'),
                           touches=[(318, 236)], trail=[(301, 250, 0.8), (284, 264, 0.6), (267, 278, 0.4), (250, 292, 0.2)],
                           mirror_style='right:{16};bottom:{96};width:{470};aspect-ratio:16/10') + '</div>')
 
-PHONE_TP = ('<div class="dev-iphone" role="img" aria-label="Deck Hand on an iPhone in light mode, scrolling with two fingers: dots light up under both fingers on the dark trackpad, '
+PHONE_TP = ('<div class="dev-iphone" role="img" aria-label="Pixel Hand on an iPhone in light mode, scrolling with two fingers: dots light up under both fingers on the dark trackpad, '
             'which shows a Scrolling badge, and the Scroll button is lit.">'
             + trackpad_screen('light', 'Studio Mac', 'Safari', phone=True, capsule=('Scrolling','updown','var(--brand-mint)'), scroll_on=True, hint='Scroll Mode',
                               touches=[(136, 262), (214, 250)],
@@ -265,11 +265,11 @@ BENTO_GRID = panel(f'<div class="search">{ic("search")}Search apps</div><div cla
                    + '</div><div style="height:calc(22*var(--pt))"></div>', 380)
 BENTO_EDIT = panel(f'<div style="padding:calc(16*var(--pt)) calc(20*var(--pt))">{qab_edit("Slack")}</div>', 345)
 
-PEERS = ('<div class="dev-iphone" role="img" aria-label="The Deck Hand picker on iPhone: Choose a Mac to control, with Junaid’s MacBook Pro marked My Mac and Studio Mac, both nearby.">'
+PEERS = ('<div class="dev-iphone" role="img" aria-label="The Pixel Hand picker on iPhone: Choose a Mac to control, with Junaid’s MacBook Pro marked My Mac and Studio Mac, both nearby.">'
          '<div class="ui ui-dark picker phone"><span class="island"></span><div class="ui-col">' + status_bar(True) + '</div>'
          f'<span class="picker__gear">{ic("gear")}</span><div class="picker__col"><div class="picker__head">'
          '<img class="picker__mark" src="assets/icon-256.png" alt="">'
-         '<div><div class="picker__title">Deck Hand</div><div class="picker__sub">Choose a Mac to control</div></div></div>'
+         '<div><div class="picker__title">Pixel Hand</div><div class="picker__sub">Choose a Mac to control</div></div></div>'
          '<div class="peers">'
          f'<div class="peer peer--busy"><span class="peer__icon"><svg aria-hidden="true" style="width:calc(22*var(--pt));height:calc(20*var(--pt))" stroke="url(#litg)" fill="none" stroke-width="2"><use href="#i-desktop"/></svg></span><span class="peer__text"><span class="peer__name">Junaid’s MacBook Pro<span class="peer__badge">My Mac</span></span><span class="peer__where"><i></i>Nearby</span></span><span class="peer__spin"></span></div>'
          f'<div class="peer" style="opacity:.4"><span class="peer__icon"><svg aria-hidden="true" style="width:calc(22*var(--pt));height:calc(20*var(--pt))" stroke="url(#litg)" fill="none" stroke-width="2"><use href="#i-desktop"/></svg></span><span class="peer__text"><span class="peer__name">Studio Mac</span><span class="peer__where"><i></i>Nearby</span></span>{ic("chev-r","peer__chev")}</div>'
@@ -301,15 +301,15 @@ def perm(title, detail, granted=True):
         fix = '<span class="mperm__fix">Fix…</span>'
     return f'<div class="mperm">{icon}<div><b>{title}</b><span>{detail}</span></div>{fix}</div>'
 POPOVER = ('<div class="macbar" aria-hidden="true"><span class="macbar__item">' + pixel_mono(HAND, fill_opacity=0.3, ratio=0.8) + '</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="6" rx="3"/><circle cx="16" cy="8" r="1.6" fill="currentColor"/><rect x="3" y="13" width="18" height="6" rx="3"/><circle cx="8" cy="16" r="1.6" fill="currentColor"/></svg><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M2 9a14.5 14.5 0 0120 0M5.2 12.4a9.6 9.6 0 0113.6 0M8.6 15.8a4.8 4.8 0 016.8 0"/><circle cx="12" cy="19.2" r="1.5" fill="currentColor" stroke="none"/></svg><span class="macbar__time">9:41 AM</span></div>'
-           '<div class="mpop-wrap"><div class="mpop ui" role="img" aria-label="The Deck Hand menu on the Mac: a pending request from Junaid’s iPad with Allow and Deny buttons, '
+           '<div class="mpop-wrap"><div class="mpop ui" role="img" aria-label="The Pixel Hand menu on the Mac: a pending request from Junaid’s iPad with Allow and Deny buttons, '
            'Accessibility and Screen Recording granted, and Notifications turned off with a Fix link.">'
-           f'<div class="mpop__head"><span class="mpop__logo">{pixel_mono(HAND, fill_opacity=0.35)}</span><div><b>Deck Hand</b><small>Ready to receive</small></div></div><div class="mpop__div"></div>'
+           f'<div class="mpop__head"><span class="mpop__logo">{pixel_mono(HAND, fill_opacity=0.35)}</span><div><b>Pixel Hand</b><small>Ready to receive</small></div></div><div class="mpop__div"></div>'
            '<div class="mpop__h mpop__h--warn">PENDING REQUESTS</div>'
            f'<div class="mrow"><span class="mrow__icon" style="color:var(--warning)">{ic("ipad")}</span><span class="mrow__text"><b>Junaid’s iPad</b><span>Requesting mouse access</span><small>Pending 12 sec ago</small></span>'
            '<span class="mrow__acts"><span class="mbtn mbtn--deny">Deny</span><span class="mbtn mbtn--allow">Allow</span></span></div>'
            '<div class="mpop__div" style="margin-top:calc(6*var(--pt))"></div><div class="mpop__h">PERMISSIONS</div>'
            + perm('Accessibility','Mouse, keyboard, and dialog control') + perm('Screen Recording','Screenshots and live mirror') + perm('Notifications','Connection approval alerts', granted=False) +
-           '<div class="mpop__div" style="margin-top:calc(6*var(--pt))"></div><div class="mpop__quit">Quit Deck Hand</div></div></div>')
+           '<div class="mpop__div" style="margin-top:calc(6*var(--pt))"></div><div class="mpop__quit">Quit Pixel Hand</div></div></div>')
 
 # ---------- Patch index.html ----------
 html = SRC.read_text()

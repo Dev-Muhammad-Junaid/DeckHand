@@ -1,8 +1,10 @@
-# Mac build session checklist (branch `claude/app-store-prep`)
+# Mac build session checklist (branch `claude/pixelhand-integration`)
 
 None of this branch has been compiled: it was written in a Linux container with
 no Xcode. Expect to fix small compile errors, most likely in
-`Shared/DeckHandDiagnostics.swift` (new Sentry code under Swift 6).
+`Shared/DeckHandDiagnostics.swift` (new Sentry code under Swift 6) and in the
+upstream Loom 2.2.16 merge. `DeckHand/Integration/STATUS.md` lists what to
+build and check first.
 
 ## 0. Before building
 
@@ -18,8 +20,8 @@ no Xcode. Expect to fix small compile errors, most likely in
 ## 1. Pull and generate
 
 ```bash
-git fetch origin claude/app-store-prep
-git checkout claude/app-store-prep
+git fetch origin claude/pixelhand-integration
+git checkout claude/pixelhand-integration
 cd DeckHand
 xcodegen generate          # first build also downloads sentry-cocoa 9.34+
 open DeckHand.xcodeproj
@@ -34,10 +36,10 @@ xcodebuild -project DeckHand.xcodeproj -scheme DeckHandiOS -destination 'generic
 ```
 
 - [ ] 12/12 contract tests pass.
-- [ ] Both apps build with no new warnings from Deck Hand's own sources.
-- [ ] Signing shows profiles for `com.widgetsflow.deckhand.mac` and
-      `com.widgetsflow.deckhand` with the iCloud container
-      `iCloud.com.widgetsflow.deckhand`.
+- [ ] Both apps build with no new warnings from Pixel Hand's own sources.
+- [ ] Signing shows profiles for `com.widgetsflow.pixelhand.mac` and
+      `com.widgetsflow.pixelhand` with the iCloud container
+      `iCloud.com.widgetsflow.pixelhand`.
 
 ## 3. Install. Read this first for the Mac
 
@@ -50,9 +52,10 @@ The new Mac bundle ID is clean. Keep it that way
 
 Then:
 
-- [ ] Quit and delete the **old** Mac app (`com.deckhand.mac`) and the **old**
-      iPad/iPhone app. The new IDs install *beside* the old ones, so otherwise
-      you'll have two "Deck Hand" icons and two menu-bar items.
+- [ ] Quit and delete the **old** Mac app (`com.deckhand.mac`, named "Deck
+      Hand") and the **old** iPad/iPhone app (`com.deckhand.ios`). The new IDs
+      install *beside* the old ones, so otherwise you'll have two icons and
+      two menu-bar items.
 - [ ] Install the new iOS app on the iPad (Xcode Run, or Devices window).
 
 ## 4. Permissions to grant again (new Mac bundle ID = new identity to macOS)
@@ -62,7 +65,7 @@ On the Mac, System Settings → Privacy & Security:
 - [ ] **Accessibility**: remove the old "Deck Hand" entry (`−`), then grant
       the new one from the menu-bar panel's **Fix…**.
 - [ ] **Screen & System Audio Recording**: same, remove old, grant new.
-- [ ] **Automation**: approve Deck Hand → System Events the first time
+- [ ] **Automation**: approve Pixel Hand → System Events the first time
       Mission Control / App Exposé is used.
 - [ ] **Notifications**: allow when asked (connection approval alerts).
 - [ ] **Local Network** (macOS 15+): allow when asked.
@@ -96,7 +99,7 @@ a new Loom identity, so the Mac asks to approve the iPad again.
 Follow "Checking it works" in `Sentry.md`. In short:
 
 - [ ] Force one crash per app *without the debugger attached*, relaunch, and
-      see it in `deckhand-ios` / `deckhand-mac` under environment
+      see it in `pixelhand-ios` / `pixelhand-mac` under environment
       `development`.
 - [ ] The event shows device model and OS, **no device name**, User with only
       an `id`, **no attachments**.
@@ -116,4 +119,4 @@ Follow "Checking it works" in `Sentry.md`. In short:
       `ITSAppUsesNonExemptEncryption = NO`. If it does, answer per
       `ExportCompliance.md`.
 - [ ] Archive DeckHandMac → Distribute → **Developer ID** → Upload (notarize).
-      Check `spctl -a -vv "Deck Hand.app"` says "Notarized Developer ID".
+      Check `spctl -a -vv "Pixel Hand.app"` says "Notarized Developer ID".

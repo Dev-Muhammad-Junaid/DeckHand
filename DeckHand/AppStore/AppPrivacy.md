@@ -1,6 +1,6 @@
 # App Store Connect: App Privacy answers (draft)
 
-For the iPhone/iPad app `com.widgetsflow.deckhand`. Enter these under
+For the iPhone/iPad app `com.widgetsflow.pixelhand`. Enter these under
 App Store Connect → the app → **App Privacy**. They must match
 `DeckHandiOS/PrivacyInfo.xcprivacy` and `website/public/privacy.html`. If one
 changes, change all three.

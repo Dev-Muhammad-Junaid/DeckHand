@@ -1,6 +1,6 @@
 //
 //  UIContext.swift
-//  Deck Hand – Shared
+//  Pixel Hand – Shared
 //
 //  Wire model for "what's currently interactable on the Mac". Phase 1 covers
 //  modal dialogs / sheets / alerts: the Mac's Accessibility-backed

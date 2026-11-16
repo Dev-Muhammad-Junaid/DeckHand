@@ -1,8 +1,8 @@
-# Deck Hand
+# Pixel Hand
 
 Turn an iPad into a control surface for your Mac.
 
-Deck Hand is a pair of apps — a menu bar host on the Mac and a remote on iPad or
+Pixel Hand is a pair of apps — a menu bar host on the Mac and a remote on iPad or
 iPhone — that discover each other on the local network and connect directly. The
 remote gives you a precision trackpad, a live view of the Mac's screen, capture
 tools, an app launcher, and shortcut chips that change with whatever app is
@@ -33,7 +33,7 @@ recognition on them with Vision, or save them to Photos — automatically, if yo
 turn that on.
 
 **Apps and shortcuts.** Browse and launch installed apps, see what is running in
-Cmd-Tab order, and get per-app shortcut chips. Deck Hand reads the frontmost
+Cmd-Tab order, and get per-app shortcut chips. Pixel Hand reads the frontmost
 app's menu bar over Accessibility, so the chips reflect that app's real
 shortcuts instead of a hard-coded list. A row of dots under a chip lights as the
 shortcut goes out and turns mint when the Mac confirms it, or red if it can't act
@@ -69,7 +69,7 @@ replayed.
 
 ## How it works
 
-The Mac advertises `_deckhand._tcp` over Bonjour and the remote browses for it.
+The Mac advertises `_pixelhand._tcp` over Bonjour and the remote browses for it.
 `LoomKit` handles discovery, the direct connection, device identity, and the
 trust decision. Every connection has to be approved on the Mac, and that approval
 is deliberately not persisted — a fresh host launch prompts again, because
@@ -138,9 +138,9 @@ open DeckHand.xcodeproj
 Both app targets use automatic signing and are pinned to the original author's
 team, so set `DEVELOPMENT_TEAM` in `DeckHand/project.yml` to your own and
 regenerate before building to a device. Bundle identifiers are
-`com.widgetsflow.deckhand` (iPhone and iPad), `com.widgetsflow.deckhand.mac` (Mac)
-and `com.widgetsflow.deckhand.tests`; the CloudKit container is
-`iCloud.com.widgetsflow.deckhand`. If you sign under your own team, change all of
+`com.widgetsflow.pixelhand` (iPhone and iPad), `com.widgetsflow.pixelhand.mac` (Mac)
+and `com.widgetsflow.pixelhand.tests`; the CloudKit container is
+`iCloud.com.widgetsflow.pixelhand`. If you sign under your own team, change all of
 them, including the container in both `.entitlements` files and
 `Shared/DeckHandCloud.swift`.
 
@@ -191,7 +191,7 @@ Worth reading before you debug a missing status item.
 
 ## iOS 27, iPadOS 27, and macOS 27
 
-Deck Hand compiles cleanly against the 27 SDKs and needs no source changes to
+Pixel Hand compiles cleanly against the 27 SDKs and needs no source changes to
 support them. [DeckHand/AppleOS27-Support.md](DeckHand/AppleOS27-Support.md) has
 the audit behind that claim, the config changes still outstanding, and a phased
 plan for the new capabilities worth adopting — App Intents, onscreen awareness,
@@ -219,12 +219,12 @@ Tests/             Loom package tests
 ## The Loom package
 
 This repository is a fork of [Loom](https://github.com/EthanLipnik/Loom) by Ethan
-Lipnik, the Swift package Deck Hand is built on. Loom is product-agnostic
+Lipnik, the Swift package Pixel Hand is built on. Loom is product-agnostic
 networking for Apple platforms: Bonjour discovery, direct `Network.framework`
 sessions, stable device identity, pluggable trust, overlay-network support for
 Tailscale-style setups, remote reachability, and diagnostics. It ships five
 library products — `Loom`, `LoomKit`, `LoomShell`, `LoomCloudKit`, and
-`LoomSharedRuntime`. Deck Hand uses `LoomKit`, the SwiftUI-first surface.
+`LoomSharedRuntime`. Pixel Hand uses `LoomKit`, the SwiftUI-first surface.
 
 This fork does not track upstream closely and the package here has diverged: it
 adds local-network diagnostics, a telemetry exporter, a SwiftUI diagnostics view,
@@ -240,7 +240,7 @@ swift test --scratch-path .build-local
 
 Two tests in the package (`invalidResumeOffsetIsRejected` and
 `liveSamePeerConnectionOutsideWindowIsDropped`) hang rather than fail. It is
-pre-existing and unrelated to Deck Hand, but it will stall an unattended run, so
+pre-existing and unrelated to Pixel Hand, but it will stall an unattended run, so
 filter them out in CI.
 
 If you came here for the networking library rather than this app, depend on
@@ -257,7 +257,7 @@ Upstream is also the better reference for the package itself:
 - [Architecture notes](Architecture.md)
 
 Keep the boundary in mind when contributing: transport, trust, and diagnostics
-belong in `Sources/`; anything that knows what Deck Hand is belongs in
+belong in `Sources/`; anything that knows what Pixel Hand is belongs in
 `DeckHand/`.
 
 ## License

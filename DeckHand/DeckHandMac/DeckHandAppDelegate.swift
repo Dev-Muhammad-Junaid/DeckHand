@@ -101,7 +101,7 @@ final class DeckHandAppDelegate: NSObject, NSApplicationDelegate {
                 .environmentObject(daemon)
         } else {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Deck Hand failed to start")
+                Text("Pixel Hand failed to start")
                     .font(.headline)
                 Text(daemon.fatalStartupError ?? "Unknown error")
                     .font(.caption)

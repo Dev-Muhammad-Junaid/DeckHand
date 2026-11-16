@@ -1,6 +1,6 @@
 //
 //  DeckHandCloud.swift
-//  Deck Hand – Shared
+//  Pixel Hand – Shared
 //
 //  Same-iCloud awareness + remote reachability configuration.
 //
@@ -36,7 +36,7 @@ enum DeckHandCloud {
     /// CloudKit container shared by the iOS remote and the Mac host.
     /// Must be registered in the Apple Developer portal and present in
     /// both targets' iCloud entitlements.
-    static let containerIdentifier = "iCloud.com.widgetsflow.deckhand"
+    static let containerIdentifier = "iCloud.com.widgetsflow.pixelhand"
 
     /// CloudKit configuration for the Loom container. `nil` disables
     /// same-iCloud awareness ("My Mac" badge, host auto-allow).
@@ -63,7 +63,7 @@ enum DeckHandCloud {
         // LoomRemoteSignalingConfiguration(
         //     baseURL: URL(string: "https://relay.example.com")!,
         //     appAuthentication: .init(
-        //         appID: "deckhand",
+        //         appID: "pixelhand",
         //         sharedSecret: <secret from secure storage>
         //     )
         // )

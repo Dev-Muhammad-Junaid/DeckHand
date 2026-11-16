@@ -1,6 +1,6 @@
 //
 //  CaptureMode.swift
-//  Deck Hand – Shared
+//  Pixel Hand – Shared
 //
 //  What the iPad is asking the Mac to capture. The default-tap path stays
 //  on `.fullScreen`; `.region` and `.window` flow from the long-press /

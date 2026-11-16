@@ -22,7 +22,7 @@ struct DeckHandApp: App {
         do {
             loomContainer = try LoomContainer(
                 for: LoomContainerConfiguration(
-                    serviceType: "_deckhand._tcp",
+                    serviceType: "_pixelhand._tcp",
                     serviceName: Self.deviceName(),
                     deviceIDSuiteName: "DeckHandLoomStore",
                     // Same-iCloud awareness: this device publishes its identity
@@ -76,10 +76,10 @@ private struct StartupFailureView: View {
     var body: some View {
         DeckHandEmptyState(
             glyph: PixelArt.cross,
-            title: "Deck Hand couldn't start",
+            title: "Pixel Hand couldn't start",
             message: [
                 message,
-                "Quit Deck Hand from the app switcher and open it again. If this keeps happening, reinstall the app.",
+                "Quit Pixel Hand from the app switcher and open it again. If this keeps happening, reinstall the app.",
             ]
             .compactMap { $0 }
             .joined(separator: "\n\n")

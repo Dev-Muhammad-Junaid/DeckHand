@@ -50,17 +50,17 @@ targets:
         product: Sentry
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.widgetsflow.deckhand.mac
-        # Sentry project "deckhand-mac". Paste its DSN here (Sentry → Project
+        PRODUCT_BUNDLE_IDENTIFIER: com.widgetsflow.pixelhand.mac
+        # Sentry project "pixelhand-mac". Paste its DSN here (Sentry → Project
         # Settings → Client Keys (DSN)). DSNs are designed to ship inside the
         # app, so committing it is fine. Empty = crash reporting off.
         SENTRY_DSN: ""
-        SENTRY_PROJECT: deckhand-mac
+        SENTRY_PROJECT: pixelhand-mac
         # The dSYM upload script needs network and ~/.sentryclirc.
         ENABLE_USER_SCRIPT_SANDBOXING: NO
         INFOPLIST_FILE: DeckHandMac/Info.plist
         CODE_SIGN_ENTITLEMENTS: DeckHandMac/DeckHandMac.entitlements
-        PRODUCT_NAME: Deck Hand
+        PRODUCT_NAME: Pixel Hand
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # Brand cobalt for system controls; matches DeckHandTheme.accent.
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
@@ -115,16 +115,16 @@ targets:
         product: Sentry
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.widgetsflow.deckhand
-        # Sentry project "deckhand-ios". Paste its DSN here (Sentry → Project
+        PRODUCT_BUNDLE_IDENTIFIER: com.widgetsflow.pixelhand
+        # Sentry project "pixelhand-ios". Paste its DSN here (Sentry → Project
         # Settings → Client Keys (DSN)). Empty = crash reporting off.
         SENTRY_DSN: ""
-        SENTRY_PROJECT: deckhand-ios
+        SENTRY_PROJECT: pixelhand-ios
         # The dSYM upload script needs network and ~/.sentryclirc.
         ENABLE_USER_SCRIPT_SANDBOXING: NO
         INFOPLIST_FILE: DeckHandiOS/Info.plist
         CODE_SIGN_ENTITLEMENTS: DeckHandiOS/DeckHandiOS.entitlements
-        PRODUCT_NAME: Deck Hand
+        PRODUCT_NAME: Pixel Hand
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # Brand cobalt for system controls; matches DeckHandTheme.accent.
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
@@ -185,7 +185,7 @@ targets:
         product: Sentry
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.widgetsflow.deckhand.tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.widgetsflow.pixelhand.tests
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         SWIFT_VERSION: 6.0
         # Without this the bundle has no Info.plist and code signing refuses

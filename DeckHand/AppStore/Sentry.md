@@ -19,8 +19,8 @@ files and the App Store privacy answers all assume it.
 
    | Platform | Project name (slug) | For |
    | --- | --- | --- |
-   | Apple → iOS | `deckhand-ios` | the iPhone/iPad app |
-   | Apple → macOS | `deckhand-mac` | the Mac host |
+   | Apple → iOS | `pixelhand-ios` | the iPhone/iPad app |
+   | Apple → macOS | `pixelhand-mac` | the Mac host |
 
    Separate projects keep the paid app's crash rate clean and let you set
    different alert rules. If you use different slugs, change `SENTRY_PROJECT`
@@ -33,8 +33,8 @@ files and the App Store privacy answers all assume it.
    them into `DeckHand/project.yml`:
 
    ```yaml
-   DeckHandMac:  ... SENTRY_DSN: "https://…"   # deckhand-mac's DSN
-   DeckHandiOS:  ... SENTRY_DSN: "https://…"   # deckhand-ios's DSN
+   DeckHandMac:  ... SENTRY_DSN: "https://…"   # pixelhand-mac's DSN
+   DeckHandiOS:  ... SENTRY_DSN: "https://…"   # pixelhand-ios's DSN
    ```
 
    A DSN only allows *sending* events, it's meant to ship inside the app, and

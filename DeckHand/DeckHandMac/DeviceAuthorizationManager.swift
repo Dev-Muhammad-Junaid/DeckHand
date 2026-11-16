@@ -141,7 +141,7 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
         }
 
         #if DEBUG
-        print("Deck Hand: 🔑 authorize() granting peer \(connection.peerName) on connection \(target.id); \(pendingConnections.count) other pending, \(peerPending.count) for this peer")
+        print("Pixel Hand: 🔑 authorize() granting peer \(connection.peerName) on connection \(target.id); \(pendingConnections.count) other pending, \(peerPending.count) for this peer")
         #endif
         removePendingConnection(id: target.id)
         if let handle = pendingHandles.removeValue(forKey: target.id) {
@@ -212,7 +212,7 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
 
     private func showNotification(for connection: LoomConnectionSnapshot) {
         let content = UNMutableNotificationContent()
-        content.title = "Deck Hand Connection"
+        content.title = "Pixel Hand Connection"
         content.body = "Incoming control request from \(connection.peerName). Allow access?"
         content.sound = .default
         content.categoryIdentifier = "INCOMING_CONNECTION"

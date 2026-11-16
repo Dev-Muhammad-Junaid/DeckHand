@@ -1,4 +1,4 @@
-/* Deck Hand app UI, rebuilt from the SwiftUI source (DeckHandTheme, ControlView,
+/* Pixel Hand app UI, rebuilt from the SwiftUI source (DeckHandTheme, ControlView,
    TrackpadView, MirrorThumbnailView, QuickActionsBar, StreamDeckGridView,
    PeerPickerView, ScreenshotPreviewView, MacMenuBarView).
    Every size is in SwiftUI points: {N} compiles to calc(N * var(--pt)), and each

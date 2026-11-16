@@ -111,14 +111,14 @@ final class ContextObserver {
     func performAction(id: String) {
         guard let element = buttonElementsByID[id] else {
             #if DEBUG
-            print("Deck Hand: ContextObserver ignoring stale action \(id)")
+            print("Pixel Hand: ContextObserver ignoring stale action \(id)")
             #endif
             return
         }
         let err = AXUIElementPerformAction(element, kAXPressAction as CFString)
         #if DEBUG
         if err != .success {
-            print("Deck Hand: ContextObserver AXPress failed (\(err.rawValue)) for \(id)")
+            print("Pixel Hand: ContextObserver AXPress failed (\(err.rawValue)) for \(id)")
         }
         #endif
     }
@@ -141,7 +141,7 @@ final class ContextObserver {
         }
 
         #if DEBUG
-        print("Deck Hand: ContextObserver attaching to \(app.localizedName ?? "?") [\(app.bundleIdentifier ?? "?")]")
+        print("Pixel Hand: ContextObserver attaching to \(app.localizedName ?? "?") [\(app.bundleIdentifier ?? "?")]")
         #endif
 
         detach()
@@ -155,7 +155,7 @@ final class ContextObserver {
         let createErr = AXObserverCreate(pid, ContextObserver.axCallback, &observer)
         guard createErr == .success, let observer else {
             #if DEBUG
-            print("Deck Hand: ContextObserver failed to create AXObserver for pid \(pid): \(createErr.rawValue)")
+            print("Pixel Hand: ContextObserver failed to create AXObserver for pid \(pid): \(createErr.rawValue)")
             #endif
             // We still want to at least take a snapshot of the current state,
             // even if we can't subscribe to updates.
@@ -179,7 +179,7 @@ final class ContextObserver {
             let err = AXObserverAddNotification(observer, axApp, note as CFString, refcon)
             #if DEBUG
             if err != .success && err != .notificationAlreadyRegistered {
-                print("Deck Hand: ContextObserver could not add \(note): \(err.rawValue)")
+                print("Pixel Hand: ContextObserver could not add \(note): \(err.rawValue)")
             }
             #endif
         }
@@ -245,11 +245,11 @@ final class ContextObserver {
 
     private func handleAXNotification(_ name: String, element: AXUIElement) {
         #if DEBUG
-        print("Deck Hand: ContextObserver AX notification \(name)")
+        print("Pixel Hand: ContextObserver AX notification \(name)")
         if name == "AXSheetCreated" {
             let role: String = Self.copyAttribute(element, kAXRoleAttribute) ?? "?"
             let subrole: String = Self.copyAttribute(element, kAXSubroleAttribute) ?? "-"
-            print("Deck Hand:   sheet element role=\(role) subrole=\(subrole)")
+            print("Pixel Hand:   sheet element role=\(role) subrole=\(subrole)")
             Self.dumpAXTree(element, depth: 1, limit: 3)
         }
         #endif
@@ -313,11 +313,11 @@ final class ContextObserver {
         #if DEBUG
         switch snapshot {
         case .none:
-            print("Deck Hand: ContextObserver snapshot = .none")
+            print("Pixel Hand: ContextObserver snapshot = .none")
         case .dialog(let ctx):
-            print("Deck Hand: ContextObserver snapshot = dialog '\(ctx.title ?? "?")' with \(ctx.buttons.count) button(s)")
+            print("Pixel Hand: ContextObserver snapshot = dialog '\(ctx.title ?? "?")' with \(ctx.buttons.count) button(s)")
         case .textField(let ctx):
-            print("Deck Hand: ContextObserver snapshot = textField kind=\(ctx.kind.rawValue)")
+            print("Pixel Hand: ContextObserver snapshot = textField kind=\(ctx.kind.rawValue)")
         }
         #endif
 
@@ -329,13 +329,13 @@ final class ContextObserver {
             data = try ControlMessageCoding.encoder.encode(msg)
         } catch {
             #if DEBUG
-            print("Deck Hand: ContextObserver ❌ failed to encode snapshot: \(error)")
+            print("Pixel Hand: ContextObserver ❌ failed to encode snapshot: \(error)")
             #endif
             return
         }
 
         #if DEBUG
-        print("Deck Hand: ContextObserver 📤 broadcasting \(data.count)B to \(connections.count) peer(s)")
+        print("Pixel Hand: ContextObserver 📤 broadcasting \(data.count)B to \(connections.count) peer(s)")
         #endif
 
         // Capture by value so each send task has a stable reference.
@@ -346,11 +346,11 @@ final class ContextObserver {
                 do {
                     try await handle.send(payload)
                     #if DEBUG
-                    print("Deck Hand: ContextObserver ✅ sent \(payload.count)B")
+                    print("Pixel Hand: ContextObserver ✅ sent \(payload.count)B")
                     #endif
                 } catch {
                     #if DEBUG
-                    print("Deck Hand: ContextObserver ❌ send failed: \(error)")
+                    print("Pixel Hand: ContextObserver ❌ send failed: \(error)")
                     #endif
                 }
             }
@@ -382,7 +382,7 @@ final class ContextObserver {
         //         don't grab focus in the AX sense).
         guard let focused: AXUIElement = copyAttribute(app, kAXFocusedWindowAttribute) else {
             #if DEBUG
-            print("Deck Hand: ContextObserver no focused window")
+            print("Pixel Hand: ContextObserver no focused window")
             #endif
             store([:])
             return .none
@@ -433,7 +433,7 @@ final class ContextObserver {
             if let focusedElem: AXUIElement = copyAttribute(app, kAXFocusedUIElementAttribute) {
                 if let kind = classifyField(focusedElem) {
                     #if DEBUG
-                    print("Deck Hand: ContextObserver focused field kind=\(kind.rawValue)")
+                    print("Pixel Hand: ContextObserver focused field kind=\(kind.rawValue)")
                     #endif
                     store([:])
                     return .textField(TextFieldContext(kind: kind))
@@ -441,20 +441,20 @@ final class ContextObserver {
                 #if DEBUG
                 let fRole: String = copyAttribute(focusedElem, kAXRoleAttribute) ?? "?"
                 let fSub:  String = copyAttribute(focusedElem, kAXSubroleAttribute) ?? "-"
-                print("Deck Hand: ContextObserver focused element not a field | role=\(fRole) subrole=\(fSub)")
+                print("Pixel Hand: ContextObserver focused element not a field | role=\(fRole) subrole=\(fSub)")
                 #endif
             }
 
             #if DEBUG
             let childSummary = summarizeChildren(of: focused, depth: 1, limit: 8)
-            print("Deck Hand: ContextObserver no dialog found | focused role=\(focusedRole) subrole=\(focusedSubrole) | children: \(childSummary)")
+            print("Pixel Hand: ContextObserver no dialog found | focused role=\(focusedRole) subrole=\(focusedSubrole) | children: \(childSummary)")
             #endif
             store([:])
             return .none
         }
 
         #if DEBUG
-        print("Deck Hand: ContextObserver found dialog via \(source)")
+        print("Pixel Hand: ContextObserver found dialog via \(source)")
         dumpAXTree(dialogRoot, depth: 0, limit: 4)
         #endif
 
@@ -558,7 +558,7 @@ final class ContextObserver {
         let subrole: String = copyAttribute(element, kAXSubroleAttribute) ?? "-"
         let title: String = copyAttribute(element, kAXTitleAttribute) ?? ""
         let indent = String(repeating: "  ", count: depth)
-        print("Deck Hand:   \(indent)[\(role) / \(subrole)] '\(title)'")
+        print("Pixel Hand:   \(indent)[\(role) / \(subrole)] '\(title)'")
         if let children: [AXUIElement] = copyAttribute(element, kAXChildrenAttribute) {
             for c in children.prefix(8) {
                 dumpAXTree(c, depth: depth + 1, limit: limit)

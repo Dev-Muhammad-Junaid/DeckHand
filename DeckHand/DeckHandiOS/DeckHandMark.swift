@@ -51,7 +51,7 @@ struct DeckHandMark: View {
             withAnimation(.easeOut(duration: 0.3).delay(0.35)) { raysLit = true }
         }
         .accessibilityElement()
-        .accessibilityLabel("Deck Hand")
+        .accessibilityLabel("Pixel Hand")
     }
 }
 

@@ -1,8 +1,8 @@
 //
 //  DeckHandMotion.swift
-//  Deck Hand – Shared
+//  Pixel Hand – Shared
 //
-//  The four timings Deck Hand animates with. They match the website's
+//  The four timings Pixel Hand animates with. They match the website's
 //  motion (`website/public/styles.css`: 160 ms hovers, `--ease-spring` at
 //  400 ms, `--ease-hero` at 800 ms), so the app and the site move alike.
 //

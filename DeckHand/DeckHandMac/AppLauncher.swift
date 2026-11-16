@@ -25,7 +25,7 @@ final class AppLauncher {
     func launch(bundleID: String) async -> Bool {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
             #if DEBUG
-            print("Deck Hand: ⚠️ No app URL for bundleID \(bundleID)")
+            print("Pixel Hand: ⚠️ No app URL for bundleID \(bundleID)")
             #endif
             return false
         }
@@ -37,7 +37,7 @@ final class AppLauncher {
             return true
         } catch {
             #if DEBUG
-            print("Deck Hand: ⚠️ Failed to open \(bundleID): \(error)")
+            print("Pixel Hand: ⚠️ Failed to open \(bundleID): \(error)")
             #endif
             return false
         }
@@ -72,7 +72,7 @@ final class AppLauncher {
             try? await Task.sleep(nanoseconds: 20_000_000)
         }
         #if DEBUG
-        print("Deck Hand: ⚠️ \(bundleID) never became frontmost within \(timeout)s; sending shortcut anyway")
+        print("Pixel Hand: ⚠️ \(bundleID) never became frontmost within \(timeout)s; sending shortcut anyway")
         #endif
     }
 }

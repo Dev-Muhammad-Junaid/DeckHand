@@ -1,6 +1,6 @@
 //
 //  ScrollPhase.swift
-//  Deck Hand – Shared
+//  Pixel Hand – Shared
 //
 //  Shared phase tag for `mouseScroll` so AppKit / WebKit can run their
 //  native rubber-banding + momentum animations. Without these phases the

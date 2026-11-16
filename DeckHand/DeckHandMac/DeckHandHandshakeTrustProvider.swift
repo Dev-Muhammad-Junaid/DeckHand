@@ -11,7 +11,7 @@ import Loom
 ///
 /// Loom 2.x fails closed: a trust provider that answers `.requiresApproval`
 /// denies the handshake before the device can reach `DeviceAuthorizationManager`.
-/// Deck Hand's own approval runs after the session is up and is deliberately
+/// Pixel Hand's own approval runs after the session is up and is deliberately
 /// not persisted, so the handshake only checks that the peer proved ownership
 /// of the identity key it presented. Approval still gates every command:
 /// `ControlReceiver` only observes handles that `DeviceAuthorizationManager`

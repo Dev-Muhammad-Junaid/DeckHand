@@ -16,9 +16,9 @@ enum StatusItemState: Equatable {
 
     var accessibilityDescription: String {
         switch self {
-        case .ready: "Deck Hand"
-        case .request: "Deck Hand, connection request waiting"
-        case .connected: "Deck Hand, iPad connected"
+        case .ready: "Pixel Hand"
+        case .request: "Pixel Hand, connection request waiting"
+        case .connected: "Pixel Hand, iPad connected"
         }
     }
 }

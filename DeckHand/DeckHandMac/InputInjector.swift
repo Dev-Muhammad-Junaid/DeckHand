@@ -220,7 +220,7 @@ final class InputInjector {
         let (modifiers, keyCode) = parseKeys(keys)
         guard let kc = keyCode else {
             #if DEBUG
-            print("Deck Hand: ⚠️ Unknown shortcut key in \(keys)")
+            print("Pixel Hand: ⚠️ Unknown shortcut key in \(keys)")
             #endif
             return
         }

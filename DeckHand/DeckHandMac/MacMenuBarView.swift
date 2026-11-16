@@ -46,7 +46,7 @@ struct MacMenuBarView: View {
                 }
                 .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Deck Hand")
+                    Text("Pixel Hand")
                         .font(.system(size: 14, weight: .bold))
                     // Failed-start state takes precedence: without it the
                     // header sits on "Starting…" forever after a startup
@@ -114,7 +114,7 @@ struct MacMenuBarView: View {
                     Text("Waiting for Connection Request...")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.secondary)
-                    Text("Open Deck Hand on your iPhone or iPad\nand select this Mac.")
+                    Text("Open Pixel Hand on your iPhone or iPad\nand select this Mac.")
                         .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
                         .multilineTextAlignment(.center)
@@ -173,7 +173,7 @@ struct MacMenuBarView: View {
                 ) { permissions.fixNotifications() }
 
                 if permissions.accessibility == .denied || permissions.screenRecording == .denied {
-                    Text("Enabled it but still listed as off? Development builds change identity on every rebuild — remove Deck Hand from the Settings list and add it back.")
+                    Text("Enabled it but still listed as off? Development builds change identity on every rebuild — remove Pixel Hand from the Settings list and add it back.")
                         .font(.system(size: 9))
                         .foregroundStyle(.tertiary)
                         .padding(.horizontal, 16)
@@ -204,7 +204,7 @@ struct MacMenuBarView: View {
                         DeckHandDiagnostics.setEnabled(enabled)
                     }
                 Spacer()
-                Button("Quit Deck Hand") { NSApplication.shared.terminate(nil) }
+                Button("Quit Pixel Hand") { NSApplication.shared.terminate(nil) }
                     .font(.system(size: 12))
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
@@ -216,7 +216,7 @@ struct MacMenuBarView: View {
         .background(.regularMaterial)
     }
 
-    /// Resolves iPhone vs iPad (etc.) from the live peer list; Deck Hand remote is iOS-only so unknown falls back to phone.
+    /// Resolves iPhone vs iPad (etc.) from the live peer list; Pixel Hand remote is iOS-only so unknown falls back to phone.
     private func deviceSystemImage(for connection: LoomConnectionSnapshot) -> String {
         guard let peer = peers.first(where: { $0.id == connection.peerID }) else {
             return DeviceType.iPhone.systemImage

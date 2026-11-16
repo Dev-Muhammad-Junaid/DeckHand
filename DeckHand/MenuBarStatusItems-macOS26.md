@@ -1,7 +1,7 @@
 # Menu bar status items on macOS 26
 
 Field notes from debugging "the menu bar icon never appears" on the
-Deck Hand Mac host. The conclusion is unintuitive enough, and cost enough
+Pixel Hand Mac host. The conclusion is unintuitive enough, and cost enough
 time, that it is worth writing down: **the bug was never in our code.**
 
 Environment where this was reproduced and confirmed:
@@ -113,8 +113,8 @@ the new bundle ID too.
 
 This app's `com.miragecontrol.*` identifiers were poisoned during the
 investigation. The rename to `com.deckhand.*` gave both targets clean
-identifiers. Those were later replaced for release by `com.widgetsflow.deckhand`
-(iOS) and `com.widgetsflow.deckhand.mac` (Mac), which start out clean too, and
+identifiers. Those were later replaced for release by `com.widgetsflow.pixelhand`
+(iOS) and `com.widgetsflow.pixelhand.mac` (Mac), which start out clean too, and
 are the ones that need to stay that way: launch the Mac build through
 LaunchServices from its very first run.
 

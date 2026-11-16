@@ -67,7 +67,7 @@ final class ControlReceiver {
     func cancelConsumption(connectionID: UUID) {
         guard let task = connectionTasks[connectionID] else { return }
         #if DEBUG
-        print("Deck Hand: 🛑 cancelling consumption for \(connectionID) (revoked or liveness timeout)")
+        print("Pixel Hand: 🛑 cancelling consumption for \(connectionID) (revoked or liveness timeout)")
         #endif
         task.cancel()
     }
@@ -120,7 +120,7 @@ final class ControlReceiver {
                 message = try ControlMessageCoding.decoder.decode(ControlMessage.self, from: data)
             } catch {
                 #if DEBUG
-                print("Deck Hand: ⚠️ Failed to decode ControlMessage (\(data.count)B): \(error)")
+                print("Pixel Hand: ⚠️ Failed to decode ControlMessage (\(data.count)B): \(error)")
                 #endif
                 continue
             }
@@ -327,7 +327,7 @@ final class ControlReceiver {
             try await handle.send(.screenshotData(requestID: requestID, data: payload))
         } catch ScreenCaptureService.CaptureError.permissionDenied {
             await sendError(requestID: requestID, to: handle,
-                            message: "Screen Recording permission required. Please allow Deck Hand in System Settings > Privacy & Security > Screen Recording, then try again.")
+                            message: "Screen Recording permission required. Please allow Pixel Hand in System Settings > Privacy & Security > Screen Recording, then try again.")
         } catch ScreenCaptureService.CaptureError.noDisplay {
             await sendError(requestID: requestID, to: handle, message: "Display capture failed. No displays found.")
         } catch ScreenCaptureService.CaptureError.windowNotFound {

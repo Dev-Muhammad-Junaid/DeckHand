@@ -1,6 +1,6 @@
 //
 //  LoomConnectionHandle+ControlMessage.swift
-//  Deck Hand – Shared
+//  Pixel Hand – Shared
 //
 //  Single canonical path for shipping a `ControlMessage` over a Loom
 //  connection. Centralizing this here prevents the iOS and Mac sides from
@@ -28,7 +28,7 @@ public enum ControlMessageCoding {
 }
 
 public extension LoomConnectionHandle {
-    /// Encodes `message` with the shared Deck Hand encoder and ships it
+    /// Encodes `message` with the shared Pixel Hand encoder and ships it
     /// on the default LoomKit message stream.
     ///
     /// Always prefer this over the generic `send<T: Encodable>` overload —

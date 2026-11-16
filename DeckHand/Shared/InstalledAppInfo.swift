@@ -1,6 +1,6 @@
 //
 //  InstalledAppInfo.swift
-//  Deck Hand – Shared
+//  Pixel Hand – Shared
 //
 
 import Foundation

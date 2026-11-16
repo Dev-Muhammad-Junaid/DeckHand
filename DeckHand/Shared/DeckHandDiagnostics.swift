@@ -1,6 +1,6 @@
 //
 //  DeckHandDiagnostics.swift
-//  Deck Hand – Shared
+//  Pixel Hand – Shared
 //
 //  Crash and performance reporting through Sentry, shared by both apps.
 //
@@ -14,7 +14,7 @@
 //     device and host names Sentry could otherwise pick up — those are
 //     usually the owner's name ("Junaid's iPad").
 //   • No user content: no screenshots, no view hierarchy, no session
-//     replay. Deck Hand shows the Mac's screen, so any of those would ship
+//     replay. Pixel Hand shows the Mac's screen, so any of those would ship
 //     the user's screen contents.
 //   • The DSN comes from the `SentryDSN` Info.plist key, which is filled in
 //     from the `SENTRY_DSN` build setting in project.yml. An empty DSN
@@ -91,7 +91,7 @@ enum DeckHandDiagnostics {
             options.sessionReplay.sessionSampleRate = 0
             options.sessionReplay.onErrorSampleRate = 0
             #endif
-            // Deck Hand makes no HTTP requests of its own; the only ones
+            // Pixel Hand makes no HTTP requests of its own; the only ones
             // would be Sentry's and CloudKit's.
             options.enableNetworkBreadcrumbs = false
             options.beforeSend = { event in scrub(event) }

@@ -1,6 +1,6 @@
 //
 //  DisplayInfo.swift
-//  Deck Hand – Shared
+//  Pixel Hand – Shared
 //
 //  Physical displays the live mirror can target, plus the Space-switch
 //  directions the PIP chrome can ask the host to perform. Spaces themselves

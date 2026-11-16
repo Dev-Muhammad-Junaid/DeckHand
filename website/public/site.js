@@ -296,7 +296,7 @@
     var label = button.textContent;
     function say(text, isError) { msg.textContent = text; msg.classList.toggle('is-error', !!isError); }
     function done(text) { form.classList.add('is-done'); say(text); }
-    if (joined) done('You’re on the list. We’ll email you when Deck Hand is ready.');
+    if (joined) done('You’re on the list. We’ll email you when Pixel Hand is ready.');
 
     form.addEventListener('submit', function (event) {
       event.preventDefault();
@@ -322,7 +322,7 @@
       }).then(function (body) {
         if (body.ok) {
           try { localStorage.setItem(JOINED_KEY, '1'); } catch (e) {}
-          done(body.already ? 'You’re already on the list. We’ll be in touch.' : 'You’re on the list. We’ll email you when Deck Hand is ready.');
+          done(body.already ? 'You’re already on the list. We’ll be in touch.' : 'You’re on the list. We’ll email you when Pixel Hand is ready.');
         } else if (body.error === 'invalid_email') {
           say('That email doesn’t look right. Check it and try again.', true);
         } else {

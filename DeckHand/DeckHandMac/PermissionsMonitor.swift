@@ -111,7 +111,7 @@ final class PermissionsMonitor: ObservableObject {
     /// deep-links straight to this app's row, where the Allow Notifications
     /// switch lives even after a prior denial.
     private func openNotificationSettings() {
-        let bundleID = Bundle.main.bundleIdentifier ?? "com.widgetsflow.deckhand.mac"
+        let bundleID = Bundle.main.bundleIdentifier ?? "com.widgetsflow.pixelhand.mac"
         guard let url = URL(
             string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(bundleID)"
         ) else { return }

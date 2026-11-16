@@ -1,7 +1,7 @@
 #!/usr/bin/env swift
 //
 //  make-app-icons.swift
-//  Deck Hand
+//  Pixel Hand
 //
 //  Regenerates both AppIcon asset catalogs from a single square master image.
 //

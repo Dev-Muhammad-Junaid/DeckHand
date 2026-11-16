@@ -1,6 +1,6 @@
-# Deck Hand website
+# Pixel Hand website
 
-The marketing site for Deck Hand, with a waitlist. Static files plus one
+The marketing site for Pixel Hand, with a waitlist. Static files plus one
 Cloudflare Pages Function.
 
 ```
@@ -33,9 +33,9 @@ locally with `cd website && npx wrangler pages dev public --kv WAITLIST`.
    - **Build output directory: `public`**
    - Production branch: `main`
 3. Create the waitlist store: **Workers & Pages → KV → Create namespace**,
-   name it `deckhand-waitlist`.
+   name it `pixelhand-waitlist`.
 4. In the Pages project, **Settings → Bindings → Add → KV namespace**:
-   variable name **`WAITLIST`**, namespace `deckhand-waitlist`. Add it for
+   variable name **`WAITLIST`**, namespace `pixelhand-waitlist`. Add it for
    Production (and Preview if you want previews to collect test signups).
 5. Redeploy. The site is live at `<project>.pages.dev`.
 6. When you have a domain, add it under **Custom domains**, then in

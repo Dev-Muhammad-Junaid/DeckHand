@@ -1,6 +1,6 @@
 //
 //  DeckHandTheme.swift
-//  Deck Hand – Shared
+//  Pixel Hand – Shared
 //
 
 import SwiftUI
@@ -71,7 +71,7 @@ extension Color {
     }
 }
 
-// MARK: - Deck Hand design tokens
+// MARK: - Pixel Hand design tokens
 
 /// Every brand color comes from a part of the app icon: a cobalt tile, a
 /// navy screen, and a pointing hand drawn in lit dots. The roles are fixed so

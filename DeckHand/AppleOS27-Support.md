@@ -1,4 +1,4 @@
-# Deck Hand on iOS 27, iPadOS 27, and macOS 27
+# Pixel Hand on iOS 27, iPadOS 27, and macOS 27
 
 Status: research and plan. No adoption work has been implemented.
 
@@ -7,7 +7,7 @@ Status: research and plan. No adoption work has been implemented.
 Verified on 16 September 2026, after the Xcode install was repaired:
 
 - ✅ Xcode 27 is healthy — simulator runtimes and `devicectl` enumerate correctly.
-- ✅ Deck Hand compiles against the macOS 27 SDK under Swift 6.4 with zero
+- ✅ Pixel Hand compiles against the macOS 27 SDK under Swift 6.4 with zero
   warnings from its own sources.
 - ✅ **12/12 contract tests pass** under Xcode 27 / Swift 6.4.
 - ❌ **Signed builds are blocked on the developer account, not on code.**
@@ -15,21 +15,21 @@ Verified on 16 September 2026, after the Xcode install was repaired:
   account 'socialmedia@learn4d365.com'. The login details ... were rejected`,
   followed by `No profiles for 'com.deckhand.mac' were found`. Re-authenticate
   the Apple Developer account in Xcode → Settings → Accounts. (The bundle IDs
-  have since moved to `com.widgetsflow.deckhand` and
-  `com.widgetsflow.deckhand.mac`; the quoted errors use the old ones.) Nothing can be
+  have since moved to `com.widgetsflow.pixelhand` and
+  `com.widgetsflow.pixelhand.mac`; the quoted errors use the old ones.) Nothing can be
   installed on a device or shipped until this is cleared.
 - ❌ **No iOS 27 simulator runtime installed** — only iOS 18.5 and 26.5. Install
   it before claiming anything about iOS 27 behavior.
 
 Do those two things, then run the Phase 0 functional check below. The single most
-important unknown is not whether Deck Hand *builds* on 27 — it does — but whether
+important unknown is not whether Pixel Hand *builds* on 27 — it does — but whether
 Accessibility input injection and AX menu reading still *behave* on 27. That is
 the app's foundation and it is untested. See open question 2.
 
 iOS 27, iPadOS 27, and macOS 27 "Golden Gate" shipped on 14 September 2026. This
 document covers two separate questions that are easy to conflate:
 
-1. **Support** — what Deck Hand must do to keep working, and to build and ship
+1. **Support** — what Pixel Hand must do to keep working, and to build and ship
    against the 27 SDKs. Mostly small, and less than expected.
 2. **Adoption** — which new capabilities are worth taking, in what order, and
    what each one actually costs. This is where the interesting work is.
@@ -48,12 +48,12 @@ behaves.
 | Host OS | macOS 27.0, build 26A428 |
 | Toolchain | Xcode 27.0 (27A266a), Swift 6.4 |
 | macOS SDK in use | `MacOSX27.0.sdk` |
-| Deck Hand deployment targets | macOS 14.0, iOS 17.4 |
+| Pixel Hand deployment targets | macOS 14.0, iOS 17.4 |
 | Loom package platforms | macOS 14, iOS 17.4, visionOS 2 |
 
-**Deck Hand already compiles cleanly against the macOS 27 SDK under Swift 6.4.**
+**Pixel Hand already compiles cleanly against the macOS 27 SDK under Swift 6.4.**
 A full `DeckHandMac` build with signing disabled succeeds with zero errors and
-zero warnings from Deck Hand's own sources. The only Swift warning in the entire
+zero warnings from Pixel Hand's own sources. The only Swift warning in the entire
 build comes from the vendored Loom package:
 
 ```
@@ -67,7 +67,7 @@ project for us. It is a config-and-opportunity project.
 ### Two environment problems that look like code problems
 
 A normal `xcodebuild` of either target currently fails, and neither failure is
-Deck Hand's fault. Both are worth writing down because both will waste an
+Pixel Hand's fault. Both are worth writing down because both will waste an
 afternoon otherwise.
 
 **Signing.** Both targets fail with `No profiles for 'com.deckhand.mac' were
@@ -97,17 +97,17 @@ before drawing conclusions, and re-run the build to confirm.
 ### 1.1 Nothing about the deployment floor has to move
 
 Building against the 27 SDK does not require raising the deployment target.
-Deck Hand can keep macOS 14 / iOS 17.4 and gate every new API behind
+Pixel Hand can keep macOS 14 / iOS 17.4 and gate every new API behind
 `if #available`. Adopting anything in Part 2 needs availability checks, not a
 floor bump, unless we decide otherwise deliberately.
 
 ### 1.2 The hard requirements when linking against the 27 SDK — audited
 
 Apple gates roughly a dozen behavior changes on "built with the 27.0 SDK." I
-audited Deck Hand against each one that could plausibly apply. Verified by
+audited Pixel Hand against each one that could plausibly apply. Verified by
 grep across `DeckHand/`:
 
-| Requirement | Deck Hand today | Action |
+| Requirement | Pixel Hand today | Action |
 | --- | --- | --- |
 | Scene-based life cycle is **mandatory** — apps built with the iOS 27 SDK that use the old app life cycle **fail to launch** | Already scene-based; SwiftUI `App` + `WindowGroup` | None |
 | Launch screen key **required** or the App Store rejects the build | `DeckHandiOS/Info.plist` already has one | None |
@@ -120,7 +120,7 @@ grep across `DeckHand/`:
 | `FileDocument` / `ReferenceFileDocument` deprecated | Not used | None |
 | `-ld_classic` ignored, `-ld64` now fails to link | No custom `OTHER_LDFLAGS` | None |
 
-Deck Hand is unusually clean here, mostly because it is a young SwiftUI codebase.
+Pixel Hand is unusually clean here, mostly because it is a young SwiftUI codebase.
 
 Two that need a real look rather than a grep:
 
@@ -130,7 +130,7 @@ Two that need a real look rather than a grep:
   nothing. The override differs per framework, which is the trap: AppKit and
   UIKit use `preferredImageVisibility` (`.automatic` / `.visible` / `.hidden`),
   **SwiftUI does not have that property** and uses `labelStyle(.titleAndIcon)`
-  instead. Deck Hand's menu bar UI is a SwiftUI popover rather than an `NSMenu`,
+  instead. Pixel Hand's menu bar UI is a SwiftUI popover rather than an `NSMenu`,
   so this may not bite at all, but `MacMenuBarView` uses `Label(_:systemImage:)`
   and needs a visual check on 27. *Unverified.*
 - **`@State` is now a Swift macro** in Xcode 27, back-deployed to iOS 17. Largely
@@ -143,7 +143,7 @@ Two that need a real look rather than a grep:
 
 ### 1.3 macOS 27 is Apple Silicon only
 
-Golden Gate drops Intel. This does not break Deck Hand — our host still targets
+Golden Gate drops Intel. This does not break Pixel Hand — our host still targets
 macOS 14 and runs on Intel — but it changes who can be on 27. Any feature we gate
 behind macOS 27 is implicitly Apple Silicon only, which conveniently is also what
 Core AI and the on-device models require.
@@ -163,7 +163,7 @@ Core AI and the on-device models require.
 
 These apply on a 27 device regardless of which SDK we built with:
 
-- **Stricter TLS** for MDM, enrollment, and software-update traffic. Deck Hand
+- **Stricter TLS** for MDM, enrollment, and software-update traffic. Pixel Hand
   does none of these, so this is almost certainly irrelevant — noted so it is not
   mistaken for a Loom transport issue.
 - **A Neural Engine background restriction with an associated entitlement.**
@@ -172,11 +172,11 @@ These apply on a 27 device regardless of which SDK we built with:
 
 ---
 
-## Part 2 — What the 27 releases offer Deck Hand
+## Part 2 — What the 27 releases offer Pixel Hand
 
 Ordered by value to this specific app, not by how much Apple talked about them.
 
-### 2.1 Expose Deck Hand's own actions as App Intents — highest value, lowest risk
+### 2.1 Expose Pixel Hand's own actions as App Intents — highest value, lowest risk
 
 **There is no separate "new Siri API" to adopt.** Siri AI is the headline feature
 of the 27 releases, but the developer surface for it is App Intents — the same
@@ -186,7 +186,7 @@ and "adopt App Intents" are the same project, and one set of intents lights up
 every one of those surfaces at once. It is also the entry point for Visual
 Intelligence (2.4). That breadth is why this is first.
 
-For Deck Hand this means things like "connect to my Mac", "capture my Mac's
+For Pixel Hand this means things like "connect to my Mac", "capture my Mac's
 screen", "start the mirror", "run this shortcut on the Mac", "lock my Mac" become
 available from Spotlight, the iPad menu bar, a widget, a Control Center control,
 or by voice — without opening the app and driving the trackpad.
@@ -195,7 +195,7 @@ Concretely worth adopting:
 
 - `AppIntent` conformances for the top actions, grouped in an
   `AppShortcutsProvider` so they work the moment the app is installed.
-- `AppEntity` for the things Deck Hand already models — a paired Mac, a running
+- `AppEntity` for the things Pixel Hand already models — a paired Mac, a running
   app, a window, a capture.
 - **Widgets are customizable through App Intents** in the 27 releases, which is
   the cheapest way to ship a home-screen "capture my Mac" button.
@@ -220,7 +220,7 @@ to structured entities the system understands, so Siri can resolve "this" and
 - Menus in iOS 27 automatically show an **Ask Siri** button when there is
   content relevant to Siri.
 
-For Deck Hand this is unusually well matched: the remote is a grid of Mac apps, a
+For Pixel Hand this is unusually well matched: the remote is a grid of Mac apps, a
 list of Mac windows, and a live mirror. Annotate the app grid and the window
 picker and "close that window" or "switch to that one" becomes tractable through
 the system rather than through our own command parsing.
@@ -239,7 +239,7 @@ Intents are exposed to Siri, Spotlight, Shortcuts, and Widgets — not to arbitr
 third-party callers. Everything that appears to do this in the wild goes through
 private WorkflowKit classes, `DYLD_INSERT_LIBRARIES` injection into
 `/usr/bin/shortcuts`, or requires SIP and AMFI disabled. None of that is
-shippable, and it should not go in Deck Hand.
+shippable, and it should not go in Pixel Hand.
 
 What *is* sanctioned, and genuinely useful:
 
@@ -270,9 +270,9 @@ publicly it changes this section completely. Do not plan around it yet.
 ### 2.4 Foundation Models and image understanding
 
 The 27 release of Foundation Models is substantial, and several pieces map onto
-things Deck Hand already does badly or not at all:
+things Pixel Hand already does badly or not at all:
 
-- **`OCRTool`**, a Vision-backed built-in tool. Deck Hand already runs Vision OCR
+- **`OCRTool`**, a Vision-backed built-in tool. Pixel Hand already runs Vision OCR
   on captures in `OCRResultView`. Routing that through a model session upgrades
   it from "here is the text" to "answer questions about what is on my Mac's
   screen."
@@ -335,7 +335,7 @@ enough for video frames); **Foundation Models for open-ended descriptive
 reasoning**; and when you need both, **call a Vision tool from inside a model
 session**.
 
-**The argument for doing this in Deck Hand is not novelty, it is coverage.** The
+**The argument for doing this in Pixel Hand is not novelty, it is coverage.** The
 app's context features — dialog buttons in the Quick Actions bar, per-app menu
 shortcuts — are built on Accessibility, and AX is excellent for native AppKit
 apps and patchy to useless for Electron apps and custom-rendered content. That
@@ -370,7 +370,7 @@ and a distance threshold does on-device similarity matching. Notably it works on
 **macOS with screenshots** rather than only camera input, and Apple flags that Mac
 pixel buffers are much larger and may need resizing.
 
-This is a lower priority for Deck Hand — we are not a content-search app — but it
+This is a lower priority for Pixel Hand — we are not a content-search app — but it
 is another reason App Intents comes first: it is the entry point for Siri, Siri
 AI, Spotlight, Widgets, Shortcuts, *and* Visual Intelligence.
 
@@ -386,7 +386,7 @@ research bet, not a feature. Park it behind 2.4.
 
 Directly relevant to the mirror and capture paths:
 
-- **`SCRecordingOutput`** writes screen and audio straight to a file. Deck Hand
+- **`SCRecordingOutput`** writes screen and audio straight to a file. Pixel Hand
   could record a Mac session from the iPad without us building an encoder — we
   currently ship JPEG frames and have no recording feature at all.
 - **HDR capture** via `captureDynamicRange` (`hdrLocalDisplay` /
@@ -415,7 +415,7 @@ budget before it goes anywhere near the default.
 ### 2.7 macOS 27 external display modes
 
 macOS 27 adds broader support for external display modes and HDR throughout the
-system UI. Deck Hand already has multi-display pointer handling, and the mirror
+system UI. Pixel Hand already has multi-display pointer handling, and the mirror
 picks a display. Worth re-testing capture and coordinate mapping against the new
 display modes — coordinate translation across displays with different scales is
 already the fiddliest part of input injection, and this is exactly the kind of
@@ -441,7 +441,7 @@ urgent. What is available:
 **The catch, and it is a big one:** Apple's Wi-Fi Aware documentation lists
 iOS 26+, iPadOS 26+, and Mac Catalyst 26+ — **not native macOS**. If that is
 accurate, Wi-Fi Aware cannot carry a Mac-host-to-iPad connection at all, and this
-entire avenue is dead for Deck Hand's topology. It also requires the
+entire avenue is dead for Pixel Hand's topology. It also requires the
 `com.apple.developer.wifi-aware` entitlement, declared services in `Info.plist`,
 and explicit pairing via `DeviceDiscoveryUI` or `AccessorySetupKit`.
 

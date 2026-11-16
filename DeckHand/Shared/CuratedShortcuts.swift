@@ -1,6 +1,6 @@
 //
 //  CuratedShortcuts.swift
-//  Deck Hand – Shared
+//  Pixel Hand – Shared
 //
 //  Built-in preset bindings so the user has a useful deck the moment they
 //  connect for the first time. IDs are deterministic (`curated.<bundleID>.<slug>`)

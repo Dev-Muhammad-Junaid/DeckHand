@@ -1,8 +1,8 @@
 //
 //  DeckHandLog.swift
-//  Deck Hand – Shared
+//  Pixel Hand – Shared
 //
-//  Thin wrapper over Apple's unified `Logger` so Deck Hand messages
+//  Thin wrapper over Apple's unified `Logger` so Pixel Hand messages
 //  flow into Console.app and the Xcode debug console under a stable
 //  subsystem. We intentionally do NOT route through `LoomLogger` for app
 //  messages: that path is category-gated by Loom's `LOOM_LOG` env var and
@@ -18,7 +18,7 @@ import Foundation
 import os
 
 enum DeckHandLog {
-    static let subsystem: String = "com.widgetsflow.deckhand"
+    static let subsystem: String = "com.widgetsflow.pixelhand"
 
     static let app = Logger(subsystem: subsystem, category: "app")
     static let connection = Logger(subsystem: subsystem, category: "connection")

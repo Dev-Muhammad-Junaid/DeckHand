@@ -1,6 +1,6 @@
 //
 //  PixelArt.swift
-//  Deck Hand – Shared
+//  Pixel Hand – Shared
 //
 //  The dot-matrix artwork from the app icon: the pointing hand drawn in lit
 //  dots, the approval check and cross, and the small glyphs used for empty

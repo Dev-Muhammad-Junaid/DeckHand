@@ -1,31 +1,29 @@
 # App Store listing (draft)
 
-For the iPhone/iPad app `com.widgetsflow.deckhand`. Limits are App Store
+For the iPhone/iPad app `com.widgetsflow.pixelhand`. Limits are App Store
 Connect's: name and subtitle 30 characters, keywords 100, promotional text 170,
 description 4,000.
 
-## Name: **Deck Hand: Remote for Mac** (25)
+## Name: **Pixel Hand: Remote for Mac** (26)
 
 Why this form:
 
-- About ten US apps already use "Deckhand". The closest are **DeckHand for
-  CyberDeck** (also an iPad control surface) and **Deckhand: Server Agent**.
-  A bare "Deckhand" would be hard to find and easy to confuse with them. The
-  space ("Deck Hand") matches our own branding and the descriptor does the
-  real work.
+- The app was called Deck Hand until November 2026. About ten US apps
+  already used "Deckhand" (among them **DeckHand for CyberDeck**, also an
+  iPad control surface), and the registered US mark **DECKHAND** (Reg.
+  6629861, class 9) was close. The owner chose **Pixel Hand** instead: the App
+  Store had no apps called Pixel Hand or Pixelhand when it was checked, and
+  the name fits the icon's dot-matrix hand.
 - "Remote for Mac" follows Apple's own guidance on its trademarks: say an app
   works *with* an Apple product ("for Mac") rather than making "Mac" part of
-  the product's name. "Deck Hand – Mac Remote" (22) reads more like a product
+  the product's name. "Pixel Hand – Mac Remote" (23) reads more like a product
   called "Mac Remote" and is likelier to draw a guideline 5.2.5 question at
   review. If you still prefer it, it fits.
-- The registered US mark **DECKHAND** (Reg. 6629861, Real Time Data Pty,
-  classes 9 and 42, fishing-logbook software) is for unrelated goods, and the
-  descriptor helps tell the products apart. But class 9 covers downloadable
-  software in general, so it isn't automatically clear. A one-hour
-  clearance opinion from a trademark attorney before launch is cheap
-  insurance. This isn't legal advice.
+- A trademark search for "Pixel Hand" hasn't been done. A one-hour clearance
+  opinion from a trademark attorney before launch is cheap insurance. This
+  isn't legal advice.
 
-Home-screen name stays **Deck Hand** (`CFBundleDisplayName`); only the store
+Home-screen name stays **Pixel Hand** (`CFBundleDisplayName`); only the store
 name carries the descriptor.
 
 ## Subtitle: **Trackpad, mirror & shortcuts** (28)
@@ -38,7 +36,7 @@ Alternative: "Trackpad and screen for Mac" (27).
 trackpad,mouse,keyboard,touchpad,mirror,screen,shortcuts,launcher,presenter,wireless,cursor,desktop
 ```
 
-Notes: commas only, no spaces. Words already in the name or subtitle ("deck",
+Notes: commas only, no spaces. Words already in the name or subtitle ("pixel",
 "hand", "remote", "mac") are indexed already, so they aren't repeated. No
 competitor names or trademarks (Apple's own included: no "MacBook", "iMac",
 "Keynote"; and no "Stream Deck"). Once live, check search rankings after two
@@ -51,10 +49,10 @@ weeks in App Store Connect → Analytics and swap the weakest words.
 
 ## Description
 
-> Deck Hand turns your iPhone or iPad into a control surface for your Mac.
+> Pixel Hand turns your iPhone or iPad into a control surface for your Mac.
 >
 > Sit back from your desk, present from across the room, or keep a second
-> screen of controls beside your keyboard. Deck Hand connects straight to your
+> screen of controls beside your keyboard. Pixel Hand connects straight to your
 > Mac over your local network, with no account and no cloud service in the
 > middle.
 >
@@ -68,7 +66,7 @@ weeks in App Store Connect → Analytics and swap the weakest words.
 > full screen and it gets sharper as it grows.
 >
 > **Shortcuts that know the app you're in**
-> Deck Hand reads the menus of the app in front on your Mac and gives you its
+> Pixel Hand reads the menus of the app in front on your Mac and gives you its
 > real shortcuts as one-tap chips. When a dialog opens, its buttons appear on
 > your iPad too, so "Don't Save, Cancel, Save" is a tap away.
 >
@@ -85,7 +83,7 @@ weeks in App Store Connect → Analytics and swap the weakest words.
 > new connection has to be approved on the Mac. Devices on the same iCloud
 > account recognise each other.
 >
-> **Requires the free Deck Hand app for Mac**
+> **Requires the free Pixel Hand app for Mac**
 > Download it from <site URL> *[replace]*. Needs macOS 14
 > or later. Your iPhone or iPad and Mac need to be on the same network.
 
@@ -115,8 +113,8 @@ switched off, drop the last sentence of "Private by design").
 
 ## App Review notes
 
-> Deck Hand is a remote control for a Mac. The iPhone/iPad app does nothing on
-> its own: it needs the free companion Mac app, Deck Hand for Mac, running on
+> Pixel Hand is a remote control for a Mac. The iPhone/iPad app does nothing on
+> its own: it needs the free companion Mac app, Pixel Hand for Mac, running on
 > a Mac on the same Wi-Fi network.
 >
 > The Mac app is distributed outside the Mac App Store as a free, notarized
@@ -127,10 +125,10 @@ switched off, drop the last sentence of "Private by design").
 > the App Store.
 >
 > To test:
-> 1. On a Mac with macOS 14 or later, download and open Deck Hand for Mac. It
+> 1. On a Mac with macOS 14 or later, download and open Pixel Hand for Mac. It
 >    appears in the menu bar. Grant Accessibility and Screen Recording when
 >    the menu-bar panel asks (System Settings → Privacy & Security).
-> 2. Put the iPhone/iPad on the same Wi-Fi network, open Deck Hand and allow
+> 2. Put the iPhone/iPad on the same Wi-Fi network, open Pixel Hand and allow
 >    Local Network access.
 > 3. Tap the Mac in the list, then click Allow on the Mac (every new device
 >    must be approved there).

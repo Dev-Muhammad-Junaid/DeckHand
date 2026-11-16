@@ -36,7 +36,7 @@ final class MacDaemon: ObservableObject {
         do {
             built = try LoomContainer(
                 for: LoomContainerConfiguration(
-                    serviceType: "_deckhand._tcp",
+                    serviceType: "_pixelhand._tcp",
                     serviceName: Self.computerName(),
                     deviceIDSuiteName: "DeckHandLoomStore",
                     // Same-iCloud awareness: publishes this Mac's identity
@@ -107,7 +107,7 @@ final class MacDaemon: ObservableObject {
                 if DeckHandCloud.remoteSignalingConfiguration != nil {
                     do {
                         let deviceID = LoomSharedDeviceID.getOrCreate(suiteName: "DeckHandLoomStore")
-                        let sessionID = "deckhand-\(deviceID.uuidString)"
+                        let sessionID = "pixelhand-\(deviceID.uuidString)"
                         try await context.publishRemoteReachability(sessionID: sessionID)
                         DeckHandLog.app.info("Published remote reachability")
                     } catch {

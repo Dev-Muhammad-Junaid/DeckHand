@@ -99,7 +99,7 @@ struct PeerPickerView: View {
             DeckHandMark(size: 132)
 
             VStack(spacing: 8) {
-                Text("Deck Hand")
+                Text("Pixel Hand")
                     .font(.system(size: 34, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
                 Text(peers.isEmpty ? "Looking for your Mac" : "Choose a Mac to control")
@@ -146,7 +146,7 @@ struct PeerPickerView: View {
     private var searchingState: some View {
         VStack(spacing: 16) {
             DotScan()
-            Text("Make sure Deck Hand is open on your Mac")
+            Text("Make sure Pixel Hand is open on your Mac")
                 .font(.system(size: 14, weight: .regular, design: .rounded))
                 .foregroundStyle(.white.opacity(0.42))
                 .multilineTextAlignment(.center)

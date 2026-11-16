@@ -112,7 +112,7 @@ struct OnboardingPage: Identifiable {
     static let all: [OnboardingPage] = [
         OnboardingPage(
             symbol: nil,
-            title: "Deck Hand",
+            title: "Pixel Hand",
             body: "Your iPad becomes a trackpad, a second view of your Mac, and a capture tool — over your own Wi-Fi, with nothing in between.",
             bullets: []
         ),
@@ -149,10 +149,10 @@ struct OnboardingPage: Identifiable {
         OnboardingPage(
             symbol: "wifi",
             title: "One thing on the Mac",
-            body: "Open Deck Hand on your Mac and keep both devices on the same Wi-Fi. The first time you connect, the Mac asks you to approve this iPad.",
+            body: "Open Pixel Hand on your Mac and keep both devices on the same Wi-Fi. The first time you connect, the Mac asks you to approve this iPad.",
             bullets: [
                 "Same Wi-Fi network",
-                "Deck Hand running on the Mac",
+                "Pixel Hand running on the Mac",
                 "Approve the iPad once",
             ]
         ),

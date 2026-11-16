@@ -1,5 +1,5 @@
 """A macOS desktop (1440x900 points) with an Xcode-style editor showing real
-Deck Hand code (from DeckHand/Shared/ControlMessage.swift), and a macOS save
+Pixel Hand code (from DeckHand/Shared/ControlMessage.swift), and a macOS save
 alert. Sizes are written as <N> mac points."""
 import re, html
 
