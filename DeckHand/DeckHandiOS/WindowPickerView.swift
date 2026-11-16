@@ -42,9 +42,7 @@ struct WindowPickerView: View {
         // Build a rank table from `runningBundleIDs`. Lower index = more
         // recent. Bundles not present rank at `Int.max` so they sort to
         // the end, keeping a stable secondary order by app name + title.
-        let rankByBundle: [String: Int] = Dictionary(
-            uniqueKeysWithValues: runningBundleIDs.enumerated().map { ($1, $0) }
-        )
+        let rankByBundle = InstalledAppInfo.recencyRank(of: runningBundleIDs)
         return windows.sorted { lhs, rhs in
             let lRank = lhs.bundleID.flatMap { rankByBundle[$0] } ?? .max
             let rRank = rhs.bundleID.flatMap { rankByBundle[$0] } ?? .max

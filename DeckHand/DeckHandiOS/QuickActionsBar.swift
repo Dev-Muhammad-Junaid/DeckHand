@@ -92,7 +92,7 @@ struct QuickActionsBar: View {
     /// Running apps the user can switch to, excluding whichever one is already
     /// frontmost. Resolved against `installedApps` so we have icons + names.
     private var otherRunningApps: [InstalledAppInfo] {
-        let lookup = Dictionary(uniqueKeysWithValues: installedApps.map { ($0.bundleID, $0) })
+        let lookup = InstalledAppInfo.byBundleID(installedApps)
         return runningBundleIDs.compactMap { bundleID -> InstalledAppInfo? in
             guard bundleID != activeBundleID else { return nil }
             return lookup[bundleID]
