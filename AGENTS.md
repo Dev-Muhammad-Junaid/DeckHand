@@ -12,7 +12,7 @@
 
 There is also a C target `CLoomShellSupport` used by `LoomShell` for PTY support.
 
-Keep public API surface in `Public/` and implementation details in `Internal/`. DocC content lives in `Sources/Loom/Loom.docc`, `Sources/LoomKit/LoomKit.docc`, `Sources/LoomHost/LoomHost.docc`, and `Sources/LoomShell/LoomShell.docc`. Tests live in `Tests/LoomTests`, `Tests/LoomCloudKitTests`, `Tests/LoomKitTests`, `Tests/LoomShellTests`, and `Tests/LoomHostTests`. Generated documentation is published from `docs/`.
+Keep public API surface in `Public/` and implementation details in `Internal/`. DocC content lives in `Sources/Loom/Loom.docc`, `Sources/LoomKit/LoomKit.docc`, `Sources/LoomHost/LoomHost.docc`, and `Sources/LoomShell/LoomShell.docc`. Tests live in `Tests/LoomTests`, `Tests/LoomCloudKitTests`, `Tests/LoomKitTests`, `Tests/LoomShellTests`, and `Tests/LoomHostTests`. Generated documentation is written to `docs/`.
 
 ## Build, Test, and Development Commands
 
@@ -24,7 +24,7 @@ swift test --scratch-path .build-local
 ./Scripts/build-docc-site.sh
 ```
 
-`swift build` validates all library targets. `swift test --scratch-path .build-local` runs the full suite without polluting the default build directory. `./Scripts/build-docc-site.sh` generates the static DocC site used by the GitHub Pages workflow.
+`swift build` validates all library targets. `swift test --scratch-path .build-local` runs the full suite without polluting the default build directory. `./Scripts/build-docc-site.sh` generates the static DocC site locally; it is no longer published by CI.
 
 ## Coding Style & Naming Conventions
 
