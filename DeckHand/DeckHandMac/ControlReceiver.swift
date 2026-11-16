@@ -37,7 +37,9 @@ final class ControlReceiver {
     private static let livenessTimeout: TimeInterval = 8
 
     /// Called from MacMenuBarView for each newly established incoming connection.
-    func observeConnection(_ connectionHandle: LoomConnectionHandle) {
+    /// `messages` is the connection's stream after `PreApprovalGate`; read it,
+    /// never `connectionHandle.messages`, which the gate already reads.
+    func observeConnection(_ connectionHandle: LoomConnectionHandle, messages: AsyncStream<Data>) {
         let key = connectionHandle.id
         connectionHandles[key] = connectionHandle
         lastActivityAt[key] = Date()
@@ -50,7 +52,7 @@ final class ControlReceiver {
             // Tell the remote up front what this host can actually do, so
             // it can explain missing permissions instead of failing silently.
             await self?.sendCapabilities(to: connectionHandle)
-            await self?.consumeMessages(from: connectionHandle)
+            await self?.consumeMessages(from: connectionHandle, messages: messages)
             // The message loop has ended (stream finished, task cancelled
             // by revocation, or liveness timeout). Stop any mirror stream
             // so capture doesn't burn CPU/GPU against a dead handle.
@@ -109,8 +111,8 @@ final class ControlReceiver {
         }
     }
 
-    private func consumeMessages(from connectionHandle: LoomConnectionHandle) async {
-        for await data in connectionHandle.messages {
+    private func consumeMessages(from connectionHandle: LoomConnectionHandle, messages: AsyncStream<Data>) async {
+        for await data in messages {
             // Honors cancelConsumption: stop dispatching the moment the
             // connection is revoked or timed out, even with a backlog.
             if Task.isCancelled { return }
@@ -277,9 +279,9 @@ final class ControlReceiver {
             // Resync path: messages are only consumed for *authorized*
             // connections (DeviceAuthorizationManager gates the handoff),
             // so reaching this dispatch means the answer is "granted".
-            // Queries sent while the request was pending sit buffered in
-            // the handle and get answered here right after approval —
-            // healing any lost/failed `granted` push.
+            // The few queries sent while the request was pending are the
+            // only messages PreApprovalGate keeps; they're answered here
+            // right after approval — healing any lost/failed `granted` push.
             do {
                 try await handle.send(.authorizationStatus(status: "granted"))
             } catch {
