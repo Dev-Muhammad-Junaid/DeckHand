@@ -27,6 +27,15 @@
          Empty turns crash reporting off. -->
     <key>SentryDSN</key>
     <string>$(SENTRY_DSN)</string>
+    <!-- Sparkle updates (Release/RELEASING.md). Values come from project.yml. -->
+    <key>SUFeedURL</key>
+    <string>$(SPARKLE_FEED_URL)</string>
+    <key>SUPublicEDKey</key>
+    <string>$(SPARKLE_PUBLIC_ED_KEY)</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUAutomaticallyUpdate</key>
+    <false/>
     <!-- Bonjour discovery -->
     <key>NSBonjourServices</key>
     <array>

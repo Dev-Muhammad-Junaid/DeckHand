@@ -17,3 +17,9 @@
 
 /*.js
   Cache-Control: public, max-age=3600
+
+# Sparkle appcast and release notes: installed Macs poll this, so a new
+# release must reach them within minutes, not a day.
+/mac/*
+  Cache-Control: public, max-age=300
+  Access-Control-Allow-Origin: *

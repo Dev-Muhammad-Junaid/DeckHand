@@ -17,3 +17,9 @@ project.xcworkspace/
 
 # Python bytecode
 __pycache__/
+
+# Mac release output (DeckHand/Scripts/release)
+DeckHand/build/
+*.dmg
+*.p12
+*.p8

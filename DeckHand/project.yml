@@ -15,6 +15,11 @@ packages:
   Sentry:
     url: https://github.com/getsentry/sentry-cocoa
     from: 9.34.0
+  # Mac self-updates (Developer ID download, not the Mac App Store).
+  # See Release/RELEASING.md.
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.9.0
 
 settings:
   base:
@@ -48,9 +53,16 @@ targets:
         product: LoomKit
       - package: Sentry
         product: Sentry
+      - package: Sparkle
+        product: Sparkle
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.widgetsflow.pixelhand.mac
+        # Sparkle appcast and EdDSA public key, read by Info.plist. The key
+        # is the base64 string `generate_keys` prints; empty = Sparkle is not
+        # started and "Check for Updates…" is greyed out (Release/RELEASING.md §1.3).
+        SPARKLE_FEED_URL: https://pixelhand.pages.dev/mac/appcast.xml
+        SPARKLE_PUBLIC_ED_KEY: ""
         # Sentry project "pixelhand-mac". Paste its DSN here (Sentry → Project
         # Settings → Client Keys (DSN)). DSNs are designed to ship inside the
         # app, so committing it is fine. Empty = crash reporting off.

@@ -43,6 +43,26 @@ locally with `cd website && npx wrangler pages dev public --kv WAITLIST`.
    `https://<your-domain>/assets/og.png`, add
    `<link rel="canonical" href="https://<your-domain>/">`, and rebuild.
 
+### Mac downloads and updates
+
+The Mac app is a free download; the iPhone/iPad app is on the App Store
+(the waitlist is for that launch). The site's part of the Mac release:
+
+```
+public/mac/appcast.xml      Sparkle update feed, polled by installed Macs
+public/mac/notes/<v>.html   release notes shown in the update window
+public/_redirects           /download/mac → newest DMG on R2
+```
+
+The DMGs themselves live in the R2 bucket `pixelhand-downloads`, not in
+Pages (25 MiB per-file limit, and no binaries in git). The release scripts
+in `DeckHand/Scripts/release/` update these files; commit and push them to
+deploy. Setup and the full process: `DeckHand/Release/RELEASING.md`.
+
+The download section (`#download`) reads the appcast in `site.js`: with a
+stable release it shows "Version x.y"; with none yet, it hides the download
+buttons and says the Mac app arrives with the iPhone/iPad app.
+
 ### Waitlist signups
 
 Each signup is a KV entry keyed `email:<address>` with the join time,
