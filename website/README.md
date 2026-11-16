@@ -25,23 +25,33 @@ locally with `cd website && npx wrangler pages dev public --kv WAITLIST`.
 
 ## Deploy to Cloudflare Pages
 
-1. **Workers & Pages → Create → Pages → Connect to Git**, pick this repository.
-2. Build settings:
-   - Framework preset: **None**
-   - Build command: *(empty)*
-   - **Root directory: `website`**
-   - **Build output directory: `public`**
-   - Production branch: `main`
-3. Create the waitlist store: **Workers & Pages → KV → Create namespace**,
-   name it `pixelhand-waitlist`.
-4. In the Pages project, **Settings → Bindings → Add → KV namespace**:
-   variable name **`WAITLIST`**, namespace `pixelhand-waitlist`. Add it for
-   Production (and Preview if you want previews to collect test signups).
-5. Redeploy. The site is live at `<project>.pages.dev`.
-6. When you have a domain, add it under **Custom domains**, then in
-   `src/index.html` replace `/assets/og.png` in the `og:image` tag with
-   `https://<your-domain>/assets/og.png`, add
-   `<link rel="canonical" href="https://<your-domain>/">`, and rebuild.
+The site is live at **https://pixelhand.app** from the Cloudflare Pages
+project `pixelhand`, deployed by direct upload (not connected to Git).
+`wrangler.toml` in this folder holds the project's config and binds the KV
+namespace `pixelhand-waitlist` as `WAITLIST` for production. Deploy from
+`website/` so the Functions are included:
+
+```bash
+cd website
+npx wrangler pages deploy --branch main
+```
+
+`--branch main` makes it a production deployment; any other branch name
+makes a preview at `<branch>.pixelhand.pages.dev`, without the waitlist.
+
+Some wrangler 4.x versions create `~/.wrangler/` during `pages deploy`, which
+hides the login stored in `~/Library/Preferences/.wrangler`. If wrangler
+suddenly says you're not logged in, check for that folder.
+
+Domain setup on the `pixelhand.app` zone:
+
+- DNS: proxied CNAMEs `pixelhand.app` and `www` → `pixelhand.pages.dev`,
+  both added as custom domains on the Pages project.
+- Redirect Rule "Redirect www to pixelhand.app": `*://www.pixelhand.app/*`
+  → `https://pixelhand.app/${2}`, 301, keeping the query string.
+- Email Routing: `support@pixelhand.app` forwards to the owner's inbox. The
+  zone's Email Address Obfuscation rewrites `mailto:` links, so addresses in
+  the pages are wrapped in `<!--email_off-->…<!--/email_off-->`.
 
 ### Mac downloads and updates
 
@@ -56,8 +66,8 @@ public/_redirects           /download/mac → newest DMG on R2
 
 The DMGs themselves live in the R2 bucket `pixelhand-downloads`, not in
 Pages (25 MiB per-file limit, and no binaries in git). The release scripts
-in `DeckHand/Scripts/release/` update these files; commit and push them to
-deploy. Setup and the full process: `DeckHand/Release/RELEASING.md`.
+in `DeckHand/Scripts/release/` update these files; commit them and run the
+deploy command above. Setup and the full process: `DeckHand/Release/RELEASING.md`.
 
 The download section (`#download`) reads the appcast in `site.js`: with a
 stable release it shows "Version x.y"; with none yet, it hides the download
@@ -76,15 +86,13 @@ npx wrangler kv key list --namespace-id <id> > waitlist-keys.json
 
 ## Before launch
 
-- [ ] Replace both `[contact email — add before launch]` placeholders in
-      `public/privacy.html` with the address that handles privacy requests.
-- [ ] Bind the `WAITLIST` KV namespace (above) and test a signup on
-      `<project>.pages.dev`.
-- [ ] Add the custom domain, then set the absolute `og:image` URL and the
-      canonical link in `src/index.html` and rebuild.
+- [x] Privacy contact in `public/privacy.html` is `support@pixelhand.app`.
+- [x] `WAITLIST` KV namespace bound and a signup tested on pixelhand.app.
+- [x] Custom domain added; absolute `og:image` URL and canonical link set.
 
 The privacy policy is served at `/privacy` (Cloudflare Pages maps it to
-`privacy.html`) and is linked from both waitlist forms and the footer. If you
+`privacy.html`) and is linked from both waitlist forms and the footer. The
+support page is `/support` (`support.html`), also linked from the footer. If you
 turn on analytics or a mailing tool, update its "Cookies and storage" and
 "The waitlist" sections to match. Its "Crash reports and diagnostics" section
 describes the apps' Sentry reporting; it has to stay in step with both
