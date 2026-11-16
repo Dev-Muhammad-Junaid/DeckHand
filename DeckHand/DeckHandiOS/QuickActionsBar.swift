@@ -309,7 +309,7 @@ struct QuickActionsBar: View {
             }
             IconButton(symbol: "macwindow", colorScheme: colorScheme) {
                 GestureHaptic.medium.trigger()
-                Task { await sender.sendMacro("showdesktop") }
+                Task { await sender.sendMacro(SystemMacro.showDesktop.macroID) }
             }
         }
     }

@@ -445,32 +445,13 @@ final class ControlReceiver {
     }
 
     private func dispatchMacro(id: String) async {
-        // System-level triggers that can't be done via CGEvent keyboard shortcuts
-        switch id {
-        case "locate_cursor":
-            CursorLocator.shared.ping()
+        // System-level triggers that can't be done via CGEvent keyboard
+        // shortcuts. Resolved first, under every id a remote may send, so
+        // e.g. "showdesktop" never falls through to the default deck (whose
+        // ids are prefixed "shortcut-") and silently does nothing.
+        if let macro = SystemMacro(macroID: id) {
+            runSystemMacro(macro)
             return
-        case "missioncontrol_trigger":
-            let proc = Process()
-            proc.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-            proc.arguments = ["-a", "Mission Control"]
-            try? proc.run()
-            return
-        case "expose_trigger":
-            // App Exposé isn't a standalone app — trigger via AppleScript
-            let proc = Process()
-            proc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            proc.arguments = ["-e", "tell application \"System Events\" to key code 125 using control down"]
-            try? proc.run()
-            return
-        case "launchpad_trigger":
-            let proc = Process()
-            proc.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-            proc.arguments = ["-a", "Launchpad"]
-            try? proc.run()
-            return
-        default:
-            break
         }
 
         // Standard MacroItem lookup
@@ -488,6 +469,45 @@ final class ControlReceiver {
                 default: break
                 }
             }
+        }
+    }
+
+    private func runSystemMacro(_ macro: SystemMacro) {
+        switch macro {
+        case .locateCursor:
+            CursorLocator.shared.ping()
+        case .missionControl:
+            runTool("/usr/bin/open", ["-a", "Mission Control"])
+        case .appExpose:
+            // App Exposé isn't a standalone app — trigger via AppleScript
+            runTool("/usr/bin/osascript", ["-e", "tell application \"System Events\" to key code 125 using control down"])
+        case .showDesktop:
+            // Show Desktop is a symbolic hot key (F11), which a CGEvent post
+            // never fires. Mission Control's own binary takes "1" for Show
+            // Desktop; System Events' F11 is the fallback.
+            if let missionControl = Self.missionControlExecutable {
+                runTool(missionControl, ["1"])
+            } else {
+                runTool("/usr/bin/osascript", ["-e", "tell application \"System Events\" to key code 103"])
+            }
+        case .launchpad:
+            runTool("/usr/bin/open", ["-a", "Launchpad"])
+        }
+    }
+
+    private static let missionControlExecutable: String? = [
+        "/System/Applications/Mission Control.app/Contents/MacOS/Mission Control",
+        "/Applications/Mission Control.app/Contents/MacOS/Mission Control",
+    ].first { FileManager.default.isExecutableFile(atPath: $0) }
+
+    private func runTool(_ path: String, _ arguments: [String]) {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: path)
+        proc.arguments = arguments
+        do {
+            try proc.run()
+        } catch {
+            DeckHandLog.input.error("Couldn't run \(path, privacy: .public): \(error.localizedDescription, privacy: .public)")
         }
     }
 
