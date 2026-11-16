@@ -6,6 +6,13 @@
 import Loom
 import LoomKit
 import SwiftUI
+import UIKit
+
+/// What this device calls itself in "Please update Pixel Hand on your …".
+@MainActor
+private var thisDeviceKind: String {
+    UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone"
+}
 
 struct PeerPickerView: View {
     let onConnected: (LoomConnectionHandle, String) -> Void
@@ -193,6 +200,16 @@ struct PeerPickerView: View {
 
     private func connectTo(_ peer: LoomPeerSnapshot) {
         guard connecting == nil else { return }
+
+        // A Mac on a different Loom protocol would fail the handshake with a
+        // generic error. Say which side to update instead of dialling.
+        let compatibility = PeerCompatibility(advertisement: peer.advertisement)
+        if let updateMessage = compatibility.updateMessage(thisDevice: thisDeviceKind, peer: "Mac") {
+            DeckHandLog.connection.info("📡 Not connecting to \(peer.name, privacy: .public): protocol \(peer.advertisement.protocolVersion), ours \(PeerCompatibility.localProtocolVersion)")
+            showError(updateMessage)
+            return
+        }
+
         connecting = peer.deviceID
         errorMessage = nil
 
@@ -209,15 +226,21 @@ struct PeerPickerView: View {
                 await MainActor.run {
                     DeckHandLog.connection.error("📡 Connect failed for \(peer.name, privacy: .public): \(error.localizedDescription, privacy: .public)")
                     connecting = nil
-                    withAnimation(.easeOut(duration: 0.22)) {
-                        errorMessage = "Connection failed: \(error.localizedDescription)"
-                    }
-                    Task {
-                        try? await Task.sleep(for: .seconds(4))
-                        withAnimation(.easeOut(duration: 0.22)) { errorMessage = nil }
-                    }
+                    showError("Connection failed: \(error.localizedDescription)")
                 }
             }
+        }
+    }
+
+    private func showError(_ message: String) {
+        withAnimation(.easeOut(duration: 0.22)) {
+            errorMessage = message
+        }
+        Task {
+            try? await Task.sleep(for: .seconds(4))
+            // Only clear this message, not a newer one shown since.
+            guard errorMessage == message else { return }
+            withAnimation(.easeOut(duration: 0.22)) { errorMessage = nil }
         }
     }
 }
@@ -231,6 +254,13 @@ private struct PeerCard: View {
     /// only one that still reads as active.
     let isDimmed: Bool
     let onTap: () -> Void
+
+    /// Set when this Mac runs a different Loom protocol, so the card says
+    /// which side to update before anyone taps it.
+    private var updateMessage: String? {
+        PeerCompatibility(advertisement: peer.advertisement)
+            .updateMessage(thisDevice: thisDeviceKind, peer: "Mac")
+    }
 
     var body: some View {
         Button(action: onTap) {
@@ -259,13 +289,24 @@ private struct PeerCard: View {
                         }
                     }
 
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(peer.isNearby ? DeckHandTheme.Brand.mint : DeckHandTheme.warning)
-                            .frame(width: 5, height: 5)
-                        Text(peer.isNearby ? "Nearby" : "Remote")
-                            .font(.system(size: 12, weight: .regular, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.45))
+                    if let updateMessage {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.down.circle")
+                                .font(.system(size: 11, weight: .semibold))
+                            Text(updateMessage)
+                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .lineLimit(2)
+                        }
+                        .foregroundStyle(DeckHandTheme.warning)
+                    } else {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(peer.isNearby ? DeckHandTheme.Brand.mint : DeckHandTheme.warning)
+                                .frame(width: 5, height: 5)
+                            Text(peer.isNearby ? "Nearby" : "Remote")
+                                .font(.system(size: 12, weight: .regular, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.45))
+                        }
                     }
                 }
 

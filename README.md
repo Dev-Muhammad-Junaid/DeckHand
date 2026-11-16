@@ -8,6 +8,10 @@ remote gives you a precision trackpad, a live view of the Mac's screen, capture
 tools, an app launcher, and shortcut chips that change with whatever app is
 frontmost.
 
+Pixel Hand was called Deck Hand until November 2026. The Xcode targets, folders
+and Swift types still use the old name (`DeckHandMac`, `DeckHandiOS`,
+`DeckHand*`); everything a person sees says Pixel Hand.
+
 Everything runs peer-to-peer over [Loom](#the-loom-package), which is vendored in
 this repository. There is no account and no relay in the path. CloudKit-backed
 "same iCloud account" awareness is on (`Shared/DeckHandCloud.swift`); internet
@@ -74,6 +78,18 @@ The Mac advertises `_pixelhand._tcp` over Bonjour and the remote browses for it.
 trust decision. Every connection has to be approved on the Mac, and that approval
 is deliberately not persisted — a fresh host launch prompts again, because
 auto-granting from stored state proved too easy to get wrong.
+
+Loom 2.x denies a device during the handshake unless its trust provider says
+`.trusted`, so the Mac installs `DeckHandHandshakeTrustProvider`: it lets
+through any device that proved it owns its identity key, and the app-level
+Allow / Deny then runs exactly as before.
+
+**Versions are checked before connecting.** Loom refuses a session between two
+different `Loom.protocolVersion`s, and every device already announces its
+version in its Bonjour TXT record. `Shared/PeerCompatibility.swift` compares
+the two, so the picker on the iPad marks a mismatched Mac with "Please update
+Pixel Hand on your Mac" (or "…on your iPad") instead of letting the connection
+fail, and the Mac's menu-bar panel lists nearby remotes that need an update.
 
 Above the transport, both apps speak a single `Codable` enum, `ControlMessage`,
 defined once in `DeckHand/Shared/` and compiled into both targets so the wire
@@ -226,9 +242,9 @@ Tailscale-style setups, remote reachability, and diagnostics. It ships five
 library products — `Loom`, `LoomKit`, `LoomShell`, `LoomCloudKit`, and
 `LoomSharedRuntime`. Pixel Hand uses `LoomKit`, the SwiftUI-first surface.
 
-This fork does not track upstream closely and the package here has diverged: it
-adds local-network diagnostics, a telemetry exporter, a SwiftUI diagnostics view,
-a retry policy, and a Bonjour entitlement check, along with smaller changes to
+The package here is upstream Loom 2.2.16 merged with this fork's own changes:
+local-network diagnostics, a telemetry exporter, a SwiftUI diagnostics view, a
+retry policy, and a Bonjour entitlement check, along with smaller changes to
 logging, discovery, and session security.
 
 The package still builds and tests independently of the apps:
@@ -238,16 +254,17 @@ swift build
 swift test --scratch-path .build-local
 ```
 
-Two tests in the package (`invalidResumeOffsetIsRejected` and
-`liveSamePeerConnectionOutsideWindowIsDropped`) hang rather than fail. It is
-pre-existing and unrelated to Pixel Hand, but it will stall an unattended run, so
-filter them out in CI.
+Nothing is skipped. `invalidResumeOffsetIsRejected` and
+`liveSamePeerConnectionOutsideWindowIsDropped` used to hang on the pre-merge
+fork; upstream's transfer rewrite and the LoomHost blocking-IO fix are expected
+to cure them, and the second has a one-minute time limit so a regression fails
+instead of stalling the run.
 
 If you came here for the networking library rather than this app, depend on
 upstream instead of this fork:
 
 ```swift
-.package(url: "https://github.com/EthanLipnik/Loom.git", from: "1.4.0")
+.package(url: "https://github.com/EthanLipnik/Loom.git", from: "2.2.16")
 ```
 
 Upstream is also the better reference for the package itself:

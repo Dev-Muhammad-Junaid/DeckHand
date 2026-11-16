@@ -108,7 +108,11 @@ struct LoomStoreIncomingDedupTests {
     }
 
     @MainActor
-    @Test("A live connection is kept and the duplicate dropped even well outside any 3s window (fragile-window regression)")
+    // Used to hang on a 3-core CI runner; the limit turns a hang into a failure.
+    @Test(
+        "A live connection is kept and the duplicate dropped even well outside any 3s window (fragile-window regression)",
+        .timeLimit(.minutes(1))
+    )
     func liveSamePeerConnectionOutsideWindowIsDropped() async throws {
         let store = makeStore()
         let peerDeviceID = UUID()

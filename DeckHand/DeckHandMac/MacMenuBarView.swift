@@ -105,6 +105,38 @@ struct MacMenuBarView: View {
                 Divider()
             }
 
+            // A nearby iPhone or iPad on a different Loom protocol can't
+            // connect (its handshake fails), so say which side to update.
+            if !outdatedPeers.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("NEEDS AN UPDATE")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(DeckHandTheme.warning)
+                        .padding(.top, 10)
+
+                    ForEach(outdatedPeers, id: \.peer.id) { item in
+                        Label {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(item.peer.name)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .lineLimit(1)
+                                Text(item.message)
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        } icon: {
+                            Image(systemName: "arrow.down.circle")
+                                .foregroundStyle(DeckHandTheme.warning)
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+
+                Divider()
+            }
+
             if authorizedConnections.isEmpty {
                 VStack(spacing: 8) {
                     PixelScreen(cornerRadius: 12, padding: 9) {
@@ -214,6 +246,22 @@ struct MacMenuBarView: View {
         }
         .frame(width: 270)
         .background(.regularMaterial)
+    }
+
+    /// Nearby remotes whose Loom protocol differs from this Mac's, with the
+    /// "Please update Pixel Hand on your …" line for each.
+    private var outdatedPeers: [(peer: LoomPeerSnapshot, message: String)] {
+        peers.compactMap { peer in
+            guard peer.deviceType != .mac else { return nil }
+            let remote = switch peer.deviceType {
+            case .iPad: "iPad"
+            case .iPhone: "iPhone"
+            default: "iPhone or iPad"
+            }
+            guard let message = PeerCompatibility(advertisement: peer.advertisement)
+                .updateMessage(thisDevice: "Mac", peer: remote) else { return nil }
+            return (peer, message)
+        }
     }
 
     /// Resolves iPhone vs iPad (etc.) from the live peer list; Pixel Hand remote is iOS-only so unknown falls back to phone.

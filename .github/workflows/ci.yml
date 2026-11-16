@@ -41,9 +41,4 @@ jobs:
       - name: Run tests
         # A hang fails here instead of running out the job.
         timeout-minutes: 8
-        # invalidResumeOffsetIsRejected and liveSamePeerConnectionOutsideWindowIsDropped
-        # hang rather than fail — pre-existing, unrelated to Deck Hand (see README).
-        run: |
-          swift test --skip-build --scratch-path .build-local \
-            --skip invalidResumeOffsetIsRejected \
-            --skip liveSamePeerConnectionOutsideWindowIsDropped
+        run: swift test --skip-build --scratch-path .build-local
