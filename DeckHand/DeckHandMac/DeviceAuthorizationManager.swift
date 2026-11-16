@@ -203,14 +203,26 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
     }
     
     func removeAndDisconnect(connection: LoomConnectionSnapshot, loomContext: LoomContext) {
-        // Stop dispatching this device's commands BEFORE tearing down the
-        // transport — otherwise buffered input keeps executing during the
-        // (async) disconnect.
-        onConnectionRevoked?(connection.id)
+        // Revoking is per device, so end every connection this peer has,
+        // not just the row that was clicked: a second live connection used
+        // to keep running input after its device's access was removed.
+        var peerConnections = loomContext.connections.filter { $0.peerID == connection.peerID }
+        if !peerConnections.contains(where: { $0.id == connection.id }) {
+            peerConnections.append(connection)
+        }
         authorizedDeviceIDs.remove(connection.peerID)
-        removePendingConnection(id: connection.id)
+        for peerConnection in peerConnections {
+            // Stop dispatching this device's commands BEFORE tearing down
+            // the transport — otherwise buffered input keeps executing
+            // during the (async) disconnect.
+            onConnectionRevoked?(peerConnection.id)
+            removePendingConnection(id: peerConnection.id)
+            pendingHandles.removeValue(forKey: peerConnection.id)
+        }
         Task {
-            await loomContext.disconnect(connection)
+            for peerConnection in peerConnections {
+                await loomContext.disconnect(peerConnection)
+            }
         }
     }
 
