@@ -488,6 +488,8 @@ struct ShortcutEditor: View {
     @State private var shift: Bool = false
     @State private var option: Bool = false
     @State private var ctrl: Bool = false
+    /// Kept so editing a binding like fn+F11 doesn't silently drop `fn`.
+    @State private var fn: Bool = false
 
     private var previewKeys: [String] {
         var keys: [String] = []
@@ -495,6 +497,7 @@ struct ShortcutEditor: View {
         if shift { keys.append("shift") }
         if option { keys.append("option") }
         if ctrl { keys.append("ctrl") }
+        if fn { keys.append("fn") }
         if !keyLiteral.isEmpty { keys.append(keyLiteral.lowercased()) }
         return keys
     }
@@ -535,6 +538,7 @@ struct ShortcutEditor: View {
                     Toggle("⇧ Shift", isOn: $shift)
                     Toggle("⌥ Option", isOn: $option)
                     Toggle("⌃ Control", isOn: $ctrl)
+                    Toggle("fn Function", isOn: $fn)
                     TextField("Key (e.g. p, space, f5, up)", text: $keyLiteral)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -576,6 +580,7 @@ struct ShortcutEditor: View {
                 shift  = mods.contains("shift")
                 option = mods.contains("option") || mods.contains("alt")
                 ctrl   = mods.contains("ctrl") || mods.contains("control")
+                fn     = mods.contains("fn")
                 keyLiteral = existing.keys.first {
                     let l = $0.lowercased()
                     return !["cmd", "command", "shift", "option", "alt", "ctrl", "control", "fn"].contains(l)
