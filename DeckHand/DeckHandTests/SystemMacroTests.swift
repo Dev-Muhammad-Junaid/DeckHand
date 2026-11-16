@@ -36,6 +36,19 @@ final class SystemMacroTests: XCTestCase {
         XCTAssertEqual(SystemMacro(macroID: "shortcut-missioncontrol"), .missionControl)
     }
 
+    func testLaunchpadNeverMapsToSpotlight() throws {
+        // The default deck's Launchpad entry used to post ⌘Space, which
+        // opens Spotlight. It must resolve to the real Launchpad action
+        // and carry no keys of its own.
+        for id in ["launchpad", "launchpad_trigger", "shortcut-launchpad"] {
+            XCTAssertEqual(SystemMacro(macroID: id), .launchpad, id)
+        }
+        let entry = try XCTUnwrap(MacroItem.defaultDeck.first { $0.id == "shortcut-launchpad" })
+        guard case let .shortcut(shortcut) = entry else { return XCTFail("\(entry)") }
+        XCTAssertNotEqual(shortcut.keys.map { $0.lowercased() }.sorted(), ["cmd", "space"])
+        XCTAssertTrue(shortcut.keys.isEmpty)
+    }
+
     func testIDsTheRemoteSendsAllResolve() {
         // Literals used in TrackpadSender, TrackpadView and QuickActionsBar.
         let sent = ["locate_cursor", "missioncontrol_trigger", "expose_trigger", "launchpad_trigger", "showdesktop_trigger"]

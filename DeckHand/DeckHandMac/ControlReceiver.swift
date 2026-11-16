@@ -491,9 +491,13 @@ final class ControlReceiver {
                 runTool("/usr/bin/osascript", ["-e", "tell application \"System Events\" to key code 103"])
             }
         case .launchpad:
-            runTool("/usr/bin/open", ["-a", "Launchpad"])
+            // macOS 26 replaced Launchpad with "Apps".
+            runTool("/usr/bin/open", ["-a", Self.launchpadAppName])
         }
     }
+
+    private static let launchpadAppName =
+        FileManager.default.fileExists(atPath: "/System/Applications/Launchpad.app") ? "Launchpad" : "Apps"
 
     private static let missionControlExecutable: String? = [
         "/System/Applications/Mission Control.app/Contents/MacOS/Mission Control",

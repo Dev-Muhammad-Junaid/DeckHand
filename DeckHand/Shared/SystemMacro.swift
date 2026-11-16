@@ -10,7 +10,8 @@
 //  (`showdesktop` from the Quick Actions bar, `shortcut-showdesktop` as the
 //  `MacroItem` id, `*_trigger` for the newer buttons). The host used to
 //  match only some of them, so Show Desktop from the Quick Actions bar did
-//  nothing. Every spelling now resolves here, before the default-deck
+//  nothing and Launchpad fell through to the default deck's ⌘Space
+//  (Spotlight). Every spelling now resolves here, before the default-deck
 //  lookup.
 //
 
@@ -46,7 +47,7 @@ public enum SystemMacro: String, CaseIterable, Sendable {
             self = .appExpose
         case "showdesktop_trigger", "showdesktop", "shortcut-showdesktop":
             self = .showDesktop
-        case "launchpad_trigger":
+        case "launchpad_trigger", "launchpad", "shortcut-launchpad":
             self = .launchpad
         default:
             return nil
