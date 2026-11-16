@@ -18,7 +18,7 @@ import Foundation
 import os
 
 enum DeckHandLog {
-    static let subsystem: String = "com.deckhand"
+    static let subsystem: String = "com.widgetsflow.deckhand"
 
     static let app = Logger(subsystem: subsystem, category: "app")
     static let connection = Logger(subsystem: subsystem, category: "connection")

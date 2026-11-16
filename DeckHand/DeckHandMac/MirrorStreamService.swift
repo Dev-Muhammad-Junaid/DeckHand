@@ -68,7 +68,7 @@ final class MirrorStreamService: NSObject {
     private var currentMaxWidth = 640
     /// Serial queue ScreenCaptureKit delivers frames on. Encoding happens
     /// here too, keeping all pixel work off the main thread.
-    private let sampleQueue = DispatchQueue(label: "com.deckhand.mirror.frames", qos: .userInteractive)
+    private let sampleQueue = DispatchQueue(label: "com.widgetsflow.deckhand.mirror.frames", qos: .userInteractive)
     private var screenObserver: NSObjectProtocol?
 
     private override init() {

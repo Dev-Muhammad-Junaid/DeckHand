@@ -135,8 +135,12 @@ open DeckHand.xcodeproj
 
 Both app targets use automatic signing and are pinned to the original author's
 team, so set `DEVELOPMENT_TEAM` in `DeckHand/project.yml` to your own and
-regenerate before building to a device. Bundle identifiers are `com.deckhand.mac`
-and `com.deckhand.ios`.
+regenerate before building to a device. Bundle identifiers are
+`com.widgetsflow.deckhand` (iPhone and iPad), `com.widgetsflow.deckhand.mac` (Mac)
+and `com.widgetsflow.deckhand.tests`; the CloudKit container is
+`iCloud.com.widgetsflow.deckhand`. If you sign under your own team, change all of
+them, including the container in both `.entitlements` files and
+`Shared/DeckHandCloud.swift`.
 
 From the command line:
 

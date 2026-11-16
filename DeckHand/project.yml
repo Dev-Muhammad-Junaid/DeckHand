@@ -1,6 +1,6 @@
 name: DeckHand
 options:
-  bundleIdPrefix: com.deckhand
+  bundleIdPrefix: com.widgetsflow
   deploymentTarget:
     macOS: "14.0"
     iOS: "17.4"
@@ -40,7 +40,7 @@ targets:
         product: LoomKit
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.deckhand.mac
+        PRODUCT_BUNDLE_IDENTIFIER: com.widgetsflow.deckhand.mac
         INFOPLIST_FILE: DeckHandMac/Info.plist
         CODE_SIGN_ENTITLEMENTS: DeckHandMac/DeckHandMac.entitlements
         PRODUCT_NAME: Deck Hand
@@ -79,7 +79,7 @@ targets:
         product: LoomKit
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.deckhand.ios
+        PRODUCT_BUNDLE_IDENTIFIER: com.widgetsflow.deckhand
         INFOPLIST_FILE: DeckHandiOS/Info.plist
         CODE_SIGN_ENTITLEMENTS: DeckHandiOS/DeckHandiOS.entitlements
         PRODUCT_NAME: Deck Hand
@@ -122,7 +122,7 @@ targets:
         product: LoomKit
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.deckhand.tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.widgetsflow.deckhand.tests
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         SWIFT_VERSION: 6.0
         # Without this the bundle has no Info.plist and code signing refuses
