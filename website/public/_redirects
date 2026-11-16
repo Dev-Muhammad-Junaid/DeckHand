@@ -1,0 +1,5 @@
+# The website's "Download for Mac" button links to /download/mac.
+# DeckHand/Scripts/release/publish.sh rewrites the line below to the newest
+# stable DMG on R2 at every release. Until the first release it points back
+# at the download section.
+/download/mac /#download 302

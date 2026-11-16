@@ -36,7 +36,7 @@
     <a class="nav__link" href="#privacy">Privacy</a>
     <a class="nav__link" href="#faq">FAQ</a>
   </div>
-  <a class="btn btn--primary btn--nav" href="#waitlist">Join Waitlist</a>
+  <a class="btn btn--primary btn--nav" href="#download">Download</a>
 </nav>
 
 <div class="stack-night">
@@ -48,17 +48,19 @@
     <div class="hero__inner">
       <h1 class="hero__title" data-words>Your iPad, now a control surface for your Mac.</h1>
       <p class="hero__desc appear" style="--delay:.6s;--y:20px">A precision trackpad, a live view of the screen, captures, and shortcuts that follow whatever app is in front. Over your own Wi-Fi, with nothing in between.</p>
-      <div class="hero__cta appear" style="--delay:.8s;--y:10px">
+      <div class="hero__cta hero__cta--stack appear" style="--delay:.8s;--y:10px">
+        <a class="btn btn--primary btn--download" href="/download/mac" data-mac-download><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10M6 9.5l4 4 4-4"/><path d="M4 15.5v1A1.5 1.5 0 0 0 5.5 18h9a1.5 1.5 0 0 0 1.5-1.5v-1"/></svg>Download for Mac<span class="btn__aside">Free</span></a>
+        <p class="hero__or">The iPhone and iPad app is coming to the App Store. Get one email when it’s out:</p>
         <form class="wl" action="/api/waitlist" method="post" data-waitlist novalidate>
           <div class="wl__row">
             <label class="sr-only" for="wl-hero">Email address</label>
             <input class="wl__input" id="wl-hero" name="email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required>
             <input class="wl__trap" name="company" tabindex="-1" autocomplete="off" aria-hidden="true">
             <input type="hidden" name="source" value="hero">
-            <button class="btn btn--primary wl__btn" type="submit">Join the waitlist</button>
+            <button class="btn btn--ghost wl__btn" type="submit">Join the waitlist</button>
           </div>
           <p class="wl__msg" role="status" aria-live="polite"></p>
-          <p class="wl__note">One email when Pixel Hand is ready. Nothing else. <a href="/privacy">Privacy policy</a></p>
+          <p class="wl__note">One email when the app is on the App Store. Nothing else. <a href="/privacy">Privacy policy</a></p>
         </form>
       </div>
       <div class="hero__meta">
@@ -345,7 +347,11 @@
       <div class="faq after-heading">
         <div class="faq__item reveal">
           <button class="faq__q" type="button" id="faq-q0" aria-expanded="false" aria-controls="faq-a0">When can I get Pixel Hand?<svg class="faq__chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 7.5 5 5 5-5"/></svg></button>
-          <div class="faq__panel" id="faq-a0" role="region" aria-labelledby="faq-q0"><div><p class="faq__a">Pixel Hand is being prepared for release. Join the waitlist and you’ll get one email when it’s ready to download.</p></div></div>
+          <div class="faq__panel" id="faq-a0" role="region" aria-labelledby="faq-q0"><div><p class="faq__a">The Mac app is a free download from this page. The iPhone and iPad app is coming to the App Store; join the waitlist and you’ll get one email when it’s there.</p></div></div>
+        </div>
+        <div class="faq__item reveal">
+          <button class="faq__q" type="button" id="faq-q6" aria-expanded="false" aria-controls="faq-a6">Why isn’t the Mac app on the Mac App Store?<svg class="faq__chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 7.5 5 5 5-5"/></svg></button>
+          <div class="faq__panel" id="faq-a6" role="region" aria-labelledby="faq-q6"><div><p class="faq__a">Moving the pointer and pressing keys in other apps needs Accessibility control that Mac App Store apps, which run in Apple’s sandbox, aren’t allowed. So the Mac app comes from this site instead. It’s signed with our Apple Developer ID and notarized by Apple, so macOS opens it without warnings, and it checks for updates itself. Its menu-bar panel also has Check for Updates.</p></div></div>
         </div>
         <div class="faq__item reveal">
           <button class="faq__q" type="button" id="faq-q1" aria-expanded="false" aria-controls="faq-a1">Does it work over the internet?<svg class="faq__chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 7.5 5 5 5-5"/></svg></button>
@@ -376,11 +382,23 @@
 </main>
 
 <div class="band-void">
-  <section class="closing" id="waitlist" aria-labelledby="closing-h">
+  <section class="closing" id="download" aria-labelledby="closing-h">
     <img class="closing__icon reveal" src="assets/icon-256.png" alt="Pixel Hand app icon" width="96" height="96">
     <h2 class="closing__title" id="closing-h" data-words>Put your Mac within reach. From anywhere in the room.</h2>
-    <p class="closing__sub reveal" style="--delay:200ms">Join the waitlist and we’ll send one email when Pixel Hand is ready.</p>
-    <div class="hero__cta reveal" style="--delay:300ms">
+    <p class="closing__sub reveal" style="--delay:200ms">Pixel Hand is two apps: a free one for your Mac, and the remote for your iPhone or iPad.</p>
+    <div class="get reveal" style="--delay:300ms">
+      <article class="get__card" aria-labelledby="get-mac-h">
+        <span class="pill pill--glass pill--sm"><span>Mac · free</span></span>
+        <h3 class="get__title" id="get-mac-h">Pixel Hand for Mac</h3>
+        <p class="get__text">Lives in the menu bar and receives your iPhone or iPad. Signed by the developer, notarized by Apple, and keeps itself up to date.</p>
+        <a class="btn btn--primary btn--download" href="/download/mac" data-mac-download><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10M6 9.5l4 4 4-4"/><path d="M4 15.5v1A1.5 1.5 0 0 0 5.5 18h9a1.5 1.5 0 0 0 1.5-1.5v-1"/></svg>Download for Mac</a>
+        <p class="get__meta" data-mac-version>macOS 14 Sonoma or later · Apple silicon and Intel</p>
+        <p class="get__soon" data-mac-soon hidden>The Mac app arrives together with the iPhone and iPad app. Join the waitlist and we’ll email you both links.</p>
+      </article>
+      <article class="get__card" id="waitlist" aria-labelledby="get-ios-h">
+        <span class="pill pill--glass pill--sm"><span>iPhone and iPad · App Store</span></span>
+        <h3 class="get__title" id="get-ios-h">The remote</h3>
+        <p class="get__text">The trackpad, live view, captures and shortcuts. Coming to the App Store; get one email when it’s there.</p>
         <form class="wl" action="/api/waitlist" method="post" data-waitlist novalidate>
           <div class="wl__row">
             <label class="sr-only" for="wl-closing">Email address</label>
@@ -390,8 +408,9 @@
             <button class="btn btn--primary wl__btn" type="submit">Join the waitlist</button>
           </div>
           <p class="wl__msg" role="status" aria-live="polite"></p>
-          <p class="wl__note">One email when Pixel Hand is ready. Nothing else. <a href="/privacy">Privacy policy</a></p>
+          <p class="wl__note">One email when the app is on the App Store. Nothing else. <a href="/privacy">Privacy policy</a></p>
         </form>
+      </article>
     </div>
   </section>
 
@@ -407,6 +426,7 @@
           <a href="#pointer">Features</a>
           <a href="#privacy">Privacy</a>
           <a href="#setup">Setup</a>
+          <a href="#download">Download for Mac</a>
           <a href="#waitlist">Waitlist</a>
           <a href="#faq">FAQ</a>
           <a href="/privacy">Privacy policy</a>

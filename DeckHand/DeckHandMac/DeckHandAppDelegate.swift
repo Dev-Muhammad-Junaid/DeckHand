@@ -68,6 +68,7 @@ final class DeckHandAppDelegate: NSObject, NSApplicationDelegate {
             }
         daemon.receiver.onLiveConnectionsChanged = { [weak self] count in
             self?.liveConnections = count
+            AppUpdater.shared.liveConnections = count
             self?.refreshIcon()
         }
 
@@ -80,6 +81,9 @@ final class DeckHandAppDelegate: NSObject, NSApplicationDelegate {
         hosting.sizingOptions = [.preferredContentSize]
         popover.contentViewController = hosting
         self.popover = popover
+
+        // Sparkle: scheduled update checks, plus the panel's "Check for Updates…".
+        AppUpdater.shared.start()
     }
 
     private func refreshIcon() {

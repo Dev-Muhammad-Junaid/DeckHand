@@ -18,6 +18,7 @@ struct MacMenuBarView: View {
     let receiver: ControlReceiver
 
     @ObservedObject private var permissions = PermissionsMonitor.shared
+    @ObservedObject private var updater = AppUpdater.shared
 
     /// Mirrors `DeckHandDiagnostics.isEnabledByUser` (absent = on).
     @AppStorage(DeckHandDiagnostics.enabledKey) private var shareCrashReports = true
@@ -222,6 +223,29 @@ struct MacMenuBarView: View {
             ) { _ in
                 permissions.refresh()
             }
+
+            Divider()
+
+            // ── Updates (Sparkle) ─────────────────────────────────────
+            Button {
+                updater.checkForUpdates()
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 12))
+                        .frame(width: 18)
+                    Text("Check for Updates…")
+                        .font(.system(size: 12))
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(updater.canCheckForUpdates ? .primary : .tertiary)
+            .disabled(!updater.canCheckForUpdates)
+            .help(updater.isConfigured ? "Look for a newer version of Pixel Hand" : "Updates aren't set up in this build")
 
             Divider()
 

@@ -337,6 +337,37 @@
     });
   });
 
+  // Mac download: show the current version from the Sparkle appcast, or a
+  // "coming soon" note while the appcast has no stable release yet.
+  var macButtons = document.querySelectorAll('[data-mac-download]');
+  if (macButtons.length && window.fetch && window.DOMParser) {
+    fetch('/mac/appcast.xml', { cache: 'no-cache' }).then(function (res) {
+      return res.ok ? res.text() : '';
+    }).then(function (text) {
+      var SPARKLE = 'http://www.andymatuschak.org/xml-namespaces/sparkle';
+      var doc = text ? new DOMParser().parseFromString(text, 'application/xml') : null;
+      var items = doc ? Array.prototype.slice.call(doc.getElementsByTagName('item')) : [];
+      var stable = items.filter(function (item) {
+        return !item.getElementsByTagNameNS(SPARKLE, 'channel').length;
+      })[0];
+      if (!stable) {
+        macButtons.forEach(function (btn) {
+          var card = btn.closest('.get__card');
+          if (card) card.classList.add('is-soon'); else btn.hidden = true;
+        });
+        document.querySelectorAll('[data-mac-soon]').forEach(function (el) { el.hidden = false; });
+        return;
+      }
+      var version = stable.getElementsByTagNameNS(SPARKLE, 'shortVersionString')[0];
+      var minOS = stable.getElementsByTagNameNS(SPARKLE, 'minimumSystemVersion')[0];
+      var label = document.querySelector('[data-mac-version]');
+      if (label && version) {
+        label.textContent = 'Version ' + version.textContent + ' · macOS ' +
+          (minOS ? minOS.textContent.replace(/\.0$/, '') : '14') + ' or later · Apple silicon and Intel';
+      }
+    }).catch(function () {});
+  }
+
   // Copy build commands.
   document.querySelectorAll('[data-copy]').forEach(function (btn) {
     btn.addEventListener('click', function () {

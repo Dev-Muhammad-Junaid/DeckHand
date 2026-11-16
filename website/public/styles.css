@@ -484,3 +484,22 @@ a { color: inherit; }
 .wl__note { margin: 0; font: 400 12px/18px var(--font-sans); color: rgba(255, 255, 255, 0.6); text-align: center; }
 .wl__note a { color: rgba(255, 255, 255, 0.85); text-underline-offset: 2px; }
 .wl.is-done .wl__note { display: none; }
+
+/* ---------- Download (Mac app) + waitlist (iPhone/iPad) ---------- */
+.hero__cta--stack { flex-direction: column; align-items: center; gap: 14px; }
+.hero__or { margin: 10px 0 0; max-width: 420px; font: 400 14px/21px var(--font-sans); letter-spacing: -0.2px; color: rgba(255, 255, 255, 0.7); text-align: center; text-wrap: balance; }
+.btn--download { height: 52px; padding: 0 22px; font-size: 17px; }
+.btn__aside { margin-left: 4px; padding: 3px 8px; border-radius: var(--radius-pill); background: rgba(255, 255, 255, 0.18); font: 600 12px/1 var(--font-sans); letter-spacing: 0; }
+.get { margin-top: 48px; width: min(100%, 900px); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; text-align: left; }
+.get__card { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; padding: 28px; border-radius: var(--radius-24);
+  background: rgba(255, 255, 255, 0.06); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12); color: rgba(255, 255, 255, 0.72); }
+.get__title { margin: 4px 0 0; color: #fff; font: 500 26px/31px var(--font-display); letter-spacing: -0.7px; }
+.get__text { margin: 0; font-size: 15px; line-height: 22px; letter-spacing: -0.3px; text-wrap: pretty; }
+.get__card .btn--download { margin-top: auto; }
+.get__card .wl { margin-top: auto; align-items: stretch; width: 100%; }
+.get__card .wl__msg, .get__card .wl__note { text-align: left; }
+.get__meta, .get__soon { margin: 0; font: 400 12px/18px var(--font-sans); color: rgba(255, 255, 255, 0.55); }
+.get__soon { font-size: 14px; line-height: 21px; color: rgba(255, 255, 255, 0.75); }
+.get__card.is-soon .btn--download, .get__card.is-soon .get__meta { display: none; }
+@media (max-width: 760px) { .get { grid-template-columns: minmax(0, 1fr); } }
+.btn[hidden] { display: none; }
