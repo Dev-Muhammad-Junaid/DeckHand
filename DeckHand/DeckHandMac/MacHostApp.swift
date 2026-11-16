@@ -29,6 +29,9 @@ final class MacDaemon: ObservableObject {
     }
 
     init() {
+        // The app delegate builds the daemon, which can happen before
+        // `MacHostApp.init` runs, so start reporting here too.
+        DeckHandDiagnostics.startIfEnabled()
         let built: LoomContainer?
         do {
             built = try LoomContainer(
@@ -55,6 +58,7 @@ final class MacDaemon: ObservableObject {
             )
         } catch {
             DeckHandLog.app.fault("LoomContainer init failed: \(error.localizedDescription, privacy: .public)")
+            DeckHandDiagnostics.capture(error)
             built = nil
             fatalStartupError = error.localizedDescription
         }
@@ -109,6 +113,7 @@ final class MacDaemon: ObservableObject {
                 }
             } catch {
                 DeckHandLog.app.fault("LoomContext start failed: \(error.localizedDescription, privacy: .public)")
+                DeckHandDiagnostics.capture(error)
                 await MainActor.run {
                     self.fatalStartupError = error.localizedDescription
                 }
@@ -177,6 +182,11 @@ struct MacHostApp: App {
     // NSStatusItem rather than SwiftUI's MenuBarExtra, so the item's
     // behavior, visibility, and panel sizing stay under our control.
     @NSApplicationDelegateAdaptor(DeckHandAppDelegate.self) private var appDelegate
+
+    init() {
+        // First, so a crash anywhere in launch is reported (if allowed).
+        DeckHandDiagnostics.startIfEnabled()
+    }
 
     var body: some Scene {
         // No visible scene. A Settings scene keeps this a valid SwiftUI App

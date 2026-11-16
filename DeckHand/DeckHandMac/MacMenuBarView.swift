@@ -19,6 +19,9 @@ struct MacMenuBarView: View {
 
     @ObservedObject private var permissions = PermissionsMonitor.shared
 
+    /// Mirrors `DeckHandDiagnostics.isEnabledByUser` (absent = on).
+    @AppStorage(DeckHandDiagnostics.enabledKey) private var shareCrashReports = true
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // ── Header ────────────────────────────────────────────────
@@ -192,6 +195,15 @@ struct MacMenuBarView: View {
 
             // ── Footer ────────────────────────────────────────────────
             HStack {
+                Toggle("Share crash reports", isOn: $shareCrashReports)
+                    .toggleStyle(.checkbox)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .help("Sends crash, hang and performance reports to the developer. Never includes your screen, your device names or who you are.")
+                    .onChange(of: shareCrashReports) { _, enabled in
+                        DeckHandDiagnostics.setEnabled(enabled)
+                    }
+                Spacer()
                 Button("Quit Deck Hand") { NSApplication.shared.terminate(nil) }
                     .font(.system(size: 12))
                     .buttonStyle(.plain)

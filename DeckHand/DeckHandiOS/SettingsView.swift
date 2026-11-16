@@ -26,6 +26,7 @@ struct SettingsView: View {
                 appsSection
                 appearanceSection
                 connectionSection
+                privacySection
                 aboutSection
             }
             .navigationTitle("Settings")
@@ -205,6 +206,18 @@ struct SettingsView: View {
             Text("Connection")
         } footer: {
             Text("The code path for this exists on both sides; switching it on needs a CloudKit container registered to a paid developer account.")
+        }
+    }
+
+    // MARK: - Privacy
+
+    private var privacySection: some View {
+        Section {
+            Toggle("Share crash reports", isOn: $settings.shareCrashReports)
+        } header: {
+            Text("Privacy")
+        } footer: {
+            Text("Sends crash, hang and performance reports to the developer so problems can be fixed. They include the device model, system version and what the app was doing — never your screen, your captures, your device names or who you are. Applies to this device; the Mac has its own switch.")
         }
     }
 

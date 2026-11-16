@@ -11,11 +11,19 @@ options:
 packages:
   Loom:
     path: ../
+  # Crash and performance reporting (see Shared/DeckHandDiagnostics.swift).
+  Sentry:
+    url: https://github.com/getsentry/sentry-cocoa
+    from: 9.34.0
 
 settings:
   base:
     SWIFT_VERSION: 6.0
     DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
+    # Sentry organization slug for the dSYM upload step. Not a secret; the
+    # auth token lives in ~/.sentryclirc on the build Mac (`sentry-cli login`),
+    # never in this repository.
+    SENTRY_ORG: widgetsflow
 
 configs:
   Debug: debug
@@ -38,9 +46,18 @@ targets:
     dependencies:
       - package: Loom
         product: LoomKit
+      - package: Sentry
+        product: Sentry
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.widgetsflow.deckhand.mac
+        # Sentry project "deckhand-mac". Paste its DSN here (Sentry → Project
+        # Settings → Client Keys (DSN)). DSNs are designed to ship inside the
+        # app, so committing it is fine. Empty = crash reporting off.
+        SENTRY_DSN: ""
+        SENTRY_PROJECT: deckhand-mac
+        # The dSYM upload script needs network and ~/.sentryclirc.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
         INFOPLIST_FILE: DeckHandMac/Info.plist
         CODE_SIGN_ENTITLEMENTS: DeckHandMac/DeckHandMac.entitlements
         PRODUCT_NAME: Deck Hand
@@ -60,6 +77,23 @@ targets:
       SystemCapabilities:
         com.apple.iCloud:
           enabled: 1
+    postBuildScripts:
+      - name: Upload dSYMs to Sentry
+        basedOnDependencyAnalysis: false
+        script: |
+          # Release builds only. Missing tools or credentials warn, never fail.
+          [ "$CONFIGURATION" = "Release" ] || exit 0
+          export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+          if ! command -v sentry-cli >/dev/null 2>&1; then
+            echo "warning: sentry-cli not installed (brew install getsentry/tools/sentry-cli); dSYMs not uploaded"
+            exit 0
+          fi
+          if [ -z "$SENTRY_DSN" ]; then
+            echo "note: SENTRY_DSN is empty; skipping dSYM upload"
+            exit 0
+          fi
+          sentry-cli debug-files upload --org "$SENTRY_ORG" --project "$SENTRY_PROJECT" "$DWARF_DSYM_FOLDER_PATH" \
+            || echo "warning: Sentry dSYM upload failed; crashes from this build won't be symbolicated"
     scheme: {}
 
   # ─────────────────────────────────────────────────────────────
@@ -77,9 +111,17 @@ targets:
     dependencies:
       - package: Loom
         product: LoomKit
+      - package: Sentry
+        product: Sentry
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.widgetsflow.deckhand
+        # Sentry project "deckhand-ios". Paste its DSN here (Sentry → Project
+        # Settings → Client Keys (DSN)). Empty = crash reporting off.
+        SENTRY_DSN: ""
+        SENTRY_PROJECT: deckhand-ios
+        # The dSYM upload script needs network and ~/.sentryclirc.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
         INFOPLIST_FILE: DeckHandiOS/Info.plist
         CODE_SIGN_ENTITLEMENTS: DeckHandiOS/DeckHandiOS.entitlements
         PRODUCT_NAME: Deck Hand
@@ -101,6 +143,23 @@ targets:
       SystemCapabilities:
         com.apple.iCloud:
           enabled: 1
+    postBuildScripts:
+      - name: Upload dSYMs to Sentry
+        basedOnDependencyAnalysis: false
+        script: |
+          # Release builds only. Missing tools or credentials warn, never fail.
+          [ "$CONFIGURATION" = "Release" ] || exit 0
+          export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+          if ! command -v sentry-cli >/dev/null 2>&1; then
+            echo "warning: sentry-cli not installed (brew install getsentry/tools/sentry-cli); dSYMs not uploaded"
+            exit 0
+          fi
+          if [ -z "$SENTRY_DSN" ]; then
+            echo "note: SENTRY_DSN is empty; skipping dSYM upload"
+            exit 0
+          fi
+          sentry-cli debug-files upload --org "$SENTRY_ORG" --project "$SENTRY_PROJECT" "$DWARF_DSYM_FOLDER_PATH" \
+            || echo "warning: Sentry dSYM upload failed; crashes from this build won't be symbolicated"
     scheme: {}
 
   # ─────────────────────────────────────────────────────────────
@@ -120,6 +179,10 @@ targets:
     dependencies:
       - package: Loom
         product: LoomKit
+      # Shared/DeckHandDiagnostics.swift imports it. No DSN here, so the
+      # tests never report anything.
+      - package: Sentry
+        product: Sentry
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.widgetsflow.deckhand.tests

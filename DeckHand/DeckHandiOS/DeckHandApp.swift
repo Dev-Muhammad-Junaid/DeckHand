@@ -17,6 +17,8 @@ struct DeckHandApp: App {
     @StateObject private var settings = DeckHandSettings()
 
     init() {
+        // First, so a crash anywhere in launch is reported (if allowed).
+        DeckHandDiagnostics.startIfEnabled()
         do {
             loomContainer = try LoomContainer(
                 for: LoomContainerConfiguration(
@@ -36,6 +38,7 @@ struct DeckHandApp: App {
             startupError = nil
         } catch {
             DeckHandLog.app.fault("LoomContainer init failed: \(error.localizedDescription, privacy: .public)")
+            DeckHandDiagnostics.capture(error)
             loomContainer = nil
             startupError = error.localizedDescription
         }
