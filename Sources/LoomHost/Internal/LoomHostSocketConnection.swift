@@ -136,19 +136,24 @@ package actor LoomHostSocketConnection {
     ) async {
         let decoder = JSONDecoder()
         var bufferedData = Data()
-        var readBuffer = [UInt8](repeating: 0, count: 4096)
+        let io = LoomHostBlockingIO(label: "com.loom.host.socket-read")
 
         while !Task.isCancelled {
-            let readCount = readBuffer.withUnsafeMutableBytes { rawBuffer in
-                Darwin.read(
-                    fileDescriptor,
-                    rawBuffer.baseAddress,
-                    rawBuffer.count
-                )
+            // `read` parks until the peer writes, so it runs off the cooperative pool.
+            let (chunk, readError) = await io.perform { () -> Data? in
+                var readBuffer = [UInt8](repeating: 0, count: 4096)
+                let readCount = readBuffer.withUnsafeMutableBytes { rawBuffer in
+                    Darwin.read(
+                        fileDescriptor,
+                        rawBuffer.baseAddress,
+                        rawBuffer.count
+                    )
+                }
+                return readCount < 0 ? nil : Data(readBuffer[..<readCount])
             }
 
-            if readCount > 0 {
-                bufferedData.append(readBuffer, count: readCount)
+            if let chunk, !chunk.isEmpty {
+                bufferedData.append(chunk)
                 if bufferedData.count > Self.maximumBufferedFrameBytes {
                     break
                 }
@@ -175,10 +180,11 @@ package actor LoomHostSocketConnection {
                 continue
             }
 
-            if readCount == 0 {
+            if chunk != nil {
+                // Zero bytes: the peer closed.
                 break
             }
-            if errno == EINTR {
+            if readError == EINTR {
                 continue
             }
             break

@@ -62,6 +62,69 @@ struct LoomHostSocketConnectionTests {
         let didClose = await nextValue(from: connectionClosed, timeout: .seconds(2))
         #expect(didClose != nil)
     }
+
+    @Test("Frames arrive while more read loops wait than there are cores")
+    func framesArriveWithMoreWaitingReadLoopsThanCores() async throws {
+        // Every connection's read loop waits in `read` between frames. When
+        // those waits held Swift concurrency threads, this many of them left
+        // none to run anything else, this test's timeout included, and the
+        // whole test process stalled.
+        let pairCount = ProcessInfo.processInfo.activeProcessorCount + 1
+        let (arrivals, arrival) = AsyncStream<Int>.makeStream()
+        var connections: [LoomHostSocketConnection] = []
+        var senders: [LoomHostSocketConnection] = []
+
+        for index in 0 ..< pairCount {
+            var sockets = [Int32](repeating: 0, count: 2)
+            try #require(socketpair(AF_UNIX, SOCK_STREAM, 0, &sockets) == 0)
+            let sender = LoomHostSocketConnection(
+                fileDescriptor: sockets[0],
+                onFrame: { _ in },
+                onClosed: {}
+            )
+            let receiver = LoomHostSocketConnection(
+                fileDescriptor: sockets[1],
+                onFrame: { _ in arrival.yield(index) },
+                onClosed: {}
+            )
+            await sender.startReading()
+            await receiver.startReading()
+            senders.append(sender)
+            connections += [sender, receiver]
+        }
+
+        for sender in senders {
+            try await sender.send(
+                LoomHostIPCFrame(requestID: nil, message: .refreshPeers(clientID: UUID()))
+            )
+        }
+
+        let arrived = await withTaskGroup(of: Set<Int>?.self) { group in
+            group.addTask {
+                var arrived = Set<Int>()
+                for await index in arrivals {
+                    arrived.insert(index)
+                    if arrived.count == pairCount {
+                        break
+                    }
+                }
+                return arrived
+            }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(5))
+                return nil
+            }
+
+            let result = await group.next() ?? nil
+            group.cancelAll()
+            return result
+        }
+        #expect(arrived?.count == pairCount)
+
+        for connection in connections {
+            await connection.close()
+        }
+    }
 }
 
 private func nextValue<Element: Sendable>(

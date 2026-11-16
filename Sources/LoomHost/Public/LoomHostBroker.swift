@@ -127,13 +127,17 @@ public actor LoomHostBroker {
         listenerFD: Int32,
         onAccept: @escaping @Sendable (Int32) async -> Void
     ) async {
+        let io = LoomHostBlockingIO(label: "com.loom.host.socket-accept")
         while !Task.isCancelled {
-            let acceptedFD = Darwin.accept(listenerFD, nil, nil)
+            // `accept` parks until a client connects, so it runs off the cooperative pool.
+            let (acceptedFD, acceptError) = await io.perform {
+                Darwin.accept(listenerFD, nil, nil)
+            }
             if acceptedFD < 0 {
-                if errno == EINTR {
+                if acceptError == EINTR {
                     continue
                 }
-                if Task.isCancelled || errno == EBADF {
+                if Task.isCancelled || acceptError == EBADF {
                     break
                 }
                 continue
