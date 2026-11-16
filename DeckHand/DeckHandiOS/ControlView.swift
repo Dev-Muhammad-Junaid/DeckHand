@@ -45,6 +45,8 @@ struct ControlView: View {
     @State private var isScreenshotPresented = false
     @State private var screenshotTimeoutTask: Task<Void, Never>?
     @State private var screenshotErrorMessage: String?
+    /// The error alert is about the live mirror, not a capture.
+    @State private var screenshotErrorIsMirror = false
     /// Token of the most recently issued screenshot request. Responses
     /// echo this value back; any mismatch is dropped on the floor so a
     /// slow, late-arriving capture from a previous tap can't show up
@@ -353,11 +355,11 @@ struct ControlView: View {
             // memory resident until the *next* capture overwrote it.
             .onDisappear { screenshotImage = nil }
         }
-        .alert("Screenshot Failed", isPresented: Binding(
+        .alert(screenshotErrorIsMirror ? "Live Mirror Unavailable" : "Screenshot Failed", isPresented: Binding(
             get: { screenshotErrorMessage != nil },
-            set: { if !$0 { screenshotErrorMessage = nil } }
+            set: { if !$0 { screenshotErrorMessage = nil; screenshotErrorIsMirror = false } }
         )) {
-            Button("OK", role: .cancel) { screenshotErrorMessage = nil }
+            Button("OK", role: .cancel) { screenshotErrorMessage = nil; screenshotErrorIsMirror = false }
         } message: {
             Text(screenshotErrorMessage ?? "")
         }
@@ -626,6 +628,7 @@ struct ControlView: View {
                         if isMirrorActive {
                             isMirrorActive = false
                             mirrorImage = nil
+                            screenshotErrorIsMirror = true
                             screenshotErrorMessage = message
                         }
                         break
