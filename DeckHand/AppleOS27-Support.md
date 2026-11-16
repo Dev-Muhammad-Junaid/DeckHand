@@ -157,7 +157,9 @@ Core AI and the on-device models require.
   unsigned recipe for CI, so this failure stops being rediscovered. The README's
   build section should get whichever we pick.
 - Verify the Loom package still resolves and tests under Swift 6.4, and fix the
-  one `LoomCloudKitShareManager` warning while we are in there.
+  one `LoomCloudKitShareManager` warning while we are in there. (Upstream Loom
+  2.2.16 renamed that file to `LoomCloudKitPeerManager.swift`; check whether the
+  warning survived the merge.)
 
 ### 1.5 Two OS-level changes that reach every binary
 
