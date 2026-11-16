@@ -45,6 +45,10 @@ final class MacDaemon: ObservableObject {
                     // Over-the-internet reachability: plumbed through, but
                     // inert until a relay is deployed (returns nil today).
                     remoteSignaling: DeckHandCloud.remoteSignalingConfiguration,
+                    // Loom 2.x denies `.requiresApproval` during the handshake;
+                    // this provider lets verified identities through so the
+                    // app-level Allow / Deny still runs.
+                    trustProvider: DeckHandHandshakeTrustProvider(),
                     // No transport-level auto-retry: connection lifecycle is
                     // owned entirely by the app (explicit connect, ping/pong
                     // liveness). Retry created overlapping reconnect state

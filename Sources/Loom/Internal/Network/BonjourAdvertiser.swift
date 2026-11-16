@@ -5,29 +5,28 @@
 //  Created by Ethan Lipnik on 1/2/26.
 //
 
+#if canImport(Network)
 import Foundation
 import Network
 
 /// Advertises a Loom peer service via Bonjour.
 ///
-/// This listener uses TCP parameters solely for Bonjour service registration
-/// and macOS local network permission grants. No TCP connections are ever
-/// accepted or established through it. Actual sessions are handled by a
-/// separate ``LoomDirectListener`` configured for UDP.
+/// The service type uses a `_tcp` suffix so Network.framework can resolve the
+/// Bonjour endpoint reliably. Authenticated sessions publish their direct
+/// TCP, UDP, and QUIC listener ports through TXT metadata so clients can
+/// connect to the selected transport directly.
 ///
-/// The reason TCP is used here: `NWConnection` cannot resolve Bonjour service
-/// endpoints whose type ends in `_udp` — the connection times out without
-/// completing DNS-SD resolution. Until Apple's Network framework supports
-/// `_udp` service endpoint resolution, the Bonjour advertisement must use a
-/// `_tcp` service type so that clients can discover the host. Clients read
-/// the UDP port from the TXT record and connect directly via
-/// `NWEndpoint.hostPort`.
+/// `NWConnection` cannot resolve Bonjour service endpoints whose type ends in
+/// `_udp` because resolution times out before completing DNS-SD. The `_tcp`
+/// service type keeps discovery reliable while TXT metadata carries the actual
+/// direct transport ports.
 actor BonjourAdvertiser {
     private var listener: NWListener?
     private let serviceType: String
     private let serviceName: String
     private var advertisement: LoomPeerAdvertisement
     private let enablePeerToPeer: Bool
+    private let onFailureAfterReady: (@Sendable (String) -> Void)?
 
     private var isAdvertising = false
 
@@ -35,33 +34,28 @@ actor BonjourAdvertiser {
         serviceName: String,
         advertisement: LoomPeerAdvertisement = LoomPeerAdvertisement(),
         serviceType: String = Loom.serviceType,
-        enablePeerToPeer: Bool = true
+        enablePeerToPeer: Bool = true,
+        onFailureAfterReady: (@Sendable (String) -> Void)? = nil
     ) {
         self.serviceName = serviceName
         self.advertisement = advertisement
         self.serviceType = serviceType
         self.enablePeerToPeer = enablePeerToPeer
+        self.onFailureAfterReady = onFailureAfterReady
     }
 
     /// Start advertising the service
-    func start(port: UInt16 = 0, onConnection: @escaping @Sendable (NWConnection) -> Void) async throws -> UInt16 {
+    func start(port: UInt16 = 0, onConnection: @escaping LoomDirectConnectionHandler) async throws -> UInt16 {
         guard !isAdvertising else { throw LoomError.alreadyAdvertising }
 
         validateBonjourInfoPlistKeys(serviceType: serviceType)
 
-        // TCP listener for Bonjour service registration only — enables discovery
-        // and local network permissions. Actual sessions use the separate UDP listener.
+        // TCP listener for Bonjour service registration, discovery, local
+        // network permissions, and authenticated TCP fallback. Datagram-capable
+        // sessions publish their direct listener ports through TXT metadata.
         // TODO: Investigate using a UDP Bonjour listener once NWConnection supports
         // resolving _udp service endpoints (rdar://FB...).
-        let parameters = NWParameters.tcp
-        parameters.serviceClass = .interactiveVideo
-        parameters.includePeerToPeer = enablePeerToPeer
-
-        if let tcpOptions = parameters.defaultProtocolStack.transportProtocol as? NWProtocolTCP.Options {
-            tcpOptions.noDelay = true
-            tcpOptions.enableKeepalive = true
-            tcpOptions.keepaliveInterval = 5
-        }
+        let parameters = Self.makeAdvertiserParameters(enablePeerToPeer: enablePeerToPeer)
 
         let actualPort: NWEndpoint.Port = port == 0 ? .any : NWEndpoint.Port(rawValue: port)!
         parameters.allowLocalEndpointReuse = true
@@ -77,19 +71,30 @@ actor BonjourAdvertiser {
         )
 
         // Set connection handler BEFORE starting the listener
-        listener?.newConnectionHandler = onConnection
+        listener?.newConnectionHandler = { connection in
+            Task {
+                await onConnection(
+                    LoomNetworkFrameworkConnection(
+                        connection: connection,
+                        transportKind: .tcp
+                    )
+                )
+            }
+        }
 
         // Capture listener reference for the closure
         guard let listener else { throw LoomError.protocolError("Failed to create listener") }
 
         return try await withCheckedThrowingContinuation { continuation in
             let continuationBox = ContinuationBox<UInt16>(continuation)
+            let startState = BonjourAdvertiserStartState()
 
             listener.stateUpdateHandler = { [weak self, continuationBox] state in
                 LoomLogger.discovery("Advertiser state: \(state)")
                 switch state {
                 case .ready:
                     if let port = listener.port?.rawValue {
+                        startState.markReady()
                         Task { await self?.setAdvertising(true) }
                         continuationBox.resume(returning: port)
                     }
@@ -104,12 +109,18 @@ actor BonjourAdvertiser {
                         LoomLogger.error(.discovery, "Advertising failed: \(guidance)")
                     }
                     Task { await self?.setAdvertising(false) }
-                    continuationBox.resume(throwing: error)
+                    if startState.hasReportedReady {
+                        self?.onFailureAfterReady?(String(describing: error))
+                    } else {
+                        continuationBox.resume(throwing: error)
+                    }
                 case let .waiting(error):
                     LoomLogger.discovery("Advertiser waiting: \(error)")
                 case .cancelled:
                     Task { await self?.setAdvertising(false) }
-                    continuationBox.resume(throwing: LoomError.protocolError("Listener cancelled"))
+                    if !startState.hasReportedReady {
+                        continuationBox.resume(throwing: LoomError.protocolError("Listener cancelled"))
+                    }
                 default:
                     break
                 }
@@ -117,6 +128,23 @@ actor BonjourAdvertiser {
 
             listener.start(queue: .global(qos: .userInteractive))
         }
+    }
+
+    package static func makeAdvertiserParameters(enablePeerToPeer: Bool) -> NWParameters {
+        let parameters = NWParameters.tcp
+        parameters.serviceClass = .interactiveVideo
+        parameters.includePeerToPeer = enablePeerToPeer
+        if #available(iOS 26, macOS 26, visionOS 26, *) {
+            parameters.allowUltraConstrainedPaths = enablePeerToPeer
+        }
+
+        if let tcpOptions = parameters.defaultProtocolStack.transportProtocol as? NWProtocolTCP.Options {
+            tcpOptions.noDelay = true
+            tcpOptions.enableKeepalive = true
+            tcpOptions.keepaliveInterval = 5
+        }
+
+        return parameters
     }
 
     private func setAdvertising(_ value: Bool) {
@@ -147,3 +175,22 @@ actor BonjourAdvertiser {
         advertisement
     }
 }
+
+private final class BonjourAdvertiserStartState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var reportedReady = false
+
+    var hasReportedReady: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return reportedReady
+    }
+
+    func markReady() {
+        lock.lock()
+        reportedReady = true
+        lock.unlock()
+    }
+}
+
+#endif

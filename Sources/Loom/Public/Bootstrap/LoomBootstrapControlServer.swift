@@ -5,6 +5,7 @@
 //  Created by Ethan Lipnik on 3/9/26.
 //
 
+#if canImport(Network)
 import Foundation
 import Network
 
@@ -26,21 +27,42 @@ public actor LoomBootstrapControlServer {
     public typealias StatusHandler = @Sendable (LoomBootstrapControlPeer) async throws -> LoomBootstrapControlResult
     public typealias UnlockHandler =
         @Sendable (LoomBootstrapControlPeer, LoomBootstrapCredentials) async throws -> LoomBootstrapControlResult
+    public typealias CommandHandler =
+        @Sendable (LoomBootstrapControlPeer, LoomBootstrapControlCommandPayload) async throws -> LoomBootstrapControlResult
+    public typealias PeerAuthorizer = @Sendable (LoomBootstrapControlPeer) async -> Bool
 
     private let controlAuthSecret: String
     private let statusHandler: StatusHandler
     private let unlockHandler: UnlockHandler
+    private let commandHandler: CommandHandler?
+    private let peerAuthorizer: PeerAuthorizer
+    private let requestTimeout: Duration
+    private let maxPendingConnections: Int
+    private let outstandingOperationLimiter: LoomOutstandingOperationLimiter
     private let replayProtector = LoomReplayProtector()
     private var listener: NWListener?
+    private var pendingConnectionCount = 0
 
     public init(
         controlAuthSecret: String,
         onStatus: @escaping StatusHandler,
-        onUnlock: @escaping UnlockHandler
+        onUnlock: @escaping UnlockHandler,
+        onCommand: CommandHandler? = nil,
+        requestTimeout: Duration = .seconds(10),
+        maxPendingConnections: Int = 16,
+        isPeerAuthorized: @escaping PeerAuthorizer = { _ in true }
     ) {
         self.controlAuthSecret = controlAuthSecret
         statusHandler = onStatus
         unlockHandler = onUnlock
+        commandHandler = onCommand
+        self.requestTimeout = max(.milliseconds(1), requestTimeout)
+        let maxPendingConnections = max(1, maxPendingConnections)
+        self.maxPendingConnections = maxPendingConnections
+        outstandingOperationLimiter = LoomOutstandingOperationLimiter(
+            maximumConcurrentOperations: maxPendingConnections
+        )
+        peerAuthorizer = isPeerAuthorized
     }
 
     public func start(port: UInt16 = Loom.defaultControlPort) async throws -> UInt16 {
@@ -51,7 +73,7 @@ public actor LoomBootstrapControlServer {
         }
         listener.newConnectionHandler = { [weak self] connection in
             Task {
-                await self?.handleConnection(connection)
+                await self?.acceptConnection(connection)
             }
         }
 
@@ -78,6 +100,31 @@ public actor LoomBootstrapControlServer {
     public func stop() {
         listener?.cancel()
         listener = nil
+    }
+
+    private func acceptConnection(_ connection: NWConnection) async {
+        guard pendingConnectionCount < maxPendingConnections else {
+            LoomLogger.log(.bootstrap, "Rejected bootstrap control connection: admission limit reached")
+            connection.cancel()
+            return
+        }
+        pendingConnectionCount += 1
+        do {
+            try await withLoomThrowingTimeout(
+                requestTimeout,
+                onTimeout: {
+                    connection.cancel()
+                }
+            ) { [weak self] in
+                guard let self else { return }
+                try await self.outstandingOperationLimiter.run {
+                    await self.handleConnection(connection)
+                }
+            }
+        } catch {
+            connection.cancel()
+        }
+        pendingConnectionCount = max(0, pendingConnectionCount - 1)
     }
 
     private func handleConnection(_ connection: NWConnection) async {
@@ -132,6 +179,21 @@ public actor LoomBootstrapControlServer {
                 nonce: request.auth.nonce
             )
             return try await unlockHandler(peer, credentials)
+        case .performCommand:
+            guard let commandHandler else {
+                throw LoomBootstrapControlError.protocolViolation("Bootstrap control commands are not supported.")
+            }
+            guard let commandPayload = request.commandPayload else {
+                throw LoomBootstrapControlError.protocolViolation("Missing encrypted command payload.")
+            }
+            let command = try LoomBootstrapControlSecurity.decryptCommand(
+                commandPayload,
+                sharedSecret: controlAuthSecret,
+                requestID: request.requestID,
+                timestampMs: request.auth.timestampMs,
+                nonce: request.auth.nonce
+            )
+            return try await commandHandler(peer, command)
         }
     }
 
@@ -144,14 +206,15 @@ public actor LoomBootstrapControlServer {
             throw LoomBootstrapControlError.protocolViolation("Bootstrap control key identifier mismatch.")
         }
 
-        guard await replayProtector.validate(
+        guard await replayProtector.canAccept(
             timestampMs: request.auth.timestampMs,
             nonce: request.auth.nonce
         ) else {
             throw LoomBootstrapControlError.protocolViolation("Bootstrap control replay rejected.")
         }
 
-        let encryptedSHA256 = LoomBootstrapControlSecurity.payloadSHA256Hex(request.credentialsPayload?.combined)
+        let signedPayload = request.credentialsPayload?.combined ?? request.commandPayload?.combined
+        let encryptedSHA256 = LoomBootstrapControlSecurity.payloadSHA256Hex(signedPayload)
         let payload = try LoomBootstrapControlSecurity.canonicalPayload(
             requestID: request.requestID,
             operation: request.operation,
@@ -167,12 +230,21 @@ public actor LoomBootstrapControlServer {
         ) else {
             throw LoomBootstrapControlError.protocolViolation("Bootstrap control signature verification failed.")
         }
-
-        return LoomBootstrapControlPeer(
+        let peer = LoomBootstrapControlPeer(
             keyID: request.auth.keyID,
             publicKey: request.auth.publicKey,
             endpoint: endpoint
         )
+        guard await peerAuthorizer(peer) else {
+            throw LoomBootstrapControlError.protocolViolation("Bootstrap control peer is not authorized.")
+        }
+        guard await replayProtector.record(
+            timestampMs: request.auth.timestampMs,
+            nonce: request.auth.nonce
+        ) else {
+            throw LoomBootstrapControlError.protocolViolation("Bootstrap control replay rejected.")
+        }
+        return peer
     }
 
     private func startAndAwaitReady(_ connection: NWConnection, queue: DispatchQueue) async throws {
@@ -296,3 +368,5 @@ private final class BootstrapServerReadyContinuationBox: @unchecked Sendable {
         }
     }
 }
+
+#endif

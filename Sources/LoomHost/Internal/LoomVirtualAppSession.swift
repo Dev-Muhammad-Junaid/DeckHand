@@ -17,12 +17,16 @@ package actor LoomVirtualAppSession: LoomSessionProtocol {
     private let sendHandler: @Sendable (UUID, UInt16, Data) async throws -> Void
     private let closeHandler: @Sendable (UUID, UInt16) async throws -> Void
     private let cancelHandler: @Sendable (UUID) async -> Void
+    private let hardCutHandler: @Sendable (UUID) async -> Void
+    private let reliableSendAdmission = LoomReliableSendAdmission()
     private let stateObservers = LoomAsyncBroadcaster<LoomAuthenticatedSessionState>()
+    private let bootstrapProgressObservers = LoomAsyncBroadcaster<LoomAuthenticatedSessionBootstrapProgress>()
     private let incomingStreamObservers = LoomAsyncBroadcaster<LoomMultiplexedStream>()
 
     // `package`-visible to satisfy the public `LoomSessionProtocol.state`
     // requirement; still only mutated from within the actor.
     package private(set) var state: LoomAuthenticatedSessionState = .ready
+    private var bootstrapProgress = LoomAuthenticatedSessionBootstrapProgress(phase: .ready)
     private var streams: [UInt16: LoomMultiplexedStream] = [:]
     private var nextOutgoingStreamID: UInt16 = 1
 
@@ -33,7 +37,8 @@ package actor LoomVirtualAppSession: LoomSessionProtocol {
         openHandler: @escaping @Sendable (UUID, UInt16, String?) async throws -> Void,
         sendHandler: @escaping @Sendable (UUID, UInt16, Data) async throws -> Void,
         closeHandler: @escaping @Sendable (UUID, UInt16) async throws -> Void,
-        cancelHandler: @escaping @Sendable (UUID) async -> Void
+        cancelHandler: @escaping @Sendable (UUID) async -> Void,
+        hardCutHandler: @escaping @Sendable (UUID) async -> Void
     ) {
         self.connectionID = connectionID
         self.transportKind = transportKind
@@ -42,10 +47,12 @@ package actor LoomVirtualAppSession: LoomSessionProtocol {
         self.sendHandler = sendHandler
         self.closeHandler = closeHandler
         self.cancelHandler = cancelHandler
+        self.hardCutHandler = hardCutHandler
     }
 
     deinit {
         stateObservers.finish()
+        bootstrapProgressObservers.finish()
         incomingStreamObservers.finish()
     }
 
@@ -59,6 +66,10 @@ package actor LoomVirtualAppSession: LoomSessionProtocol {
 
     package func makePathObserver() -> AsyncStream<LoomSessionNetworkPathSnapshot> {
         AsyncStream { $0.finish() }
+    }
+
+    package func makeBootstrapProgressObserver() -> AsyncStream<LoomAuthenticatedSessionBootstrapProgress> {
+        bootstrapProgressObservers.makeStream(initialValue: bootstrapProgress)
     }
 
     package func openStream(label: String?) async throws -> LoomMultiplexedStream {
@@ -81,12 +92,19 @@ package actor LoomVirtualAppSession: LoomSessionProtocol {
         nextOutgoingStreamID = streamID == .max ? 0 : streamID &+ 1
 
         let stream = makeStream(id: streamID, label: label)
+        guard let lease = reliableSendAdmission.acquire() else {
+            throw LoomHostError.protocolViolation(
+                "The broker-backed Loom session is closed to reliable sends."
+            )
+        }
+        defer { lease.release() }
         try await openHandler(connectionID, streamID, label)
         streams[streamID] = stream
         return stream
     }
 
     package func cancel() async {
+        reliableSendAdmission.close()
         guard state != .cancelled else {
             return
         }
@@ -116,10 +134,7 @@ package actor LoomVirtualAppSession: LoomSessionProtocol {
         stream.finishInbound()
     }
 
-    package func handleStateChanged(
-        _ newState: LoomAuthenticatedSessionState,
-        errorMessage _: String?
-    ) {
+    package func handleStateChanged(_ newState: LoomAuthenticatedSessionState) {
         state = newState
         stateObservers.yield(newState)
         switch newState {
@@ -129,21 +144,72 @@ package actor LoomVirtualAppSession: LoomSessionProtocol {
             break
         case .cancelled,
              .failed:
+            reliableSendAdmission.close()
             finishAllStreams()
         }
     }
 
     private func makeStream(id: UInt16, label: String?) -> LoomMultiplexedStream {
-        LoomMultiplexedStream(
+        let terminateHardCut: @Sendable () async -> Void = {
+            [weak self, connectionID, hardCutHandler, reliableSendAdmission] in
+            if let self {
+                await self.terminateForReliableSendHardCut()
+            } else {
+                // A retained stream can outlive its virtual session. The shared IPC cut remains
+                // mandatory because its broker request may still be suspended.
+                await hardCutHandler(connectionID)
+                await reliableSendAdmission.waitForQuiescence()
+            }
+        }
+        return LoomMultiplexedStream(
             id: id,
             label: label,
-            sendHandler: { [connectionID, sendHandler] data in
+            sendHandler: { [connectionID, sendHandler, reliableSendAdmission] data in
+                guard let lease = reliableSendAdmission.acquire() else {
+                    throw LoomHostError.protocolViolation("The broker-backed Loom session is closed to reliable sends.")
+                }
+                defer { lease.release() }
                 try await sendHandler(connectionID, id, data)
+            },
+            hardDeadlineSendHandler: {
+                [connectionID, sendHandler, reliableSendAdmission, terminateHardCut] data, deadline in
+                let deadlineLeaseTransfer: LoomReliableSendLeaseTransfer
+                switch reliableSendAdmission.acquire(before: deadline) {
+                case let .admitted(lease):
+                    // Admission and deadline observation share one lock, so an IPC request cannot
+                    // enter through a task that begins running after its caller's deadline.
+                    deadlineLeaseTransfer = LoomReliableSendLeaseTransfer(lease)
+                case .expired:
+                    // No lease or IPC request exists, so pre-admission expiry leaves the session open.
+                    throw LoomError.timeout
+                case .closed:
+                    throw LoomHostError.protocolViolation("The broker-backed Loom session is closed to reliable sends.")
+                }
+                defer { deadlineLeaseTransfer.releaseIfOperationHasNotStarted() }
+                try await withLoomQuiescingHardDeadline(
+                    deadline,
+                    closeAdmission: {
+                        reliableSendAdmission.close()
+                    },
+                    releaseUnstartedOperation: {
+                        // A hard cut can win before the spawned task takes ownership of its lease.
+                        deadlineLeaseTransfer.releaseIfOperationHasNotStarted()
+                    },
+                    quiesce: terminateHardCut,
+                    operation: {
+                        guard let lease = deadlineLeaseTransfer.takeForOperation() else {
+                            // The hard-cut winner already released a task that never entered IPC.
+                            throw CancellationError()
+                        }
+                        defer { lease.release() }
+                        try await sendHandler(connectionID, id, data)
+                    }
+                )
             },
             unreliableSendHandler: { [connectionID, sendHandler] data in
                 try await sendHandler(connectionID, id, data)
             },
-            queuedUnreliableSendHandler: { [connectionID, sendHandler] data, onComplete in
+            queuedUnreliableSendHandler: { [connectionID, sendHandler] data, _, _, onComplete in
                 do {
                     try await sendHandler(connectionID, id, data)
                     onComplete(nil)
@@ -151,10 +217,33 @@ package actor LoomVirtualAppSession: LoomSessionProtocol {
                     onComplete(error)
                 }
             },
-            closeHandler: { [connectionID, closeHandler] in
+            queuedUnreliableResetHandler: { _ in },
+            closeHandler: { [connectionID, closeHandler, reliableSendAdmission] in
+                guard let lease = reliableSendAdmission.acquire() else {
+                    throw LoomHostError.protocolViolation(
+                        "The broker-backed Loom session is closed to reliable sends."
+                    )
+                }
+                defer { lease.release() }
                 try await closeHandler(connectionID, id)
             }
         )
+    }
+
+    private func terminateForReliableSendHardCut() async {
+        reliableSendAdmission.close()
+        switch state {
+        case .cancelled, .failed:
+            break
+        case .idle, .handshaking, .ready:
+            state = .failed("Reliable broker-backed Loom stream send was hard-cut before completion.")
+            stateObservers.yield(state)
+            finishAllStreams()
+        }
+        // Closing the IPC socket bypasses the ordered request lane whose current request may be the
+        // operation that crossed its deadline. The socket owner fails every pending continuation.
+        await hardCutHandler(connectionID)
+        await reliableSendAdmission.waitForQuiescence()
     }
 
     private func finishAllStreams() {

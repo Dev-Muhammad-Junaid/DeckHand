@@ -6,7 +6,9 @@
 //
 
 import Foundation
+#if canImport(os)
 import os
+#endif
 
 public enum LoomLogLevel: String, Sendable {
     case info
@@ -211,6 +213,7 @@ public struct LoomLogger: Sendable {
     ) {
         let rawMessage = message()
         let sourceMessage = "\(sourcePrefix(fileID: fileID, line: line, function: function)) \(rawMessage)"
+#if canImport(os)
         let logger = logger(for: category)
         switch level {
         case .info:
@@ -222,6 +225,9 @@ public struct LoomLogger: Sendable {
         case .fault:
             logger.fault("\(sourceMessage, privacy: .public)")
         }
+#else
+        print("[\(level.rawValue)] [\(category.rawValue)] \(sourceMessage)")
+#endif
 
         let now = Date()
         LoomDiagnostics.record(log: LoomDiagnosticsLogEvent(
@@ -258,9 +264,11 @@ public struct LoomLogger: Sendable {
         "[\(fileID):\(line) \(function)]"
     }
 
+#if canImport(os)
     private static func logger(for category: LoomLogCategory) -> Logger {
         storage.logger(for: category)
     }
+#endif
 
     /// Parse LOOM_LOG environment variable
     private static func parseEnvironment() -> Set<LoomLogCategory> {

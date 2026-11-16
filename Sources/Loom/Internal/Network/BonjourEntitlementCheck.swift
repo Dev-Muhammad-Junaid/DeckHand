@@ -91,4 +91,7 @@ private let isRunningInTestContext: Bool = {
         || ProcessInfo.processInfo.arguments.contains(where: { $0.contains("xctest") || $0.contains(".xctest") })
         || Bundle.main.bundlePath.hasSuffix(".xctest")
         || ProcessInfo.processInfo.processName == "xctest"
+        // swift-testing runs (upstream Loom 2.x check).
+        || ProcessInfo.processInfo.arguments.contains("--testing-library")
+        || ProcessInfo.processInfo.arguments.contains("swift-testing")
 }()

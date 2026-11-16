@@ -5,10 +5,10 @@
 //  Created by Ethan Lipnik on 1/2/26.
 //
 
+#if canImport(Network)
 import Foundation
 import Network
 import Observation
-import CryptoKit
 
 /// Discovers Loom peers on the local network via Bonjour.
 @Observable
@@ -20,8 +20,17 @@ public final class LoomDiscovery {
     /// Whether discovery is currently active
     public private(set) var isSearching: Bool = false
 
+    /// Whether Bonjour browsing has reached the ready state.
+    public private(set) var isBrowserReady: Bool = false
+
     /// Whether peer-to-peer WiFi discovery is enabled
     public var enablePeerToPeer: Bool = true
+
+    /// Whether Bonjour discovery is enabled.
+    public var enableBonjour: Bool = true
+
+    /// Policy used to rank discovered direct transports for the same device.
+    public var directConnectionPolicy: LoomDirectConnectionPolicy
 
     /// Optional local device identifier used to filter self from discovery results.
     public var localDeviceID: UUID?
@@ -29,30 +38,51 @@ public final class LoomDiscovery {
     /// Callback invoked whenever discovered peers change.
     public var onPeersChanged: (([LoomPeer]) -> Void)?
 
+    /// Callback invoked when the local network access denial state changes.
+    public var onLocalNetworkAccessDeniedChanged: ((Bool) -> Void)?
+
+    /// Whether Bonjour browsing is currently marked as denied by local network privacy.
+    public private(set) var localNetworkAccessDenied = false
+
     /// Additional peer-change observers keyed by registration token.
     private var peersChangedObservers: [UUID: ([LoomPeer]) -> Void] = [:]
 
     private var browser: NWBrowser?
     private var txtRecordMonitor: BonjourTXTRecordMonitor?
+    private var stoppingTXTRecordMonitors: [BonjourTXTRecordMonitor] = []
+    private var browserCanRefreshInPlace = false
+    private let browserQueue = DispatchQueue(label: "com.mirage.loom.discovery.browser", qos: .utility)
     private let serviceType: String
     private var browseResultsByEndpoint: [NWEndpoint: NWBrowser.Result] = [:]
     private var txtRecordsByService: [BonjourServiceIdentity: [String: String]] = [:]
+    private var resolvedAddressesByService: [BonjourServiceIdentity: [NWEndpoint.Host]] = [:]
     private var peerCandidatesByDeviceID: [UUID: [NWEndpoint: LoomHostDiscoveryCandidate]] = [:]
     private var peerIDByEndpoint: [NWEndpoint: UUID] = [:]
     private var peersByID: [LoomPeerID: LoomPeer] = [:]
+    private var lastPublishedPeerSnapshots: [PublishedPeerSnapshot] = []
 
     public init(
         serviceType: String = Loom.serviceType,
+        enableBonjour: Bool = true,
         enablePeerToPeer: Bool = true,
+        directConnectionPolicy: LoomDirectConnectionPolicy = .default,
         localDeviceID: UUID? = nil
     ) {
         self.serviceType = serviceType
+        self.enableBonjour = enableBonjour
         self.enablePeerToPeer = enablePeerToPeer
+        self.directConnectionPolicy = directConnectionPolicy
         self.localDeviceID = localDeviceID
     }
 
     /// Start discovery on the local network.
     public func startDiscovery() {
+        guard enableBonjour else {
+            LoomLogger.discovery("Bonjour discovery disabled by configuration")
+            stopDiscovery()
+            return
+        }
+
         guard !isSearching else {
             LoomLogger.discovery("Already searching")
             return
@@ -62,8 +92,7 @@ public final class LoomDiscovery {
 
         LoomLogger.discovery("Starting discovery for \(serviceType)")
 
-        let parameters = NWParameters()
-        parameters.includePeerToPeer = enablePeerToPeer
+        let parameters = Self.makeBrowserParameters(enablePeerToPeer: enablePeerToPeer)
 
         let txtRecordMonitor = BonjourTXTRecordMonitor(
             serviceType: serviceType,
@@ -71,6 +100,9 @@ public final class LoomDiscovery {
         )
         txtRecordMonitor.onTXTRecordChanged = { [weak self] serviceIdentity, txtRecord in
             self?.handleTXTRecordUpdate(txtRecord, for: serviceIdentity)
+        }
+        txtRecordMonitor.onServiceResolved = { [weak self] serviceIdentity, hosts in
+            self?.handleServiceResolved(hosts, for: serviceIdentity)
         }
         txtRecordMonitor.onServiceRemoved = { [weak self] serviceIdentity in
             self?.handleTXTRecordRemoval(for: serviceIdentity)
@@ -93,41 +125,61 @@ public final class LoomDiscovery {
         browser?.browseResultsChangedHandler = { [weak self] results, changes in
             LoomLogger.discovery("Results changed: \(results.count) hosts, \(changes.count) changes")
             Task { @MainActor [weak self] in
-                self?.handleBrowseResults(results, changes: changes)
+                self?.handleBrowseResults(changes: changes)
             }
         }
 
-        browser?.start(queue: .main)
+        browser?.start(queue: browserQueue)
         isSearching = true
+    }
+
+    nonisolated package static func makeBrowserParameters(enablePeerToPeer: Bool) -> NWParameters {
+        let parameters = NWParameters()
+        parameters.includePeerToPeer = enablePeerToPeer
+        if #available(iOS 26, macOS 26, visionOS 26, *) {
+            parameters.allowUltraConstrainedPaths = enablePeerToPeer
+        }
+        return parameters
     }
 
     /// Stop discovery.
     public func stopDiscovery() {
         browser?.cancel()
         browser = nil
-        txtRecordMonitor?.stop()
-        txtRecordMonitor = nil
+        browserCanRefreshInPlace = false
+        stopTXTRecordMonitor()
         isSearching = false
+        isBrowserReady = false
         browseResultsByEndpoint.removeAll()
         txtRecordsByService.removeAll()
+        resolvedAddressesByService.removeAll()
         peerCandidatesByDeviceID.removeAll()
         peerIDByEndpoint.removeAll()
         peersByID.removeAll()
-        discoveredPeers.removeAll()
-        notifyPeersChanged()
+        publishDiscoveredPeers([])
     }
 
     private func handleBrowserState(_ state: NWBrowser.State) {
         switch state {
+        case .setup,
+             .waiting:
+            browserCanRefreshInPlace = true
         case .ready:
             isSearching = true
+            browserCanRefreshInPlace = true
+            isBrowserReady = true
+            setLocalNetworkAccessDenied(false)
         case .cancelled:
             isSearching = false
+            browserCanRefreshInPlace = false
+            isBrowserReady = false
         case let .failed(error):
             isSearching = false
-            // Authorization denials (-65555) are the classic "works in
-            // debug, dead in production" failure. Attach actionable
-            // guidance to the log instead of the bare NWError (WID-333).
+            browserCanRefreshInPlace = false
+            isBrowserReady = false
+            setLocalNetworkAccessDenied(Self.isLocalNetworkAccessDenied(error))
+            // DeckHand fork (WID-333): attach actionable guidance to the log
+            // instead of the bare NWError.
             if let guidance = LoomLocalNetworkDiagnostics.guidance(
                 for: error, serviceType: serviceType
             ) {
@@ -140,7 +192,35 @@ public final class LoomDiscovery {
         }
     }
 
-    private func handleBrowseResults(_: Set<NWBrowser.Result>, changes: Set<NWBrowser.Result.Change>) {
+    private func setLocalNetworkAccessDenied(_ value: Bool) {
+        guard localNetworkAccessDenied != value else { return }
+        localNetworkAccessDenied = value
+        onLocalNetworkAccessDeniedChanged?(value)
+    }
+
+    private static func isLocalNetworkAccessDenied(_ error: Error) -> Bool {
+        if let nwError = error as? NWError,
+           case let .dns(code) = nwError {
+            return code == -65_555
+        }
+
+        let nsError = error as NSError
+        return nsError.domain == NetService.errorDomain && nsError.code == -65_555
+    }
+
+    private func stopTXTRecordMonitor() {
+        guard let monitor = txtRecordMonitor else { return }
+        txtRecordMonitor = nil
+        stoppingTXTRecordMonitors.append(monitor)
+        monitor.stop { [weak self, weak monitor] in
+            Task { @MainActor [weak self, weak monitor] in
+                guard let self, let monitor else { return }
+                self.stoppingTXTRecordMonitors.removeAll { $0 === monitor }
+            }
+        }
+    }
+
+    private func handleBrowseResults(changes: Set<NWBrowser.Result.Change>) {
         for change in changes {
             switch change {
             case let .added(result):
@@ -169,34 +249,54 @@ public final class LoomDiscovery {
             peerName = name
         }
 
+        let resolvedAddresses: [NWEndpoint.Host]
+        if let serviceIdentity = BonjourServiceIdentity(endpoint: result.endpoint) {
+            resolvedAddresses = resolvedAddressesByService[serviceIdentity] ?? []
+        } else {
+            resolvedAddresses = []
+        }
+
         upsertBonjourPeer(
             peerName: peerName,
             endpoint: result.endpoint,
-            txtRecord: txtRecord(for: result)
+            txtRecord: txtRecord(for: result),
+            resolvedAddresses: resolvedAddresses,
+            discoveredInterfaces: result.interfaces.map(LoomDiscoveredInterface.init)
         )
     }
 
     private func upsertBonjourPeer(
         peerName: String,
         endpoint: NWEndpoint,
-        txtRecord: [String: String]
+        txtRecord: [String: String],
+        resolvedAddresses: [NWEndpoint.Host] = [],
+        discoveredInterfaces: [LoomDiscoveredInterface] = []
     ) {
-        let advertisement = LoomPeerAdvertisement.from(txtRecord: txtRecord)
+        let decodedAdvertisement = LoomPeerAdvertisement.from(txtRecord: txtRecord)
         if !txtRecord.isEmpty {
             LoomLogger.discovery(
-                "Peer metadata \(peerName): did=\(advertisement.deviceID?.uuidString ?? "nil") type=\(advertisement.deviceType?.rawValue ?? "unknown") keys=\(txtRecord.keys.sorted())"
+                "Peer metadata \(peerName): did=\(decodedAdvertisement.deviceID?.uuidString ?? "nil") type=\(decodedAdvertisement.deviceType?.rawValue ?? "unknown") keys=\(txtRecord.keys.sorted())"
             )
         }
 
-        let peerID = advertisement.deviceID ?? fallbackPeerID(endpoint: endpoint, peerName: peerName)
+        guard let peerID = decodedAdvertisement.deviceID else {
+            removePeer(for: endpoint)
+            return
+        }
+
         guard peerID != localDeviceID else {
             removePeer(for: endpoint)
             return
         }
 
+        let advertisement = mergeTransportHints(
+            from: decodedAdvertisement,
+            endpoint: endpoint,
+            peerID: peerID
+        )
         let normalizedAdvertisement = LoomPeerAdvertisement(
             protocolVersion: advertisement.protocolVersion,
-            deviceID: advertisement.deviceID ?? peerID,
+            deviceID: advertisement.deviceID,
             identityKeyID: advertisement.identityKeyID,
             deviceType: advertisement.deviceType,
             modelIdentifier: advertisement.modelIdentifier,
@@ -210,27 +310,53 @@ public final class LoomDiscovery {
             name: peerName,
             deviceType: normalizedAdvertisement.deviceType ?? .unknown,
             endpoint: endpoint,
-            advertisement: normalizedAdvertisement
+            advertisement: normalizedAdvertisement,
+            resolvedAddresses: resolvedAddresses,
+            resolvedServiceAddresses: Self.resolvedServiceAddresses(
+                from: resolvedAddresses,
+                discoveredInterfaces: discoveredInterfaces
+            ),
+            discoveredInterfaces: discoveredInterfaces
         )
 
         storeCandidate(candidate, for: endpoint, peerID: peerID)
     }
 
-    private func fallbackPeerID(endpoint: NWEndpoint, peerName: String) -> UUID {
-        let source = "\(peerName)|\(endpoint.debugDescription)"
-        let digest = SHA256.hash(data: Data(source.utf8))
-        let bytes = Array(digest)
-        var uuidBytes = Array(bytes.prefix(16))
-        uuidBytes[6] = (uuidBytes[6] & 0x0F) | 0x40
-        uuidBytes[8] = (uuidBytes[8] & 0x3F) | 0x80
+    private func mergeTransportHints(
+        from advertisement: LoomPeerAdvertisement,
+        endpoint: NWEndpoint,
+        peerID: UUID
+    ) -> LoomPeerAdvertisement {
+        guard let existingAdvertisement = peerCandidatesByDeviceID[peerID]?[endpoint]?.advertisement else {
+            return advertisement
+        }
 
-        let uuid = uuid_t(
-            uuidBytes[0], uuidBytes[1], uuidBytes[2], uuidBytes[3],
-            uuidBytes[4], uuidBytes[5], uuidBytes[6], uuidBytes[7],
-            uuidBytes[8], uuidBytes[9], uuidBytes[10], uuidBytes[11],
-            uuidBytes[12], uuidBytes[13], uuidBytes[14], uuidBytes[15]
+        var transportsByKind = existingAdvertisement.directTransports.reduce(
+            into: [LoomTransportKind: LoomDirectTransportAdvertisement]()
+        ) { result, transport in
+            result[transport.transportKind] = transport
+        }
+        for transport in advertisement.directTransports {
+            transportsByKind[transport.transportKind] = transport
+        }
+
+        let mergedTransports = LoomTransportKind.allCases.compactMap { transportsByKind[$0] }
+        guard mergedTransports != advertisement.directTransports else {
+            return advertisement
+        }
+
+        return LoomPeerAdvertisement(
+            protocolVersion: advertisement.protocolVersion,
+            deviceID: advertisement.deviceID,
+            identityKeyID: advertisement.identityKeyID,
+            deviceType: advertisement.deviceType,
+            modelIdentifier: advertisement.modelIdentifier,
+            iconName: advertisement.iconName,
+            machineFamily: advertisement.machineFamily,
+            hostName: advertisement.hostName,
+            directTransports: mergedTransports,
+            metadata: advertisement.metadata
         )
-        return UUID(uuid: uuid)
     }
 
     private func removePeer(for endpoint: NWEndpoint) {
@@ -260,8 +386,17 @@ public final class LoomDiscovery {
         refreshPeers(for: serviceIdentity)
     }
 
+    private func handleServiceResolved(_ hosts: [NWEndpoint.Host], for serviceIdentity: BonjourServiceIdentity) {
+        resolvedAddressesByService[serviceIdentity] = hosts
+        LoomLogger.discovery(
+            "Service resolved \(serviceIdentity.name): \(hosts.map { "\($0)" }.joined(separator: ", "))"
+        )
+        refreshPeers(for: serviceIdentity)
+    }
+
     private func handleTXTRecordRemoval(for serviceIdentity: BonjourServiceIdentity) {
         txtRecordsByService.removeValue(forKey: serviceIdentity)
+        resolvedAddressesByService.removeValue(forKey: serviceIdentity)
         refreshPeers(for: serviceIdentity)
     }
 
@@ -306,17 +441,38 @@ public final class LoomDiscovery {
     }
 
     private func updatePeersList() {
-        discoveredPeers = Array(peersByID.values).sorted { lhs, rhs in
+        let updatedPeers = Array(peersByID.values).sorted { lhs, rhs in
             if lhs.name != rhs.name {
                 return lhs.name < rhs.name
             }
             return lhs.id.rawValue < rhs.id.rawValue
         }
-        notifyPeersChanged()
+        publishDiscoveredPeers(updatedPeers)
     }
 
     /// Force a discovery refresh.
-    public func refresh() {
+    public func refresh(forceRestart: Bool = false, reason: String? = nil) {
+        guard enableBonjour else {
+            stopDiscovery()
+            return
+        }
+
+        if forceRestart {
+            if let reason, !reason.isEmpty {
+                LoomLogger.discovery("Restarting discovery: \(reason)")
+            } else {
+                LoomLogger.discovery("Restarting discovery")
+            }
+            stopDiscovery()
+            startDiscovery()
+            return
+        }
+
+        guard browser == nil || !browserCanRefreshInPlace else {
+            LoomLogger.discovery("Discovery refresh skipped; Bonjour browser is already active")
+            return
+        }
+
         stopDiscovery()
         startDiscovery()
     }
@@ -329,20 +485,15 @@ public final class LoomDiscovery {
             name: peer.name,
             deviceType: peer.deviceType,
             endpoint: peer.endpoint,
-            advertisement: peer.advertisement.deviceID == nil
-                ? LoomPeerAdvertisement(
-                    protocolVersion: peer.advertisement.protocolVersion,
-                    deviceID: peer.deviceID,
-                    identityKeyID: peer.advertisement.identityKeyID,
-                    deviceType: peer.advertisement.deviceType,
-                    modelIdentifier: peer.advertisement.modelIdentifier,
-                    iconName: peer.advertisement.iconName,
-                    machineFamily: peer.advertisement.machineFamily,
-                    hostName: peer.advertisement.hostName,
-                    directTransports: peer.advertisement.directTransports,
-                    metadata: peer.advertisement.metadata
-                )
-                : peer.advertisement
+            advertisement: peer.advertisement,
+            resolvedAddresses: peer.resolvedAddresses,
+            resolvedServiceAddresses: peer.resolvedServiceAddresses.contains(where: \.hasInterfaceScope)
+                ? peer.resolvedServiceAddresses
+                : Self.resolvedServiceAddresses(
+                    from: peer.resolvedAddresses,
+                    discoveredInterfaces: peer.discoveredInterfaces
+                ),
+            discoveredInterfaces: peer.discoveredInterfaces
         )
         storeCandidate(candidate, for: peer.endpoint, peerID: peer.deviceID)
     }
@@ -350,12 +501,16 @@ public final class LoomDiscovery {
     package func upsertBonjourPeerForTesting(
         peerName: String,
         endpoint: NWEndpoint,
-        txtRecord: [String: String]
+        txtRecord: [String: String],
+        resolvedAddresses: [NWEndpoint.Host] = [],
+        discoveredInterfaces: [LoomDiscoveredInterface] = []
     ) {
         upsertBonjourPeer(
             peerName: peerName,
             endpoint: endpoint,
-            txtRecord: txtRecord
+            txtRecord: txtRecord,
+            resolvedAddresses: resolvedAddresses,
+            discoveredInterfaces: discoveredInterfaces
         )
     }
 
@@ -374,11 +529,21 @@ public final class LoomDiscovery {
             updatePeersList()
             return
         }
+        let discoveredInterfaces = mergedDiscoveredInterfaces(from: candidates.values)
+        let resolvedAddresses = mergedResolvedAddresses(
+            from: candidates.values,
+            preferredCandidate: preferredCandidate
+        )
+        let resolvedServiceAddresses = mergedResolvedServiceAddresses(
+            from: candidates.values,
+            preferredCandidate: preferredCandidate
+        )
 
         removeProjectedPeers(forDeviceID: peerID)
         let projections = LoomHostCatalogCodec.projections(
             peerName: preferredCandidate.name,
-            advertisement: preferredCandidate.advertisement
+            advertisement: preferredCandidate.advertisement,
+            fallbackDeviceID: peerID
         )
         for projection in projections {
             peersByID[projection.peerID] = LoomPeer(
@@ -386,26 +551,129 @@ public final class LoomDiscovery {
                 name: projection.displayName,
                 deviceType: preferredCandidate.deviceType,
                 endpoint: preferredCandidate.endpoint,
-                advertisement: projection.advertisement
+                advertisement: projection.advertisement,
+                resolvedAddresses: resolvedAddresses,
+                resolvedServiceAddresses: resolvedServiceAddresses,
+                discoveredInterfaces: discoveredInterfaces
             )
         }
         updatePeersList()
     }
 
-    private func isPreferredPeer(_ lhs: LoomHostDiscoveryCandidate, _ rhs: LoomHostDiscoveryCandidate) -> Bool {
-        let leftRank = rank(for: lhs)
-        let rightRank = rank(for: rhs)
-        if leftRank != rightRank {
-            return leftRank < rightRank
+    private func mergedResolvedAddresses(
+        from candidates: Dictionary<NWEndpoint, LoomHostDiscoveryCandidate>.Values,
+        preferredCandidate: LoomHostDiscoveryCandidate
+    ) -> [NWEndpoint.Host] {
+        var resolvedAddresses: [NWEndpoint.Host] = []
+        var seenKeys: Set<String> = []
+
+        func append(_ hosts: [NWEndpoint.Host]) {
+            for host in hosts {
+                let key = host.debugDescription.lowercased()
+                guard seenKeys.insert(key).inserted else {
+                    continue
+                }
+                resolvedAddresses.append(host)
+            }
         }
-        return lhs.endpoint.debugDescription < rhs.endpoint.debugDescription
+
+        append(preferredCandidate.resolvedAddresses)
+
+        let remainingCandidates = candidates
+            .filter { $0.endpoint.debugDescription != preferredCandidate.endpoint.debugDescription }
+            .sorted { lhs, rhs in
+                isPreferredPeer(lhs, rhs)
+            }
+        for candidate in remainingCandidates {
+            append(candidate.resolvedAddresses)
+        }
+
+        return resolvedAddresses
     }
 
-    private func rank(for peer: LoomHostDiscoveryCandidate) -> Int {
-        guard let preferredTransport = peer.advertisement.directTransports.min(by: transportIsPreferred(_:_:)) else {
-            return Int.max
+    private func mergedResolvedServiceAddresses(
+        from candidates: Dictionary<NWEndpoint, LoomHostDiscoveryCandidate>.Values,
+        preferredCandidate: LoomHostDiscoveryCandidate
+    ) -> [LoomResolvedServiceAddress] {
+        var resolvedServiceAddresses: [LoomResolvedServiceAddress] = []
+        var seenKeys: Set<String> = []
+
+        func append(_ addresses: [LoomResolvedServiceAddress]) {
+            for address in addresses {
+                let key = address.host.debugDescription.lowercased()
+                guard seenKeys.insert(key).inserted else {
+                    continue
+                }
+                resolvedServiceAddresses.append(address)
+            }
         }
-        return pathRank(preferredTransport.pathKind) * 10 + transportRank(preferredTransport.transportKind)
+
+        append(preferredCandidate.resolvedServiceAddresses)
+
+        let remainingCandidates = candidates
+            .filter { $0.endpoint.debugDescription != preferredCandidate.endpoint.debugDescription }
+            .sorted { lhs, rhs in
+                isPreferredPeer(lhs, rhs)
+            }
+        for candidate in remainingCandidates {
+            append(candidate.resolvedServiceAddresses)
+        }
+
+        return resolvedServiceAddresses
+    }
+
+    private func mergedDiscoveredInterfaces(
+        from candidates: Dictionary<NWEndpoint, LoomHostDiscoveryCandidate>.Values
+    ) -> [LoomDiscoveredInterface] {
+        var interfacesByKey: [String: LoomDiscoveredInterface] = [:]
+        for candidate in candidates {
+            for discoveredInterface in candidate.discoveredInterfaces {
+                let key: String
+                if discoveredInterface.index > 0 {
+                    key = "index:\(discoveredInterface.index)"
+                } else {
+                    key = "name:\(discoveredInterface.name.lowercased())"
+                }
+                if interfacesByKey[key]?.networkInterface == nil {
+                    interfacesByKey[key] = discoveredInterface
+                }
+            }
+        }
+        return interfacesByKey.values.sorted { lhs, rhs in
+            let leftPriority = lhs.proximityPriority ?? Int.max
+            let rightPriority = rhs.proximityPriority ?? Int.max
+            if leftPriority != rightPriority {
+                return leftPriority < rightPriority
+            }
+            if lhs.isPeerToPeer != rhs.isPeerToPeer {
+                return lhs.isPeerToPeer
+            }
+            if lhs.index != rhs.index {
+                return lhs.index < rhs.index
+            }
+            return lhs.name < rhs.name
+        }
+    }
+
+    private func isPreferredPeer(_ lhs: LoomHostDiscoveryCandidate, _ rhs: LoomHostDiscoveryCandidate) -> Bool {
+        let leftTransport = lhs.advertisement.directTransports.min(by: transportIsPreferred(_:_:))
+        let rightTransport = rhs.advertisement.directTransports.min(by: transportIsPreferred(_:_:))
+        switch (leftTransport, rightTransport) {
+        case let (left?, right?):
+            if transportIsPreferred(left, right) {
+                return true
+            }
+            if transportIsPreferred(right, left) {
+                return false
+            }
+        case (.some, nil):
+            return true
+        case (nil, .some):
+            return false
+        case (nil, nil):
+            break
+        }
+        return lhs.endpoint.debugDescription < rhs.endpoint.debugDescription
     }
 
     private func removeProjectedPeers(forDeviceID peerID: UUID) {
@@ -416,36 +684,25 @@ public final class LoomDiscovery {
         _ lhs: LoomDirectTransportAdvertisement,
         _ rhs: LoomDirectTransportAdvertisement
     ) -> Bool {
-        let leftRank = pathRank(lhs.pathKind) * 10 + transportRank(lhs.transportKind)
-        let rightRank = pathRank(rhs.pathKind) * 10 + transportRank(rhs.transportKind)
-        if leftRank != rightRank {
-            return leftRank < rightRank
+        let leftPathRank = pathRank(lhs.pathKind)
+        let rightPathRank = pathRank(rhs.pathKind)
+        if leftPathRank != rightPathRank {
+            return leftPathRank < rightPathRank
+        }
+        let leftTransportRank = transportRank(lhs.transportKind)
+        let rightTransportRank = transportRank(rhs.transportKind)
+        if leftTransportRank != rightTransportRank {
+            return leftTransportRank < rightTransportRank
         }
         return lhs.port < rhs.port
     }
 
     private func pathRank(_ pathKind: LoomDirectPathKind?) -> Int {
-        switch pathKind ?? .other {
-        case .wired:
-            return 0
-        case .wifi:
-            return 1
-        case .awdl:
-            return 2
-        case .other:
-            return 3
-        }
+        directConnectionPolicy.preferredLocalPathOrder.firstIndex(of: pathKind ?? .other) ?? Int.max
     }
 
     private func transportRank(_ transportKind: LoomTransportKind) -> Int {
-        switch transportKind {
-        case .udp:
-            return 0
-        case .quic:
-            return 1
-        case .tcp:
-            return 2
-        }
+        directConnectionPolicy.preferredTransportOrder.firstIndex(of: transportKind) ?? Int.max
     }
 
     /// Registers an observer that is invoked whenever discovered peers change.
@@ -461,11 +718,81 @@ public final class LoomDiscovery {
         peersChangedObservers.removeValue(forKey: token)
     }
 
-    private func notifyPeersChanged() {
-        onPeersChanged?(discoveredPeers)
+    private func publishDiscoveredPeers(_ peers: [LoomPeer]) {
+        let snapshots = peers.map(PublishedPeerSnapshot.init)
+        guard snapshots != lastPublishedPeerSnapshots else { return }
+
+        discoveredPeers = peers
+        lastPublishedPeerSnapshots = snapshots
+        onPeersChanged?(peers)
         for observer in peersChangedObservers.values {
-            observer(discoveredPeers)
+            observer(peers)
         }
+    }
+
+    nonisolated private static func resolvedServiceAddresses(
+        from hosts: [NWEndpoint.Host],
+        discoveredInterfaces: [LoomDiscoveredInterface]
+    ) -> [LoomResolvedServiceAddress] {
+        let interfacesByName = discoveredInterfaces.reduce(into: [String: LoomDiscoveredInterface]()) { result, discoveredInterface in
+            let name = discoveredInterface.name
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            guard !name.isEmpty else { return }
+            if result[name]?.networkInterface == nil {
+                result[name] = discoveredInterface
+            }
+        }
+
+        return hosts.map { host in
+            let interfaceName = scopedIPv6InterfaceName(host)
+            let interfaceKind = interfaceName.map { name in
+                interfacesByName[name]?.kind ??
+                    LoomDiscoveredInterface(name: name, type: .other, index: 0).kind
+            }
+            return LoomResolvedServiceAddress(
+                host: host,
+                interfaceName: interfaceName,
+                interfaceKind: interfaceKind
+            )
+        }
+    }
+
+    nonisolated private static func scopedIPv6InterfaceName(_ host: NWEndpoint.Host) -> String? {
+        guard case let .ipv6(address) = host else {
+            return nil
+        }
+        let description = String(describing: address)
+        guard let separator = description.lastIndex(of: "%") else {
+            return nil
+        }
+        let suffix = description[description.index(after: separator)...]
+        let interfaceName = suffix
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return interfaceName.isEmpty ? nil : interfaceName
+    }
+}
+
+private struct PublishedPeerSnapshot: Equatable {
+    let id: LoomPeerID
+    let name: String
+    let deviceType: DeviceType
+    let endpoint: NWEndpoint
+    let advertisement: LoomPeerAdvertisement
+    let resolvedAddresses: [NWEndpoint.Host]
+    let resolvedServiceAddresses: [LoomResolvedServiceAddress]
+    let discoveredInterfaces: [LoomDiscoveredInterface]
+
+    init(_ peer: LoomPeer) {
+        id = peer.id
+        name = peer.name
+        deviceType = peer.deviceType
+        endpoint = peer.endpoint
+        advertisement = peer.advertisement
+        resolvedAddresses = peer.resolvedAddresses
+        resolvedServiceAddresses = peer.resolvedServiceAddresses
+        discoveredInterfaces = peer.discoveredInterfaces
     }
 }
 
@@ -474,4 +801,9 @@ private struct LoomHostDiscoveryCandidate {
     let deviceType: DeviceType
     let endpoint: NWEndpoint
     let advertisement: LoomPeerAdvertisement
+    let resolvedAddresses: [NWEndpoint.Host]
+    let resolvedServiceAddresses: [LoomResolvedServiceAddress]
+    let discoveredInterfaces: [LoomDiscoveredInterface]
 }
+
+#endif

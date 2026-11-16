@@ -6,25 +6,32 @@
 //
 
 @_exported import Foundation
+@_exported import LoomNetworking
+
+#if os(Windows)
+// CoreFoundation's absolute-time aliases are not exported by Foundation on Windows.
+package typealias CFAbsoluteTime = TimeInterval
+
+package func CFAbsoluteTimeGetCurrent() -> CFAbsoluteTime {
+    Date.timeIntervalSinceReferenceDate
+}
+#endif
 
 package typealias WindowID = UInt32
 package typealias StreamID = UInt16
 package typealias StreamSessionID = UUID
 
 public enum Loom {
-    public static let version = "1.6.0"
-    public static let protocolVersion: UInt8 = 2
+    public static let version = "2.2.0"
+    public static let protocolVersion: UInt8 = 3
     /// Default Bonjour service type for peer discovery.
     ///
-    /// Uses `_tcp` suffix despite actual sessions running over UDP because
-    /// `NWConnection` cannot resolve `_udp` Bonjour service endpoints
-    /// (the connection times out during DNS-SD resolution). The TCP
-    /// `NWListener` in ``BonjourAdvertiser`` exists only for service
-    /// registration — no TCP connections are established. Clients read
-    /// the UDP port from the TXT record and connect directly.
-    public static let serviceType = "_loom._tcp"
-    public static let defaultControlPort: UInt16 = 9847
-    public static let defaultDataPort: UInt16 = 9848
-    public static let defaultOverlayProbePort: UInt16 = 9850
+    /// Uses a `_tcp` suffix because `NWConnection` cannot resolve `_udp`
+    /// Bonjour service endpoints reliably. Authenticated sessions publish
+    /// their direct TCP and UDP ports in TXT metadata.
+    public static let serviceType = "_loom-default._tcp"
+    public static let defaultControlPort: UInt16 = 38447
+    public static let defaultDataPort: UInt16 = 38448
+    public static let defaultOverlayProbePort: UInt16 = 38450
     public static let defaultMaxPacketSize = 1200
 }

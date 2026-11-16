@@ -5,19 +5,34 @@
 //  Created by Ethan Lipnik on 1/2/26.
 //
 
-import CoreGraphics
 import Foundation
+
+package struct LoomContentRect: Equatable, Sendable {
+    package let x: Double
+    package let y: Double
+    package let width: Double
+    package let height: Double
+
+    package init(x: Double, y: Double, width: Double, height: Double) {
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+    }
+
+    package static let zero = LoomContentRect(x: 0, y: 0, width: 0, height: 0)
+}
 
 /// Magic number for packet validation.
 package let loomProtocolMagic: UInt32 = 0x4C4F_4F4D // "LOOM"
 
 /// Protocol version
-package let loomProtocolVersion: UInt8 = 2
+package let loomProtocolVersion: UInt8 = 3
 package let loomSupportedFeatures: LoomFeatureSet = [
     .controlMessageRouting,
     .protocolNegotiation,
     .identityAuthV2,
-    .udpRegistrationAuthV1,
+    .datagramRegistrationAuthV1,
     .encryptedMediaV1
 ]
 
@@ -44,7 +59,7 @@ package let loomHeaderSize: Int = 61
 /// Base fields (4+1+1+1+1+2+4+8+4+2+2+2+4+4+1+2+4 = 47).
 package let loomAudioHeaderSize: Int = 47
 
-/// AEAD authentication tag size (ChaCha20-Poly1305).
+/// AEAD authentication tag size (AES-256-GCM).
 package let loomMediaAuthTagSize: Int = 16
 
 /// Compute payload size from the configured maximum packet size.
@@ -314,7 +329,7 @@ package struct FrameHeader {
         payloadLength: UInt32,
         frameByteCount: UInt32,
         checksum: UInt32,
-        contentRect: CGRect = .zero,
+        contentRect: LoomContentRect = .zero,
         dimensionToken: UInt16 = 0,
         epoch: UInt16 = 0
     ) {
@@ -328,21 +343,21 @@ package struct FrameHeader {
         self.payloadLength = payloadLength
         self.frameByteCount = frameByteCount
         self.checksum = checksum
-        contentRectX = Float32(contentRect.origin.x)
-        contentRectY = Float32(contentRect.origin.y)
-        contentRectWidth = Float32(contentRect.size.width)
-        contentRectHeight = Float32(contentRect.size.height)
+        contentRectX = Float32(contentRect.x)
+        contentRectY = Float32(contentRect.y)
+        contentRectWidth = Float32(contentRect.width)
+        contentRectHeight = Float32(contentRect.height)
         self.dimensionToken = dimensionToken
         self.epoch = epoch
     }
 
-    /// Get contentRect as CGRect
-    package var contentRect: CGRect {
-        CGRect(
-            x: CGFloat(contentRectX),
-            y: CGFloat(contentRectY),
-            width: CGFloat(contentRectWidth),
-            height: CGFloat(contentRectHeight)
+    /// Returns the decoded content rectangle.
+    package var contentRect: LoomContentRect {
+        LoomContentRect(
+            x: Double(contentRectX),
+            y: Double(contentRectY),
+            width: Double(contentRectWidth),
+            height: Double(contentRectHeight)
         )
     }
 
@@ -479,11 +494,11 @@ package struct FrameHeader {
             payloadLength: payloadLength,
             frameByteCount: frameByteCount,
             checksum: checksum,
-            contentRect: CGRect(
-                x: CGFloat(contentRectX),
-                y: CGFloat(contentRectY),
-                width: CGFloat(contentRectWidth),
-                height: CGFloat(contentRectHeight)
+            contentRect: LoomContentRect(
+                x: Double(contentRectX),
+                y: Double(contentRectY),
+                width: Double(contentRectWidth),
+                height: Double(contentRectHeight)
             ),
             dimensionToken: dimensionToken,
             epoch: epoch

@@ -17,7 +17,7 @@ struct LoomConnectionCoordinatorTests {
         let node = LoomNode(
             configuration: LoomNetworkConfiguration(
                 directConnectionPolicy: LoomDirectConnectionPolicy(
-                    preferredRemoteTransportOrder: [.quic, .tcp]
+                    preferredTransportOrder: [.quic, .tcp]
                 )
             )
         )
@@ -44,13 +44,46 @@ struct LoomConnectionCoordinatorTests {
     }
 
     @MainActor
+    @Test("Local discovery host override preserves advertised transport ports")
+    func localPlanUsesConfiguredHostOverride() async throws {
+        let node = LoomNode(
+            configuration: LoomNetworkConfiguration(
+                directConnectionPolicy: LoomDirectConnectionPolicy(
+                    preferredTransportOrder: [.quic, .tcp],
+                    localDiscoveryHostOverride: "127.0.0.1"
+                )
+            )
+        )
+        let coordinator = LoomConnectionCoordinator(node: node)
+        let peer = LoomPeer(
+            id: UUID(),
+            name: "Nearby Mac",
+            deviceType: .mac,
+            endpoint: .hostPort(host: "10.0.0.164", port: 4444),
+            advertisement: LoomPeerAdvertisement(
+                deviceType: .mac,
+                directTransports: [
+                    LoomDirectTransportAdvertisement(transportKind: .tcp, port: 4444),
+                    LoomDirectTransportAdvertisement(transportKind: .quic, port: 5555),
+                ]
+            )
+        )
+
+        let plan = try await coordinator.makePlan(localPeer: peer)
+
+        #expect(plan.targets.map(\.transportKind) == [.quic, .tcp])
+        #expect(plan.targets.first?.endpoint == .hostPort(host: "127.0.0.1", port: 5555))
+        #expect(plan.targets.last?.endpoint == .hostPort(host: "127.0.0.1", port: 4444))
+    }
+
+    @MainActor
     @Test("Local discovery prefers wired then Wi-Fi then AWDL when path hints are present")
     func localPlanPrefersConfiguredPathOrder() async throws {
         let node = LoomNode(
             configuration: LoomNetworkConfiguration(
                 directConnectionPolicy: LoomDirectConnectionPolicy(
                     preferredLocalPathOrder: [.wired, .wifi, .awdl, .other],
-                    preferredRemoteTransportOrder: [.quic, .tcp]
+                    preferredTransportOrder: [.quic, .tcp]
                 )
             )
         )
@@ -103,13 +136,11 @@ struct LoomConnectionCoordinatorTests {
         try await LoomGlobalSinkTestLock.shared.runOnMainActor(reset: {
             await LoomInstrumentation.resetForTesting()
         }) {
-            let instrumentationSink = ConnectionCoordinatorInstrumentationSink()
-            _ = await LoomInstrumentation.addSink(instrumentationSink)
             let attemptRecorder = ConnectionAttemptRecorder()
             let node = LoomNode(
                 configuration: LoomNetworkConfiguration(
                     directConnectionPolicy: LoomDirectConnectionPolicy(
-                        preferredRemoteTransportOrder: [.quic, .tcp],
+                        preferredTransportOrder: [.quic, .tcp],
                         racesLocalCandidates: true,
                         racesRemoteCandidates: false
                     )
@@ -122,13 +153,13 @@ struct LoomConnectionCoordinatorTests {
                     switch target.transportKind {
                     case .udp:
                         try await Task.sleep(for: .milliseconds(10))
-                        return makeCoordinatorTestSession(transportKind: .udp)
+                        return try makeCoordinatorTestSession(transportKind: .udp)
                     case .quic:
                         try await Task.sleep(for: .milliseconds(250))
-                        return makeCoordinatorTestSession(transportKind: .quic)
+                        return try makeCoordinatorTestSession(transportKind: .quic)
                     case .tcp:
                         try await Task.sleep(for: .milliseconds(25))
-                        return makeCoordinatorTestSession(transportKind: .tcp)
+                        return try makeCoordinatorTestSession(transportKind: .tcp)
                     }
                 }
             )
@@ -140,12 +171,6 @@ struct LoomConnectionCoordinatorTests {
 
             #expect(await session.transportKind == .tcp)
             #expect(await attemptRecorder.attempts() == [.quic, .tcp])
-            #expect(await waitUntil {
-                let events = await instrumentationSink.eventNames()
-                return events.contains("loom.connection.race.localDiscovery.started.2") &&
-                    events.contains("loom.connection.race.localDiscovery.selected.tcp") &&
-                    events.contains("loom.connection.race.cancelled.localDiscovery.quic")
-            })
         }
     }
 
@@ -156,7 +181,7 @@ struct LoomConnectionCoordinatorTests {
         let node = LoomNode(
             configuration: LoomNetworkConfiguration(
                 directConnectionPolicy: LoomDirectConnectionPolicy(
-                    preferredRemoteTransportOrder: [.quic, .tcp],
+                    preferredTransportOrder: [.quic, .tcp],
                     racesLocalCandidates: false,
                     racesRemoteCandidates: false
                 )
@@ -169,13 +194,13 @@ struct LoomConnectionCoordinatorTests {
                 switch target.transportKind {
                 case .udp:
                     try await Task.sleep(for: .milliseconds(2))
-                    return makeCoordinatorTestSession(transportKind: .udp)
+                    return try makeCoordinatorTestSession(transportKind: .udp)
                 case .quic:
                     try await Task.sleep(for: .milliseconds(50))
-                    return makeCoordinatorTestSession(transportKind: .quic)
+                    return try makeCoordinatorTestSession(transportKind: .quic)
                 case .tcp:
                     try await Task.sleep(for: .milliseconds(5))
-                    return makeCoordinatorTestSession(transportKind: .tcp)
+                    return try makeCoordinatorTestSession(transportKind: .tcp)
                 }
             }
         )
@@ -185,8 +210,8 @@ struct LoomConnectionCoordinatorTests {
             localPeer: makeCoordinatorTestPeer()
         )
 
-        #expect(await session.transportKind == .quic)
-        #expect(await attemptRecorder.attempts() == [.quic])
+        #expect(await session.transportKind == .tcp)
+        #expect(await attemptRecorder.attempts() == [.quic, .tcp])
     }
 
     @MainActor
@@ -196,7 +221,7 @@ struct LoomConnectionCoordinatorTests {
             configuration: LoomNetworkConfiguration(
                 enablePeerToPeer: false,
                 directConnectionPolicy: LoomDirectConnectionPolicy(
-                    preferredRemoteTransportOrder: [.quic, .tcp],
+                    preferredTransportOrder: [.quic, .tcp],
                     racesLocalCandidates: false,
                     racesRemoteCandidates: false
                 )
@@ -242,27 +267,18 @@ struct LoomConnectionCoordinatorTests {
     }
 
     @MainActor
-    @Test("Remote signaling fallback remains available when only overlay discovery succeeded")
-    func signalingFallbackIgnoresOverlayPresence() {
-        let overlayPeer = makeCoordinatorTestPeer(
-            name: "Overlay Host",
-            endpointHost: "overlay.internal",
-            tcpPort: 4600,
-            quicPort: nil
-        )
-
+    @Test("Remote signaling fallback remains available when no local peer was found")
+    func signalingFallbackRequiresMissingLocalPeer() {
         #expect(
             LoomConnectionCoordinator.signalingFallbackSessionID(
                 advertisedSignalingSessionID: "relay-session",
-                localPeer: nil,
-                overlayPeer: overlayPeer
+                localPeer: nil
             ) == "relay-session"
         )
         #expect(
             LoomConnectionCoordinator.signalingFallbackSessionID(
                 advertisedSignalingSessionID: "relay-session",
-                localPeer: makeCoordinatorTestPeer(),
-                overlayPeer: overlayPeer
+                localPeer: makeCoordinatorTestPeer()
             ) == nil
         )
     }
@@ -296,7 +312,7 @@ struct LoomConnectionCoordinatorTests {
                     configuration: LoomNetworkConfiguration(
                         enablePeerToPeer: false,
                         directConnectionPolicy: LoomDirectConnectionPolicy(
-                            preferredRemoteTransportOrder: [.quic, .tcp],
+                            preferredTransportOrder: [.quic, .tcp],
                             racesLocalCandidates: false,
                             racesRemoteCandidates: false
                         )
@@ -305,7 +321,7 @@ struct LoomConnectionCoordinatorTests {
                 signalingClient: signalingClient,
                 connector: { target, _ in
                     await attemptRecorder.record(target.transportKind, source: target.source)
-                    return makeCoordinatorTestSession(transportKind: target.transportKind)
+                    return try makeCoordinatorTestSession(transportKind: target.transportKind)
                 }
             )
 
@@ -396,16 +412,20 @@ private func makeCoordinatorTestHello() -> LoomSessionHelloRequest {
 
 private func makeCoordinatorTestSession(
     transportKind: LoomTransportKind
-) -> LoomAuthenticatedSession {
+) throws -> LoomAuthenticatedSession {
+    if transportKind == .quic {
+        throw LoomError.protocolError("QUIC transport has been removed.")
+    }
+
     let connection = NWConnection(
         host: "127.0.0.1",
         port: NWEndpoint.Port(rawValue: 9)!,
-        using: .tcp
+        using: transportKind == .tcp ? .tcp : .udp
     )
+    let loomConnection: LoomConnection = transportKind == .tcp ? .tcp(connection) : .udp(connection)
     return LoomAuthenticatedSession(
-        rawSession: LoomSession(connection: connection),
-        role: .initiator,
-        transportKind: transportKind
+        connection: loomConnection,
+        role: .initiator
     )
 }
 

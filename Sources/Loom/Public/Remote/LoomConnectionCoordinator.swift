@@ -5,6 +5,7 @@
 //  Created by Ethan Lipnik on 3/9/26.
 //
 
+#if canImport(Network)
 import Foundation
 import Network
 
@@ -21,17 +22,23 @@ public struct LoomConnectionTarget: Sendable {
     public let transportKind: LoomTransportKind
     public let endpoint: NWEndpoint
     public let requiredLocalPort: UInt16?
+    public let expectedIdentityKeyID: String?
+    public let expectedIdentityPublicKey: Data?
 
     public init(
         source: LoomConnectionTargetSource,
         transportKind: LoomTransportKind,
         endpoint: NWEndpoint,
-        requiredLocalPort: UInt16? = nil
+        requiredLocalPort: UInt16? = nil,
+        expectedIdentityKeyID: String? = nil,
+        expectedIdentityPublicKey: Data? = nil
     ) {
         self.source = source
         self.transportKind = transportKind
         self.endpoint = endpoint
         self.requiredLocalPort = requiredLocalPort
+        self.expectedIdentityKeyID = expectedIdentityKeyID
+        self.expectedIdentityPublicKey = expectedIdentityPublicKey
     }
 }
 
@@ -52,23 +59,16 @@ public enum LoomDirectCandidateCollector {
         publicHostForTCP: String? = nil
     ) async -> [LoomRemoteCandidate] {
         var candidates: [LoomRemoteCandidate] = []
-        let quicPort = listeningPorts[.quic] ?? configuration.quicPort
+        let udpPort = listeningPorts[.udp] ?? configuration.udpPort
         let tcpPort = listeningPorts[.tcp] ?? configuration.controlPort
 
-        if configuration.enabledDirectTransports.contains(.quic),
-           quicPort > 0 {
-            let quicProbe = await LoomSTUNProbe.run(localPort: quicPort)
-            if quicProbe.reachable,
-               let address = quicProbe.mappedAddress,
-               let mappedPort = quicProbe.mappedPort {
-                candidates.append(
-                    LoomRemoteCandidate(
-                        transport: .quic,
-                        address: address,
-                        port: mappedPort
-                    )
-                )
-            }
+        if configuration.enabledDirectTransports.contains(.udp),
+           udpPort > 0,
+           let candidate = await mappedDatagramCandidate(
+                transportKind: .udp,
+                localPort: udpPort
+           ) {
+            candidates.append(candidate)
         }
 
         if configuration.enabledDirectTransports.contains(.tcp),
@@ -84,6 +84,26 @@ public enum LoomDirectCandidateCollector {
         }
 
         return candidates
+    }
+
+    private static func mappedDatagramCandidate(
+        transportKind: LoomTransportKind,
+        localPort: UInt16
+    ) async -> LoomRemoteCandidate? {
+        guard transportKind.usesDatagramPath else {
+            return nil
+        }
+        let probe = await LoomSTUNProbe.run(localPort: localPort)
+        guard probe.reachable,
+              let address = probe.mappedAddress,
+              let mappedPort = probe.mappedPort else {
+            return nil
+        }
+        return LoomRemoteCandidate(
+            transport: transportKind,
+            address: address,
+            port: mappedPort
+        )
     }
 }
 
@@ -104,13 +124,15 @@ public final class LoomConnectionCoordinator {
         self.signalingClient = signalingClient
         self.policy = policy ?? node.configuration.directConnectionPolicy
         connector = { target, hello in
-            try await node.connect(
-                to: target.endpoint,
-                using: target.transportKind,
-                hello: hello,
-                requiredLocalPort: target.requiredLocalPort
-            )
-        }
+                try await node.connect(
+                    to: target.endpoint,
+                    using: target.transportKind,
+                    hello: hello,
+                    requiredLocalPort: target.requiredLocalPort,
+                    expectedPeerIdentityKeyID: target.expectedIdentityKeyID,
+                    expectedPeerIdentityPublicKey: target.expectedIdentityPublicKey
+                )
+            }
     }
 
     public init(
@@ -127,8 +149,7 @@ public final class LoomConnectionCoordinator {
 
     nonisolated package static func signalingFallbackSessionID(
         advertisedSignalingSessionID: String?,
-        localPeer: LoomPeer?,
-        overlayPeer _: LoomPeer?
+        localPeer: LoomPeer?
     ) -> String? {
         guard localPeer == nil else {
             return nil
@@ -149,7 +170,8 @@ public final class LoomConnectionCoordinator {
                 contentsOf: Self.discoveryTargets(
                     from: localPeer,
                     source: .localDiscovery,
-                    policy: policy
+                    policy: policy,
+                    hostOverride: policy.localDiscoveryHostOverride
                 )
             )
         }
@@ -159,7 +181,8 @@ public final class LoomConnectionCoordinator {
                 contentsOf: Self.discoveryTargets(
                     from: overlayPeer,
                     source: .overlayDirectory,
-                    policy: policy
+                    policy: policy,
+                    hostOverride: nil
                 )
             )
         }
@@ -167,9 +190,18 @@ public final class LoomConnectionCoordinator {
         if let signalingSessionID,
            let signalingClient {
             let presence = try await signalingClient.fetchPresence(sessionID: signalingSessionID)
+            guard presence.acceptingConnections else {
+                return LoomConnectionPlan(targets: targets)
+            }
             let remoteCandidateTargets = presence.peerCandidates
                 .sorted(by: compareRemoteCandidates(_:_:))
-                .compactMap { Self.target(from: $0, requiredLocalPort: requiredLocalPort) }
+                .compactMap {
+                    Self.target(
+                        from: $0,
+                        requiredLocalPort: requiredLocalPort,
+                        advertisement: presence.advertisement
+                    )
+                }
             targets.append(contentsOf: remoteCandidateTargets)
         }
 
@@ -197,7 +229,7 @@ public final class LoomConnectionCoordinator {
         for batch in connectionBatches(from: plan) {
             do {
                 let resolved = try await connect(batch: batch, hello: hello)
-                recordConnectedTarget(resolved.target, session: resolved.session)
+                await recordConnectedTarget(resolved.target, session: resolved.session)
                 recordRaceSelectionIfNeeded(for: batch, winner: resolved.target)
                 return resolved.session
             } catch {
@@ -230,38 +262,33 @@ public final class LoomConnectionCoordinator {
         return lhs.port < rhs.port
     }
 
-    private func remoteCandidatePriority(_ transport: LoomRemoteCandidateTransport) -> Int {
-        let transportKind: LoomTransportKind = switch transport {
-        case .quic: .quic
-        case .tcp: .tcp
-        }
-        return policy.preferredRemoteTransportOrder.firstIndex(of: transportKind) ?? Int.max
+    private func remoteCandidatePriority(_ transport: LoomTransportKind) -> Int {
+        policy.preferredTransportOrder.firstIndex(of: transport) ?? Int.max
     }
 
     private static func target(
         from candidate: LoomRemoteCandidate,
-        requiredLocalPort: UInt16? = nil
+        requiredLocalPort: UInt16? = nil,
+        advertisement: LoomPeerAdvertisement? = nil
     ) -> LoomConnectionTarget? {
         guard let endpointPort = NWEndpoint.Port(rawValue: candidate.port) else {
             return nil
         }
         let host = NWEndpoint.Host(candidate.address)
-        let transportKind: LoomTransportKind = switch candidate.transport {
-        case .quic: .quic
-        case .tcp: .tcp
-        }
         return LoomConnectionTarget(
             source: .remoteSignaling,
-            transportKind: transportKind,
+            transportKind: candidate.transport,
             endpoint: .hostPort(host: host, port: endpointPort),
-            requiredLocalPort: transportKind == .quic ? requiredLocalPort : nil
+            requiredLocalPort: candidate.transport.usesDatagramPath ? requiredLocalPort : nil,
+            expectedIdentityKeyID: advertisement?.identityKeyID
         )
     }
 
     private static func discoveryTargets(
         from peer: LoomPeer,
         source: LoomConnectionTargetSource,
-        policy: LoomDirectConnectionPolicy
+        policy: LoomDirectConnectionPolicy,
+        hostOverride: String?
     ) -> [LoomConnectionTarget] {
         let advertisedTransports = peer.advertisement.directTransports
         let transports = advertisedTransports.isEmpty
@@ -272,8 +299,8 @@ public final class LoomConnectionCoordinator {
                 if leftPathIndex != rightPathIndex {
                     return leftPathIndex < rightPathIndex
                 }
-                let leftIndex = policy.preferredRemoteTransportOrder.firstIndex(of: lhs.transportKind) ?? Int.max
-                let rightIndex = policy.preferredRemoteTransportOrder.firstIndex(of: rhs.transportKind) ?? Int.max
+                let leftIndex = policy.preferredTransportOrder.firstIndex(of: lhs.transportKind) ?? Int.max
+                let rightIndex = policy.preferredTransportOrder.firstIndex(of: rhs.transportKind) ?? Int.max
                 if leftIndex != rightIndex {
                     return leftIndex < rightIndex
                 }
@@ -286,18 +313,25 @@ public final class LoomConnectionCoordinator {
                 transportKind: transport.transportKind,
                 endpoint: localEndpoint(
                     from: peer.endpoint,
-                    advertisedPort: transport.port
-                )
+                    advertisedPort: transport.port,
+                    hostOverride: hostOverride
+                ),
+                expectedIdentityKeyID: peer.advertisement.identityKeyID
             )
         }
     }
 
     private static func localEndpoint(
         from endpoint: NWEndpoint,
-        advertisedPort: UInt16
+        advertisedPort: UInt16,
+        hostOverride: String? = nil
     ) -> NWEndpoint {
         guard advertisedPort > 0 else {
             return endpoint
+        }
+        if let hostOverride,
+           let port = NWEndpoint.Port(rawValue: advertisedPort) {
+            return .hostPort(host: NWEndpoint.Host(hostOverride), port: port)
         }
         guard case let .hostPort(host, _) = endpoint,
               let port = NWEndpoint.Port(rawValue: advertisedPort) else {
@@ -515,8 +549,8 @@ public final class LoomConnectionCoordinator {
     private func recordConnectedTarget(
         _ target: LoomConnectionTarget,
         session: LoomAuthenticatedSession
-    ) {
-        guard let path = session.rawSession.connection.currentPath else {
+    ) async {
+        guard let snapshot = await session.pathSnapshot else {
             LoomInstrumentation.record(
                 LoomStepEvent(
                     rawValue: "loom.connection.connected.\(target.source.rawValue).\(target.transportKind.rawValue).unknown"
@@ -524,10 +558,10 @@ public final class LoomConnectionCoordinator {
             )
             return
         }
-        let snapshot = LoomNetworkPathClassifier.classify(path)
+        let classifiedPath = LoomNetworkPathClassifier.classify(snapshot)
         LoomInstrumentation.record(
             LoomStepEvent(
-                rawValue: "loom.connection.connected.\(target.source.rawValue).\(target.transportKind.rawValue).\(snapshot.kind.rawValue)"
+                rawValue: "loom.connection.connected.\(target.source.rawValue).\(target.transportKind.rawValue).\(classifiedPath.kind.rawValue)"
             )
         )
     }
@@ -543,3 +577,5 @@ private enum LoomConnectionAttemptResult {
     case failure(LoomConnectionTarget, Error)
     case cancelled(LoomConnectionTarget)
 }
+
+#endif

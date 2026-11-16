@@ -4,6 +4,7 @@ This document describes the generic networking package and its layered products.
 
 It applies to:
 
+- `Sources/LoomNetworking`
 - `Sources/Loom`
 - `Sources/LoomCloudKit`
 - `Sources/LoomShell`
@@ -17,15 +18,17 @@ It applies to:
 
 ## 1. Package Topology
 
-Loom is a standalone Swift package with five library products:
+Loom is a standalone Swift package with these library products:
 
-- `Loom` — Core transport, identity, trust, bootstrap, diagnostics, and remote signaling.
-- `LoomCloudKit` — CloudKit-backed discovery, sharing, and trust. Depends on `Loom`.
-- `LoomShell` — Interactive shell sessions over authenticated Loom transport. Depends on `Loom`, `CLoomShellSupport`, and NIO/SSH.
-- `LoomKit` — SwiftUI-first container, context, query, and connection handle surface. Depends on `Loom`, `LoomCloudKit`, and `LoomSharedRuntime`.
-- `LoomSharedRuntime` — Multi-app host coordination runtime. Depends on `Loom` and `LoomCloudKit`. Source is in `Sources/LoomHost`.
+- `LoomNetworking`
+- `LoomNetworkingNIO`
+- `Loom`
+- `LoomShell`
+- `LoomCloudKit`
+- `LoomKit`
+- `LoomSharedRuntime`
 
-Supported platforms:
+Minimum Apple deployment targets:
 
 - macOS 14+
 - iOS 17.4+
@@ -35,6 +38,17 @@ External dependencies:
 
 - `swift-nio`
 - `swift-nio-ssh`
+- `swift-crypto`
+
+`LoomNetworking` has no external dependencies and owns backend-independent
+endpoint, interface, path, service-class, and direct-connection policy values.
+`LoomNetworkingNIO` supplies the portable SwiftNIO TCP and UDP backend.
+`LoomPlatformAdapters` is an internal support target for platform DNS-SD and
+protected identity storage; it is composed into `Loom` rather than shipped as
+a standalone product.
+The `Loom` target provides the current Network.framework backend and preserves
+its released Apple-facing API while selecting the SwiftNIO backend on platforms
+without Network.framework.
 
 ## 2. Ownership Boundary
 
@@ -44,6 +58,7 @@ It owns:
 
 - peer discovery
 - transport and session lifecycle
+- authenticated-session bootstrap phase reporting
 - signaling/direct connectivity
 - identity and trust
 - replay protection
@@ -111,6 +126,17 @@ It does not own product-specific:
 - `LoomInstrumentation` captures timeline-style lifecycle events.
 
 These sinks are generic and reusable. Higher-level packages add their own categories and context without changing Loom's ownership model.
+
+### 3.5 Datagram Session Transports
+
+`LoomReliableChannel` and `LoomQUICSessionTransport` define authenticated-session datagram transport contracts:
+
+- reliable control messages and unreliable datagrams are available through one authenticated session API
+- UDP reliability uses selective acknowledgements, retransmission, and fragment reassembly
+- QUIC reliability uses bidirectional streams and native datagrams
+- timeout and cancellation decisions consider both control and datagram activity
+
+Datagram transports should fail truly dead peers promptly without collapsing a still-live session just because reliable control and high-rate unreliable traffic briefly contend for receive scheduling.
 
 ## 4. Layering Rule
 

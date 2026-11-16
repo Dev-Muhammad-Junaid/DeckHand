@@ -18,12 +18,12 @@ When CloudKit is enabled, LoomKit merges nearby peers and CloudKit-visible peers
 
 ## Add Signaling For Remote Joins
 
-Set ``LoomContainerConfiguration/relay`` when you want signaling-backed remote reachability outside the local network:
+Set ``LoomContainerConfiguration/remoteSignaling`` when you want signaling-backed remote reachability outside the local network:
 
 ```swift
 let configuration = LoomContainerConfiguration(
     serviceName: "Example Mac",
-    relay: relayConfiguration
+    remoteSignaling: remoteSignalingConfiguration
 )
 ```
 
@@ -38,6 +38,26 @@ When you ask LoomKit to connect to a ``LoomPeerSnapshot``, it uses a fixed resol
 3. Bootstrap remains explicit through ``LoomContext/bootstrap`` when a peer publishes recovery capability.
 
 That ordering matters because the app-facing API stays stable while LoomKit still prefers the fastest and lowest-latency path first.
+
+Use ``LoomContainerConfiguration/enabledDirectTransports`` when a container should publish only a subset of Loom's direct transports. Use ``LoomContainerConfiguration/directConnectionPolicy`` when a container should keep Loom's resolution behavior but customize path order, transport order, local candidate racing, or a local-discovery host override.
+
+Use ``LoomContainerConfiguration/ports`` when a container needs fixed listener ports. TCP, UDP, and QUIC default to `0`, which lets the system assign available ephemeral ports. Overlay probing defaults to Loom's overlay probe port when ``LoomContainerConfiguration/overlayDirectory`` is enabled and the overlay configuration omits its own `probePort`:
+
+```swift
+let configuration = LoomContainerConfiguration(
+    serviceName: "Example Mac",
+    ports: LoomKitPortConfiguration(
+        udpPort: 9951,
+        quicPort: 9952,
+        overlayProbePort: 9953
+    ),
+    overlayDirectory: LoomOverlayDirectoryConfiguration(
+        seedProvider: {
+            [LoomOverlaySeed(host: "example-mac.tailnet.example")]
+        }
+    )
+)
+```
 
 ## Trust Modes
 

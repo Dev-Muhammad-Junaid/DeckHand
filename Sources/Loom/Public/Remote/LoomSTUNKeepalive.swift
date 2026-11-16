@@ -8,6 +8,7 @@
 //  inbound QUIC connections.
 //
 
+#if canImport(Network)
 import Foundation
 import Network
 
@@ -41,7 +42,7 @@ public final class LoomSTUNKeepalive: @unchecked Sendable {
     /// Creates a STUN keepalive.
     ///
     /// - Parameters:
-    ///   - localPort: The QUIC listener port to send probes from.
+    ///   - localPort: The datagram listener port to send probes from.
     ///   - stunHost: STUN server hostname.
     ///   - stunPort: STUN server UDP port.
     ///   - interval: Time between keepalive probes (default 25 s).
@@ -112,3 +113,5 @@ public final class LoomSTUNKeepalive: @unchecked Sendable {
         keepaliveTask?.cancel()
     }
 }
+
+#endif

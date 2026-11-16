@@ -24,7 +24,7 @@ package struct LoomHostRuntimeDependencies: Sendable {
     package let node: LoomNode
     package let cloudKitManager: LoomCloudKitManager?
     package let peerProvider: LoomCloudKitPeerProvider?
-    package let shareManager: LoomCloudKitShareManager?
+    package let peerManager: LoomCloudKitPeerManager?
     package let signalingClient: LoomRemoteSignalingClient?
     package let overlayDirectoryConfiguration: LoomOverlayDirectoryConfiguration?
     package let connectionCoordinator: LoomConnectionCoordinator
@@ -39,7 +39,7 @@ package struct LoomHostRuntimeDependencies: Sendable {
         node: LoomNode,
         cloudKitManager: LoomCloudKitManager?,
         peerProvider: LoomCloudKitPeerProvider?,
-        shareManager: LoomCloudKitShareManager?,
+        peerManager: LoomCloudKitPeerManager?,
         signalingClient: LoomRemoteSignalingClient?,
         overlayDirectoryConfiguration: LoomOverlayDirectoryConfiguration?,
         connectionCoordinator: LoomConnectionCoordinator,
@@ -53,7 +53,7 @@ package struct LoomHostRuntimeDependencies: Sendable {
         self.node = node
         self.cloudKitManager = cloudKitManager
         self.peerProvider = peerProvider
-        self.shareManager = shareManager
+        self.peerManager = peerManager
         self.signalingClient = signalingClient
         self.overlayDirectoryConfiguration = overlayDirectoryConfiguration
         self.connectionCoordinator = connectionCoordinator
@@ -67,6 +67,23 @@ package struct LoomHostRuntimeDependencies: Sendable {
 package struct LoomHostEstablishedSession: Sendable {
     package let peer: LoomHostPeerRecord
     package let session: LoomAuthenticatedSession
+}
+
+/// Identifies one broker-ordered claim on an app ID. App IDs are stable across process launches,
+/// so teardown must match this generation before it can remove the runtime's current claim.
+package struct LoomHostRuntimeAppRegistration: Sendable, Hashable {
+    package let appID: String
+    package let generation: UInt64
+
+    package init(appID: String, generation: UInt64) {
+        self.appID = appID
+        self.generation = generation
+    }
+}
+
+private struct LoomHostRuntimeRegisteredApp {
+    let descriptor: LoomHostAppDescriptor
+    let registration: LoomHostRuntimeAppRegistration
 }
 
 package actor LoomHostRuntime {
@@ -89,7 +106,7 @@ package actor LoomHostRuntime {
     private var signalingHeartbeatTask: Task<Void, Never>?
     private var currentRemoteSessionID: String?
     private var currentPublicHostForTCP: String?
-    private var registeredApps: [String: LoomHostAppDescriptor] = [:]
+    private var registeredApps: [String: LoomHostRuntimeRegisteredApp] = [:]
 
     package init(
         dependencies: LoomHostRuntimeDependencies,
@@ -101,18 +118,35 @@ package actor LoomHostRuntime {
         self.onIncomingSession = onIncomingSession
     }
 
-    package func register(app: LoomHostAppDescriptor) async throws {
-        registeredApps[app.appID] = app
+    package func register(
+        app: LoomHostAppDescriptor,
+        registration: LoomHostRuntimeAppRegistration
+    ) async throws -> Bool {
+        guard registration.appID == app.appID else {
+            throw LoomHostError.protocolViolation("Shared-host app registration identity mismatch.")
+        }
+        if let current = registeredApps[app.appID],
+           current.registration.generation > registration.generation {
+            return false
+        }
+        registeredApps[app.appID] = LoomHostRuntimeRegisteredApp(
+            descriptor: app,
+            registration: registration
+        )
         if isRunning {
             try await republishHostStateIfNeeded()
             await notifyStateChanged()
-            return
+            return registeredApps[app.appID]?.registration == registration
         }
         try await startIfNeeded()
+        return registeredApps[app.appID]?.registration == registration
     }
 
-    package func unregister(appID: String) async {
-        registeredApps.removeValue(forKey: appID)
+    package func unregister(registration: LoomHostRuntimeAppRegistration) async {
+        guard registeredApps[registration.appID]?.registration == registration else {
+            return
+        }
+        registeredApps.removeValue(forKey: registration.appID)
         if registeredApps.isEmpty {
             await stop()
             return
@@ -141,8 +175,8 @@ package actor LoomHostRuntime {
             if let cloudKitManager = dependencies.cloudKitManager {
                 await cloudKitManager.initialize()
             }
-            if let shareManager = dependencies.shareManager {
-                await shareManager.setup()
+            if let peerManager = dependencies.peerManager {
+                await peerManager.setup()
             }
 
             let discovery = await MainActor.run {
@@ -363,8 +397,7 @@ package actor LoomHostRuntime {
         let overlayPeer = localPeer == nil ? overlayPeersByID[peerID] : nil
         let signalingSessionID = LoomConnectionCoordinator.signalingFallbackSessionID(
             advertisedSignalingSessionID: resolvedPeer?.signalingSessionID,
-            localPeer: localPeer,
-            overlayPeer: overlayPeer
+            localPeer: localPeer
         )
 
         guard localPeer != nil || overlayPeer != nil || signalingSessionID != nil else {
@@ -378,7 +411,6 @@ package actor LoomHostRuntime {
         let session = try await dependencies.connectionCoordinator.connect(
             hello: hello,
             localPeer: localPeer,
-            overlayPeer: overlayPeer,
             signalingSessionID: signalingSessionID
         )
         let peer = try await resolveConnectedPeer(
@@ -482,8 +514,8 @@ package actor LoomHostRuntime {
                     advertisement: advertisement,
                     ttlSeconds: 360
                 )
-                if let shareManager = dependencies.shareManager {
-                    await shareManager.updateLastSeen()
+                if let peerManager = dependencies.peerManager {
+                    await peerManager.updateLastSeen()
                 }
             } catch let signalingError as LoomRemoteSignalingError {
                 await record(signalingError)
@@ -500,7 +532,7 @@ package actor LoomHostRuntime {
     }
 
     private func publishCurrentPeer() async throws {
-        guard let shareManager = dependencies.shareManager,
+        guard let peerManager = dependencies.peerManager,
               let cloudKitManager = dependencies.cloudKitManager else {
             return
         }
@@ -515,7 +547,7 @@ package actor LoomHostRuntime {
         let identity = try await MainActor.run {
             try (dependencies.node.identityManager ?? LoomIdentityManager.shared).currentIdentity()
         }
-        try await shareManager.registerPeer(
+        try await peerManager.registerPeer(
             deviceID: dependencies.deviceID,
             name: dependencies.serviceName,
             advertisement: advertisement,
@@ -545,8 +577,7 @@ package actor LoomHostRuntime {
 
         await peerProvider.fetchPeers()
         let cloudPeers = await MainActor.run {
-            (peerProvider.ownPeers + peerProvider.sharedPeers)
-                .filter { $0.deviceID != dependencies.deviceID }
+            peerProvider.ownPeers.filter { $0.deviceID != dependencies.deviceID }
         }
         cloudPeersByID = Dictionary(uniqueKeysWithValues: cloudPeers.map { ($0.id, $0) })
         await notifyStateChanged()
@@ -625,7 +656,7 @@ package actor LoomHostRuntime {
             sources.append(.overlay)
         }
         if let cloudPeer {
-            sources.append(cloudPeer.isShared ? .cloudKitShared : .cloudKitOwn)
+            sources.append(.cloudKitOwn)
             if cloudPeer.signalingSessionID != nil {
                 sources.append(.remoteSignaling)
             }
@@ -646,7 +677,6 @@ package actor LoomHostRuntime {
             deviceType: deviceType,
             sources: sources,
             isNearby: localPeer != nil,
-            isShared: cloudPeer?.isShared ?? false,
             remoteAccessEnabled: cloudPeer?.remoteAccessEnabled ?? false,
             signalingSessionID: cloudPeer?.signalingSessionID,
             advertisement: advertisement,
@@ -684,7 +714,6 @@ package actor LoomHostRuntime {
             deviceType: sessionContext.peerIdentity.deviceType,
             sources: signalingSessionID == nil ? [] : [.remoteSignaling],
             isNearby: false,
-            isShared: false,
             remoteAccessEnabled: signalingSessionID != nil,
             signalingSessionID: signalingSessionID,
             advertisement: LoomPeerAdvertisement(
@@ -753,7 +782,7 @@ package actor LoomHostRuntime {
     }
 
     private func makeDeviceProfile(for appID: String?) async -> LoomDeviceProfile {
-        let appFeatures = appID.flatMap { registeredApps[$0]?.supportedFeatures } ?? []
+        let appFeatures = appID.flatMap { registeredApps[$0]?.descriptor.supportedFeatures } ?? []
         return LoomDeviceProfile(
             deviceID: dependencies.deviceID,
             deviceName: dependencies.serviceName,
@@ -784,7 +813,7 @@ package actor LoomHostRuntime {
     }
 
     private func hostCatalog() -> LoomHostCatalog? {
-        let entries = registeredApps.values.map(\.catalogEntry)
+        let entries = registeredApps.values.map(\.descriptor.catalogEntry)
         guard !entries.isEmpty else {
             return nil
         }
