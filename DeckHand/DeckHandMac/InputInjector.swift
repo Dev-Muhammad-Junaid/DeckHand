@@ -81,6 +81,11 @@ final class InputInjector {
     /// display without us doing anything extra.
     func moveCursor(dx: Float, dy: Float) {
         guard isAccessibilityGranted else { noteInjectSkipped("mouseDelta"); return }
+        // ControlReceiver already sanitizes; this keeps a NaN/∞ from ever
+        // becoming a cursor position if another caller forgets to.
+        guard let safeDX = RemoteInputValidation.clamp(dx, limit: RemoteInputValidation.maxPointerDelta),
+              let safeDY = RemoteInputValidation.clamp(dy, limit: RemoteInputValidation.maxPointerDelta)
+        else { return }
         // Jitter probe: during active movement the iPad streams deltas at up to
         // 120 Hz (~8 ms apart). A gap in the 33–250 ms band means frames were
         // dropped while the user was still moving — i.e. visible cursor jitter,
@@ -100,8 +105,8 @@ final class InputInjector {
         // multi-display setups where the main display isn't at the top.
         let cgCurrent = Self.flipNSPointToCG(currentPos)
 
-        let accelDx = applyAcceleration(dx)
-        let accelDy = applyAcceleration(dy)
+        let accelDx = applyAcceleration(safeDX)
+        let accelDy = applyAcceleration(safeDY)
 
         let next = CGPoint(x: cgCurrent.x + Double(accelDx),
                            y: cgCurrent.y + Double(accelDy))
@@ -141,8 +146,10 @@ final class InputInjector {
             scrollWheelEvent2Source: nil,
             units: .pixel,
             wheelCount: 2,
-            wheel1: Int32(-dy * 3),
-            wheel2: Int32(-dx * 3),
+            // Never `Int32(-dy * 3)`: that traps on NaN, ±∞ or anything past
+            // ±7e8, and the value comes straight off the network.
+            wheel1: RemoteInputValidation.wheelUnits(forScrollDelta: dy),
+            wheel2: RemoteInputValidation.wheelUnits(forScrollDelta: dx),
             wheel3: 0
         ) else { return }
 

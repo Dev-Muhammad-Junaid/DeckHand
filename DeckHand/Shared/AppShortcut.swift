@@ -118,7 +118,9 @@ public extension MacroItem {
         .app(.init(id: "mail",      displayName: "Mail",      bundleID: "com.apple.mail",                    sfSymbol: "envelope")),
         .app(.init(id: "calendar",  displayName: "Calendar",  bundleID: "com.apple.iCal",                    sfSymbol: "calendar")),
         .shortcut(.init(id: "missioncontrol", displayName: "Mission Control", sfSymbol: "square.grid.2x2",   keys: ["ctrl", "up"])),
-        .shortcut(.init(id: "launchpad",      displayName: "Launchpad",       sfSymbol: "circle.grid.3x3",   keys: ["cmd", "space"])),
+        // No keys: Launchpad has no default shortcut (⌘Space is Spotlight).
+        // The host runs it as `SystemMacro.launchpad`.
+        .shortcut(.init(id: "launchpad",      displayName: "Launchpad",       sfSymbol: "circle.grid.3x3",   keys: [])),
         .shortcut(.init(id: "showdesktop",    displayName: "Show Desktop",    sfSymbol: "desktopcomputer",   keys: ["fn", "f11"])),
         .media(.init(id: "prev", displayName: "Previous", sfSymbol: "backward.end.fill", action: "prev")),
         .media(.init(id: "playpause", displayName: "Play/Pause", sfSymbol: "playpause.fill", action: "playpause")),

@@ -27,9 +27,15 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
     private var pendingHandles: [UUID: LoomConnectionHandle] = [:]
     private var pendingRequestedAt: [UUID: Date] = [:]
     private var pendingExpiryTasks: [UUID: Task<Void, Never>] = [:]
+    /// Reads each pending connection from the moment it arrives and drops
+    /// what it sends before Allow. Without it the messages buffered in the
+    /// handle and all ran the moment the user clicked Allow.
+    private var gates: [UUID: PreApprovalGate] = [:]
 
-    // Callback so MacMenuBarView can pass authorized handles to the receiver
-    var onDeviceAuthorized: ((LoomConnectionHandle) -> Void)?
+    // Callback so MacMenuBarView can pass authorized handles to the receiver,
+    // with the gated stream the receiver must read instead of
+    // `handle.messages`.
+    var onDeviceAuthorized: ((LoomConnectionHandle, AsyncStream<Data>) -> Void)?
     /// Fired when the user revokes a connection so the receiver stops
     /// consuming its messages immediately — buffered commands from the
     /// revoked device are dropped, not executed.
@@ -76,6 +82,10 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
     }
 
     func handleIncomingConnection(_ connection: LoomConnectionSnapshot, handle: LoomConnectionHandle) {
+        // Start reading (and discarding) this connection's messages now, so
+        // nothing it sends while pending survives to run after Allow. One
+        // gate per connection: its stream allows a single reader.
+        let gate = gates[connection.id] ?? PreApprovalGate(source: handle.messages)
         // SIMPLE BY DESIGN: every incoming connection goes through an
         // explicit Accept / Deny. No persisted auto-grant, no same-iCloud
         // fast path, no other checks — the user decides, every time.
@@ -91,7 +101,9 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
                     DeckHandLog.trust.error("Failed to push granted status: \(error.localizedDescription, privacy: .public)")
                 }
             }
-            onDeviceAuthorized?(handle)
+            gates.removeValue(forKey: connection.id)
+            gate.open()
+            onDeviceAuthorized?(handle, gate.messages)
             return
         }
 
@@ -110,6 +122,7 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
         if !pendingConnections.contains(where: { $0.id == connection.id }) {
             pendingConnections.append(connection)
             pendingHandles[connection.id] = handle
+            gates[connection.id] = gate
             pendingRequestedAt[connection.id] = Date()
             DeckHandLog.trust.info("🔑 New pending request from \(connection.peerName, privacy: .public) conn=\(connection.id, privacy: .public) — awaiting Allow/Deny (approve in menu bar or notification)")
             Task {
@@ -143,8 +156,18 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
         #if DEBUG
         print("Pixel Hand: 🔑 authorize() granting peer \(connection.peerName) on connection \(target.id); \(pendingConnections.count) other pending, \(peerPending.count) for this peer")
         #endif
+        let pendingGate = gates.removeValue(forKey: target.id)
         removePendingConnection(id: target.id)
         if let handle = pendingHandles.removeValue(forKey: target.id) {
+            // Open now, at the click: anything the remote sent before this
+            // was dropped; from here on its input runs. The remote only
+            // starts sending input once it sees `granted`, below.
+            let gate = pendingGate ?? PreApprovalGate(source: handle.messages)
+            gate.open()
+            let messages = gate.messages
+            if gate.droppedCount > 0 {
+                DeckHandLog.trust.info("🔑 Dropped \(gate.droppedCount, privacy: .public) message(s) sent before approval on conn=\(target.id, privacy: .public)")
+            }
             Task {
                 // The push is best-effort, but a silent failure here used to
                 // strand the iPad on the approval overlay while the host
@@ -158,7 +181,7 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
                 } catch {
                     DeckHandLog.trust.error("Failed to push granted status: \(error.localizedDescription, privacy: .public)")
                 }
-                onDeviceAuthorized?(handle)
+                onDeviceAuthorized?(handle, messages)
             }
         } else {
             // Approval raced the 45 s expiry (or a dismissal): trust was
@@ -180,14 +203,26 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
     }
     
     func removeAndDisconnect(connection: LoomConnectionSnapshot, loomContext: LoomContext) {
-        // Stop dispatching this device's commands BEFORE tearing down the
-        // transport — otherwise buffered input keeps executing during the
-        // (async) disconnect.
-        onConnectionRevoked?(connection.id)
+        // Revoking is per device, so end every connection this peer has,
+        // not just the row that was clicked: a second live connection used
+        // to keep running input after its device's access was removed.
+        var peerConnections = loomContext.connections.filter { $0.peerID == connection.peerID }
+        if !peerConnections.contains(where: { $0.id == connection.id }) {
+            peerConnections.append(connection)
+        }
         authorizedDeviceIDs.remove(connection.peerID)
-        removePendingConnection(id: connection.id)
+        for peerConnection in peerConnections {
+            // Stop dispatching this device's commands BEFORE tearing down
+            // the transport — otherwise buffered input keeps executing
+            // during the (async) disconnect.
+            onConnectionRevoked?(peerConnection.id)
+            removePendingConnection(id: peerConnection.id)
+            pendingHandles.removeValue(forKey: peerConnection.id)
+        }
         Task {
-            await loomContext.disconnect(connection)
+            for peerConnection in peerConnections {
+                await loomContext.disconnect(peerConnection)
+            }
         }
     }
 
@@ -249,6 +284,8 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
 
     private func removePendingConnection(id: UUID) {
         pendingConnections.removeAll(where: { $0.id == id })
+        // Releasing the gate ends its read of the connection.
+        gates.removeValue(forKey: id)
         pendingRequestedAt.removeValue(forKey: id)
         pendingExpiryTasks[id]?.cancel()
         pendingExpiryTasks.removeValue(forKey: id)

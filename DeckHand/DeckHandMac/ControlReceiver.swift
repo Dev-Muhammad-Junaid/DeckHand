@@ -37,7 +37,9 @@ final class ControlReceiver {
     private static let livenessTimeout: TimeInterval = 8
 
     /// Called from MacMenuBarView for each newly established incoming connection.
-    func observeConnection(_ connectionHandle: LoomConnectionHandle) {
+    /// `messages` is the connection's stream after `PreApprovalGate`; read it,
+    /// never `connectionHandle.messages`, which the gate already reads.
+    func observeConnection(_ connectionHandle: LoomConnectionHandle, messages: AsyncStream<Data>) {
         let key = connectionHandle.id
         connectionHandles[key] = connectionHandle
         lastActivityAt[key] = Date()
@@ -50,7 +52,7 @@ final class ControlReceiver {
             // Tell the remote up front what this host can actually do, so
             // it can explain missing permissions instead of failing silently.
             await self?.sendCapabilities(to: connectionHandle)
-            await self?.consumeMessages(from: connectionHandle)
+            await self?.consumeMessages(from: connectionHandle, messages: messages)
             // The message loop has ended (stream finished, task cancelled
             // by revocation, or liveness timeout). Stop any mirror stream
             // so capture doesn't burn CPU/GPU against a dead handle.
@@ -109,19 +111,26 @@ final class ControlReceiver {
         }
     }
 
-    private func consumeMessages(from connectionHandle: LoomConnectionHandle) async {
-        for await data in connectionHandle.messages {
+    private func consumeMessages(from connectionHandle: LoomConnectionHandle, messages: AsyncStream<Data>) async {
+        for await data in messages {
             // Honors cancelConsumption: stop dispatching the moment the
             // connection is revoked or timed out, even with a backlog.
             if Task.isCancelled { return }
             lastActivityAt[connectionHandle.id] = Date()
-            let message: ControlMessage
+            let decoded: ControlMessage
             do {
-                message = try ControlMessageCoding.decoder.decode(ControlMessage.self, from: data)
+                decoded = try ControlMessageCoding.decoder.decode(ControlMessage.self, from: data)
             } catch {
                 #if DEBUG
                 print("Pixel Hand: ⚠️ Failed to decode ControlMessage (\(data.count)B): \(error)")
                 #endif
+                continue
+            }
+            // Every number from the remote is checked here, once, before
+            // any handler sees it: non-finite values drop the message and
+            // the rest are clamped (PH-031).
+            guard let message = RemoteInputValidation.sanitize(decoded) else {
+                DeckHandLog.input.error("Dropped a message with an invalid number from \(connectionHandle.id, privacy: .public)")
                 continue
             }
             // Arrival visibility: when the iPad "does nothing", the first
@@ -270,9 +279,9 @@ final class ControlReceiver {
             // Resync path: messages are only consumed for *authorized*
             // connections (DeviceAuthorizationManager gates the handoff),
             // so reaching this dispatch means the answer is "granted".
-            // Queries sent while the request was pending sit buffered in
-            // the handle and get answered here right after approval —
-            // healing any lost/failed `granted` push.
+            // The few queries sent while the request was pending are the
+            // only messages PreApprovalGate keeps; they're answered here
+            // right after approval — healing any lost/failed `granted` push.
             do {
                 try await handle.send(.authorizationStatus(status: "granted"))
             } catch {
@@ -438,32 +447,13 @@ final class ControlReceiver {
     }
 
     private func dispatchMacro(id: String) async {
-        // System-level triggers that can't be done via CGEvent keyboard shortcuts
-        switch id {
-        case "locate_cursor":
-            CursorLocator.shared.ping()
+        // System-level triggers that can't be done via CGEvent keyboard
+        // shortcuts. Resolved first, under every id a remote may send, so
+        // e.g. "showdesktop" never falls through to the default deck (whose
+        // ids are prefixed "shortcut-") and silently does nothing.
+        if let macro = SystemMacro(macroID: id) {
+            runSystemMacro(macro)
             return
-        case "missioncontrol_trigger":
-            let proc = Process()
-            proc.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-            proc.arguments = ["-a", "Mission Control"]
-            try? proc.run()
-            return
-        case "expose_trigger":
-            // App Exposé isn't a standalone app — trigger via AppleScript
-            let proc = Process()
-            proc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            proc.arguments = ["-e", "tell application \"System Events\" to key code 125 using control down"]
-            try? proc.run()
-            return
-        case "launchpad_trigger":
-            let proc = Process()
-            proc.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-            proc.arguments = ["-a", "Launchpad"]
-            try? proc.run()
-            return
-        default:
-            break
         }
 
         // Standard MacroItem lookup
@@ -481,6 +471,49 @@ final class ControlReceiver {
                 default: break
                 }
             }
+        }
+    }
+
+    private func runSystemMacro(_ macro: SystemMacro) {
+        switch macro {
+        case .locateCursor:
+            CursorLocator.shared.ping()
+        case .missionControl:
+            runTool("/usr/bin/open", ["-a", "Mission Control"])
+        case .appExpose:
+            // App Exposé isn't a standalone app — trigger via AppleScript
+            runTool("/usr/bin/osascript", ["-e", "tell application \"System Events\" to key code 125 using control down"])
+        case .showDesktop:
+            // Show Desktop is a symbolic hot key (F11), which a CGEvent post
+            // never fires. Mission Control's own binary takes "1" for Show
+            // Desktop; System Events' F11 is the fallback.
+            if let missionControl = Self.missionControlExecutable {
+                runTool(missionControl, ["1"])
+            } else {
+                runTool("/usr/bin/osascript", ["-e", "tell application \"System Events\" to key code 103"])
+            }
+        case .launchpad:
+            // macOS 26 replaced Launchpad with "Apps".
+            runTool("/usr/bin/open", ["-a", Self.launchpadAppName])
+        }
+    }
+
+    private static let launchpadAppName =
+        FileManager.default.fileExists(atPath: "/System/Applications/Launchpad.app") ? "Launchpad" : "Apps"
+
+    private static let missionControlExecutable: String? = [
+        "/System/Applications/Mission Control.app/Contents/MacOS/Mission Control",
+        "/Applications/Mission Control.app/Contents/MacOS/Mission Control",
+    ].first { FileManager.default.isExecutableFile(atPath: $0) }
+
+    private func runTool(_ path: String, _ arguments: [String]) {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: path)
+        proc.arguments = arguments
+        do {
+            try proc.run()
+        } catch {
+            DeckHandLog.input.error("Couldn't run \(path, privacy: .public): \(error.localizedDescription, privacy: .public)")
         }
     }
 

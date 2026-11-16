@@ -72,8 +72,8 @@ final class MacDaemon: ObservableObject {
         let context = container.mainContext
         
         // Wire up authorization manager to feed ControlReceiver
-        DeviceAuthorizationManager.shared.onDeviceAuthorized = { [weak receiver] handle in
-            receiver?.observeConnection(handle)
+        DeviceAuthorizationManager.shared.onDeviceAuthorized = { [weak receiver] handle, messages in
+            receiver?.observeConnection(handle, messages: messages)
         }
         DeviceAuthorizationManager.shared.onConnectionRevoked = { [weak receiver] connectionID in
             receiver?.cancelConsumption(connectionID: connectionID)
