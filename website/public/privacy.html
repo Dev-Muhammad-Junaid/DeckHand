@@ -36,13 +36,14 @@
 
   <div class="sheet sheet--top">
     <main id="main" class="legal">
-      <p class="legal__updated">Last updated 9 October 2026</p>
+      <p class="legal__updated">Last updated 16 November 2026</p>
 
       <section class="legal__summary" aria-label="Summary">
         <h2>The short version</h2>
         <ul class="check">
           <li><span class="check__dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg></span>No accounts, no ads, no trackers</li>
           <li><span class="check__dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg></span>Your screen, input and captures go device to device, never to us</li>
+          <li><span class="check__dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg></span>The apps send anonymous crash and performance reports, and you can turn them off</li>
           <li><span class="check__dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg></span>We keep your email only if you join the waitlist, and only to tell you when Deck Hand is ready</li>
         </ul>
       </section>
@@ -71,7 +72,18 @@
 
       <h3>Everything stays between your devices</h3>
       <p>The iPad or iPhone remote finds your Mac on your local network and connects to it directly. The pointer movements, keystrokes, live mirror, screenshots and app lists it exchanges travel only between your devices. There is no Deck Hand server in the path, and none of it reaches us.</p>
-      <p>The apps have no accounts, no analytics and no advertising, and they don’t send crash reports or usage data to us. Diagnostic logs stay on your device.</p>
+      <p>The apps have no accounts, no analytics and no advertising, and nothing in them tracks you across other companies’ apps or websites.</p>
+
+      <h3>Crash reports and diagnostics</h3>
+      <p>To find and fix problems, the apps send us reports through <a href="https://sentry.io/privacy/">Sentry</a>, a crash-reporting service that stores them on our behalf. A report is sent when an app crashes, freezes, or hits an error it recovered from, and for a small sample of launches to measure how fast the app runs. A report contains:</p>
+      <ul>
+        <li>what went wrong and where in the app’s code</li>
+        <li>the device model, system version, app version, and things like free memory and battery level at the time</li>
+        <li>a short trail of what the app was doing just before, such as which screen was open</li>
+        <li>a random identifier for the app install, so repeated crashes can be counted</li>
+      </ul>
+      <p>A report never contains your screen, the live mirror, your captures, what you typed, your app lists, your device or computer names, or your Apple Account. Reports aren’t linked to you, we don’t use them for advertising or tracking, and we don’t sell or share them. Sentry sees your IP address when a report arrives but is set not to store it. Reports are deleted automatically after 90 days at most.</p>
+      <p>To turn this off, open <b>Settings → Privacy</b> in the iPad or iPhone app and switch off <b>Share crash reports</b>, or untick <b>Share crash reports</b> at the bottom of the Mac app’s menu-bar panel. Each device has its own switch. Diagnostic logs (the ones you can see in Console on a Mac) stay on your device.</p>
 
       <h3>iCloud</h3>
       <p>If you’re signed in to iCloud, each device saves a small record in your own private iCloud database so your devices can recognise each other: a device identifier, the device’s name and type, a public key used to verify it, and when it was last seen. Apple stores this under your Apple Account. We can’t read it. Signing out of iCloud, or removing Deck Hand’s data in iCloud settings, deletes it.</p>
@@ -86,7 +98,7 @@
       <p>Every new connection has to be approved on the Mac before anything is shared.</p>
 
       <h2>Your choices</h2>
-      <p>You can ask us what we hold about you, ask us to correct it, or ask us to delete it, at any time. For the waitlist, that means your email and the details listed above. Email <span class="legal__contact">[contact email — add before launch]</span> from the address you signed up with and we’ll handle it within 30 days.</p>
+      <p>You can ask us what we hold about you, ask us to correct it, or ask us to delete it, at any time. For the waitlist, that means your email and the details listed above. Crash reports aren’t linked to you, so we can’t pick out yours, but they’re deleted within 90 days anyway. Email <span class="legal__contact">[contact email — add before launch]</span> from the address you signed up with and we’ll handle it within 30 days.</p>
       <p>Depending on where you live, you may have further rights under laws such as the GDPR or California’s CCPA, including complaining to your local data protection authority.</p>
 
       <h2>Children</h2>

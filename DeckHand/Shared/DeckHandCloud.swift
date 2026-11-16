@@ -36,7 +36,7 @@ enum DeckHandCloud {
     /// CloudKit container shared by the iOS remote and the Mac host.
     /// Must be registered in the Apple Developer portal and present in
     /// both targets' iCloud entitlements.
-    static let containerIdentifier = "iCloud.com.deckhand.shared"
+    static let containerIdentifier = "iCloud.com.widgetsflow.deckhand"
 
     /// CloudKit configuration for the Loom container. `nil` disables
     /// same-iCloud awareness ("My Mac" badge, host auto-allow).

@@ -66,7 +66,9 @@ npx wrangler kv key list --namespace-id <id> > waitlist-keys.json
 The privacy policy is served at `/privacy` (Cloudflare Pages maps it to
 `privacy.html`) and is linked from both waitlist forms and the footer. If you
 turn on analytics or a mailing tool, update its "Cookies and storage" and
-"The waitlist" sections to match.
+"The waitlist" sections to match. Its "Crash reports and diagnostics" section
+describes the apps' Sentry reporting; it has to stay in step with both
+`PrivacyInfo.xcprivacy` files and `DeckHand/AppStore/AppPrivacy.md`.
 
 ## Official Apple bezels and app icons
 

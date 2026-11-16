@@ -14,7 +14,9 @@ Verified on 16 September 2026, after the Xcode install was repaired:
   `xcodebuild ... -allowProvisioningUpdates` fails with `Unable to log in with
   account 'socialmedia@learn4d365.com'. The login details ... were rejected`,
   followed by `No profiles for 'com.deckhand.mac' were found`. Re-authenticate
-  the Apple Developer account in Xcode → Settings → Accounts. Nothing can be
+  the Apple Developer account in Xcode → Settings → Accounts. (The bundle IDs
+  have since moved to `com.widgetsflow.deckhand` and
+  `com.widgetsflow.deckhand.mac`; the quoted errors use the old ones.) Nothing can be
   installed on a device or shipped until this is cleared.
 - ❌ **No iOS 27 simulator runtime installed** — only iOS 18.5 and 26.5. Install
   it before claiming anything about iOS 27 behavior.

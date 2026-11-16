@@ -9,10 +9,11 @@ tools, an app launcher, and shortcut chips that change with whatever app is
 frontmost.
 
 Everything runs peer-to-peer over [Loom](#the-loom-package), which is vendored in
-this repository. As shipped there is no account, no relay, and no cloud service
-in the path. CloudKit-backed "same iCloud account" awareness and internet
-reachability are wired up but switched off in `Shared/DeckHandCloud.swift`, since
-both need a paid developer account and a registered container.
+this repository. There is no account and no relay in the path. CloudKit-backed
+"same iCloud account" awareness is on (`Shared/DeckHandCloud.swift`); internet
+reachability is wired up but stays off until a relay exists. Crash and
+performance reports go to Sentry unless the user turns them off; see
+[`DeckHand/AppStore/Sentry.md`](DeckHand/AppStore/Sentry.md).
 
 ## What it does
 
@@ -61,6 +62,7 @@ manual controls rather than an automatic heuristic:
 | Default capture action | Which capture the main button triggers |
 | Auto-save to Photos | On / off |
 | Appearance | System / light / dark |
+| Share crash reports | On / off (the Mac has its own checkbox in the menu-bar panel) |
 
 Hidden apps can also be restored from here, and the first-run tour can be
 replayed.
@@ -135,8 +137,12 @@ open DeckHand.xcodeproj
 
 Both app targets use automatic signing and are pinned to the original author's
 team, so set `DEVELOPMENT_TEAM` in `DeckHand/project.yml` to your own and
-regenerate before building to a device. Bundle identifiers are `com.deckhand.mac`
-and `com.deckhand.ios`.
+regenerate before building to a device. Bundle identifiers are
+`com.widgetsflow.deckhand` (iPhone and iPad), `com.widgetsflow.deckhand.mac` (Mac)
+and `com.widgetsflow.deckhand.tests`; the CloudKit container is
+`iCloud.com.widgetsflow.deckhand`. If you sign under your own team, change all of
+them, including the container in both `.entitlements` files and
+`Shared/DeckHandCloud.swift`.
 
 From the command line:
 
@@ -202,6 +208,8 @@ DeckHand/
                    shared theme, pixel art and motion
   DeckHandTests/   Wire-format contract tests
   Scripts/         App icon generation
+  AppStore/        Store listing, privacy answers, export compliance, Sentry
+                   setup and the release checklist
   project.yml      XcodeGen project definition
 website/           Marketing site and waitlist (see website/README.md)
 Sources/           The Loom Swift package

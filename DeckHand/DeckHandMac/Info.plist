@@ -23,6 +23,10 @@
     <!-- Run as menu bar app (no Dock icon) -->
     <key>LSUIElement</key>
     <true/>
+    <!-- Sentry DSN, from the SENTRY_DSN build setting in project.yml.
+         Empty turns crash reporting off. -->
+    <key>SentryDSN</key>
+    <string>$(SENTRY_DSN)</string>
     <!-- Bonjour discovery -->
     <key>NSBonjourServices</key>
     <array>

@@ -113,7 +113,10 @@ the new bundle ID too.
 
 This app's `com.miragecontrol.*` identifiers were poisoned during the
 investigation. The rename to `com.deckhand.*` gave both targets clean
-identifiers, which is the state they need to stay in.
+identifiers. Those were later replaced for release by `com.widgetsflow.deckhand`
+(iOS) and `com.widgetsflow.deckhand.mac` (Mac), which start out clean too, and
+are the ones that need to stay that way: launch the Mac build through
+LaunchServices from its very first run.
 
 ## Diagnosing it
 

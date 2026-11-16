@@ -281,6 +281,14 @@ final class DeckHandSettings: ObservableObject {
         didSet { defaults.set(appearance.rawValue, forKey: Key.appearance) }
     }
 
+    // ── Privacy ─────────────────────────────────────────────────────
+    /// Whether crash and performance reports go to Sentry. Stored by
+    /// `DeckHandDiagnostics` under its own key so it can be read at launch,
+    /// before this store exists. Takes effect immediately either way.
+    @Published var shareCrashReports: Bool {
+        didSet { DeckHandDiagnostics.setEnabled(shareCrashReports) }
+    }
+
     // ── First run ───────────────────────────────────────────────────
     @Published var hasCompletedOnboarding: Bool {
         didSet { defaults.set(hasCompletedOnboarding, forKey: Key.hasCompletedOnboarding) }
@@ -316,6 +324,8 @@ final class DeckHandSettings: ObservableObject {
 
         appearance = (defaults.string(forKey: Key.appearance)
             .flatMap(AppearanceMode.init(rawValue:))) ?? .system
+
+        shareCrashReports = DeckHandDiagnostics.isEnabledByUser
 
         hasCompletedOnboarding = defaults.bool(forKey: Key.hasCompletedOnboarding)
 
