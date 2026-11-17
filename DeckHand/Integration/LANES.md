@@ -30,9 +30,10 @@ Loom package at the repository root). `Core/…` means
    here and not only on the Mac. Add your own app files to the type check
    (`run.sh path/to/File.swift`) when their dependencies can be stubbed.
 3. Never commit to `claude/pixelhand-integration`. Push your lane branch and
-   write `Integration/<LANE>.md` (what changed, Mac checks, compile risks)
-   ending with the line `<Lane>: READY TO MERGE`. The primary session merges
-   and the owner's Mac build loop verifies.
+   write `Integration/LANE-<name>.md` (what changed, Mac checks, compile
+   risks) ending with the line `Lane: READY TO MERGE` (see
+   `COORDINATOR.md`). The coordinator merges and the owner's Mac build loop
+   verifies.
 4. Private API: Mac app only, through `dlsym`, with a fallback when the
    symbol is missing (`DECISIONS.md`). The iOS app stays public API only.
 5. Re-implement from Sill's behaviour and docs; copy no Sill code.
@@ -211,7 +212,9 @@ Owned by the integration (primary) session; lanes ask before editing:
 
 ### Merge order
 
-Protocol-bumping branches go one at a time; within that, the suggested
-order is: Network (S1), Pairing (S4), Mac system control (S7/S8/S9, Spaces),
-iOS interaction, Mirror (binary stream, then S5/S6), Store last. A lane that
-doesn't bump the protocol can merge in between.
+Protocol-bumping branches merge one at a time, in the order the
+coordinator's queue starts them (`COORDINATOR.md`: Network, Mac system
+control, Mirror, iOS interaction, Pairing, Store). A lane that doesn't bump
+the protocol can merge in between. Store merges last because it gates UI
+the others are still changing; S15 (Network) waits for Pairing's trust
+list.
