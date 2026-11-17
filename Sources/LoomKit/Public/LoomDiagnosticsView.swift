@@ -89,9 +89,6 @@ public struct LoomDiagnosticsView: View {
                         if peer.isNearby {
                             badge("Nearby", color: .green)
                         }
-                        if peer.isShared {
-                            badge("Shared", color: .blue)
-                        }
                         if peer.remoteAccessEnabled {
                             badge("Remote", color: .purple)
                         }
