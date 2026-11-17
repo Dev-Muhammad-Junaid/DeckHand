@@ -346,6 +346,24 @@ final class InputInjector {
         noteInjectionActive("warpCursor")
     }
 
+    /// The pointer's position in global display coordinates.
+    func cursorPosition() -> CGPoint {
+        currentCGCursorPosition()
+    }
+
+    /// Puts the pointer at `point` (global display coordinates).
+    func moveCursor(to point: CGPoint) {
+        guard isAccessibilityGranted else { noteInjectSkipped("warpCursor"); return }
+        let event = CGEvent(
+            mouseEventSource: nil,
+            mouseType: .mouseMoved,
+            mouseCursorPosition: point,
+            mouseButton: .left
+        )
+        event?.post(tap: .cghidEventTap)
+        noteInjectionActive("warpCursor")
+    }
+
     /// Display currently under the pointer, used when the iPad has not
     /// yet named a monitor. Falls back to the main display.
     func displayIDUnderCursor() -> CGDirectDisplayID {

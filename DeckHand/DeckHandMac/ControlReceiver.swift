@@ -378,16 +378,24 @@ final class ControlReceiver {
         let target = displayID.map { CGDirectDisplayID($0) }
             ?? injector.displayIDUnderCursor()
 
+        let pointerBefore = injector.cursorPosition()
         injector.moveCursorToMenuBar(ofDisplay: target)
         try? await Task.sleep(for: .milliseconds(60))
 
         switch direction {
         case .previous, .next:
-            async let spaceChanged: Void = waitForActiveSpaceChange()
+            async let spaceChanged = waitForActiveSpaceChange()
             postSystemSpaceKey(previous: direction == .previous)
-            await spaceChanged
-            injector.moveCursorToCenter(ofDisplay: target)
-            CursorLocator.shared.ping()
+            if await spaceChanged {
+                injector.moveCursorToCenter(ofDisplay: target)
+                CursorLocator.shared.ping()
+            } else {
+                // No Space to go to (end of the strip, or a display with a
+                // single desktop): put the pointer back instead of yanking
+                // it to the centre and flashing Locate for nothing.
+                DeckHandLog.input.info("Space switch on display \(target, privacy: .public) changed nothing; pointer restored")
+                injector.moveCursor(to: pointerBefore)
+            }
         case .missionControl:
             await dispatchMacro(id: "missioncontrol_trigger")
         }
@@ -407,9 +415,10 @@ final class ControlReceiver {
     }
 
     /// Resolves when Mission Control finishes switching Space, or after a
-    /// short timeout if we were already at the end of the strip.
-    private func waitForActiveSpaceChange(timeout: Duration = .milliseconds(800)) async {
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+    /// short timeout if we were already at the end of the strip. Returns
+    /// whether the Space actually changed.
+    private func waitForActiveSpaceChange(timeout: Duration = .milliseconds(800)) async -> Bool {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
             let once = OnceResume(continuation)
             let center = NSWorkspace.shared.notificationCenter
             let token = center.addObserver(
@@ -417,12 +426,12 @@ final class ControlReceiver {
                 object: nil,
                 queue: .main
             ) { _ in
-                once.resume()
+                once.resume(returning: true)
             }
             once.setToken(token)
             Task { @MainActor in
                 try? await Task.sleep(for: timeout)
-                once.resume()
+                once.resume(returning: false)
             }
         }
     }
@@ -556,10 +565,10 @@ final class ControlReceiver {
 /// observer. Shared between the space-change notification and its timeout.
 private final class OnceResume: @unchecked Sendable {
     private let lock = NSLock()
-    private var continuation: CheckedContinuation<Void, Never>?
+    private var continuation: CheckedContinuation<Bool, Never>?
     private var token: NSObjectProtocol?
 
-    init(_ continuation: CheckedContinuation<Void, Never>) {
+    init(_ continuation: CheckedContinuation<Bool, Never>) {
         self.continuation = continuation
     }
 
@@ -569,7 +578,7 @@ private final class OnceResume: @unchecked Sendable {
         lock.unlock()
     }
 
-    func resume() {
+    func resume(returning value: Bool) {
         lock.lock()
         let pending = continuation
         continuation = nil
@@ -579,6 +588,6 @@ private final class OnceResume: @unchecked Sendable {
         if let token {
             NSWorkspace.shared.notificationCenter.removeObserver(token)
         }
-        pending?.resume()
+        pending?.resume(returning: value)
     }
 }
