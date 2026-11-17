@@ -53,6 +53,9 @@ final class ContextObserver {
     /// Coalesces bursts of AX notifications — Chrome-style apps can fire
     /// a dozen within a few milliseconds while a sheet animates in.
     private var debounceTask: Task<Void, Never>?
+    /// Bumped per recompute; an off-main walk whose generation is stale by
+    /// the time it finishes is discarded.
+    private var recomputeGeneration: UInt64 = 0
     private static let debounceNanoseconds: UInt64 = 75_000_000
 
     // AX notifications we want to know about on the frontmost app.
@@ -281,24 +284,40 @@ final class ContextObserver {
 
     private func recompute() {
         guard let app = currentAppElement else {
+            recomputeGeneration &+= 1
             updateSnapshot(.none)
             return
         }
 
-        // Accessibility tree walks run synchronously on the main thread and
-        // can contend with input injection (also main-thread via CGEvent).
-        // Log only slow passes (>16 ms ≈ one display frame) so future cursor-
-        // jitter investigations can correlate stalls with AX work, without
-        // adding any hot-path logging in the common (sub-millisecond) case.
-        let start = Date()
-        let snapshot = Self.buildSnapshot(for: app) { [weak self] table in
-            self?.buttonElementsByID = table
+        // The tree walk is many synchronous AX IPC calls (40–50 ms seen on
+        // build 1). On the main actor it held up cursor injection and the
+        // message loop. AX calls are safe from any thread, so the walk runs
+        // off the main actor and only the result hops back. A walk that
+        // finishes after a newer one started is dropped.
+        recomputeGeneration &+= 1
+        let generation = recomputeGeneration
+        let appBox = AXElementBox(element: app)
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let start = Date()
+            var table: [String: AXUIElement] = [:]
+            let snapshot = ContextObserver.buildSnapshot(for: appBox.element) { table = $0 }
+            let elapsedMs = Date().timeIntervalSince(start) * 1000
+            if elapsedMs > 16 {
+                DeckHandLog.context.info("AX recompute slow: \(elapsedMs, format: .fixed(precision: 1))ms (off the main actor)")
+            }
+            let result = AXSnapshotResult(snapshot: snapshot, table: table)
+            await MainActor.run { [weak self] in
+                guard let self, generation == self.recomputeGeneration else { return }
+                self.buttonElementsByID = result.table
+                self.updateSnapshot(result.snapshot)
+            }
         }
-        updateSnapshot(snapshot)
-        let elapsedMs = Date().timeIntervalSince(start) * 1000
-        if elapsedMs > 16 {
-            DeckHandLog.context.info("AX recompute slow: \(elapsedMs, format: .fixed(precision: 1))ms — may contend with cursor input")
-        }
+    }
+
+    /// A finished off-main walk, carried back to the main actor.
+    private struct AXSnapshotResult: @unchecked Sendable {
+        let snapshot: UIContextSnapshot
+        let table: [String: AXUIElement]
     }
 
     private func updateSnapshot(_ snapshot: UIContextSnapshot) {
@@ -363,7 +382,7 @@ final class ContextObserver {
     /// sheet, and emits a `UIContextSnapshot` plus a fresh AX element map.
     /// The `store` callback receives the populated map so the singleton
     /// can update its lookup table under MainActor isolation.
-    private static func buildSnapshot(
+    nonisolated private static func buildSnapshot(
         for app: AXUIElement,
         store: (_ table: [String: AXUIElement]) -> Void
     ) -> UIContextSnapshot {
@@ -528,7 +547,7 @@ final class ContextObserver {
     /// `DialogContext` equality holds and `updateSnapshot` dedupes them.
     /// We cap at a handful of fields because the AX tree above this point
     /// has already filtered down to "real dialog content".
-    private static func makeDialogRevision(
+    nonisolated private static func makeDialogRevision(
         title: String?,
         message: String?,
         buttons: [(title: String, isDefault: Bool, isCancel: Bool)]
@@ -552,7 +571,7 @@ final class ContextObserver {
     #if DEBUG
     /// Prints the AX role tree rooted at `element` to the given depth.
     /// Used to diagnose why a dialog didn't yield the expected buttons.
-    private static func dumpAXTree(_ element: AXUIElement, depth: Int, limit: Int) {
+    nonisolated private static func dumpAXTree(_ element: AXUIElement, depth: Int, limit: Int) {
         guard depth < limit else { return }
         let role: String = copyAttribute(element, kAXRoleAttribute) ?? "?"
         let subrole: String = copyAttribute(element, kAXSubroleAttribute) ?? "-"
@@ -572,7 +591,7 @@ final class ContextObserver {
     /// Shallow search for the first direct-or-near-descendant child with
     /// the given role. Used to find attached sheets that don't show up in
     /// the window's `AXSheets` attribute.
-    private static func firstChild(
+    nonisolated private static func firstChild(
         of element: AXUIElement,
         matchingRole role: String,
         depth: Int,
@@ -595,7 +614,7 @@ final class ContextObserver {
     /// Looks for an `AXGroup` with subrole `AXDialog` / `AXSystemDialog`
     /// anywhere within a bounded subtree. System Settings and several
     /// SwiftUI-on-AppKit apps use this pattern for confirmation prompts.
-    private static func firstChild(
+    nonisolated private static func firstChild(
         ofGroupWithDialogSubrole element: AXUIElement,
         depth: Int,
         limit: Int
@@ -622,7 +641,7 @@ final class ContextObserver {
 
     /// Reads `kAXModalAttribute` on a window. SwiftUI sheets frequently set
     /// this even when they don't adopt the `AXSheet` role or dialog subrole.
-    private static func isModal(_ element: AXUIElement) -> Bool {
+    nonisolated private static func isModal(_ element: AXUIElement) -> Bool {
         let raw: NSNumber? = copyAttribute(element, "AXModal")
         return raw?.boolValue ?? false
     }
@@ -641,7 +660,7 @@ final class ContextObserver {
     ///
     /// Disabled elements (read-only, dimmed) are treated as "not a field"
     /// so we don't surface chips that'll no-op.
-    private static func classifyField(_ elem: AXUIElement) -> TextFieldContext.Kind? {
+    nonisolated private static func classifyField(_ elem: AXUIElement) -> TextFieldContext.Kind? {
         let enabledRaw: NSNumber? = copyAttribute(elem, kAXEnabledAttribute)
         if let e = enabledRaw, e.boolValue == false { return nil }
 
@@ -654,7 +673,7 @@ final class ContextObserver {
     }
 
     /// Lookup the kind purely from role / subrole — fast, no tree walking.
-    private static func directFieldKind(_ elem: AXUIElement) -> TextFieldContext.Kind? {
+    nonisolated private static func directFieldKind(_ elem: AXUIElement) -> TextFieldContext.Kind? {
         let role: String = copyAttribute(elem, kAXRoleAttribute) ?? ""
         let subrole: String = copyAttribute(elem, kAXSubroleAttribute) ?? ""
         if subrole == "AXSecureTextField" { return .secure }
@@ -670,7 +689,7 @@ final class ContextObserver {
     /// `true` when `AXValue` on this element is a settable string — i.e.
     /// the user can write text into it. Catches the many Electron / custom
     /// controls that don't advertise themselves as `AXTextField`.
-    private static func hasSettableStringValue(_ elem: AXUIElement) -> Bool {
+    nonisolated private static func hasSettableStringValue(_ elem: AXUIElement) -> Bool {
         var settable: DarwinBoolean = false
         let err = AXUIElementIsAttributeSettable(
             elem, kAXValueAttribute as CFString, &settable
@@ -684,7 +703,7 @@ final class ContextObserver {
     /// a descendant that's both marked `AXFocused == true` and looks like
     /// a text field. Bounded to `limit` levels and follows only focused
     /// branches so it's cheap even on enormous web-content trees.
-    private static func findFocusedFieldDescendant(
+    nonisolated private static func findFocusedFieldDescendant(
         under element: AXUIElement,
         depth: Int,
         limit: Int
@@ -712,7 +731,7 @@ final class ContextObserver {
     /// One-line summary of a focused window's immediate (or near-immediate)
     /// children — used when we can't find a dialog so the log tells us what
     /// the app's structure actually looks like in AX terms.
-    private static func summarizeChildren(
+    nonisolated private static func summarizeChildren(
         of element: AXUIElement,
         depth: Int,
         limit: Int
@@ -734,7 +753,7 @@ final class ContextObserver {
     /// sheet (role `AXSheet`) or dialog-subrole window (free-standing
     /// alert that doesn't own AX focus). Also digs one level into each
     /// window to find attached sheets that didn't come up via `AXSheets`.
-    private static func firstModalWindow(in app: AXUIElement) -> AXUIElement? {
+    nonisolated private static func firstModalWindow(in app: AXUIElement) -> AXUIElement? {
         guard let windows: [AXUIElement] = copyAttribute(app, kAXWindowsAttribute) else {
             return nil
         }
@@ -760,7 +779,7 @@ final class ContextObserver {
 
     /// Recursive, depth-bounded search for enabled `AXButton` descendants.
     /// Caps at 12 results so a pathological window can't stall the AX thread.
-    private static func collectButtons(
+    nonisolated private static func collectButtons(
         root: AXUIElement,
         depth: Int,
         into out: inout [(AXUIElement, String)]
@@ -792,7 +811,7 @@ final class ContextObserver {
 
     /// AX can name a button via title / description / identifier. Tries in
     /// order; returns empty string if none work so the caller can skip.
-    private static func buttonLabel(for element: AXUIElement) -> String {
+    nonisolated private static func buttonLabel(for element: AXUIElement) -> String {
         if let t: String = copyAttribute(element, kAXTitleAttribute), !t.isEmpty { return t }
         if let d: String = copyAttribute(element, kAXDescriptionAttribute), !d.isEmpty { return d }
         if let id: String = copyAttribute(element, kAXIdentifierAttribute), !id.isEmpty { return id }
@@ -801,7 +820,7 @@ final class ContextObserver {
 
     /// Finds the first non-empty static-text descendant within a few levels
     /// of the dialog root. Used for the dialog body/message copy.
-    private static func firstStaticText(
+    nonisolated private static func firstStaticText(
         under root: AXUIElement,
         depth: Int,
         limit: Int
@@ -829,7 +848,7 @@ final class ContextObserver {
 
     /// Generic typed wrapper over `AXUIElementCopyAttributeValue`. Returns
     /// `nil` on failure or type mismatch — callers never see raw AXError.
-    private static func copyAttribute<T>(_ element: AXUIElement, _ attribute: String) -> T? {
+    nonisolated private static func copyAttribute<T>(_ element: AXUIElement, _ attribute: String) -> T? {
         var ref: CFTypeRef?
         let err = AXUIElementCopyAttributeValue(element, attribute as CFString, &ref)
         guard err == .success, let ref else { return nil }

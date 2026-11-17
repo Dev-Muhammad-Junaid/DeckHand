@@ -20,7 +20,7 @@ enum ApprovalGlyph: Equatable {
         switch status {
         case "granted": self = .approved
         case "denied": self = .denied
-        case "host_disconnected": self = .disconnected
+        case "host_disconnected", ApprovalStatusCopy.timedOutStatus: self = .disconnected
         default: self = .waiting
         }
     }

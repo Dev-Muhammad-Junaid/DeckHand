@@ -40,7 +40,7 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
     /// consuming its messages immediately — buffered commands from the
     /// revoked device are dropped, not executed.
     var onConnectionRevoked: ((UUID) -> Void)?
-    private static let pendingRequestTimeout: Duration = .seconds(45)
+    private static let pendingRequestTimeout: Duration = .seconds(ApprovalStatusCopy.pendingRequestTimeout)
 
     override init() {
         super.init()

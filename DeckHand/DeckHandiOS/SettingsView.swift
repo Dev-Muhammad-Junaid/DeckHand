@@ -11,6 +11,7 @@
 //  / Full" floating with nothing to say what they belong to.
 //
 
+import CloudKit
 import SwiftUI
 
 struct SettingsView: View {
@@ -31,6 +32,7 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
+            .modifier(OpaqueSettingsBar())
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
@@ -198,14 +200,11 @@ struct SettingsView: View {
 
     private var connectionSection: some View {
         Section {
-            UnavailableRow(
-                title: "Recognize my own devices",
-                detail: "Macs on your iCloud account would connect without the approval prompt."
-            )
+            CloudRecognitionRow()
         } header: {
             Text("Connection")
         } footer: {
-            Text("The code path for this exists on both sides; switching it on needs a CloudKit container registered to a paid developer account.")
+            Text(CloudRecognitionStatus.footer)
         }
     }
 
@@ -236,6 +235,31 @@ struct SettingsView: View {
 }
 
 // MARK: - Building blocks
+
+/// Keeps scrolled rows from showing through the "Settings" title.
+///
+/// In a sheet the inline bar is transparent until content scrolls under it,
+/// and on iOS 26 its soft scroll-edge blur let glass controls such as the
+/// segmented pickers read straight through the title in dark mode. A
+/// visible bar background, plus a hard scroll edge on iOS 26, keeps the
+/// title on a solid surface in both appearances.
+private struct OpaqueSettingsBar: ViewModifier {
+    func body(content: Content) -> some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            content
+                .toolbarBackground(.visible, for: .navigationBar)
+                .scrollEdgeEffectStyle(.hard, for: .top)
+        } else {
+            content
+                .toolbarBackground(.visible, for: .navigationBar)
+        }
+        #else
+        content
+            .toolbarBackground(.visible, for: .navigationBar)
+        #endif
+    }
+}
 
 /// A titled control. Segmented pickers and sliders lose their `Picker` label
 /// inside a `Form`, so the title is drawn explicitly above the control.
@@ -279,34 +303,59 @@ private struct SettingBlock<Content: View>: View {
     }
 }
 
-/// A setting that is deliberately visible but not wired up yet. Rendered as
-/// inert text rather than a disabled control, so it can't read as a toggle
-/// that simply failed to respond.
-private struct UnavailableRow: View {
-    let title: String
-    let detail: String
+/// "Recognize my own devices": reports whether same-iCloud recognition is
+/// working on this device, from the build switch and the iCloud account.
+private struct CloudRecognitionRow: View {
+    @State private var account: CloudRecognitionStatus.Account?
+
+    private var status: CloudRecognitionStatus {
+        .resolve(cloudEnabled: DeckHandCloud.isCloudEnabled, account: account)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 8) {
-                Text(title)
-                    .foregroundStyle(.secondary)
+                Text("Recognize my own devices")
+                    .foregroundStyle(status.isActive ? Color.primary : Color.secondary)
                 Spacer(minLength: 8)
-                Text("Not available")
+                Text(status.badge)
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(status.isActive ? DeckHandTheme.Brand.mint : Color.secondary)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
                     .background(
-                        Capsule().fill(Color.secondary.opacity(0.14))
+                        Capsule().fill((status.isActive ? DeckHandTheme.Brand.mint : Color.secondary).opacity(0.14))
                     )
             }
-            Text(detail)
+            Text(status.detail)
                 .font(.footnote)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondary)
         }
         .padding(.vertical, 3)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(title). Not available. \(detail)")
+        .accessibilityLabel("Recognize my own devices. \(status.badge). \(status.detail)")
+        .task {
+            // Never touch CKContainer when the build has CloudKit off: the
+            // container needs the iCloud entitlement to exist.
+            guard DeckHandCloud.isCloudEnabled else { return }
+            account = await Self.currentAccount()
+        }
+    }
+
+    private static func currentAccount() async -> CloudRecognitionStatus.Account {
+        do {
+            let status = try await CKContainer(identifier: DeckHandCloud.containerIdentifier).accountStatus()
+            switch status {
+            case .available: return .available
+            case .noAccount: return .noAccount
+            case .restricted: return .restricted
+            case .temporarilyUnavailable: return .temporarilyUnavailable
+            case .couldNotDetermine: return .couldNotDetermine
+            @unknown default: return .couldNotDetermine
+            }
+        } catch {
+            DeckHandLog.app.error("iCloud account status failed: \(error.localizedDescription, privacy: .public)")
+            return .couldNotDetermine
+        }
     }
 }

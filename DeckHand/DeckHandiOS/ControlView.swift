@@ -15,6 +15,8 @@ extension Notification.Name {
 struct ControlView: View {
     let connection: LoomConnectionHandle
     let peerName: String
+    /// The approval state the root view shows, after timeout mapping.
+    let authStatus: String
     let onAuthStatusChanged: (String) -> Void
     let onDisconnect: () -> Void
 
@@ -95,14 +97,10 @@ struct ControlView: View {
     @State private var lastAuthStatus = "pending"
 
     // ── Liveness heartbeat ──────────────────────────────────────────
-    /// Time the last pong arrived. The heartbeat loop sends a ping every
-    /// 2 s; if no pong lands within the timeout the host is provably gone
-    /// (quit, crashed, network dropped) and we bounce to the picker —
-    /// regardless of what the transport's cached state claims.
-    @State private var lastPongAt: Date?
-    /// Set once any pong arrives; before that the timeout isn't enforced
-    /// (covers connecting to an older host build that doesn't speak ping).
-    @State private var heartbeatEstablished = false
+    // A `LivenessClock` made per connection in `.task`: every message from
+    // the Mac counts as a sign of life, not only pongs, and the timeout
+    // isn't enforced until the first pong (older hosts don't speak ping).
+    // See Shared/Liveness.swift.
 
     // ── Host capabilities ───────────────────────────────────────────
     /// What the Mac can actually execute right now, as reported by the
@@ -250,8 +248,10 @@ struct ControlView: View {
                             .truncationMode(.middle)
                         HStack(spacing: 4) {
                             // The icon's mint pixel, breathing while connected.
-                            LivePixel()
-                            Text(activeAppName ?? "Connected")
+                            if ApprovalStatusCopy.showsLiveIndicator(status: authStatus) {
+                                LivePixel()
+                            }
+                            Text(ApprovalStatusCopy.headerSubtitle(status: authStatus, activeAppName: activeAppName))
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
@@ -441,35 +441,41 @@ struct ControlView: View {
             }
 
             // ── Liveness heartbeat ──────────────────────────────────
-            // Ping every 2 s; declare the host dead after ~6 s of pong
-            // silence (three missed beats). Structured child of .task,
-            // so view teardown cancels it cleanly — no phantom
-            // disconnects from replaced views.
+            // Ping every 2 s; declare the host dead after 10 s with no
+            // traffic at all from it (any message counts, not only pongs).
+            // A check that runs late means this iPad stalled, and restarts
+            // the silence clock instead of blaming the Mac. Structured
+            // child of .task, so view teardown cancels it cleanly.
+            let liveness = LivenessClock(LivenessPolicy.remoteMonitor())
             let heartbeat = Task {
                 var seq: UInt64 = 0
                 while !Task.isCancelled {
                     seq &+= 1
                     await s.sendPing(seq: seq)
-                    try? await Task.sleep(for: .seconds(2))
+                    try? await Task.sleep(for: .seconds(LivenessPolicy.pingInterval))
                     guard !Task.isCancelled else { return }
-                    let silent = await MainActor.run { () -> Bool in
-                        guard heartbeatEstablished, let lastPongAt else { return false }
-                        return Date().timeIntervalSince(lastPongAt) > 6
-                    }
-                    if silent {
+                    switch liveness.check() {
+                    case let .localStall(gap):
+                        DeckHandLog.connection.info("Heartbeat check ran \(gap, format: .fixed(precision: 1), privacy: .public)s late (iPad stalled or suspended); restarting the silence clock")
+                    case let .dead(silence, sinceHeartbeat):
+                        liveness.markGaveUp()
+                        let state = liveness.snapshot
+                        DeckHandLog.connection.error("Heartbeat: IPAD GAVE UP on the Mac: nothing received for \(silence, format: .fixed(precision: 1), privacy: .public)s (last pong \(sinceHeartbeat, format: .fixed(precision: 1), privacy: .public)s ago, \(state.inboundCount, privacy: .public) messages total, last ping seq \(seq, privacy: .public), timeout \(LivenessPolicy.remoteTimeout, privacy: .public)s)")
                         await MainActor.run {
                             if lastAuthStatus != "denied" {
                                 onAuthStatusChanged("host_disconnected")
                             }
                         }
                         return
+                    case .alive, .notEstablished:
+                        break
                     }
                 }
             }
             defer { heartbeat.cancel() }
 
             // Single consolidated message loop — no competing consumers
-            await listenForHostMessages()
+            await listenForHostMessages(liveness: liveness)
         }
     }
 
@@ -496,8 +502,11 @@ struct ControlView: View {
     // across multiple views causes AsyncSequence racing where messages get
     // silently consumed by the wrong listener.
 
-    private func listenForHostMessages() async {
+    private func listenForHostMessages(liveness: LivenessClock) async {
         for await data in connection.messages {
+            // Anything from the Mac proves it's alive, so a pong stuck
+            // behind mirror frames can't read as a dead host.
+            liveness.noteInbound()
             let message: ControlMessage
             do {
                 message = try ControlMessageCoding.decoder.decode(ControlMessage.self, from: data)
@@ -515,7 +524,13 @@ struct ControlView: View {
             // listener task so decode stays off the main thread, and only
             // hop to MainActor for the cheap state swap.
             if case let .mirrorFrame(seq, frameData) = message {
-                guard let decoded = UIImage(data: frameData)?.preparingForDisplay() else { continue }
+                // This loop runs on the main actor, so decode in a detached
+                // task; up to 20 frames a second otherwise compete with
+                // touch handling and the heartbeat.
+                let decodedFrame = await Task.detached(priority: .userInitiated) {
+                    UIImage(data: frameData)?.preparingForDisplay()
+                }.value
+                guard let decoded = decodedFrame else { continue }
                 await MainActor.run {
                     guard isMirrorActive else { return }
                     // Ordered transport: a sequence REGRESSION can only mean
@@ -530,6 +545,9 @@ struct ControlView: View {
             // Feature flags and receipts only concern the sender actor; no
             // UI state changes, so they skip the main-actor hop.
             switch message {
+            case .pong:
+                liveness.noteHeartbeat()
+                continue
             case let .hostFeatures(commandReceipts):
                 await sender?.setHostSendsReceipts(commandReceipts)
                 continue
@@ -541,10 +559,6 @@ struct ControlView: View {
             }
             await MainActor.run {
                 switch message {
-                case .pong:
-                    lastPongAt = Date()
-                    heartbeatEstablished = true
-
                 case let .hostCapabilities(accessibility, screenRecording):
                     withAnimation(.easeInOut(duration: 0.2)) {
                         hostAccessibilityGranted = accessibility
@@ -712,6 +726,15 @@ struct ControlView: View {
                     break
                 }
             }
+        }
+
+        // Say which side ended it: if the heartbeat didn't give up, the
+        // stream ended because the Mac closed the connection.
+        if liveness.gaveUp {
+            DeckHandLog.connection.info("Host message stream ended after the iPad gave up (see the heartbeat line above)")
+        } else {
+            let since = Date().timeIntervalSince(liveness.snapshot.lastInboundAt)
+            DeckHandLog.connection.info("Host message stream ended: the Mac closed the connection (MAC GAVE UP, quit or revoked; last message \(since, format: .fixed(precision: 1), privacy: .public)s ago)")
         }
 
         // No stream-end inference here. Liveness is decided by exactly one

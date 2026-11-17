@@ -135,6 +135,10 @@ public final class LoomNode {
     private var bonjourAdvertisingGeneration = UUID()
     private var bonjourAdvertisingRecoveryTask: Task<Void, Never>?
     private var bonjourAdvertisingRecoveryAttempt = 0
+    /// When the current Bonjour advertiser last reached `.ready`. A failure
+    /// only resets the recovery backoff if the advertiser stayed up for at
+    /// least ``bonjourAdvertisingStableDuration`` first.
+    private var bonjourAdvertisingReadyAt: ContinuousClock.Instant?
     private let preauthenticationWorkLimiter: LoomOutstandingOperationLimiter
     private let preauthenticationAdmission: LoomPreauthenticationAdmissionController
     private let activeAuthenticatedSessionAdmission: LoomPreauthenticationAdmissionController
@@ -144,6 +148,9 @@ public final class LoomNode {
     private let networkBackend: any LoomNetworkBackend
 
     nonisolated private static let minimumBonjourAdvertisingRecoveryDelay: Duration = .seconds(1)
+    /// How long a recovered advertiser must stay up before its next failure
+    /// starts the backoff from the beginning again.
+    nonisolated package static let bonjourAdvertisingStableDuration: Duration = .seconds(30)
 
     public init(
         configuration: LoomNetworkConfiguration = .default,
@@ -276,6 +283,7 @@ public final class LoomNode {
             onConnection: onConnection
         )
         bonjourAdvertisingRecoveryAttempt = 0
+        bonjourAdvertisingReadyAt = nil
         let port = try await startBonjourAdvertising(context: bonjourAdvertisingContext)
         try validateAuthenticatedAdvertisingGeneration(authenticatedGeneration)
         return port
@@ -292,6 +300,7 @@ public final class LoomNode {
         bonjourAdvertisingGeneration = UUID()
         bonjourAdvertisingContext = nil
         bonjourAdvertisingRecoveryAttempt = 0
+        bonjourAdvertisingReadyAt = nil
 #if canImport(Network)
         let overlayProbeServer = self.overlayProbeServer
         self.overlayProbeServer = nil
@@ -1113,7 +1122,10 @@ public final class LoomNode {
             await advertiser.stop()
             throw CancellationError()
         }
-        bonjourAdvertisingRecoveryAttempt = 0
+        // The attempt count is kept, not reset, until the advertiser proves
+        // stable: an advertiser that fails again within a second of every
+        // recovery would otherwise retry once a second forever.
+        bonjourAdvertisingReadyAt = .now
         advertisingDiagnostics = advertisingDiagnostics.updating(
             state: .advertising,
             serviceName: context.serviceName,
@@ -1132,7 +1144,12 @@ public final class LoomNode {
 
         LoomLogger.discovery("Bonjour advertiser failed after publishing: \(failureDescription)")
         bonjourAdvertisingGeneration = UUID()
-        bonjourAdvertisingRecoveryAttempt += 1
+        let healthyDuration = bonjourAdvertisingReadyAt.map { ContinuousClock.now - $0 }
+        bonjourAdvertisingReadyAt = nil
+        bonjourAdvertisingRecoveryAttempt = Self.bonjourAdvertisingRecoveryAttempt(
+            afterFailureFollowing: bonjourAdvertisingRecoveryAttempt,
+            healthyDuration: healthyDuration
+        )
         let recoveryAttempt = bonjourAdvertisingRecoveryAttempt
         advertisingDiagnostics = advertisingDiagnostics.recordingBonjourFailure(
             failureDescription,
@@ -1197,6 +1214,22 @@ public final class LoomNode {
             )
             scheduleBonjourAdvertisingRecovery(attempt: recoveryAttempt)
         }
+    }
+
+    /// The recovery attempt number to use after an advertiser fails.
+    ///
+    /// The count starts again at 1 only when the failed advertiser had been
+    /// up for at least ``bonjourAdvertisingStableDuration``. An advertiser
+    /// that keeps failing shortly after each recovery keeps climbing, so
+    /// ``bonjourAdvertisingRecoveryDelay(attempt:)`` backs off.
+    nonisolated package static func bonjourAdvertisingRecoveryAttempt(
+        afterFailureFollowing previousAttempt: Int,
+        healthyDuration: Duration?
+    ) -> Int {
+        if let healthyDuration, healthyDuration >= bonjourAdvertisingStableDuration {
+            return 1
+        }
+        return max(previousAttempt, 0) + 1
     }
 
     nonisolated package static func bonjourAdvertisingRecoveryDelay(attempt: Int) -> Duration {

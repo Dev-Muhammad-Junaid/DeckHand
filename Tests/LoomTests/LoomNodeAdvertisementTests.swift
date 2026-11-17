@@ -207,6 +207,37 @@ struct LoomNodeAdvertisementTests {
         #expect(LoomNode.bonjourAdvertisingRecoveryDelay(attempt: 10) == .seconds(30))
     }
 
+    @Test("Bonjour advertiser that fails soon after each recovery keeps backing off")
+    func bonjourAdvertiserFlappingKeepsBackingOff() {
+        var attempt = 0
+        var delays: [Duration] = []
+        for _ in 0..<6 {
+            // Ready for one second, then failed again.
+            attempt = LoomNode.bonjourAdvertisingRecoveryAttempt(
+                afterFailureFollowing: attempt,
+                healthyDuration: .seconds(1)
+            )
+            delays.append(LoomNode.bonjourAdvertisingRecoveryDelay(attempt: attempt))
+        }
+        #expect(delays == [.seconds(1), .seconds(2), .seconds(4), .seconds(8), .seconds(16), .seconds(30)])
+    }
+
+    @Test("Bonjour advertiser backoff starts over after a stable period")
+    func bonjourAdvertiserBackoffResetsAfterStablePeriod() {
+        #expect(LoomNode.bonjourAdvertisingRecoveryAttempt(
+            afterFailureFollowing: 5,
+            healthyDuration: LoomNode.bonjourAdvertisingStableDuration
+        ) == 1)
+        #expect(LoomNode.bonjourAdvertisingRecoveryAttempt(
+            afterFailureFollowing: 5,
+            healthyDuration: nil
+        ) == 6)
+        #expect(LoomNode.bonjourAdvertisingRecoveryAttempt(
+            afterFailureFollowing: 0,
+            healthyDuration: .milliseconds(10)
+        ) == 1)
+    }
+
     @Test("Advertisement leaves hostName unset when no explicit host name is provided")
     func advertisementLeavesHostNameUnsetWithoutExplicitValue() {
         let advertisement = LoomPeerAdvertisement(

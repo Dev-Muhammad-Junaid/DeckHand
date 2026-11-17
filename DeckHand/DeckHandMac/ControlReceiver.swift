@@ -19,10 +19,13 @@ final class ControlReceiver {
     /// commands from a dead/revoked iPad are dropped, never replayed.
     private var connectionTasks: [UUID: Task<Void, Never>] = [:]
     private var connectionHandles: [UUID: LoomConnectionHandle] = [:]
-    /// Last time any message arrived per connection, and whether the peer
-    /// has ever pinged (heartbeat-capable builds only get the timeout).
-    private var lastActivityAt: [UUID: Date] = [:]
-    private var hasPinged: Set<UUID> = []
+    /// Liveness per connection. Stamped off the main actor as each message
+    /// arrives (`HeartbeatResponder`), so a busy main actor can't make a
+    /// live iPad look silent. Only enforced once the peer has pinged.
+    private var livenessClocks: [UUID: LivenessClock] = [:]
+    /// Connections this Mac dropped for silence, so the loop-ended log can
+    /// say which side gave up first.
+    private var droppedForSilence: Set<UUID> = []
     private var livenessSweepTask: Task<Void, Never>?
     /// Sampled counter for high-rate input logging (see consumeMessages).
     private var inputMessageCount = 0
@@ -31,18 +34,27 @@ final class ControlReceiver {
     /// one starts or ends. Drives the menu bar icon's connected state.
     var onLiveConnectionsChanged: ((Int) -> Void)?
 
-    /// Connections silent for longer than this (after having pinged at
-    /// least once — i.e. provably heartbeat-capable) are declared dead.
-    /// The iPad pings every 2 s, so 8 s = four missed beats.
-    private static let livenessTimeout: TimeInterval = 8
+    // Connections silent for `LivenessPolicy.hostTimeout` (15 s) after
+    // having pinged at least once are declared dead. The iPad pings every
+    // 2 s and gives up after 10 s, so it normally notices first.
 
     /// Called from MacMenuBarView for each newly established incoming connection.
     /// `messages` is the connection's stream after `PreApprovalGate`; read it,
     /// never `connectionHandle.messages`, which the gate already reads.
-    func observeConnection(_ connectionHandle: LoomConnectionHandle, messages: AsyncStream<Data>) {
+    func observeConnection(_ connectionHandle: LoomConnectionHandle, messages gatedMessages: AsyncStream<Data>) {
         let key = connectionHandle.id
         connectionHandles[key] = connectionHandle
-        lastActivityAt[key] = Date()
+        let clock = LivenessClock(LivenessPolicy.hostMonitor())
+        livenessClocks[key] = clock
+        // Pongs go out as pings arrive, off the main actor; everything is
+        // still passed on, in order, to the main-actor loop below.
+        let messages = HeartbeatResponder.relay(gatedMessages, clock: clock) { seq in
+            do {
+                try await connectionHandle.send(.pong(seq: seq))
+            } catch {
+                DeckHandLog.connection.error("Pong \(seq, privacy: .public) to \(key, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
         onLiveConnectionsChanged?(connectionHandles.count)
         startLivenessSweepIfNeeded()
         connectionTasks[key] = Task { [weak self] in
@@ -78,8 +90,8 @@ final class ControlReceiver {
         connectionTasks.removeValue(forKey: key)
         connectionHandles.removeValue(forKey: key)
         onLiveConnectionsChanged?(connectionHandles.count)
-        lastActivityAt.removeValue(forKey: key)
-        hasPinged.remove(key)
+        livenessClocks.removeValue(forKey: key)
+        droppedForSilence.remove(key)
         ActiveAppMonitor.shared.removeConnection(id: key)
         RunningAppMonitor.shared.removeConnection(id: key)
         ContextObserver.shared.removeConnection(id: key)
@@ -92,7 +104,7 @@ final class ControlReceiver {
         guard livenessSweepTask == nil else { return }
         livenessSweepTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(3))
+                try? await Task.sleep(for: .seconds(LivenessPolicy.hostSweepInterval))
                 await self?.sweepDeadConnections()
             }
         }
@@ -100,9 +112,16 @@ final class ControlReceiver {
 
     private func sweepDeadConnections() async {
         let now = Date()
-        for (key, lastSeen) in lastActivityAt
-        where hasPinged.contains(key) && now.timeIntervalSince(lastSeen) > Self.livenessTimeout {
-            DeckHandLog.connection.info("Liveness timeout for connection \(key, privacy: .public) — dropping")
+        for (key, clock) in livenessClocks {
+            let verdict = clock.check(at: now)
+            if case let .localStall(gap) = verdict {
+                DeckHandLog.connection.info("Liveness sweep for \(key, privacy: .public) ran \(gap, format: .fixed(precision: 1), privacy: .public)s late (Mac stalled or slept); restarting its silence clock")
+                continue
+            }
+            guard case let .dead(silence, sinceHeartbeat) = verdict else { continue }
+            let state = clock.snapshot
+            DeckHandLog.connection.error("Liveness: MAC GAVE UP on \(key, privacy: .public): nothing received for \(silence, format: .fixed(precision: 1), privacy: .public)s (last ping \(sinceHeartbeat, format: .fixed(precision: 1), privacy: .public)s ago, \(state.inboundCount, privacy: .public) messages total, timeout \(LivenessPolicy.hostTimeout, privacy: .public)s) — dropping")
+            droppedForSilence.insert(key)
             cancelConsumption(connectionID: key)
             if let handle = connectionHandles[key] {
                 Task { await handle.disconnect() }
@@ -116,7 +135,6 @@ final class ControlReceiver {
             // Honors cancelConsumption: stop dispatching the moment the
             // connection is revoked or timed out, even with a backlog.
             if Task.isCancelled { return }
-            lastActivityAt[connectionHandle.id] = Date()
             let decoded: ControlMessage
             do {
                 decoded = try ControlMessageCoding.decoder.decode(ControlMessage.self, from: data)
@@ -149,7 +167,15 @@ final class ControlReceiver {
             }
             await dispatch(message, handle: connectionHandle)
         }
-        DeckHandLog.connection.info("📪 message loop ended for \(connectionHandle.id, privacy: .public) (peer disconnected, revoked, or session replaced)")
+        let id = connectionHandle.id
+        if droppedForSilence.contains(id) {
+            DeckHandLog.connection.info("📪 message loop ended for \(id, privacy: .public): the Mac dropped it for silence")
+        } else if Task.isCancelled {
+            DeckHandLog.connection.info("📪 message loop ended for \(id, privacy: .public): revoked or replaced on the Mac")
+        } else {
+            let since = livenessClocks[id].map { Date().timeIntervalSince($0.snapshot.lastInboundAt) } ?? -1
+            DeckHandLog.connection.info("📪 message loop ended for \(id, privacy: .public): the iPad closed the connection (IPAD GAVE UP or left; last message \(since, format: .fixed(precision: 1), privacy: .public)s ago)")
+        }
     }
 
     private func dispatch(_ message: ControlMessage, handle: LoomConnectionHandle) async {
@@ -246,8 +272,8 @@ final class ControlReceiver {
             Task { await self.handleSwitchSpace(direction: direction, displayID: displayID) }
 
         case let .ping(seq):
-            hasPinged.insert(handle.id)
-            try? await handle.send(.pong(seq: seq))
+            // The pong already went out from HeartbeatResponder as the ping
+            // arrived, so main-actor work here can't delay it.
             // Re-report capabilities every 5th ping (~10 s): if the user
             // grants/revokes a TCC permission mid-session the remote's
             // warning banner updates without reconnecting.
@@ -461,7 +487,7 @@ final class ControlReceiver {
         // e.g. "showdesktop" never falls through to the default deck (whose
         // ids are prefixed "shortcut-") and silently does nothing.
         if let macro = SystemMacro(macroID: id) {
-            runSystemMacro(macro)
+            await runSystemMacro(macro)
             return
         }
 
@@ -483,7 +509,7 @@ final class ControlReceiver {
         }
     }
 
-    private func runSystemMacro(_ macro: SystemMacro) {
+    private func runSystemMacro(_ macro: SystemMacro) async {
         switch macro {
         case .locateCursor:
             CursorLocator.shared.ping()
@@ -492,28 +518,12 @@ final class ControlReceiver {
         case .appExpose:
             // App Exposé isn't a standalone app — trigger via AppleScript
             runTool("/usr/bin/osascript", ["-e", "tell application \"System Events\" to key code 125 using control down"])
-        case .showDesktop:
-            // Show Desktop is a symbolic hot key (F11), which a CGEvent post
-            // never fires. Mission Control's own binary takes "1" for Show
-            // Desktop; System Events' F11 is the fallback.
-            if let missionControl = Self.missionControlExecutable {
-                runTool(missionControl, ["1"])
-            } else {
-                runTool("/usr/bin/osascript", ["-e", "tell application \"System Events\" to key code 103"])
-            }
-        case .launchpad:
-            // macOS 26 replaced Launchpad with "Apps".
-            runTool("/usr/bin/open", ["-a", Self.launchpadAppName])
+        case .showDesktop, .launchpad:
+            // Neither depends on the user's shortcut settings any more, and
+            // neither uses the paths macOS 27 broke. See SystemActionTrigger.
+            await SystemActionTrigger.shared.run(macro)
         }
     }
-
-    private static let launchpadAppName =
-        FileManager.default.fileExists(atPath: "/System/Applications/Launchpad.app") ? "Launchpad" : "Apps"
-
-    private static let missionControlExecutable: String? = [
-        "/System/Applications/Mission Control.app/Contents/MacOS/Mission Control",
-        "/Applications/Mission Control.app/Contents/MacOS/Mission Control",
-    ].first { FileManager.default.isExecutableFile(atPath: $0) }
 
     private func runTool(_ path: String, _ arguments: [String]) {
         let proc = Process()
