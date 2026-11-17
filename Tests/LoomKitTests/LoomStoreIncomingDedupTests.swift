@@ -239,7 +239,7 @@ struct LoomStoreIncomingDedupTests {
             ),
             cloudKitManager: nil,
             peerProvider: nil,
-            shareManager: nil,
+            peerManager: nil,
             signalingClient: nil,
             connectionCoordinator: LoomConnectionCoordinator(node: node)
         )
@@ -313,14 +313,12 @@ struct LoomStoreIncomingDedupTests {
         }))
 
         let client = LoomAuthenticatedSession(
-            rawSession: LoomSession(connection: clientConnection),
-            role: .initiator,
-            transportKind: .tcp
+            connection: .tcp(clientConnection),
+            role: .initiator
         )
         let incoming = LoomAuthenticatedSession(
-            rawSession: LoomSession(connection: serverConnection),
-            role: .receiver,
-            transportKind: .tcp
+            connection: .tcp(serverConnection),
+            role: .receiver
         )
 
         // The client's hello device id becomes the resolved peer id on the

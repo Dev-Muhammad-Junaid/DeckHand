@@ -411,7 +411,6 @@ struct LoomConnectionLifecycleTests {
             deviceType: deviceType,
             sources: [.nearby],
             isNearby: true,
-            isShared: false,
             remoteAccessEnabled: false,
             signalingSessionID: nil,
             advertisement: LoomPeerAdvertisement(
@@ -525,14 +524,12 @@ private func makeLoopbackPair(
     }))
 
     let client = LoomAuthenticatedSession(
-        rawSession: LoomSession(connection: clientConnection),
-        role: .initiator,
-        transportKind: .tcp
+        connection: .tcp(clientConnection),
+        role: .initiator
     )
     let server = LoomAuthenticatedSession(
-        rawSession: LoomSession(connection: serverConnection),
-        role: .receiver,
-        transportKind: .tcp
+        connection: .tcp(serverConnection),
+        role: .receiver
     )
 
     let clientHello = LoomSessionHelloRequest(
