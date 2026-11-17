@@ -3,6 +3,32 @@
 Recorded by the coordinating session ("Deckhand project status review").
 Newest first. If a doc elsewhere disagrees, this file wins.
 
+## 2026-11-17 — Full go-ahead: Loom first, then all of Sill, then the roadmap
+The owner approved the whole plan without further check-ins ("You have full
+approval from my end, so you don't have to wait for anything") and asked
+for one update when everything is done, tested and ready to review.
+- Order: (1) Loom up to date (done: 2.2.16 merged) plus the foundation
+  refactor (protocol reset, PixelHandCore, hot-spot file splits); (2) every
+  worthwhile Sill item S1–S15 and S17, by lane; (3) the Pixel Hand roadmap
+  (Deck 2, App Intents, multi-Mac, sharing, AI) together with a major UX and
+  visual redesign. No time limit.
+- Method: re-implement from Sill's behaviour and docs (no copied code).
+- AWDL off by default: approved.
+- Mac private APIs: approved generally for the Mac app (Developer ID, not
+  the Mac App Store), always via `dlsym` with graceful fallback. Includes
+  the build-1 Show Desktop/Apps mechanisms (`CGSSetSymbolicHotKeyEnabled`,
+  `CGSSetSymbolicHotKeyValue` with restore, `CoreDockSendNotification`) and
+  S16 virtual display when it is scheduled. The iOS app stays public-API
+  only.
+- Later, after the Sill work: iPhone Fold ("iPhone Duo") two-pane layouts,
+  and a Picture-in-Picture live Mac screen on iPhone and iPad that keeps
+  running on the Home Screen.
+- UX: the app should match the website's quality and visual language;
+  redesign layouts for landscape and small screens, fewer button walls,
+  a dock / column / multi-layout system, and Apple Intelligence where it
+  helps. A design-strategy session proposes options first; implementation
+  follows the Sill work.
+
 ## 2026-11-17 — What we take from upstream Loom and Sill
 Sources: comparison report `docs/review/upstream-comparison-2026-11.md` on
 `claude/upstream-comparison-2026-11` (§4 ranks Sill items S1–S17) and the

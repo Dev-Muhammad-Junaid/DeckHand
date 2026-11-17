@@ -360,3 +360,19 @@ It reported HP = 1 desktop and built-in = 3 with the 2nd current, which matched 
 - A UI check on a two-display Mac with uneven desktop counts.
 
 Status: BUILDS AND TESTS GREEN; M0 Show Desktop and Launchpad broken on macOS 27; Spaces and connection stability need fixes; mirror Spaces/display ticket ready to schedule
+
+## Build 2 queued (2026-11-17)
+
+Merged `claude/pixelhand-build1-fixes` (all 8 bugs from the first Mac build;
+details and Mac/iPad checks in `BUILD1-FIXES.md`). Sentry DSNs are set, so
+debug builds now report to `pixelhand-ios` / `pixelhand-mac`. The site footer
+no longer links to GitHub.
+
+For bugs 1 and 2, if the default does nothing on macOS 27, try the other
+mechanisms with `defaults write com.widgetsflow.pixelhand.mac
+PixelHandShowDesktopMechanism dockNotification|dedicatedKey` (and
+`PixelHandLaunchpadMechanism`), record which one works, and change the
+default order (one line).
+
+Status: READY FOR MAC BUILD (build 2)
+
