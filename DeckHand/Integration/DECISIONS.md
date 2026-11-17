@@ -18,7 +18,7 @@ Newest first. If a doc elsewhere disagrees, this file wins.
   subscription group "Pixel Hand Pro"; product IDs
   `com.widgetsflow.pixelhand.pro.monthly` and
   `com.widgetsflow.pixelhand.pro.yearly`; Family Sharing on.
-- Proposed, pending owner confirmation: free tier = trackpad, keyboard and
+- **Decided 2026-11-17 (owner delegated the call):** free tier = trackpad, keyboard and
   media keys with one Mac; Pro = decks and chips, mirror, capture/OCR,
   multiple Macs, sharing, AI. During the trial everything is unlocked.
 - The Mac app stays a free Developer ID download; entitlement lives on the
