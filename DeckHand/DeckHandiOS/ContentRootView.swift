@@ -45,7 +45,18 @@ struct ContentRootView: View {
                     ControlView(
                         connection: connection.handle,
                         peerName: connection.peerName,
-                        onAuthStatusChanged: { status in
+                        onAuthStatusChanged: { wireStatus in
+                            // The Mac answers "denied" both when the user
+                            // clicks Deny and when its 45 s window runs out.
+                            let status = ApprovalStatusCopy.displayStatus(
+                                forWireStatus: wireStatus,
+                                pendingFor: Date().timeIntervalSince(pendingSince)
+                            )
+                            // A heartbeat loss after the verdict mustn't
+                            // replace the reason the connection ended.
+                            if status == "host_disconnected", ApprovalStatusCopy.isFinalVerdict(authStatus) {
+                                return
+                            }
                             let isNewGrant = status == "granted" && authStatus == "pending"
                             if isNewGrant, Date().timeIntervalSince(pendingSince) > 0.6 {
                                 isShowingApproval = true
@@ -99,7 +110,7 @@ struct ContentRootView: View {
                         if case let .disconnected(reason) = event {
                             DeckHandLog.connection.info("iPad handle disconnected for \(connection.peerName, privacy: .public) conn=\(connection.handle.id, privacy: .public) reason=\(reason ?? "nil", privacy: .public) — leaving ControlView")
                             await MainActor.run {
-                                if authStatus != "denied" {
+                                if !ApprovalStatusCopy.isFinalVerdict(authStatus) {
                                     withAnimation(.easeInOut(duration: 0.22)) {
                                         authStatus = "host_disconnected"
                                     }

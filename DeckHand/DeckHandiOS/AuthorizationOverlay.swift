@@ -16,7 +16,7 @@ struct AuthorizationOverlay: View {
     /// connection is already gone). Drives both the button label and its
     /// destructive role.
     private var isTerminalState: Bool {
-        status == "denied" || status == "host_disconnected"
+        ApprovalStatusCopy.isTerminal(status)
     }
 
     var body: some View {
@@ -120,17 +120,6 @@ struct AuthorizationOverlay: View {
     }
 
     private var copy: (title: String, message: String) {
-        switch status {
-        case "pending":
-            ("Waiting for Approval", "Please allow the connection request on \(peerName).")
-        case "granted":
-            ("Approved", "You’re connected to \(peerName).")
-        case "host_disconnected":
-            ("Disconnected", "The connection to \(peerName) was closed.")
-        case "denied":
-            ("Access Denied", "Your request to control \(peerName) was declined.")
-        default:
-            ("Unknown state", "")
-        }
+        ApprovalStatusCopy.overlay(status: status, peerName: peerName)
     }
 }
