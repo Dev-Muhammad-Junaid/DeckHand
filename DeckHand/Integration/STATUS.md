@@ -296,12 +296,16 @@ The old Deck Hand app is removed from both devices: uninstalled from the iPad, a
 
 ### More open bugs
 
-8. **Spaces switching doesn't switch, and fights Locate.**
-   - `handleSwitchSpace` moves the cursor to the target display's menu bar, posts ⌃←/⌃→ with `osascript` → System Events, waits up to 800 ms for `activeSpaceDidChangeNotification`, then centres the cursor and pings `CursorLocator`.
-   - The Space shortcuts (symbolic hot keys 79–82) are enabled on this Mac.
-   - **Likely cause:** Pixel Hand has no Automation permission for System Events. It was never prompted, and nothing logs the `osascript` failure (`try? proc.run()`, exit status ignored).
-   - So the cursor jumps and the Locate ping fires while the Space doesn't change. That matches the owner's report.
-   - **Fix:** surface the Automation state in the panel (like Accessibility/Screen Recording), log the `osascript` exit status, and skip the centre-and-ping when no Space change arrived. Also confirm on a Mac where Automation is granted.
+8. **Spaces switching, diagnosed on 2026-11-17.** Automation for System Events is on.
+   - **The mechanism works on macOS 27:** ⌃→ sent through System Events with the pointer on the built-in display moved it from desktop 2 to desktop 3.
+   - **Cause on this Mac:** the HP E273 (main, display 2) has **one** desktop; the built-in display has three. The mirror always shows the main display (see 8b). Its ‹ › buttons send `switchSpace(displayID: mirrored display)`, so they target the single-desktop HP and nothing can change.
+   - **Why it fought Locate:** after the 800 ms wait, the host still centred the pointer on the target display and pinged `CursorLocator`, dragging it across displays.
+   - **Fixed in `1b41cdd`:** when no `activeSpaceDidChangeNotification` arrives, the host restores the pointer and skips the ping, and logs "Space switch … changed nothing". Verified from the simulator: the pointer stayed at (758, 720) and the log line appeared.
+   - **Still open:** the three-finger swipe targets the display under the pointer. Confirm on the iPad that it switches the built-in display's three desktops. The simulator can't make a three-finger touch.
+   - **Still open, UX:** with one desktop there's no feedback. Consider a brief "No other desktop on this display" note on the iPad, or hiding ‹ › when the mirrored display has a single Space.
+8b. **The iPad can't choose which display to mirror.**
+   - The host sends `displayListUpdate(displays:selectedDisplayID:)`, but `ControlView` keeps only `selectedDisplayID` and drops the list. No picker exists, so the mirror always starts on the main display (`preferredDisplayID: nil`).
+   - This is the "multi-display switching" item. It needs a display picker on the mirror. The Spaces chevrons and the owner's request for a cursor-location hint (bug 10) depend on it.
 9. **The iPad disconnects after a couple of minutes of use.**
    - Host log, first time: the iPad connected at 18:46:47, then "Liveness timeout … dropping" at 18:47:57.
    - Second time: the iPad's message loop ended (peer side) at 18:50:45. The simulator's connection timed out on liveness 5 s later, at 18:50:50.
