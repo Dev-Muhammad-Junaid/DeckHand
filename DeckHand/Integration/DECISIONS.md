@@ -7,7 +7,7 @@ Newest first. If a doc elsewhere disagrees, this file wins.
 - iPhone/iPad app is **free to download**; access is an **auto-renewable
   subscription** with **monthly** and **yearly** plans, each with a
   **2-week free trial** (introductory offer).
-- Proposed, pending owner confirmation: $2.99/month and $19.99/year
+- **Confirmed by the owner 2026-11-17:** $2.99/month and $19.99/year
   (USD tier; other storefronts follow Apple's equalisation); one
   subscription group "Pixel Hand Pro"; product IDs
   `com.widgetsflow.pixelhand.pro.monthly` and
