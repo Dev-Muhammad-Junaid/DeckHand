@@ -69,21 +69,21 @@ struct LoomNetworkFrameworkAdapterTests {
 
     @Test("Portable peer storage retains released Network.framework projections")
     func peerProjection() throws {
-        let endpoint = LoomNetworkEndpoint.hostPort(host: "fe80::4%en7", port: 38_447)
+        let endpoint = LoomNetworkEndpoint.hostPort(host: "fe80::4%lo0", port: 38_447)
         let peer = LoomPeer(
             id: UUID(),
             name: "Studio Mac",
             deviceType: .mac,
             backendEndpoint: endpoint,
             advertisement: LoomPeerAdvertisement(),
-            backendResolvedAddresses: ["192.0.2.8", "fe80::4%en7"],
+            backendResolvedAddresses: ["192.0.2.8", "fe80::4%lo0"],
             discoveredInterfaces: [
-                LoomDiscoveredInterface(name: "en7", backendType: .wiredEthernet, index: 7),
+                LoomDiscoveredInterface(name: "lo0", backendType: .wiredEthernet, index: 1),
             ]
         )
 
         #expect(LoomNetworkEndpoint(peer.endpoint) == endpoint)
-        #expect(peer.resolvedAddresses.map(String.init(describing:)) == ["192.0.2.8", "fe80::4%en7"])
+        #expect(peer.resolvedAddresses.map(String.init(describing:)) == ["192.0.2.8", "fe80::4%lo0"])
         #expect(peer.discoveredInterfaces.first?.type == .wiredEthernet)
     }
 
