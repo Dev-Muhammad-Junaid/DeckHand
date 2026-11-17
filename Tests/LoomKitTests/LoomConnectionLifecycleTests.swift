@@ -29,7 +29,8 @@ struct LoomConnectionLifecycleTests {
         )
         async let serverCtx = pair.server.start(
             localHello: pair.serverHello,
-            identityManager: pair.serverIdentityManager
+            identityManager: pair.serverIdentityManager,
+            trustProvider: LoomKitTestAlwaysTrustProvider()
         )
         _ = try await (clientCtx, serverCtx)
 
@@ -83,7 +84,8 @@ struct LoomConnectionLifecycleTests {
         )
         async let serverCtx = pair.server.start(
             localHello: pair.serverHello,
-            identityManager: pair.serverIdentityManager
+            identityManager: pair.serverIdentityManager,
+            trustProvider: LoomKitTestAlwaysTrustProvider()
         )
         _ = try await (clientCtx, serverCtx)
 
@@ -133,7 +135,8 @@ struct LoomConnectionLifecycleTests {
         )
         async let serverCtx = pair.server.start(
             localHello: pair.serverHello,
-            identityManager: pair.serverIdentityManager
+            identityManager: pair.serverIdentityManager,
+            trustProvider: LoomKitTestAlwaysTrustProvider()
         )
         _ = try await (clientCtx, serverCtx)
 

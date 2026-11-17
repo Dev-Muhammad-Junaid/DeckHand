@@ -344,7 +344,8 @@ struct LoomStoreIncomingDedupTests {
         )
         async let serverContext = incoming.start(
             localHello: serverHello,
-            identityManager: serverIdentityManager
+            identityManager: serverIdentityManager,
+            trustProvider: LoomKitTestAlwaysTrustProvider()
         )
         _ = try await (clientContext, serverContext)
 
