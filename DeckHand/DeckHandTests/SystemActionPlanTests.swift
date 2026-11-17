@@ -38,6 +38,30 @@ final class SystemActionPlanTests: XCTestCase {
         }
     }
 
+    // MARK: Launchpad / Apps (bug 2)
+
+    func testLaunchpadOnMacOS27NeverUsesOpenApp() {
+        let plan = SystemActionPlan.mechanisms(for: .launchpad, macOSMajor: 27)
+        XCTAssertFalse(plan.contains(.openApp))
+        XCTAssertEqual(plan, [.symbolicHotKey, .dedicatedKey, .dockNotification])
+    }
+
+    func testLaunchpadOnOlderSystemsKeepsOpenAppFirst() {
+        for major in [14, 15, 26] {
+            let plan = SystemActionPlan.mechanisms(for: .launchpad, macOSMajor: major)
+            XCTAssertEqual(plan.first, .openApp, "macOS \(major)")
+            XCTAssertTrue(plan.contains(.symbolicHotKey), "macOS \(major)")
+        }
+    }
+
+    func testLaunchpadNeverFallsBackToShowDesktopPaths() {
+        for major in [14, 26, 27, 28] {
+            let plan = SystemActionPlan.mechanisms(for: .launchpad, macOSMajor: major)
+            XCTAssertFalse(plan.contains(.missionControlBinary))
+            XCTAssertFalse(plan.contains(.systemEventsKey))
+        }
+    }
+
     // MARK: Other actions and overrides
 
     func testOtherActionsAreNotPlanned() {
@@ -52,6 +76,10 @@ final class SystemActionPlanTests: XCTestCase {
         XCTAssertEqual(
             SystemActionPlan.mechanisms(for: .showDesktop, macOSMajor: 27, override: "dockNotification"),
             [.dockNotification]
+        )
+        XCTAssertEqual(
+            SystemActionPlan.mechanisms(for: .launchpad, macOSMajor: 27, override: " dedicatedKey , symbolicHotKey "),
+            [.dedicatedKey, .symbolicHotKey]
         )
     }
 
@@ -87,5 +115,12 @@ final class SystemActionPlanTests: XCTestCase {
         let showDesktop = SymbolicHotKey.showDesktop.chord(boundKeyCode: SymbolicHotKey.unboundKeyCode, boundModifiers: 0)
         XCTAssertTrue(showDesktop.needsTemporaryBinding)
         XCTAssertEqual(showDesktop.chord.keyCode, 103)
+
+        let launchpad = SymbolicHotKey.showLaunchpad.chord(boundKeyCode: nil, boundModifiers: 0)
+        XCTAssertTrue(launchpad.needsTemporaryBinding)
+        XCTAssertEqual(launchpad.chord.keyCode, 80)
+        // Never ⌘Space (Spotlight).
+        XCTAssertNotEqual(launchpad.chord.keyCode, 49)
+        XCTAssertNotEqual(launchpad.chord.modifiers, 0, "a bare F19 could clash with a user's own binding")
     }
 }

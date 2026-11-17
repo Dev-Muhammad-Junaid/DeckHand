@@ -73,7 +73,10 @@ public enum SystemActionPlan {
                 + (legacy ? [.missionControlBinary] : [])
                 + [.systemEventsKey]
         case .launchpad:
-            return [.openApp]
+            // `open -a` is the known-good path on 14 and 15, and the only
+            // one tried on 26 so far, so it stays first there.
+            return (legacy ? [.openApp] : [])
+                + [.symbolicHotKey, .dedicatedKey, .dockNotification]
         default:
             return []
         }
