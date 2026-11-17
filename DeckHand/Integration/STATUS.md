@@ -313,4 +313,50 @@ The old Deck Hand app is removed from both devices: uninstalled from the iPad, a
    - Needs the iPad-side log (heartbeat: about 6 s of pong silence counts as dead) to tell which side gave up first.
 10. **Feature gap: the mirror doesn't show where the cursor is.** With two displays, the iPad gives no hint when the cursor is on a display other than the one being mirrored. The owner asked for an indicator, or for the mirror to follow the cursor's display.
 
-Status: BUILDS AND TESTS GREEN; M0 Show Desktop and Launchpad broken on macOS 27; Spaces and connection stability need fixes
+### New ticket: Mirror — Spaces, displays and cursor awareness (owner-requested, private API approved)
+
+**Why.** On a two-display Mac the owner can't tell:
+
+- which display the mirror shows;
+- how many desktops it has, or which one is current;
+- whether the cursor is on another display.
+
+The ‹ › Space buttons do nothing on a single-desktop display, and Locate only flashes on the Mac. See bugs 8, 8b and 10.
+
+**Verified on this Mac (macOS 27):** `CGSCopyManagedDisplaySpaces(CGSMainConnectionID())` returns live data per display:
+
+- `Display Identifier` (the display UUID; `Main` for the main display on some setups);
+- `Spaces`, each with `ManagedSpaceID` and `type`, where 4 means a full-screen app;
+- `Current Space`.
+
+It reported HP = 1 desktop and built-in = 3 with the 2nd current, which matched reality. Map the UUIDs to `CGDirectDisplayID` with `CGDisplayCreateUUIDFromDisplayID` (`import ColorSync`).
+
+**Mac (host):**
+
+1. A `SpacesMonitor` builds a snapshot of the layout and the cursor:
+   - per display: `id`, `name`, `bounds`, `spaceCount`, `currentSpaceIndex`, and the index and app name of any full-screen Spaces;
+   - `cursorDisplayID`.
+2. It sends a new snapshot when any of these happen:
+   - `NSWorkspace.activeSpaceDidChangeNotification`;
+   - a screen-parameters change;
+   - the cursor crosses to another display (check on the existing input path, at most about 10 per second);
+   - a remote connects.
+3. It sends the snapshot to authorized remotes as a new message, for example `displayStateUpdate`. Version it with the protocol reset (PH-003): `ControlMessage.swift` is reserved for that.
+4. `handleSwitchSpace` uses the snapshot to refuse a switch past either end, instead of waiting 800 ms. The pointer-restore fallback from `1b41cdd` stays as a backstop.
+5. If the private symbols are missing, send the snapshot without the Space fields.
+
+**iPad (remote):**
+
+1. **Display picker on the mirror:** list each display by name, plus a **Follow cursor** option that switches the mirrored display when `cursorDisplayID` changes. Use the existing `startMirror(displayID:)` and `displayListUpdate` path; the iPad currently drops the list.
+2. **Desktop dots** under the mirror for the mirrored display, with the current one filled and full-screen apps as small app labels. Hide or dim ‹ › at either end, and hide both when there is a single desktop.
+3. **"Cursor is on <display>" badge** when `cursorDisplayID` isn't the mirrored display, with a button to bring the cursor here (`moveCursorToCenter`) or to switch the mirror to it.
+4. **Cursor in the mirror:** draw a marker at the cursor's position, scaled from display bounds, so Locate is visible on the iPad too. Optionally send the cursor point with the snapshot when it's on the mirrored display, throttled.
+
+**Tests:**
+
+- Snapshot encoding round trip.
+- Index and edge rules: 1 desktop; 3 desktops at either end; full-screen Spaces.
+- "Symbol missing" fallback.
+- A UI check on a two-display Mac with uneven desktop counts.
+
+Status: BUILDS AND TESTS GREEN; M0 Show Desktop and Launchpad broken on macOS 27; Spaces and connection stability need fixes; mirror Spaces/display ticket ready to schedule

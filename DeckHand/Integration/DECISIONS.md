@@ -3,6 +3,12 @@
 Recorded by the coordinating session ("Deckhand project status review").
 Newest first. If a doc elsewhere disagrees, this file wins.
 
+## 2026-11-17 — Private API approved: reading Spaces on the Mac
+- The owner approved `CGSCopyManagedDisplaySpaces` (with `CGSMainConnectionID`), loaded with `dlsym`, in the **Mac app only**. It is used to read each display's desktops, which one is current, and which are full-screen apps.
+- This is acceptable because the Mac app ships as a Developer ID download, not through the Mac App Store. The iOS app only receives plain data and calls no private API.
+- If the symbol is missing on a future macOS, the Mac app must fall back gracefully: no desktop dots, and everything else keeps working.
+- This was recorded by the Mac build session at the owner's request. The design is the "Mirror: Spaces, displays and cursor awareness" ticket in `STATUS.md`.
+
 ## 2026-11-17 — Business model: subscription with a 2-week free trial
 - iPhone/iPad app is **free to download**; access is an **auto-renewable
   subscription** with **monthly** and **yearly** plans, each with a
