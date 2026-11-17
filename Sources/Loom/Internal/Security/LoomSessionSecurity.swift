@@ -207,7 +207,7 @@ package struct LoomSessionSecurityContext: Sendable {
         let sequence: UInt64?
         switch cipherMode {
         case .legacyRandomNonce:
-            nonceData = Self.randomNonce()
+            nonceData = try Self.randomNonce()
             sequence = nil
         case .sequencedV2:
             let nextSequence = try cipherState.nextSendSequence(for: trafficClass)
@@ -248,7 +248,7 @@ package struct LoomSessionSecurityContext: Sendable {
         encryptedPayloads.reserveCapacity(plaintexts.count)
         for (index, plaintext) in plaintexts.enumerated() {
             let sequence = firstSequence.map { $0 + UInt64(index) }
-            let nonceData = sequence.map(Self.nonce(for:)) ?? Self.randomNonce()
+            let nonceData = try sequence.map(Self.nonce(for:)) ?? Self.randomNonce()
             encryptedPayloads.append(try Self.seal(
                 plaintext,
                 using: key,
