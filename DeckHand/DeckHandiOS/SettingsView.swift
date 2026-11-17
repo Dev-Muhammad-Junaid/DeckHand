@@ -31,6 +31,7 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
+            .modifier(OpaqueSettingsBar())
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
@@ -236,6 +237,31 @@ struct SettingsView: View {
 }
 
 // MARK: - Building blocks
+
+/// Keeps scrolled rows from showing through the "Settings" title.
+///
+/// In a sheet the inline bar is transparent until content scrolls under it,
+/// and on iOS 26 its soft scroll-edge blur let glass controls such as the
+/// segmented pickers read straight through the title in dark mode. A
+/// visible bar background, plus a hard scroll edge on iOS 26, keeps the
+/// title on a solid surface in both appearances.
+private struct OpaqueSettingsBar: ViewModifier {
+    func body(content: Content) -> some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            content
+                .toolbarBackground(.visible, for: .navigationBar)
+                .scrollEdgeEffectStyle(.hard, for: .top)
+        } else {
+            content
+                .toolbarBackground(.visible, for: .navigationBar)
+        }
+        #else
+        content
+            .toolbarBackground(.visible, for: .navigationBar)
+        #endif
+    }
+}
 
 /// A titled control. Segmented pickers and sliders lose their `Picker` label
 /// inside a `Form`, so the title is drawn explicitly above the control.
