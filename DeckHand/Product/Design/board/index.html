@@ -1,0 +1,223 @@
+<title>Pixel Hand Redesign</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Google+Sans:wght@400;500;600&family=Google+Sans+Code:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="board.css">
+
+<header class="hero">
+  <div class="wrap">
+    <span class="hero__eyebrow"><i></i>Design strategy · 17 Nov 2026 · for review</span>
+    <h1>Pixel Hand redesign: one canvas, one dock, every Mac.</h1>
+    <p>The control surface is rebuilt around a single canvas that shows the trackpad, the live screen or the deck, with a glass dock under your thumb. It splits into panes when the space allows: iPhone landscape, iPhone Duo, iPad. The look follows pixelhand.app: navy screens, cobalt actions, and dots that only light when your Mac is talking.</p>
+    <div class="hero__rec">
+      <span class="tag tag--glass">Recommended: A · Dock &amp; Canvas</span>
+      <span class="tag tag--glass">Mockups at real iOS point sizes</span>
+      <span class="tag tag--glass">Light and dark</span>
+      <span class="tag tag--glass">Tap any screen on a phone to zoom</span>
+    </div>
+  </div>
+</header>
+
+<nav class="nav" aria-label="Sections">
+  <div class="wrap nav__row">
+    <a href="#direction">Direction</a><a href="#tokens">Tokens</a><a href="#components">Components</a><a href="#iphone">iPhone</a><a href="#small">Small &amp; landscape</a><a href="#duo">iPhone Duo</a><a href="#ipad">iPad</a><a href="#pip">PiP</a><a href="#flows">Flows</a><a href="#mac">Mac panel</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <section class="sheet" id="direction" aria-labelledby="direction-h">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="kicker">Layout strategy</span>
+        <h2 id="direction-h">Three ways to arrange the control surface</h2>
+        <p>Each option arranges the same parts: the trackpad, the mirror, the deck, the app dock, the context chips, capture, Ask and the Mac switcher. Full adaptation tables are in <code>03-Layout-Strategy.md</code>.</p>
+      </div>
+      <div class="opts">
+        <article class="opt opt--rec">
+          <h4>A · Dock &amp; Canvas <span class="tag tag--accent">Recommended</span></h4>
+          <div class="wire" aria-hidden="true">
+            <i style="left:4%;top:6%;width:40%;height:9%" class="g"></i>
+            <i style="left:4%;top:20%;width:92%;height:52%"></i><b style="left:8%;top:24%">CANVAS · POINTER / SCREEN / DECK</b>
+            <i style="left:70%;top:24%;width:22%;height:16%" class="m"></i>
+            <i style="left:4%;top:75%;width:70%;height:6%"></i><b style="left:6%;top:76.5%">CHIPS</b>
+            <i style="left:4%;top:84%;width:72%;height:10%" class="g"></i><b style="left:7%;top:87%">TABS + DOCK</b>
+            <i style="left:79%;top:84%;width:17%;height:10%" class="a"></i>
+          </div>
+          <p>One canvas shows a surface. A glass dock holds the surfaces, the Mac's running apps and Ask. When there's room, the canvas splits into two panes, and on iPad a Macs sidebar appears.</p>
+          <ul><li>One-tap reach for everything on iPhone, using standard iOS 26 tab-bar behaviour</li><li>Grows naturally into Duo and iPad panes</li><li>Smallest change from today's code and mental model</li><li>Risk: the bottom of a small iPhone gets busy (handled by minimising)</li></ul>
+        </article>
+        <article class="opt">
+          <h4>B · Columns</h4>
+          <div class="wire" aria-hidden="true">
+            <i style="left:3%;top:6%;width:18%;height:88%"></i><b style="left:5%;top:9%">MACS</b>
+            <i style="left:23%;top:6%;width:20%;height:88%"></i><b style="left:25%;top:9%">SURFACES</b>
+            <i style="left:45%;top:6%;width:52%;height:88%"></i><b style="left:47%;top:9%">CONTEXT</b>
+          </div>
+          <p><code>NavigationSplitView</code>: Macs | Surfaces (Pointer, Screen, Deck pages, Captures, Inbox) | the chosen surface. On iPhone it collapses to a navigation stack.</p>
+          <ul><li>Very iPadOS; multi-Mac and sharing have a home</li><li>On iPhone, controls sit two levels deep</li><li>Columns take width away from the mirror and trackpad</li></ul>
+        </article>
+        <article class="opt">
+          <h4>C · Modules</h4>
+          <div class="wire" aria-hidden="true">
+            <i style="left:3%;top:6%;width:56%;height:52%"></i><b style="left:5%;top:9%">SCREEN</b>
+            <i style="left:61%;top:6%;width:36%;height:24%"></i><b style="left:63%;top:9%">DECK</b>
+            <i style="left:61%;top:33%;width:36%;height:25%"></i><b style="left:63%;top:36%">MEDIA</b>
+            <i style="left:3%;top:61%;width:94%;height:33%"></i><b style="left:5%;top:64%">TRACKPAD</b>
+          </div>
+          <p>The user arranges resizable modules (trackpad, screen, deck page, chips, media, Mac card) into saved layouts for each window size.</p>
+          <ul><li>Most flexible; Stream Deck-like</li><li>Highest build and test cost: every module × every size</li><li>Easy to end up with a new wall of tiles</li></ul>
+        </article>
+      </div>
+      <div class="note"><b>Recommendation.</b> Build A. Borrow B's Macs column as A's iPad sidebar from 1.3, and C's flexibility as <b>layout presets</b> on wide windows (Split, Screen focus, Pointer focus) rather than free-form modules. If people ask for more after Deck 2 ships, modules can grow out of presets, because both use the same panes.</div>
+    </div>
+  </section>
+
+  <section class="sheet" id="tokens" aria-labelledby="tokens-h">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="kicker">Design system</span>
+        <h2 id="tokens-h">Tokens from the website, mapped to SwiftUI</h2>
+        <p>Every colour keeps one meaning. Neutrals are biased toward cobalt, as on pixelhand.app. The full table, with SwiftUI names, is in <code>02-Design-System.md</code>.</p>
+      </div>
+      <h3 class="sub">Brand (fixed, from the icon)</h3>
+      <div class="swatches">
+        <div class="sw"><div class="sw__chip"><span style="background:#3a4cf2"></span><span style="background:#5466ff"></span></div><div class="sw__meta"><b>Cobalt</b><code>#3A4CF2 / #5466FF</code><small>The one action colour</small></div></div>
+        <div class="sw"><div class="sw__chip"><span style="background:#060a2a"></span><span style="background:#0e1540"></span></div><div class="sw__meta"><b>Screen navy</b><code>#060A2A / #0E1540</code><small>Trackpad, mirror, brand screens</small></div></div>
+        <div class="sw"><div class="sw__chip"><span style="background:#3de0e0"></span><span style="background:#9ff6ff"></span></div><div class="sw__meta"><b>Glow · Ray</b><code>#3DE0E0 / #9FF6FF</code><small>Live activity right now; on navy only</small></div></div>
+        <div class="sw"><div class="sw__chip"><span style="background:#3de0b0"></span><span style="background:#0b7a6c"></span></div><div class="sw__meta"><b>Mint · Teal ink</b><code>#3DE0B0 / #0B7A6C</code><small>Connected, delivered</small></div></div>
+        <div class="sw"><div class="sw__chip"><span style="background:#effffc"></span><span style="background:#8e70ff"></span></div><div class="sw__meta"><b>Phosphor · Violet</b><code>#EFFFFC / #8E70FF</code><small>Lit dots; the hand (dot art only)</small></div></div>
+        <div class="sw"><div class="sw__chip"><span style="background:#86b4ff"></span><span style="background:#e6eaff"></span></div><div class="sw__meta"><b>Sky · Cobalt tint</b><code>#86B4FF / #E6EAFF</code><small>Gradients, selected fills</small></div></div>
+      </div>
+      <h3 class="sub">Semantic (light / dark)</h3>
+      <div class="swatches">
+        <div class="sw"><div class="sw__chip"><span style="background:#f3f4f9"></span><span style="background:#070a1c"></span></div><div class="sw__meta"><b>canvas</b><code>#F3F4F9 / #070A1C</code><small>Behind everything</small></div></div>
+        <div class="sw"><div class="sw__chip"><span style="background:#ffffff"></span><span style="background:#0e1330"></span></div><div class="sw__meta"><b>raised</b><code>#FFFFFF / #0E1330</code><small>Keys, chips, cards</small></div></div>
+        <div class="sw"><div class="sw__chip"><span style="background:#ffffff"></span><span style="background:#161c40"></span></div><div class="sw__meta"><b>elevated</b><code>#FFFFFF / #161C40</code><small>Sheets, popovers</small></div></div>
+        <div class="sw"><div class="sw__chip"><span style="background:#121522"></span><span style="background:#f4f6ff"></span></div><div class="sw__meta"><b>ink</b><code>#121522 / #F4F6FF</code><small>Text; secondary 64 %, tertiary 40 %</small></div></div>
+        <div class="sw"><div class="sw__chip"><span style="background:#a35f00"></span><span style="background:#ffb547"></span></div><div class="sw__meta"><b>warning</b><code>#A35F00 / #FFB547</code><small>Needs a fix; pending</small></div></div>
+        <div class="sw"><div class="sw__chip"><span style="background:#d92d3f"></span><span style="background:#ff4d5e"></span></div><div class="sw__meta"><b>danger</b><code>#D92D3F / #FF4D5E</code><small>Refused, failed, destructive</small></div></div>
+      </div>
+      <h3 class="sub">Type: Geist for display, SF Pro for everything you read</h3>
+      <div class="typespec">
+        <div><code>display.large</code><span style="font:500 34px/1.1 var(--font-display);letter-spacing:-0.9px">Pair with Studio</span><code>Geist Medium 34 · .largeTitle</code></div>
+        <div><code>display</code><span style="font:500 22px/1.15 var(--font-display);letter-spacing:-0.5px">Xcode</span><code>Geist Medium 22 · .title2</code></div>
+        <div><code>headline</code><span style="font:600 17px/1.3 -apple-system, system-ui, sans-serif">Save changes to “Main.swift”?</span><code>SF Pro Semibold · .headline</code></div>
+        <div><code>body</code><span style="font:400 17px/1.35 -apple-system, system-ui, sans-serif">Type the code shown on your Mac.</span><code>SF Pro · .body</code></div>
+        <div><code>chip</code><span style="font:600 15px/1.3 -apple-system, system-ui, sans-serif">Build <span style="font:500 12px/1 var(--font-mono);opacity:.5">⌘B</span></span><code>.subheadline.semibold + mono chord</code></div>
+        <div><code>caption</code><span style="font:400 12px/1.35 -apple-system, system-ui, sans-serif;color:var(--ink-muted)">Lands in Downloads › Pixel Hand</span><code>SF Pro · .caption</code></div>
+        <div><code>numerals</code><span style="font:500 13px/1 var(--font-mono);letter-spacing:.2px">60 fps · 7 ms · HEVC 1920</span><code>SF Mono · monospacedDigit</code></div>
+      </div>
+      <div class="tbl"><table>
+        <thead><tr><th>Token</th><th>Values</th><th>Use</th></tr></thead>
+        <tbody>
+          <tr><td>space</td><td>4 · 8 · 12 · 16 · 24 · 32 · 48</td><td>Stacks use <code>spacing:</code>; gutters 16 / 20 / 24 by width class</td></tr>
+          <tr><td>radius</td><td>8 kbd · 14 chip · 18 key · 24 card · 30 pane · 36 sheet · capsule</td><td>Panes use <code>ConcentricRectangle</code> inside the window corners</td></tr>
+          <tr><td>motion</td><td>quick 160 ms · standard 240 ms · spring 0.4 s bounce 0.15 · hero 0.8 s</td><td>The website's ease-spring and ease-hero curves; Reduce Motion cross-fades</td></tr>
+          <tr><td>glass</td><td>Liquid Glass on chrome only: docks, tab bar, header controls, mirror toolbar</td><td>Never on the trackpad, keys or content; solid <code>#11152F</code> with Reduce Transparency</td></tr>
+          <tr><td>dots</td><td>2.4 pt on a 15 pt pitch · status strip 4 × 3.5 pt · beam 6 pt</td><td>Lit dots only while a Mac is talking</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <section class="sheet" id="components" aria-labelledby="components-h">
+    <div class="wrap">
+      <div class="sec-head"><span class="kicker">Components</span><h2 id="components-h">Chips, keys, docks, toasts and status</h2><p>Every state also changes shape, so it reads without colour: delivered dots turn into a check, refused dots into a cross.</p></div>
+      <div class="boards">
+        <div class="board" data-s="components" data-t="light" data-target="600" data-title="Components, light" data-size="600 × 640 pt"></div>
+        <div class="board" data-s="components" data-t="dark" data-target="600" data-title="Components, dark" data-size="600 × 640 pt"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sheet" id="iphone" aria-labelledby="iphone-h">
+    <div class="wrap">
+      <div class="sec-head"><span class="kicker">Recommended option on iPhone</span><h2 id="iphone-h">Three surfaces, one dock</h2><p>Pointer, Screen and Deck are tabs in a Liquid Glass tab bar. Above it, the app dock shows the Mac's running apps with the Mac Dock's own running dots, and the chips show what the front app needs right now. Ask sits in the tab bar's search slot.</p></div>
+      <div class="boards">
+        <div class="board" data-s="phPointer" data-t="dark" data-target="300" data-title="Pointer, with a dialog waiting" data-size="iPhone 17 Pro · 402 × 874" data-note="The dialog's buttons take over the chips; Save is the default. The mirror floats and can be pinched or flicked away."></div>
+        <div class="board" data-s="phPointer" data-t="light" data-target="300" data-title="Pointer, light" data-size="402 × 874" data-note="The trackpad stays navy in both themes: it is a screen, not a sheet."></div>
+        <div class="board" data-s="phDeck" data-t="light" data-target="300" data-title="Deck follows the front app" data-size="402 × 874" data-note="Suggested keys appear ghosted with a dotted outline until you keep them."></div>
+        <div class="board" data-s="phDeck" data-t="dark" data-target="300" data-title="Deck, dark" data-size="402 × 874"></div>
+        <div class="board" data-s="phScreen" data-t="dark" data-target="300" data-title="Screen: zoom follows the cursor" data-size="402 × 874" data-note="2× zoom pans with the pointer so text is readable on a phone; the minimap shows where you are. Direct mode taps where you point."></div>
+        <div class="board" data-s="phAsk" data-t="light" data-target="300" data-title="Ask: a plan before anything runs" data-size="402 × 874" data-note="On-device model, typed actions only. Run, save as a key, or edit."></div>
+        <div class="board" data-s="phMacs" data-t="dark" data-target="300" data-title="My Macs (1.3)" data-size="402 × 874" data-note="Live glance thumbnails. Badges say why a Mac needs you."></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sheet" id="small" aria-labelledby="small-h">
+    <div class="wrap">
+      <div class="sec-head"><span class="kicker">Small screens and landscape</span><h2 id="small-h">Fold the chrome, keep the pad</h2><p>On short screens the tab bar minimises to the current surface and Ask, and the app dock folds into the first chip. In landscape the chrome moves to a leading rail, as Screens does, and the deck takes a column.</p></div>
+      <div class="boards">
+        <div class="board" data-s="phSE" data-t="light" data-target="280" data-title="iPhone SE, light" data-size="375 × 667" data-note="The app chip opens the running apps; tap the minimised tab to switch surfaces."></div>
+        <div class="board" data-s="phLand" data-t="dark" data-target="640" data-title="iPhone landscape" data-size="874 × 402" data-note="Rail on the leading edge (away from the Dynamic Island side when rotated the other way, it mirrors). Trackpad 60 %, deck 40 %."></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sheet" id="duo" aria-labelledby="duo-h">
+    <div class="wrap">
+      <div class="sec-head"><span class="kicker">iPhone Duo (the folding iPhone)</span><h2 id="duo-h">Two panes, nothing on the crease</h2><p>Sizes from the iOS 27.1 simulator: inner 951 × 669 pt, cover 466 × 678 pt, with a 40 pt division along the crease while half-folded. Each half of the inner display is about the size of the cover, so each pane reuses a phone layout.</p></div>
+      <div class="boards">
+        <div class="board" data-s="duoCover" data-t="dark" data-target="290" data-title="Closed: cover display" data-size="466 × 678" data-note="The iPhone layout, unchanged."></div>
+        <div class="board" data-s="duoBook" data-t="dark" data-target="700" data-title="Open, book pose" data-size="951 × 669" data-note="Left: screen and trackpad with the app dock. Right: chips, deck, tabs and Ask. Folding keeps both panes; closing returns to the cover layout with the same surface selected."></div>
+        <div class="board" data-s="duoBook" data-t="light" data-target="700" data-title="Open, book pose, light" data-size="951 × 669"></div>
+        <div class="board" data-s="duoLaptop" data-t="dark" data-target="420" data-title="Half-folded, laptop pose" data-size="669 × 951" data-note="The screen stands up above the fold; chips, trackpad and tabs lie flat below it. Like a tiny MacBook."></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sheet" id="ipad" aria-labelledby="ipad-h">
+    <div class="wrap">
+      <div class="sec-head"><span class="kicker">iPad</span><h2 id="ipad-h">Everything at once, with the Macs alongside</h2><p>On wide windows the canvas splits into the screen over the trackpad, with the deck in a trailing column. The app dock floats like the Mac's own Dock. Layout presets (Split, Screen, Pointer) replace the tab bar.</p></div>
+      <div class="boards">
+        <div class="board" data-s="padLand" data-t="dark" data-target="900" data-title="iPad landscape, dark" data-size="iPad Air 11″ · 1180 × 820" data-note="Macs sidebar (1.3) with live thumbnails and a drop target for sharing. Ask is a field with ⌘K."></div>
+        <div class="board" data-s="padLand" data-t="light" data-target="900" data-title="iPad landscape, light" data-size="1180 × 820"></div>
+        <div class="board" data-s="padPort" data-t="light" data-target="460" data-title="iPad portrait" data-size="820 × 1180" data-note="Screen across the top, trackpad and deck side by side below."></div>
+        <div class="board" data-s="padSplit" data-t="dark" data-target="420" data-title="Half Split View or Stage Manager window" data-size="590 × 820" data-note="Medium width: the trackpad and a one-row deck stacked, tabs at the bottom. Below 500 pt wide it becomes the iPhone layout."></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sheet" id="pip" aria-labelledby="pip-h">
+    <div class="wrap">
+      <div class="sec-head"><span class="kicker">Picture in Picture</span><h2 id="pip-h">Keep watching the Mac from the Home Screen</h2><p>When you leave the app while the screen is live, iOS starts PiP automatically. Pixel Hand never starts PiP from code, as Apple's review rules require. PiP shows the picture only: no input, and no overlays except the cursor, which is drawn into the frames.</p></div>
+      <div class="boards">
+        <div class="board" data-s="pipPhone" data-t="dark" data-target="300" data-title="iPhone Home Screen" data-size="402 × 874" data-note="Pause freezes the picture and keeps the session. Ten minutes paused, locking the phone, or ending the session closes PiP."></div>
+        <div class="board" data-s="pipPad" data-t="light" data-target="760" data-title="iPad, next to another app" data-size="1180 × 820" data-note="Watch a build or a render on the Mac while you write somewhere else."></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sheet" id="flows" aria-labelledby="flows-h">
+    <div class="wrap">
+      <div class="sec-head"><span class="kicker">Flows</span><h2 id="flows-h">Pairing, Pro, sharing, editing and errors</h2></div>
+      <div class="boards">
+        <div class="board" data-s="pair" data-target="300" data-title="Pair with a code (1.1)" data-size="402 × 874" data-note="Dot-matrix numerals in groups of 4; the check digit is dimmer."></div>
+        <div class="board" data-s="paywall" data-target="300" data-title="Pro paywall" data-size="402 × 874" data-note="Shown when you tap a Pro feature, and once after onboarding. Never mid-gesture. Includes Apple's required disclosures."></div>
+        <div class="board" data-s="locked" data-t="light" data-target="300" data-title="Free tier: Deck preview" data-size="402 × 874" data-note="Free keeps the trackpad, keyboard and media keys (in the chips) for one Mac."></div>
+        <div class="board" data-s="send" data-t="light" data-target="300" data-title="Send to a device (1.3)" data-size="402 × 874" data-note="The dot beam fills as it sends, then turns mint."></div>
+        <div class="board" data-s="deckEdit" data-t="light" data-target="300" data-title="Deck editor (1.2)" data-size="402 × 874" data-note="Dotted cobalt outlines in edit mode. Glyphs can be drawn on the same 8 × 8 dots as the icon."></div>
+        <div class="board" data-s="empty" data-t="dark" data-target="300" data-title="Mac not answering" data-size="402 × 874" data-note="Say what's wrong and what to try. A status pill explains missing permissions and offers the fix."></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sheet" id="mac" aria-labelledby="mac-h">
+    <div class="wrap">
+      <div class="sec-head"><span class="kicker">Mac menu-bar panel</span><h2 id="mac-h">Same language on the Mac</h2><p>340 pt wide, system text sizes, one level of sections. Devices show what they may do, and Disconnect is a real button rather than appearing on hover.</p></div>
+      <div class="boards">
+        <div class="board" data-s="macPanel" data-t="light" data-target="340" data-title="Mac panel, light" data-size="340 pt"></div>
+        <div class="board" data-s="macPanel" data-t="dark" data-target="340" data-title="Mac panel, dark" data-size="340 pt"></div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <b>Pixel Hand</b> · design strategy for the post-Sill rebuild. Source: <code>DeckHand/Product/Design/</code> on <code>claude/pixelhand-design-strategy</code>. App icons in the mockups are generic placeholders; real ones come from the Mac.
+  </footer>
+</main>
+
+<script src="board.js"></script>
