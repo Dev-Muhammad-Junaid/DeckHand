@@ -461,7 +461,7 @@ final class ControlReceiver {
         // e.g. "showdesktop" never falls through to the default deck (whose
         // ids are prefixed "shortcut-") and silently does nothing.
         if let macro = SystemMacro(macroID: id) {
-            runSystemMacro(macro)
+            await runSystemMacro(macro)
             return
         }
 
@@ -483,7 +483,7 @@ final class ControlReceiver {
         }
     }
 
-    private func runSystemMacro(_ macro: SystemMacro) {
+    private func runSystemMacro(_ macro: SystemMacro) async {
         switch macro {
         case .locateCursor:
             CursorLocator.shared.ping()
@@ -492,28 +492,12 @@ final class ControlReceiver {
         case .appExpose:
             // App Exposé isn't a standalone app — trigger via AppleScript
             runTool("/usr/bin/osascript", ["-e", "tell application \"System Events\" to key code 125 using control down"])
-        case .showDesktop:
-            // Show Desktop is a symbolic hot key (F11), which a CGEvent post
-            // never fires. Mission Control's own binary takes "1" for Show
-            // Desktop; System Events' F11 is the fallback.
-            if let missionControl = Self.missionControlExecutable {
-                runTool(missionControl, ["1"])
-            } else {
-                runTool("/usr/bin/osascript", ["-e", "tell application \"System Events\" to key code 103"])
-            }
-        case .launchpad:
-            // macOS 26 replaced Launchpad with "Apps".
-            runTool("/usr/bin/open", ["-a", Self.launchpadAppName])
+        case .showDesktop, .launchpad:
+            // Neither depends on the user's shortcut settings any more, and
+            // neither uses the paths macOS 27 broke. See SystemActionTrigger.
+            await SystemActionTrigger.shared.run(macro)
         }
     }
-
-    private static let launchpadAppName =
-        FileManager.default.fileExists(atPath: "/System/Applications/Launchpad.app") ? "Launchpad" : "Apps"
-
-    private static let missionControlExecutable: String? = [
-        "/System/Applications/Mission Control.app/Contents/MacOS/Mission Control",
-        "/Applications/Mission Control.app/Contents/MacOS/Mission Control",
-    ].first { FileManager.default.isExecutableFile(atPath: $0) }
 
     private func runTool(_ path: String, _ arguments: [String]) {
         let proc = Process()
