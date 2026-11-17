@@ -165,3 +165,112 @@ Then go through `DeckHand/AppStore/MacBuildChecklist.md` §3–5 for install, pe
 The two branches touched no common files and merged cleanly. Extra compile-risk spots: the Swift 6 Sendable notes at the end of `M0-FIXES.md`, and `AppUpdater`'s `nonisolated` delegate methods.
 
 Status: READY FOR MAC BUILD
+
+## Mac build results (2026-11-17)
+
+Mac session on macOS 27.0 (26A428), Xcode 27.2 (27B52), Swift 6.4.2, MacBook Pro M1 Pro with two displays. Built from `4a6bcf8`; fixes pushed up to `9e3dc79`.
+
+### Build
+
+| Target | Result |
+| --- | --- |
+| Loom package (`swift build --build-tests`) | Builds after fixes 1–4 below |
+| `DeckHandMac` (Debug, `-allowProvisioningUpdates`) | **Builds.** Signed by team `DD5AWPLT2V`; entitlements carry `iCloud.com.widgetsflow.pixelhand` and keychain group `DD5AWPLT2V.com.widgetsflow.pixelhand.mac`. No warnings from Pixel Hand's own sources. |
+| `DeckHandiOS` (device and simulator) | **Builds.** No warnings from Pixel Hand's own sources. |
+
+The Xcode account for Mega Creations LLC signs in fine; automatic signing created the profiles on the first build. Sparkle resolved to 2.10.1, and sentry-cocoa to 9.35.0. Note: building the app project rewrites the repo-root `Package.resolved` with the app's Sentry/Sparkle pins. Those were discarded each time and not committed; don't commit them into Loom's file.
+
+### Tests
+
+- **Loom, `swift test --scratch-path .build-local`, nothing skipped:** **all pass.** That is 461 Swift Testing tests in 8 runs (LoomTests 363, LoomKitTests 40, and 13 + 10 + 5 + 9 + 6 + 15 in the other targets) plus 7 XCTest, in about 20 s with no hangs.
+  - The two un-skipped tests pass: `invalidResumeOffsetIsRejected` (0.14 s) and `liveSamePeerConnectionOutsideWindowIsDropped` (4.5 s).
+  - The new LoomHost read-loop test passes.
+- **Before the fixes**, there were 9 failures:
+  - **7 in LoomKitTests**, new with the merge and fixed by 6: the fork's own lifecycle and dedup tests got `authenticationFailed`, because a receiver with no trust provider now requires approval.
+  - **`peerProjection`**, upstream and machine-dependent, fixed by 7: it needs an `en7` interface.
+  - **"Restarting authenticated advertising closes every previous listener generation"**, an upstream test that is load-sensitive. It failed once while an iOS build ran at the same time, then passed 3 of 3 alone and in the full run. Left as is.
+- **App tests, `DeckHandTests` scheme:** **51 of 51 pass**, after fixes 8 and 9. That's ControlMessageContract, UIContextSnapshotContract, PeerCompatibility, RemoteInputValidation, SystemMacro, DuplicateBundleID, SerialTaskQueue and PreApprovalGate.
+
+### Fixes pushed (one commit each)
+
+1. `efa3d21` Loom merge: `randomNonce()` throws in the fork, so two call sites in `LoomSessionSecurity` were missing `try`.
+2. `7b80048` Loom merge: `LoomStore`'s retry path still passed `overlayPeer:` to `signalingFallbackSessionID`, which upstream removed. It now matches the first-connect path.
+3. `08e29d0` Loom merge: `LoomDiagnosticsView` used `LoomPeerSnapshot.isShared`, which upstream removed. The "Shared" badge is dropped.
+4. `7dc8d0f` Fork tests: these used `LoomSession`/`rawSession:`, `shareManager:` and `isShared:`. They're updated to upstream's `connection: .tcp(_)` and `peerManager:`.
+5. `f822d37` `AppUpdater`: Swift 6 rejected sending the non-Sendable `installHandler` into `MainActor.assumeIsolated`. Sparkle calls this on the main thread, so the handler is captured `nonisolated(unsafe)`.
+6. `77fc62d` Fork LoomKit tests: the loopback receiver gets an explicit always-trust provider (`LoomKitTestAlwaysTrustProvider`).
+7. `1a290b7` Upstream test: `fe80::4%en7` became `%lo0`. Network.framework drops the scope of an interface that doesn't exist.
+8. `b71b763` `SerialTaskQueueTests`: Swift 6.4's region checker can't analyse `group.addTask { @MainActor in }`. The concurrent callers are now main-actor `Task`s.
+9. `a823d97` `RemoteInputValidation`: an in-bounds region came back changed by Float rounding (0.25 → 0.24999999). An already-inside region is now returned untouched. This was found by the existing test.
+10. `9e3dc79` **Runtime bug found end to end:** the pre-approval gate (M0 #6) also dropped the app-list request that `ControlView` sends on appear. After a first-time Allow, the Apps tab stayed on "Loading apps from Mac…" for good. The iPad now asks again on the first `granted`. Verified in the simulator.
+
+### Install
+
+- **Mac:** a signed Debug build is at `/Applications/Pixel Hand.app`, launched with `open` only (never ⌘R, never the executable). The old `/Applications/Deck Hand.app` is untouched and wasn't running. The menu-bar icon shows (owner confirmed).
+- **Mac permissions granted by the owner:** Accessibility, Screen Recording and Notifications. Automation and Local Network weren't prompted during this pass.
+- **iPad Air 11" (M3), physical:** installed with `devicectl`. It didn't launch because the iPad was locked. The old Deck Hand app is untouched. The iPad permissions (Local Network, Photos) haven't been granted yet.
+- **iOS Simulator:** **boots now** (iPad Pro 11" M5, iOS 26.5 runtime). Every end-to-end check below was done from the simulator against the Mac host on this machine.
+
+### End-to-end (simulator → Mac host)
+
+| Check | Result | Notes |
+| --- | --- | --- |
+| Discovery (`_pixelhand._tcp`) | **Pass** | |
+| Handshake via `DeckHandHandshakeTrustProvider` → "Waiting for Approval" | **Pass** | |
+| Deny | **Pass** | The iPad shows "Access Denied". |
+| 45 s timeout | **Pass** | At 45 s the iPad shows "Access Denied … was declined". The copy should say it timed out. |
+| Prompt again after relaunching the host | **Pass** | Confirmed in the host log. |
+| Allow from the notification | **Pass** | |
+| Input sent before approval is dropped | **Pass** | Host log: "Dropped 5 message(s) sent before approval", then "Granting". |
+| Cursor movement | **Pass** | Confirmed by the owner. |
+| Fast two-finger flick | **Pass, no crash** | Not confirmed visually. |
+| Locate, Mission Control | **Pass** | Confirmed by the owner. |
+| **Show Desktop** | **Fail** | See bug 1. |
+| **Launchpad / Apps** | **Fail** | See bug 2. |
+| Shortcut chips from real menus | **Pass (display)** | Chrome and Finder chips appeared and follow the frontmost app. Pressing them wasn't tested. |
+| App list after first Allow | **Fail → fixed** | `9e3dc79` |
+| Mirror, one remote | **Pass** | "Mirror stream started (20 fps, 640px, display 2)". |
+| Mirror, two remotes | Not tested | Needs the iPhone or a second simulator. |
+| Spaces chevrons on the mirror | Inconclusive | The frontmost app changed after ›; not confirmed visually. |
+| Multi-display switching | Not tested | |
+| Region capture, OCR, annotation | Not tested | |
+| Keyboard, media keys, dialog-button chips, delivery-receipt dots | Not tested | Skipped on purpose: from the simulator they would type into whatever app had focus on the owner's Mac. |
+| Menu-bar dot-hand icon | **Pass** | |
+| "Check for Updates…" | **Pass** | Greyed out while there's no key. Host log: "Sparkle not started: SUPublicEDKey or SUFeedURL is missing". |
+| Share crash reports, Mac panel | **Pass** | Present and ticked. |
+| Share crash reports, iPad Settings → Privacy | **Pass** | Present and on. |
+| Dark mode; iPad portrait and landscape | **Pass** | |
+| Light mode | Pass | |
+| iPhone layouts | Not tested | |
+| Real iPad | Not tested | Installed but locked. |
+
+### Open bugs for the cloud fix sessions
+
+1. **Show Desktop does nothing on macOS 27** (M0 #2).
+   - `Mission Control.app/Contents/MacOS/Mission Control 1` is a silent no-op; run by hand from a shell, it exits 137 and shows nothing.
+   - The F11 fallback can't help here: this Mac has Show Desktop disabled (`com.apple.symbolichotkeys` key 36 `enabled = 0`), and the fallback only runs when the binary is missing.
+   - It needs a trigger that works on macOS 27 and doesn't depend on the user's binding.
+2. **Launchpad does nothing on macOS 27** (M0 #3).
+   - `open -a Apps` and `open -b com.apple.apps.launcher` exit 0, but LaunchServices logs "Asking CSUI to launch 0 items" and nothing appears.
+   - Needs another way to show Apps on 27.
+3. **Minor copy: the 45 s expiry reads as "was declined".** The iPad's "Access Denied" card should say the request timed out.
+4. **Minor: header says "Connected" behind the denied and waiting cards.**
+5. **Minor: iPad Settings header overlap.** In dark mode, scrolled content (the appearance segmented control) shows through behind the "Settings" title.
+6. **Stale copy (already known from the checklist):** "Recognize my own devices — Not available … needs a CloudKit container registered to a paid developer account." The container is registered now.
+7. **Simulator only: the iOS app's Bonjour advertiser loops.** LoomKit's advertiser fails with `-65563 ServiceNotRunning` about once a second and recovers, with no backoff. It's probably the simulator's mDNS. Check on a device whether Loom's recovery needs a backoff.
+
+### Still to do on hardware (owner)
+
+Do these on the real iPad and iPhone:
+
+- the Local Network and Photos prompts;
+- keyboard, media keys, a scroll flick, and dialog-button chips with receipt dots;
+- capture, OCR and annotation;
+- two remotes on the mirror at once (M0 #5 steps 1–4);
+- display switching and Spaces;
+- iPhone layouts;
+- the Automation prompt on first Mission Control or App Exposé.
+
+Also, quit and remove the old Deck Hand apps when ready. They were left in place.
+
+Status: BUILDS AND TESTS GREEN; M0 Show Desktop and Launchpad broken on macOS 27
