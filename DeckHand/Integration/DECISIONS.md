@@ -3,6 +3,39 @@
 Recorded by the coordinating session ("Deckhand project status review").
 Newest first. If a doc elsewhere disagrees, this file wins.
 
+## 2026-11-17 — What we take from upstream Loom and Sill
+Sources: comparison report `docs/review/upstream-comparison-2026-11.md` on
+`claude/upstream-comparison-2026-11` (§4 ranks Sill items S1–S17) and the
+backlog `DeckHand/Product/05-Backlog.md` on `claude/pixelhand-product-spec`.
+
+**Upstream Loom:** merged (2.2.16) on the integration branch, with
+`DeckHandHandshakeTrustProvider` keeping the Mac's Allow/Deny prompt. Builds;
+all 461 Loom tests and 51 app tests pass on the owner's Mac (2026-11-17).
+
+**Sill:** re-implemented from its behaviour and docs, no code copied, so no
+license obligations. By release:
+- Done: S2 Sparkle + notarized DMG pipeline.
+- 1.0: S1 AWDL off + Wi-Fi keep-alive; S3 cursor drawn on the device;
+  mirror on its own binary stream; S7 real Mission Control shortcuts
+  (Mac private API, approved); S8 display wake + locked-Mac check; S9
+  hardened menu reading; S6-lite stats overlay. Plus Pixel Hand's own:
+  text typing, click-drag, crash fixes, display picker / desktop dots.
+- 1.1: S5 HEVC mirror (with S6 stats HUD); S4 persistent pairing with
+  code/QR and "Forget device"; S10 clipboard sync.
+- Later (1.2–1.3): S11 more gestures, S12 Pencil hover, S13 USB "wired"
+  mode, S14 single-window streaming, S15 remote access over VPN (with
+  multi-Mac in 1.3), S17 audio (only if users ask).
+- Not doing: S16 virtual display (deferred: most likely to break on macOS
+  updates); Sill's iPhone layout (Pixel Hand has its own grid UI).
+- Kept as Pixel Hand's identity: shortcut chips from real menus,
+  dialog-button chips, OCR + annotation, media keys, delivery receipts,
+  dot-matrix cobalt look, and the coming Deck 2 / multi-Mac / sharing / AI.
+
+## 2026-11-17 — Business status
+- Free app with paid options confirmed by the owner. Paid Applications
+  agreement: bank and tax details submitted, under Apple review.
+- Sentry: the owner is creating the projects.
+
 ## 2026-11-17 — Private API approved: reading Spaces on the Mac
 - The owner approved `CGSCopyManagedDisplaySpaces` (with `CGSMainConnectionID`), loaded with `dlsym`, in the **Mac app only**. It is used to read each display's desktops, which one is current, and which are full-screen apps.
 - This is acceptable because the Mac app ships as a Developer ID download, not through the Mac App Store. The iOS app only receives plain data and calls no private API.
