@@ -12,6 +12,9 @@ struct DeckHandApp: App {
     @StateObject private var settings = DeckHandSettings()
 
     init() {
+        // Crash reporting before Loom so init/start failures are captured.
+        DeckHandSentry.start()
+
         loomContainer = try! LoomContainer(
             for: LoomContainerConfiguration(
                 serviceType: "_deckhand._tcp",

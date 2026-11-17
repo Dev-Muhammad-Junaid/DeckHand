@@ -11,6 +11,10 @@ options:
 packages:
   Loom:
     path: ../
+  # Crash / error reporting for the Pixel Hand apps only — not Loom.
+  Sentry:
+    url: https://github.com/getsentry/sentry-cocoa
+    from: 9.35.0
 
 settings:
   base:
@@ -38,6 +42,9 @@ targets:
     dependencies:
       - package: Loom
         product: LoomKit
+      - package: Sentry
+        # Compile-from-source product (recommended); still imports as `Sentry`.
+        product: SentrySPM
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.deckhand.mac
@@ -77,6 +84,9 @@ targets:
     dependencies:
       - package: Loom
         product: LoomKit
+      - package: Sentry
+        # Compile-from-source product (recommended); still imports as `Sentry`.
+        product: SentrySPM
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.deckhand.ios

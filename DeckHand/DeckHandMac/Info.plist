@@ -36,5 +36,8 @@
     <!-- Screen Recording usage (ScreenCaptureKit) — required on macOS 14+/26 Tahoe -->
     <key>NSScreenCaptureUsageDescription</key>
     <string>Deck Hand captures your Mac screen so your iPad can preview it on demand.</string>
+    <!-- Sentry DSN for widgetsflow / pixelhand-mac (US). Public client key. -->
+    <key>SENTRY_DSN</key>
+    <string>https://13458f5fbc835d8a1c16b748500aa778@o4512448017072128.ingest.us.sentry.io/4512448022642688</string>
 </dict>
 </plist>
