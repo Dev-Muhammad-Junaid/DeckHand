@@ -66,7 +66,7 @@ targets:
         # Sentry project "pixelhand-mac". Paste its DSN here (Sentry → Project
         # Settings → Client Keys (DSN)). DSNs are designed to ship inside the
         # app, so committing it is fine. Empty = crash reporting off.
-        SENTRY_DSN: ""
+        SENTRY_DSN: "https://13458f5fbc835d8a1c16b748500aa778@o4512448017072128.ingest.us.sentry.io/4512448022642688"
         SENTRY_PROJECT: pixelhand-mac
         # The dSYM upload script needs network and ~/.sentryclirc.
         ENABLE_USER_SCRIPT_SANDBOXING: NO
@@ -130,7 +130,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.widgetsflow.pixelhand
         # Sentry project "pixelhand-ios". Paste its DSN here (Sentry → Project
         # Settings → Client Keys (DSN)). Empty = crash reporting off.
-        SENTRY_DSN: ""
+        SENTRY_DSN: "https://39ab9907703e2b99fc30f2d76e6b3ac5@o4512448017072128.ingest.us.sentry.io/4512448021069824"
         SENTRY_PROJECT: pixelhand-ios
         # The dSYM upload script needs network and ~/.sentryclirc.
         ENABLE_USER_SCRIPT_SANDBOXING: NO
