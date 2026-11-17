@@ -70,6 +70,9 @@ public enum RemoteInputValidation {
         guard case let .region(x, y, width, height) = mode else { return mode }
         guard x.isFinite, y.isFinite, width.isFinite, height.isFinite,
               width > 0, height > 0 else { return nil }
+        // Already inside: return it untouched, since recomputing the size
+        // from the clipped edges can shift it by a Float rounding step.
+        if x >= 0, y >= 0, x + width <= 1, y + height <= 1 { return mode }
         let minX = max(0, min(1, x))
         let minY = max(0, min(1, y))
         let maxX = max(0, min(1, x + width))
