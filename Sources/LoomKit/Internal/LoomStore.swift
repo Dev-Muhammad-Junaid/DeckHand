@@ -713,8 +713,7 @@ actor LoomStore {
             let effectiveSignaling = signalingSessionID
                 ?? LoomConnectionCoordinator.signalingFallbackSessionID(
                     advertisedSignalingSessionID: resolvedPeer.signalingSessionID,
-                    localPeer: localPeer,
-                    overlayPeer: overlayPeer
+                    localPeer: localPeer
                 )
 
             guard localPeer != nil || overlayPeer != nil || effectiveSignaling != nil else {
