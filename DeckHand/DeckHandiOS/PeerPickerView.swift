@@ -276,7 +276,7 @@ private struct PeerCard: View {
                             .truncationMode(.middle)
 
                         // Provably the user's own device (private CloudKit
-                        // DB record) — connects without an approval prompt.
+                        // DB record). The Mac still asks to allow it.
                         if peer.isSameICloudDevice {
                             Text("My Mac")
                                 .font(.system(size: 10, weight: .semibold, design: .rounded))
