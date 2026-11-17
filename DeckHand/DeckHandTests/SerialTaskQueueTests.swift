@@ -29,22 +29,23 @@ final class SerialTaskQueueTests: XCTestCase {
         let queue = SerialTaskQueue()
         let probe = Probe()
 
-        await withTaskGroup(of: Void.self) { group in
-            for _ in 0..<8 {
-                group.addTask { @MainActor in
-                    await queue.run {
-                        probe.inFlight += 1
-                        probe.started += 1
-                        probe.maxInFlight = max(probe.maxInFlight, probe.inFlight)
-                        // Suspend mid-operation, the way `startStream` awaits
-                        // ScreenCaptureKit; a re-entrant caller would get in here.
-                        try? await Task.sleep(for: .milliseconds(5))
-                        await Task.yield()
-                        probe.inFlight -= 1
-                    }
+        // Main-actor tasks rather than a task group: Swift 6.4's region
+        // checker can't analyse `group.addTask { @MainActor in }` here.
+        let callers = (0..<8).map { _ in
+            Task { @MainActor in
+                await queue.run {
+                    probe.inFlight += 1
+                    probe.started += 1
+                    probe.maxInFlight = max(probe.maxInFlight, probe.inFlight)
+                    // Suspend mid-operation, the way `startStream` awaits
+                    // ScreenCaptureKit; a re-entrant caller would get in here.
+                    try? await Task.sleep(for: .milliseconds(5))
+                    await Task.yield()
+                    probe.inFlight -= 1
                 }
             }
         }
+        for caller in callers { await caller.value }
 
         XCTAssertEqual(probe.started, 8)
         XCTAssertEqual(probe.maxInFlight, 1)
@@ -72,18 +73,17 @@ final class SerialTaskQueueTests: XCTestCase {
         let queue = SerialTaskQueue()
         let probe = Probe()
 
-        await withTaskGroup(of: Void.self) { group in
-            for _ in 0..<2 {
-                group.addTask { @MainActor in
-                    await queue.run {
-                        guard !probe.hasStream else { return }
-                        try? await Task.sleep(for: .milliseconds(5))
-                        probe.streamsCreated += 1
-                        probe.hasStream = true
-                    }
+        let callers = (0..<2).map { _ in
+            Task { @MainActor in
+                await queue.run {
+                    guard !probe.hasStream else { return }
+                    try? await Task.sleep(for: .milliseconds(5))
+                    probe.streamsCreated += 1
+                    probe.hasStream = true
                 }
             }
         }
+        for caller in callers { await caller.value }
 
         XCTAssertEqual(probe.streamsCreated, 1)
     }
