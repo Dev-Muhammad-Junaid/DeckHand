@@ -45,6 +45,7 @@ struct ContentRootView: View {
                     ControlView(
                         connection: connection.handle,
                         peerName: connection.peerName,
+                        authStatus: authStatus,
                         onAuthStatusChanged: { wireStatus in
                             // The Mac answers "denied" both when the user
                             // clicks Deny and when its 45 s window runs out.

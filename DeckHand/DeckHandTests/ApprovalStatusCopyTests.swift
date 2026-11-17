@@ -50,3 +50,28 @@ final class ApprovalStatusCopyTests: XCTestCase {
         XCTAssertFalse(ApprovalStatusCopy.isTerminal("granted"))
     }
 }
+
+final class ConnectionHeaderStatusTests: XCTestCase {
+
+    func testHeaderSaysConnectedOnlyWhenGranted() {
+        XCTAssertEqual(ApprovalStatusCopy.headerSubtitle(status: "granted", activeAppName: nil), "Connected")
+        XCTAssertEqual(ApprovalStatusCopy.headerSubtitle(status: "granted", activeAppName: "Safari"), "Safari")
+        for status in ["pending", "denied", ApprovalStatusCopy.timedOutStatus, "host_disconnected", "weird"] {
+            let subtitle = ApprovalStatusCopy.headerSubtitle(status: status, activeAppName: "Safari")
+            XCTAssertNotEqual(subtitle, "Connected", status)
+            XCTAssertNotEqual(subtitle, "Safari", status)
+        }
+    }
+
+    func testWaitingAndDeniedHeaders() {
+        XCTAssertEqual(ApprovalStatusCopy.headerSubtitle(status: "pending", activeAppName: nil), "Waiting for approval")
+        XCTAssertEqual(ApprovalStatusCopy.headerSubtitle(status: "denied", activeAppName: nil), "Not allowed")
+    }
+
+    func testLiveIndicatorOnlyWhenGranted() {
+        XCTAssertTrue(ApprovalStatusCopy.showsLiveIndicator(status: "granted"))
+        XCTAssertFalse(ApprovalStatusCopy.showsLiveIndicator(status: "pending"))
+        XCTAssertFalse(ApprovalStatusCopy.showsLiveIndicator(status: "denied"))
+        XCTAssertFalse(ApprovalStatusCopy.showsLiveIndicator(status: "host_disconnected"))
+    }
+}

@@ -48,6 +48,32 @@ public enum ApprovalStatusCopy {
         status == "denied" || status == timedOutStatus
     }
 
+    /// The line under the Mac's name in the control screen's header.
+    /// "Connected" only once the Mac has allowed this device; before that
+    /// the header used to say "Connected" behind the waiting and denied
+    /// cards.
+    public static func headerSubtitle(status: String, activeAppName: String?) -> String {
+        switch status {
+        case "granted":
+            activeAppName ?? "Connected"
+        case "pending":
+            "Waiting for approval"
+        case "denied":
+            "Not allowed"
+        case timedOutStatus:
+            "Request timed out"
+        case "host_disconnected":
+            "Disconnected"
+        default:
+            "Not connected"
+        }
+    }
+
+    /// Whether the header shows the breathing "live" pixel.
+    public static func showsLiveIndicator(status: String) -> Bool {
+        status == "granted"
+    }
+
     /// Title and message for the approval card.
     public static func overlay(status: String, peerName: String) -> (title: String, message: String) {
         switch status {

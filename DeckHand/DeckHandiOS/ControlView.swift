@@ -15,6 +15,8 @@ extension Notification.Name {
 struct ControlView: View {
     let connection: LoomConnectionHandle
     let peerName: String
+    /// The approval state the root view shows, after timeout mapping.
+    let authStatus: String
     let onAuthStatusChanged: (String) -> Void
     let onDisconnect: () -> Void
 
@@ -250,8 +252,10 @@ struct ControlView: View {
                             .truncationMode(.middle)
                         HStack(spacing: 4) {
                             // The icon's mint pixel, breathing while connected.
-                            LivePixel()
-                            Text(activeAppName ?? "Connected")
+                            if ApprovalStatusCopy.showsLiveIndicator(status: authStatus) {
+                                LivePixel()
+                            }
+                            Text(ApprovalStatusCopy.headerSubtitle(status: authStatus, activeAppName: activeAppName))
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
