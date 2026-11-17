@@ -565,11 +565,18 @@ struct ControlView: View {
                     // the approval overlay forever. The poll is precisely the
                     // recovery path for a lost push — keep it alive until the
                     // host actually grants or denies.
+                    let isFirstGrant = status == "granted" && lastAuthStatus != "granted"
                     if status != "pending" {
                         hasReceivedAuthStatus = true
                     }
                     lastAuthStatus = status
                     onAuthStatusChanged(status)
+                    // The host's pre-approval gate drops everything sent
+                    // before Allow, including the app-list request made when
+                    // this view appeared. Ask again once access is granted.
+                    if isFirstGrant, let sender {
+                        Task { await sender.requestAppList() }
+                    }
 
                 case let .activeAppUpdate(name, bundleID):
                     withAnimation(.easeInOut(duration: 0.2)) {
