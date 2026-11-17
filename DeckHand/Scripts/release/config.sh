@@ -54,7 +54,7 @@ REDIRECTS_PATH="${REDIRECTS_PATH:-$WEBSITE_PUBLIC/_redirects}"
 # Release notes pages are published next to the appcast:
 #   website/public/mac/notes/<version>.html
 RELEASE_NOTES_DIR="${RELEASE_NOTES_DIR:-$WEBSITE_PUBLIC/mac/notes}"
-SITE_BASE_URL="${SITE_BASE_URL:-https://pixelhand.pages.dev}"
+SITE_BASE_URL="${SITE_BASE_URL:-https://pixelhand.app}"
 
 # ── Helpers ────────────────────────────────────────────────────────────
 log()  { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
