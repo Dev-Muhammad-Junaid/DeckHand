@@ -273,4 +273,40 @@ Do these on the real iPad and iPhone:
 
 Also, quit and remove the old Deck Hand apps when ready. They were left in place.
 
-Status: BUILDS AND TESTS GREEN; M0 Show Desktop and Launchpad broken on macOS 27
+### Real iPad pass (2026-11-17, iPad Air 11" M3, owner-reported)
+
+The old Deck Hand app is removed from both devices: uninstalled from the iPad, and the Mac app moved to the Trash.
+
+**Note:** the first iPad install was a device build from before `9e3dc79`. That's why the owner first saw "Loading apps from Mac…" again. After a rebuild and reinstall, the app grid loads and works.
+
+| Check | Result |
+| --- | --- |
+| Discovery, connect, Allow | **Pass** |
+| Trackpad | **Pass** |
+| Keyboard | **Pass** |
+| Media keys | **Pass** |
+| Spotlight button | **Pass** |
+| App grid after first Allow | **Pass, with `9e3dc79`** |
+| Capture and OCR | **Pass** |
+| Screen mirror | **Pass** |
+| Show Desktop, from the Trackpad bar and from Quick Actions | **Fail** (bug 1) |
+| Spaces switching | **Fail** (bug 8) |
+| Connection stability | **Fail** (bug 9) |
+| Annotation, two remotes at once, iPhone layouts, dialog chips and receipt dots | Not reported yet |
+
+### More open bugs
+
+8. **Spaces switching doesn't switch, and fights Locate.**
+   - `handleSwitchSpace` moves the cursor to the target display's menu bar, posts ⌃←/⌃→ with `osascript` → System Events, waits up to 800 ms for `activeSpaceDidChangeNotification`, then centres the cursor and pings `CursorLocator`.
+   - The Space shortcuts (symbolic hot keys 79–82) are enabled on this Mac.
+   - **Likely cause:** Pixel Hand has no Automation permission for System Events. It was never prompted, and nothing logs the `osascript` failure (`try? proc.run()`, exit status ignored).
+   - So the cursor jumps and the Locate ping fires while the Space doesn't change. That matches the owner's report.
+   - **Fix:** surface the Automation state in the panel (like Accessibility/Screen Recording), log the `osascript` exit status, and skip the centre-and-ping when no Space change arrived. Also confirm on a Mac where Automation is granted.
+9. **The iPad disconnects after a couple of minutes of use.**
+   - Host log, first time: the iPad connected at 18:46:47, then "Liveness timeout … dropping" at 18:47:57.
+   - Second time: the iPad's message loop ended (peer side) at 18:50:45. The simulator's connection timed out on liveness 5 s later, at 18:50:50.
+   - The host logs frequent "AX recompute slow: 40–50 ms" and "Cursor delta gap 33–86 ms — possible jitter / main-thread contention", which points to main-actor stalls delaying pings and pongs.
+   - Needs the iPad-side log (heartbeat: about 6 s of pong silence counts as dead) to tell which side gave up first.
+10. **Feature gap: the mirror doesn't show where the cursor is.** With two displays, the iPad gives no hint when the cursor is on a display other than the one being mirrored. The owner asked for an indicator, or for the mirror to follow the cursor's display.
+
+Status: BUILDS AND TESTS GREEN; M0 Show Desktop and Launchpad broken on macOS 27; Spaces and connection stability need fixes
