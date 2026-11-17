@@ -108,15 +108,15 @@ import Testing
     }
 
     @Test func recognisesPingsOnly() throws {
-        #expect(HeartbeatResponder.pingSequence(in: try encode(.ping(seq: 42))) == 42)
-        #expect(HeartbeatResponder.pingSequence(in: try encode(.ping(seq: .max))) == .max)
-        #expect(HeartbeatResponder.pingSequence(in: try encode(.pong(seq: 42))) == nil)
-        #expect(HeartbeatResponder.pingSequence(in: try encode(.mouseDelta(dx: 1, dy: 2))) == nil)
+        #expect(HeartbeatResponder.pingSequence(in: try encode(.session(.ping(seq: 42)))) == 42)
+        #expect(HeartbeatResponder.pingSequence(in: try encode(.session(.ping(seq: .max)))) == .max)
+        #expect(HeartbeatResponder.pingSequence(in: try encode(.session(.pong(seq: 42)))) == nil)
+        #expect(HeartbeatResponder.pingSequence(in: try encode(.input(.mouseDelta(dx: 1, dy: 2)))) == nil)
         #expect(HeartbeatResponder.pingSequence(in: Data("not json".utf8)) == nil)
     }
 
     @Test func encodedPingFitsTheSizeLimit() throws {
-        #expect(try encode(.ping(seq: .max)).count <= HeartbeatResponder.maxPingBytes)
+        #expect(try encode(.session(.ping(seq: .max))).count <= HeartbeatResponder.maxPingBytes)
     }
 
     @Test func relayAnswersPingsAndPassesEverythingOnInOrder() async throws {
@@ -128,10 +128,10 @@ import Testing
         }
 
         let sent: [ControlMessage] = [
-            .mouseDelta(dx: 1, dy: 1),
-            .ping(seq: 7),
-            .mouseClick(button: .left),
-            .ping(seq: 8),
+            .input(.mouseDelta(dx: 1, dy: 1)),
+            .session(.ping(seq: 7)),
+            .input(.mouseClick(button: .left)),
+            .session(.ping(seq: 8)),
         ]
         for message in sent {
             input.yield(try encode(message))

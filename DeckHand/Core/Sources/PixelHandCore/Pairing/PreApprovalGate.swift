@@ -47,10 +47,11 @@ public struct PreApprovalFilter: Sendable {
     }
 
     public static func isStatusQuery(_ data: Data) -> Bool {
-        guard let message = try? ControlMessageCoding.decoder.decode(ControlMessage.self, from: data) else {
+        guard data.count <= 256,
+              let message = try? ControlMessageCoding.decode(data) else {
             return false
         }
-        if case .requestAuthorizationStatus = message { return true }
+        if case .pairing(.requestAuthorizationStatus) = message { return true }
         return false
     }
 }

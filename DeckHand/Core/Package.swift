@@ -23,10 +23,12 @@ let package = Package(
     ],
     targets: [
         .target(name: "PixelHandCore"),
+        // Golden fixtures are read from the source tree through #filePath,
+        // so they need no resource bundle.
         .testTarget(
             name: "PixelHandCoreTests",
             dependencies: ["PixelHandCore"],
-            resources: [.copy("Fixtures")]
+            exclude: ["Fixtures"]
         ),
     ]
 )

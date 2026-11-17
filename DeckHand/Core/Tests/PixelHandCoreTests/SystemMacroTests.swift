@@ -4,8 +4,10 @@
 //
 //  "Show Desktop" in the Quick Actions bar never worked: the remote sent
 //  `macroButton("showdesktop")`, and the host only matched default-deck ids,
-//  which are prefixed `shortcut-`. These tests pin that every id a remote
-//  sends for a system action resolves on the host.
+//  which are prefixed `shortcut-`. Protocol 2 sends system actions typed
+//  (`SystemMessage.run(action:)`), so there are no ids to drift; these tests
+//  pin the typed wire values and that every old id still resolves (for
+//  importing old decks).
 //
 
 import Foundation
@@ -28,38 +30,48 @@ import Testing
         }
     }
 
-    @Test func defaultDeckSystemEntriesResolveBeforeTheirKeyFallback() {
-        // These default-deck entries are symbolic hot keys; their `keys`
-        // never fire when posted, so the host must route them as system
-        // actions instead.
-        let ids = MacroItem.defaultDeck.map(\.id)
-        #expect(ids.contains("shortcut-showdesktop"))
+    @Test("Old deck ids for system actions resolve to them")
+    func oldDeckIDsResolve() {
         #expect(SystemMacro(macroID: "shortcut-showdesktop") == .showDesktop)
         #expect(SystemMacro(macroID: "shortcut-missioncontrol") == .missionControl)
     }
 
-    @Test func launchpadNeverMapsToSpotlight() throws {
-        // The default deck's Launchpad entry used to post ⌘Space, which
-        // opens Spotlight. It must resolve to the real Launchpad action
-        // and carry no keys of its own.
+    @Test("Launchpad never maps to Spotlight")
+    func launchpadNeverMapsToSpotlight() {
+        // The old default deck's Launchpad entry posted ⌘Space, which opens
+        // Spotlight. Every spelling resolves to the real Launchpad action.
         for id in ["launchpad", "launchpad_trigger", "shortcut-launchpad"] {
             #expect(SystemMacro(macroID: id) == .launchpad, "\(id)")
         }
-        let entry = try #require(MacroItem.defaultDeck.first { $0.id == "shortcut-launchpad" })
-        guard case let .shortcut(shortcut) = entry else { Issue.record("\(entry)"); return }
-        #expect(shortcut.keys.map { $0.lowercased() }.sorted() != ["cmd", "space"])
-        #expect(shortcut.keys.isEmpty)
+        #expect(Action.system(action: .launchpad).message == .system(.run(action: .launchpad)))
+    }
+
+    @Test("System actions travel typed, by their raw value")
+    func wireValuesArePinned() throws {
+        let expected: [SystemMacro: String] = [
+            .locateCursor: "locateCursor",
+            .missionControl: "missionControl",
+            .appExpose: "appExpose",
+            .showDesktop: "showDesktop",
+            .launchpad: "launchpad",
+        ]
+        #expect(expected.count == SystemMacro.allCases.count)
+        for macro in SystemMacro.allCases {
+            let data = try ControlMessageCoding.encode(.system(.run(action: macro)))
+            #expect(String(decoding: data, as: UTF8.self).contains("\"\(expected[macro] ?? "?")\""), "\(macro)")
+            #expect(try ControlMessageCoding.decode(data) == .system(.run(action: macro)))
+        }
     }
 
     @Test func iDsTheRemoteSendsAllResolve() {
-        // Literals used in TrackpadSender, TrackpadView and QuickActionsBar.
+        // Literals protocol 1 remotes sent.
         let sent = ["locate_cursor", "missioncontrol_trigger", "expose_trigger", "launchpad_trigger", "showdesktop_trigger"]
         for id in sent {
             #expect(SystemMacro(macroID: id) != nil, "\(id)")
         }
     }
 
-    @Test func nonSystemIDsAreLeftForTheDefaultDeck() {
+    @Test func nonSystemIDsDontResolve() {
         for id in ["app-safari", "media-playpause", "shortcut-unknown", "", "SHOWDESKTOP"] {
             #expect(SystemMacro(macroID: id) == nil, "\(id)")
         }

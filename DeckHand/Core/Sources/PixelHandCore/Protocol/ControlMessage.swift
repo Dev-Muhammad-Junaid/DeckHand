@@ -2,457 +2,118 @@
 //  ControlMessage.swift
 //  PixelHandCore
 //
+//  The one envelope every message between the Mac and a remote travels in.
+//
+//  On the wire a message is a JSON object with the protocol version and
+//  exactly one domain key:
+//
+//      {"input":{"mouseDelta":{"dx":1.5,"dy":-2}},"v":2}
+//
+//  Each domain's cases live in their own file (`InputMessage.swift`,
+//  `MirrorMessage.swift`, …) and use Swift's synthesized `Codable`, so a
+//  lane adds a message by adding a case to its own domain file, plus a
+//  golden fixture. This file only changes when a whole new domain appears.
+//
+//  Bulk binary data (mirror video, later) does not belong here: it goes on
+//  its own Loom stream with `BinaryFrameHeader` framing. See
+//  `BinaryFrame.swift`.
+//
 
 import Foundation
 
-// MARK: - Top-level message envelope
+public enum ControlMessage: Sendable, Equatable {
+    /// Pointer, scroll, clicks, keys and media keys. Remote → Mac.
+    case input(InputMessage)
+    /// Mission Control, Spaces, Show Desktop and other system actions. Remote → Mac.
+    case system(SystemMessage)
+    /// Apps, the frontmost app and its interactable context. Both ways.
+    case apps(AppsMessage)
+    /// Shortcut chips, menu import, and tracked action runs with receipts. Both ways.
+    case deck(DeckMessage)
+    /// The live mirror and the display list. Both ways.
+    case mirror(MirrorMessage)
+    /// Screenshots, region and window captures. Both ways.
+    case capture(CaptureMessage)
+    /// The approval handshake (and persistent pairing later). Both ways.
+    case pairing(PairingMessage)
+    /// Liveness and what the host can do. Both ways.
+    case session(SessionMessage)
+    /// Clipboard and file sharing. Reserved; no messages yet.
+    case sharing(SharingMessage)
+    /// Diagnostics and stats. Reserved; no messages yet.
+    case diagnostics(DiagnosticsMessage)
 
-public enum ControlMessage: Codable, Sendable {
-    case mouseDelta(dx: Float, dy: Float)
-    /// Continuous scroll delta tagged with a `ScrollPhase` so the host can
-    /// emit native trackpad-style scroll events (with rubber-banding +
-    /// momentum) instead of unphased mouse-wheel ticks.
-    case mouseScroll(dx: Float, dy: Float, phase: ScrollPhase)
-    case mouseClick(button: MouseButton)
-    case mouseDoubleClick(button: MouseButton)
-    case keyboardShortcut(keys: [String])
-    case launchApp(bundleID: String)
-    case macroButton(id: String)
-    case authorizationStatus(status: String)
-    
-    // Bidirectional/New Features
-    /// iPad → Mac: request a fresh screen capture. `requestID` is echoed back
-    /// in the response so a slow, late-arriving capture from a previous tap
-    /// can't hijack the UI of the next request. `mode` lets the iPad pick
-    /// between full-screen, a normalized region, or a single window.
-    case requestScreenshot(requestID: String, mode: CaptureMode, quality: CaptureQuality = .standard)
-    case mediaCommand(action: String)
-    case screenshotData(requestID: String, data: Data)
-    case screenshotError(requestID: String, message: String)
-    case activeAppUpdate(name: String, bundleID: String?)
-
-    /// iPad → Mac: enumerate currently visible user-facing windows so the
-    /// iPad can populate its window picker. Reply: `windowListResponse`.
-    case requestWindowList(requestID: String)
-    /// Mac → iPad: snapshot of visible windows at request time.
-    case windowListResponse(requestID: String, windows: [WindowInfo])
-
-    // App Launcher
-    case requestAppList
-    case appListResponse(apps: [InstalledAppInfo])
-
-    /// Activate `bundleID` on the Mac, wait for it to become frontmost, and
-    /// inject `keys`. Kept separate from `keyboardShortcut` so shortcut
-    /// triggers always land in the intended app, even when the user taps
-    /// quickly after launching something else.
-    case appShortcut(bundleID: String, keys: [String])
-
-    /// iPad asks the Mac to enumerate every shortcut in `bundleID`'s menu
-    /// bar via Accessibility, and reply with `appMenuShortcutsResponse`.
-    case requestAppMenuShortcuts(bundleID: String)
-    /// Host's reply to `requestAppMenuShortcuts`. Empty array means the app
-    /// wasn't running or had no menu shortcuts we could read.
-    case appMenuShortcutsResponse(bundleID: String, shortcuts: [AppShortcutBinding])
-
-    /// Mac → iPad: all currently running user-facing apps, ordered by most-
-    /// recent activation (Cmd+Tab order). Sent unsolicited on connection and
-    /// on every launch / terminate / activate. iPad maps bundle IDs to icons
-    /// from its existing `installedApps` cache — no icon payload needed.
-    case runningAppsUpdate(bundleIDs: [String])
-
-    /// Mac → iPad: what's currently interactable on the frontmost app, as
-    /// seen through Accessibility. Phase 1 carries dialog/sheet button
-    /// snapshots so the iPad can surface "Cancel / Don't Save / Save"
-    /// chips in the Quick Actions bar. `.none` means fall back to regular
-    /// per-app shortcut chips.
-    case uiContextUpdate(snapshot: UIContextSnapshot)
-
-    /// iPad → Mac: the user tapped a dialog button. `id` is an opaque
-    /// handle from the most recent `uiContextUpdate` snapshot; the Mac
-    /// looks up its stored AX element reference and performs `kAXPressAction`.
-    /// Stale IDs (after the snapshot has been superseded) are ignored.
-    case triggerContextAction(id: String)
-
-    // ── Live mini mirror (WID-403) ───────────────────────────────────
-    /// iPad → Mac: start streaming low-res screen frames. `fps` caps the
-    /// capture rate (the Mac may deliver fewer under load); `maxWidth`
-    /// bounds the longest frame edge in pixels so the host downsamples
-    /// on the GPU before encoding. `displayID` picks a physical monitor;
-    /// omitted (or unknown) means the host's main display.
-    case startMirror(fps: Int, maxWidth: Int, displayID: UInt32? = nil)
-    /// iPad → Mac: stop the mirror stream. Also implied by disconnect.
-    case stopMirror
-    /// Mac → iPad: one JPEG frame. `seq` increases monotonically within a
-    /// stream so the iPad can drop out-of-order/stale frames; frames are
-    /// independent (no inter-frame state) so any frame may be dropped.
-    case mirrorFrame(seq: UInt64, data: Data)
-    /// Mac → iPad: the physical displays the host can mirror, plus which
-    /// one the current stream is pointed at. Pushed when a mirror starts
-    /// and whenever screens are plugged or unplugged. `displayID` on
-    /// `startMirror` is how the iPad picks a different one.
-    case displayListUpdate(displays: [DisplayInfo], selectedDisplayID: UInt32)
-    /// iPad → Mac: switch Mission Control Space on a display. The host
-    /// warps the cursor onto `displayID` first so Control-Left/Right
-    /// lands on the mirrored monitor rather than whichever display last
-    /// had keyboard focus. There is no public API to capture an
-    /// off-screen Space, so this only changes *which* Space is live.
-    case switchSpace(direction: SpaceDirection, displayID: UInt32? = nil)
-
-    /// iPad → Mac: "what's my authorization state?" Self-healing resync for
-    /// the approval handshake. Status pushes ride best-effort sends — if the
-    /// host's `granted` ever fails to transmit, the iPad would otherwise
-    /// wait on the approval overlay forever while the host believes the
-    /// session is live. The iPad polls this while it hasn't heard a status;
-    /// the host replies with `authorizationStatus`. While the request is
-    /// still pending the host intentionally doesn't consume messages, so
-    /// queries buffer in the handle and are answered the moment the
-    /// connection is approved — exactly the resync we want.
-    case requestAuthorizationStatus
-
-    // ── Application-level liveness ───────────────────────────────────
-    /// iPad → Mac, every ~2 s while a session is active. The transport's
-    /// own state can lag reality badly after abrupt kills (buffered
-    /// streams, half-open TCP), so liveness is proven at the protocol
-    /// level: each side trusts only recent ping/pong traffic.
-    case ping(seq: UInt64)
-    /// Mac → iPad: echo of `ping`. Missing pongs ⇒ host is gone — the
-    /// iPad returns to the picker instead of showing a zombie session.
-    /// Missing pings ⇒ iPad is gone — the host drops the connection and
-    /// stops consuming its buffered commands.
-    case pong(seq: UInt64)
-
-    /// Mac → iPad: what the host can actually DO right now. Sent when a
-    /// session starts and re-checked periodically, so the remote can show
-    /// "the Mac is missing Accessibility permission" instead of letting
-    /// taps fail silently. `accessibility` gates input injection +
-    /// dialog/menu features; `screenRecording` gates screenshots + mirror.
-    case hostCapabilities(accessibility: Bool, screenRecording: Bool)
-
-    // ── Delivery receipts ────────────────────────────────────────────
-    /// Mac → iPad, at session start and with each capability report: the
-    /// optional protocol features this host build supports. Older remotes
-    /// can't decode it and skip it, and older hosts never send it, so the
-    /// remote only ever sends `tracked` to a host that can run it. Every flag decodes as `false` when absent, so
-    /// later builds can add more.
-    case hostFeatures(commandReceipts: Bool)
-    /// iPad → Mac: run `command`, then reply `commandReceipt` with the same
-    /// `requestID`. Only sent to hosts that announced `commandReceipts`.
-    /// Doesn't nest: a `tracked` command inside another fails to decode.
-    indirect case tracked(requestID: String, command: ControlMessage)
-    /// Mac → iPad: the host received `requestID`'s command and handed it to
-    /// input injection (`delivered`), or couldn't: Accessibility isn't
-    /// granted, or a dialog button is no longer on screen. Slow commands such
-    /// as `appShortcut` finish in their own tasks afterwards, so this
-    /// confirms delivery, not the app's result.
-    case commandReceipt(requestID: String, delivered: Bool)
-
-    // MARK: Codable
-
-    private enum CodingKeys: String, CodingKey {
-        case type, dx, dy, button, keys, bundleID, bundleIDs, id, status, action, data, name, message, apps, shortcuts, snapshot, requestID, mode, quality, windows, phase, fps, maxWidth, seq, accessibility, screenRecording, displayID, displays, selectedDisplayID, direction
-        case commandReceipts, command, delivered
-    }
-
-    private enum MessageType: String, Codable {
-        case mouseDelta, mouseScroll, mouseClick, mouseDoubleClick
-        case keyboardShortcut, launchApp, macroButton, authorizationStatus
-        case requestScreenshot, mediaCommand, screenshotData, screenshotError, activeAppUpdate
-        case requestWindowList, windowListResponse
-        case requestAppList, appListResponse
-        case appShortcut
-        case requestAppMenuShortcuts, appMenuShortcutsResponse
-        case runningAppsUpdate
-        case uiContextUpdate, triggerContextAction
-        case startMirror, stopMirror, mirrorFrame
-        case displayListUpdate, switchSpace
-        case requestAuthorizationStatus
-        case ping, pong
-        case hostCapabilities
-        case hostFeatures, tracked, commandReceipt
-    }
-
-    public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        let type = try c.decode(MessageType.self, forKey: .type)
-        switch type {
-        case .mouseDelta:
-            self = .mouseDelta(dx: try c.decode(Float.self, forKey: .dx),
-                               dy: try c.decode(Float.self, forKey: .dy))
-        case .mouseScroll:
-            // `phase` defaults to `.changed` for back-compat with builds
-            // that haven't been bumped to send phased scroll yet.
-            let phase = try c.decodeIfPresent(ScrollPhase.self, forKey: .phase) ?? .changed
-            self = .mouseScroll(
-                dx: try c.decode(Float.self, forKey: .dx),
-                dy: try c.decode(Float.self, forKey: .dy),
-                phase: phase
-            )
-        case .mouseClick:
-            self = .mouseClick(button: try c.decode(MouseButton.self, forKey: .button))
-        case .mouseDoubleClick:
-            self = .mouseDoubleClick(button: try c.decode(MouseButton.self, forKey: .button))
-        case .keyboardShortcut:
-            self = .keyboardShortcut(keys: try c.decode([String].self, forKey: .keys))
-        case .launchApp:
-            self = .launchApp(bundleID: try c.decode(String.self, forKey: .bundleID))
-        case .macroButton:
-            self = .macroButton(id: try c.decode(String.self, forKey: .id))
-        case .authorizationStatus:
-            self = .authorizationStatus(status: try c.decode(String.self, forKey: .status))
-        case .requestScreenshot:
-            // `mode` and `quality` are optional for back-compat; missing
-            // implies a standard-quality full-screen capture.
-            let mode = try c.decodeIfPresent(CaptureMode.self, forKey: .mode) ?? .fullScreen
-            let quality = try c.decodeIfPresent(CaptureQuality.self, forKey: .quality) ?? .standard
-            self = .requestScreenshot(
-                requestID: try c.decode(String.self, forKey: .requestID),
-                mode: mode,
-                quality: quality
-            )
-        case .requestWindowList:
-            self = .requestWindowList(
-                requestID: try c.decode(String.self, forKey: .requestID)
-            )
-        case .windowListResponse:
-            self = .windowListResponse(
-                requestID: try c.decode(String.self, forKey: .requestID),
-                windows: try c.decode([WindowInfo].self, forKey: .windows)
-            )
-        case .mediaCommand:
-            self = .mediaCommand(action: try c.decode(String.self, forKey: .action))
-        case .screenshotData:
-            self = .screenshotData(
-                requestID: try c.decode(String.self, forKey: .requestID),
-                data: try c.decode(Data.self, forKey: .data)
-            )
-        case .screenshotError:
-            self = .screenshotError(
-                requestID: try c.decode(String.self, forKey: .requestID),
-                message: try c.decode(String.self, forKey: .message)
-            )
-        case .activeAppUpdate:
-            self = .activeAppUpdate(name: try c.decode(String.self, forKey: .name),
-                                    bundleID: try c.decodeIfPresent(String.self, forKey: .bundleID))
-        case .requestAppList:
-            self = .requestAppList
-        case .appListResponse:
-            self = .appListResponse(apps: try c.decode([InstalledAppInfo].self, forKey: .apps))
-        case .appShortcut:
-            self = .appShortcut(
-                bundleID: try c.decode(String.self, forKey: .bundleID),
-                keys: try c.decode([String].self, forKey: .keys)
-            )
-        case .requestAppMenuShortcuts:
-            self = .requestAppMenuShortcuts(
-                bundleID: try c.decode(String.self, forKey: .bundleID)
-            )
-        case .appMenuShortcutsResponse:
-            self = .appMenuShortcutsResponse(
-                bundleID: try c.decode(String.self, forKey: .bundleID),
-                shortcuts: try c.decode([AppShortcutBinding].self, forKey: .shortcuts)
-            )
-        case .runningAppsUpdate:
-            self = .runningAppsUpdate(
-                bundleIDs: try c.decode([String].self, forKey: .bundleIDs)
-            )
-        case .uiContextUpdate:
-            self = .uiContextUpdate(
-                snapshot: try c.decode(UIContextSnapshot.self, forKey: .snapshot)
-            )
-        case .triggerContextAction:
-            self = .triggerContextAction(id: try c.decode(String.self, forKey: .id))
-        case .startMirror:
-            // `displayID` is optional for back-compat; missing means the
-            // host picks the main display.
-            self = .startMirror(
-                fps: try c.decode(Int.self, forKey: .fps),
-                maxWidth: try c.decode(Int.self, forKey: .maxWidth),
-                displayID: try c.decodeIfPresent(UInt32.self, forKey: .displayID)
-            )
-        case .stopMirror:
-            self = .stopMirror
-        case .mirrorFrame:
-            self = .mirrorFrame(
-                seq: try c.decode(UInt64.self, forKey: .seq),
-                data: try c.decode(Data.self, forKey: .data)
-            )
-        case .displayListUpdate:
-            self = .displayListUpdate(
-                displays: try c.decode([DisplayInfo].self, forKey: .displays),
-                selectedDisplayID: try c.decode(UInt32.self, forKey: .selectedDisplayID)
-            )
-        case .switchSpace:
-            self = .switchSpace(
-                direction: try c.decode(SpaceDirection.self, forKey: .direction),
-                displayID: try c.decodeIfPresent(UInt32.self, forKey: .displayID)
-            )
-        case .requestAuthorizationStatus:
-            self = .requestAuthorizationStatus
-        case .ping:
-            self = .ping(seq: try c.decode(UInt64.self, forKey: .seq))
-        case .pong:
-            self = .pong(seq: try c.decode(UInt64.self, forKey: .seq))
-        case .hostCapabilities:
-            self = .hostCapabilities(
-                accessibility: try c.decode(Bool.self, forKey: .accessibility),
-                screenRecording: try c.decode(Bool.self, forKey: .screenRecording)
-            )
-        case .hostFeatures:
-            self = .hostFeatures(
-                commandReceipts: try c.decodeIfPresent(Bool.self, forKey: .commandReceipts) ?? false
-            )
-        case .tracked:
-            // Check the inner type before decoding it, so hostile input
-            // can't recurse the decoder through nested `tracked` wrappers.
-            let inner = try c.nestedContainer(keyedBy: CodingKeys.self, forKey: .command)
-            if try inner.decode(MessageType.self, forKey: .type) == .tracked {
-                throw DecodingError.dataCorruptedError(
-                    forKey: .command,
-                    in: c,
-                    debugDescription: "tracked commands can't be nested"
-                )
-            }
-            self = .tracked(
-                requestID: try c.decode(String.self, forKey: .requestID),
-                command: try c.decode(ControlMessage.self, forKey: .command)
-            )
-        case .commandReceipt:
-            self = .commandReceipt(
-                requestID: try c.decode(String.self, forKey: .requestID),
-                delivered: try c.decode(Bool.self, forKey: .delivered)
-            )
-        }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
+    /// The domain this message belongs to.
+    public var domain: ProtocolDomain {
         switch self {
-        case let .mouseDelta(dx, dy):
-            try c.encode(MessageType.mouseDelta, forKey: .type)
-            try c.encode(dx, forKey: .dx); try c.encode(dy, forKey: .dy)
-        case let .mouseScroll(dx, dy, phase):
-            try c.encode(MessageType.mouseScroll, forKey: .type)
-            try c.encode(dx, forKey: .dx)
-            try c.encode(dy, forKey: .dy)
-            try c.encode(phase, forKey: .phase)
-        case let .mouseClick(button):
-            try c.encode(MessageType.mouseClick, forKey: .type)
-            try c.encode(button, forKey: .button)
-        case let .mouseDoubleClick(button):
-            try c.encode(MessageType.mouseDoubleClick, forKey: .type)
-            try c.encode(button, forKey: .button)
-        case let .keyboardShortcut(keys):
-            try c.encode(MessageType.keyboardShortcut, forKey: .type)
-            try c.encode(keys, forKey: .keys)
-        case let .launchApp(bundleID):
-            try c.encode(MessageType.launchApp, forKey: .type)
-            try c.encode(bundleID, forKey: .bundleID)
-        case let .macroButton(id):
-            try c.encode(MessageType.macroButton, forKey: .type)
-            try c.encode(id, forKey: .id)
-        case let .authorizationStatus(status):
-            try c.encode(MessageType.authorizationStatus, forKey: .type)
-            try c.encode(status, forKey: .status)
-        case let .requestScreenshot(requestID, mode, quality):
-            try c.encode(MessageType.requestScreenshot, forKey: .type)
-            try c.encode(requestID, forKey: .requestID)
-            try c.encode(mode, forKey: .mode)
-            try c.encode(quality, forKey: .quality)
-        case let .requestWindowList(requestID):
-            try c.encode(MessageType.requestWindowList, forKey: .type)
-            try c.encode(requestID, forKey: .requestID)
-        case let .windowListResponse(requestID, windows):
-            try c.encode(MessageType.windowListResponse, forKey: .type)
-            try c.encode(requestID, forKey: .requestID)
-            try c.encode(windows, forKey: .windows)
-        case let .mediaCommand(action):
-            try c.encode(MessageType.mediaCommand, forKey: .type)
-            try c.encode(action, forKey: .action)
-        case let .screenshotData(requestID, data):
-            try c.encode(MessageType.screenshotData, forKey: .type)
-            try c.encode(requestID, forKey: .requestID)
-            try c.encode(data, forKey: .data)
-        case let .screenshotError(requestID, message):
-            try c.encode(MessageType.screenshotError, forKey: .type)
-            try c.encode(requestID, forKey: .requestID)
-            try c.encode(message, forKey: .message)
-        case let .activeAppUpdate(name, bundleID):
-            try c.encode(MessageType.activeAppUpdate, forKey: .type)
-            try c.encode(name, forKey: .name)
-            try c.encodeIfPresent(bundleID, forKey: .bundleID)
-        case .requestAppList:
-            try c.encode(MessageType.requestAppList, forKey: .type)
-        case let .appListResponse(apps):
-            try c.encode(MessageType.appListResponse, forKey: .type)
-            try c.encode(apps, forKey: .apps)
-        case let .appShortcut(bundleID, keys):
-            try c.encode(MessageType.appShortcut, forKey: .type)
-            try c.encode(bundleID, forKey: .bundleID)
-            try c.encode(keys, forKey: .keys)
-        case let .requestAppMenuShortcuts(bundleID):
-            try c.encode(MessageType.requestAppMenuShortcuts, forKey: .type)
-            try c.encode(bundleID, forKey: .bundleID)
-        case let .appMenuShortcutsResponse(bundleID, shortcuts):
-            try c.encode(MessageType.appMenuShortcutsResponse, forKey: .type)
-            try c.encode(bundleID, forKey: .bundleID)
-            try c.encode(shortcuts, forKey: .shortcuts)
-        case let .runningAppsUpdate(bundleIDs):
-            try c.encode(MessageType.runningAppsUpdate, forKey: .type)
-            try c.encode(bundleIDs, forKey: .bundleIDs)
-        case let .uiContextUpdate(snapshot):
-            try c.encode(MessageType.uiContextUpdate, forKey: .type)
-            try c.encode(snapshot, forKey: .snapshot)
-        case let .triggerContextAction(id):
-            try c.encode(MessageType.triggerContextAction, forKey: .type)
-            try c.encode(id, forKey: .id)
-        case let .startMirror(fps, maxWidth, displayID):
-            try c.encode(MessageType.startMirror, forKey: .type)
-            try c.encode(fps, forKey: .fps)
-            try c.encode(maxWidth, forKey: .maxWidth)
-            try c.encodeIfPresent(displayID, forKey: .displayID)
-        case .stopMirror:
-            try c.encode(MessageType.stopMirror, forKey: .type)
-        case let .mirrorFrame(seq, data):
-            try c.encode(MessageType.mirrorFrame, forKey: .type)
-            try c.encode(seq, forKey: .seq)
-            try c.encode(data, forKey: .data)
-        case let .displayListUpdate(displays, selectedDisplayID):
-            try c.encode(MessageType.displayListUpdate, forKey: .type)
-            try c.encode(displays, forKey: .displays)
-            try c.encode(selectedDisplayID, forKey: .selectedDisplayID)
-        case let .switchSpace(direction, displayID):
-            try c.encode(MessageType.switchSpace, forKey: .type)
-            try c.encode(direction, forKey: .direction)
-            try c.encodeIfPresent(displayID, forKey: .displayID)
-        case .requestAuthorizationStatus:
-            try c.encode(MessageType.requestAuthorizationStatus, forKey: .type)
-        case let .ping(seq):
-            try c.encode(MessageType.ping, forKey: .type)
-            try c.encode(seq, forKey: .seq)
-        case let .pong(seq):
-            try c.encode(MessageType.pong, forKey: .type)
-            try c.encode(seq, forKey: .seq)
-        case let .hostCapabilities(accessibility, screenRecording):
-            try c.encode(MessageType.hostCapabilities, forKey: .type)
-            try c.encode(accessibility, forKey: .accessibility)
-            try c.encode(screenRecording, forKey: .screenRecording)
-        case let .hostFeatures(commandReceipts):
-            try c.encode(MessageType.hostFeatures, forKey: .type)
-            try c.encode(commandReceipts, forKey: .commandReceipts)
-        case let .tracked(requestID, command):
-            try c.encode(MessageType.tracked, forKey: .type)
-            try c.encode(requestID, forKey: .requestID)
-            try c.encode(command, forKey: .command)
-        case let .commandReceipt(requestID, delivered):
-            try c.encode(MessageType.commandReceipt, forKey: .type)
-            try c.encode(requestID, forKey: .requestID)
-            try c.encode(delivered, forKey: .delivered)
+        case .input: .input
+        case .system: .system
+        case .apps: .apps
+        case .deck: .deck
+        case .mirror: .mirror
+        case .capture: .capture
+        case .pairing: .pairing
+        case .session: .session
+        case .sharing: .sharing
+        case .diagnostics: .diagnostics
         }
     }
 }
 
-// MARK: - Supporting types
+/// The envelope's domain keys.
+public enum ProtocolDomain: String, CaseIterable, Codable, Sendable {
+    case input, system, apps, deck, mirror, capture, pairing, session, sharing, diagnostics
+}
 
-public enum MouseButton: String, Codable, Sendable {
-    case left, right, middle
+// MARK: - Codable
+
+extension ControlMessage: Codable {
+    private enum Key: String, CodingKey {
+        case v
+        case input, system, apps, deck, mirror, capture, pairing, session, sharing, diagnostics
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: Key.self)
+        let version = try c.decode(Int.self, forKey: .v)
+        guard version == PixelHandProtocol.version else {
+            throw ProtocolError.unsupportedVersion(version)
+        }
+        let domains = c.allKeys.filter { $0 != .v }
+        guard let key = domains.first else { throw ProtocolError.unknownDomain }
+        guard domains.count == 1 else {
+            throw ProtocolError.multipleDomains(domains.map(\.stringValue).sorted())
+        }
+        switch key {
+        case .input: self = .input(try c.decode(InputMessage.self, forKey: key))
+        case .system: self = .system(try c.decode(SystemMessage.self, forKey: key))
+        case .apps: self = .apps(try c.decode(AppsMessage.self, forKey: key))
+        case .deck: self = .deck(try c.decode(DeckMessage.self, forKey: key))
+        case .mirror: self = .mirror(try c.decode(MirrorMessage.self, forKey: key))
+        case .capture: self = .capture(try c.decode(CaptureMessage.self, forKey: key))
+        case .pairing: self = .pairing(try c.decode(PairingMessage.self, forKey: key))
+        case .session: self = .session(try c.decode(SessionMessage.self, forKey: key))
+        // Reserved domains with no messages yet: nothing can decode. When a
+        // domain gets its first case, decode it here like the others (the
+        // golden fixture round trip fails until you do).
+        case .sharing, .diagnostics, .v: throw ProtocolError.unknownDomain
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: Key.self)
+        try c.encode(PixelHandProtocol.version, forKey: .v)
+        switch self {
+        case let .input(message): try c.encode(message, forKey: .input)
+        case let .system(message): try c.encode(message, forKey: .system)
+        case let .apps(message): try c.encode(message, forKey: .apps)
+        case let .deck(message): try c.encode(message, forKey: .deck)
+        case let .mirror(message): try c.encode(message, forKey: .mirror)
+        case let .capture(message): try c.encode(message, forKey: .capture)
+        case let .pairing(message): try c.encode(message, forKey: .pairing)
+        case let .session(message): try c.encode(message, forKey: .session)
+        case let .sharing(message): try c.encode(message, forKey: .sharing)
+        case let .diagnostics(message): try c.encode(message, forKey: .diagnostics)
+        }
+    }
 }

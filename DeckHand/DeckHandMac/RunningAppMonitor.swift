@@ -124,6 +124,6 @@ final class RunningAppMonitor {
     }
 
     private func send(_ bundleIDs: [String], to handle: LoomConnectionHandle) async throws {
-        try await handle.send(.runningAppsUpdate(bundleIDs: bundleIDs))
+        try await handle.send(.apps(.runningAppsUpdate(bundleIDs: bundleIDs)))
     }
 }

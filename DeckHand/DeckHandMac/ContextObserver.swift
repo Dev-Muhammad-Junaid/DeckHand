@@ -340,7 +340,7 @@ final class ContextObserver {
         }
         #endif
 
-        let msg = ControlMessage.uiContextUpdate(snapshot: snapshot)
+        let msg = ControlMessage.apps(.uiContextUpdate(snapshot: snapshot))
         let data: Data
         do {
             // Encode once, broadcast the same payload to every peer; reuse
@@ -858,6 +858,6 @@ final class ContextObserver {
     // MARK: - Send
 
     private func send(_ snapshot: UIContextSnapshot, to handle: LoomConnectionHandle) async throws {
-        try await handle.send(.uiContextUpdate(snapshot: snapshot))
+        try await handle.send(.apps(.uiContextUpdate(snapshot: snapshot)))
     }
 }

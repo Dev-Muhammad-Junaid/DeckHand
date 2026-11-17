@@ -2,29 +2,28 @@
 //  SystemMacro.swift
 //  PixelHandCore
 //
-//  System-level actions behind `macroButton(id:)` that can't be done with a
-//  posted keyboard shortcut. Mission Control, Show Desktop and Launchpad are
-//  symbolic hot keys, and `CGEvent` posts never fire those.
+//  System-level actions that can't be done with a posted keyboard shortcut.
+//  Mission Control, Show Desktop and Launchpad are symbolic hot keys, and
+//  `CGEvent` posts never fire those.
 //
-//  The remote has sent several spellings of the same action over time
-//  (`showdesktop` from the Quick Actions bar, `shortcut-showdesktop` as the
-//  `MacroItem` id, `*_trigger` for the newer buttons). The host used to
-//  match only some of them, so Show Desktop from the Quick Actions bar did
-//  nothing and Launchpad fell through to the default deck's ⌘Space
-//  (Spotlight). Every spelling now resolves here, before the default-deck
-//  lookup.
+//  Protocol 2 sends these typed (`SystemMessage.run(action:)`, encoded by
+//  their raw value). Protocol 1 sent string ids through `macroButton(id:)`,
+//  and the remote had sent several spellings of the same action over time
+//  (`showdesktop`, `shortcut-showdesktop`, `*_trigger`), so Show Desktop and
+//  Launchpad once did nothing. `init(macroID:)` still resolves every old
+//  spelling, for importing old decks and settings.
 //
 
 import Foundation
 
-public enum SystemMacro: String, CaseIterable, Sendable {
+public enum SystemMacro: String, CaseIterable, Codable, Sendable, Hashable {
     case locateCursor
     case missionControl
     case appExpose
     case showDesktop
     case launchpad
 
-    /// The id the remote should send for this action.
+    /// The protocol 1 id for this action.
     public var macroID: String {
         switch self {
         case .locateCursor:   "locate_cursor"
@@ -35,8 +34,8 @@ public enum SystemMacro: String, CaseIterable, Sendable {
         }
     }
 
-    /// Resolves any id a remote may send for a system action, or `nil` for
-    /// ids that aren't system actions (apps, shortcuts, media).
+    /// Resolves any protocol 1 id for a system action, or `nil` for ids
+    /// that aren't system actions (apps, shortcuts, media).
     public init?(macroID id: String) {
         switch id {
         case "locate_cursor":

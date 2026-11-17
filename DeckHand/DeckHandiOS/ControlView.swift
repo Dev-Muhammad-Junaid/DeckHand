@@ -481,18 +481,10 @@ struct ControlView: View {
 
     #if DEBUG
     private func messageTypeName(_ m: ControlMessage) -> String {
-        switch m {
-        case .authorizationStatus: "authorizationStatus"
-        case .activeAppUpdate: "activeAppUpdate"
-        case .screenshotData: "screenshotData"
-        case .screenshotError: "screenshotError"
-        case .appListResponse: "appListResponse"
-        case .appMenuShortcutsResponse: "appMenuShortcutsResponse"
-        case .runningAppsUpdate: "runningAppsUpdate"
-        case .uiContextUpdate: "uiContextUpdate"
-        case .windowListResponse: "windowListResponse"
-        default: "other"
-        }
+        // "domain.case", for example "apps.activeAppUpdate".
+        let parts = String(describing: m).split(separator: "(")
+        let caseName = parts.count > 1 ? parts[1].split(separator: ".").last.map(String.init) ?? "?" : "?"
+        return "\(m.domain.rawValue).\(caseName)"
     }
     #endif
 
@@ -509,11 +501,9 @@ struct ControlView: View {
             liveness.noteInbound()
             let message: ControlMessage
             do {
-                message = try ControlMessageCoding.decoder.decode(ControlMessage.self, from: data)
+                message = try ControlMessageCoding.decode(data)
             } catch {
-                #if DEBUG
-                print("DeckHandiOS: ⚠️ Failed to decode ControlMessage (\(data.count)B): \(error)")
-                #endif
+                DeckHandLog.connection.error("Dropped an undecodable message from the Mac (\(data.count, privacy: .public) B): \(String(describing: error), privacy: .public)")
                 continue
             }
             #if DEBUG
@@ -523,7 +513,7 @@ struct ControlView: View {
             // and JPEG decode is the heavy part — handle them here on the
             // listener task so decode stays off the main thread, and only
             // hop to MainActor for the cheap state swap.
-            if case let .mirrorFrame(seq, frameData) = message {
+            if case let .mirror(.frame(seq, frameData)) = message {
                 // This loop runs on the main actor, so decode in a detached
                 // task; up to 20 frames a second otherwise compete with
                 // touch handling and the heartbeat.
@@ -545,27 +535,29 @@ struct ControlView: View {
             // Feature flags and receipts only concern the sender actor; no
             // UI state changes, so they skip the main-actor hop.
             switch message {
-            case .pong:
+            case .session(.pong):
                 liveness.noteHeartbeat()
                 continue
-            case let .hostFeatures(commandReceipts):
-                await sender?.setHostSendsReceipts(commandReceipts)
+            case let .deck(.receipt(requestID, outcome)):
+                await sender?.receivedReceipt(requestID: requestID, outcome: outcome)
                 continue
-            case let .commandReceipt(requestID, delivered):
-                await sender?.receivedReceipt(requestID: requestID, delivered: delivered)
-                continue
+            case let .session(.hostStatus(status)):
+                await sender?.setHostSendsReceipts(status.supports(.commandReceipts))
             default:
                 break
             }
             await MainActor.run {
                 switch message {
-                case let .hostCapabilities(accessibility, screenRecording):
+                case let .session(.hostStatus(hostStatus)):
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        hostAccessibilityGranted = accessibility
-                        hostScreenRecordingGranted = screenRecording
+                        hostAccessibilityGranted = hostStatus.accessibility
+                        hostScreenRecordingGranted = hostStatus.screenRecording
                     }
 
-                case let .authorizationStatus(status):
+                case let .pairing(.authorizationStatus(state)):
+                    // The UI keeps string states because it adds local ones
+                    // ("timed_out", "host_disconnected"); see ApprovalStatusCopy.
+                    let status = state.rawValue
                     // Always-on so the pending→granted/denied transition is
                     // visible in Console.app for release/TestFlight, not just
                     // Xcode-attached DEBUG. `decisive` mirrors the resync-poll
@@ -592,13 +584,13 @@ struct ControlView: View {
                         Task { await sender.requestAppList() }
                     }
 
-                case let .activeAppUpdate(name, bundleID):
+                case let .apps(.activeAppUpdate(name, bundleID)):
                     withAnimation(.easeInOut(duration: 0.2)) {
                         activeAppName = name
                         activeBundleID = bundleID
                     }
 
-                case let .screenshotData(requestID, data):
+                case let .capture(.screenshotData(requestID, data)):
                     // Drop responses for a request we've already given up on
                     // (timeout fired, user dismissed, or a newer request
                     // overwrote the token).
@@ -641,19 +633,16 @@ struct ControlView: View {
                         screenshotIntent = .fullScreen
                     }
 
-                case let .screenshotError(requestID, message):
-                    // The mirror stream reuses this channel with a fixed
-                    // token: stop the mirror and surface the reason rather
-                    // than letting the stale-request guard eat it.
-                    if requestID == "mirror" {
-                        if isMirrorActive {
-                            isMirrorActive = false
-                            mirrorImage = nil
-                            screenshotErrorIsMirror = true
-                            screenshotErrorMessage = message
-                        }
-                        break
+                case let .mirror(.error(message)):
+                    // Stop the mirror and surface the reason.
+                    if isMirrorActive {
+                        isMirrorActive = false
+                        mirrorImage = nil
+                        screenshotErrorIsMirror = true
+                        screenshotErrorMessage = message
                     }
+
+                case let .capture(.screenshotError(requestID, message)):
                     guard requestID == screenshotRequestID else {
                         #if DEBUG
                         print("DeckHandiOS: ⏭️ dropping stale screenshotError (\(requestID))")
@@ -668,7 +657,7 @@ struct ControlView: View {
                     screenshotIntent = .fullScreen
                     screenshotErrorMessage = message
 
-                case let .windowListResponse(requestID, windows):
+                case let .capture(.windowListResponse(requestID, windows)):
                     // The window picker may have been dismissed before the
                     // list arrived; we still keep the cached list so the
                     // next open is instant.
@@ -680,19 +669,19 @@ struct ControlView: View {
                         availableWindows = windows
                     }
 
-                case let .appListResponse(apps):
+                case let .apps(.appListResponse(apps)):
                     withAnimation(.easeInOut(duration: 0.2)) {
                         installedApps = apps
                     }
                     // Cache to disk for instant display on next connect
                     Self.cacheAppList(apps)
 
-                case let .runningAppsUpdate(ids):
+                case let .apps(.runningAppsUpdate(ids)):
                     withAnimation(.easeInOut(duration: 0.2)) {
                         runningBundleIDs = ids
                     }
 
-                case let .uiContextUpdate(snapshot):
+                case let .apps(.uiContextUpdate(snapshot)):
                     #if DEBUG
                     switch snapshot {
                     case .none:
@@ -707,10 +696,10 @@ struct ControlView: View {
                         uiContext = snapshot
                     }
 
-                case let .displayListUpdate(_, selectedDisplayID):
+                case let .mirror(.displayList(_, selectedDisplayID)):
                     selectedMirrorDisplayID = selectedDisplayID
 
-                case let .appMenuShortcutsResponse(bundleID, shortcuts):
+                case let .deck(.appMenuShortcutsResponse(bundleID, shortcuts)):
                     let added = ShortcutStore.shared.importBindings(shortcuts, for: bundleID)
                     NotificationCenter.default.post(
                         name: .appMenuShortcutsImported,

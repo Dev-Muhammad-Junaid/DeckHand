@@ -163,7 +163,7 @@ struct QuickActionsBar: View {
                 ForEach(ctx.buttons) { button in
                     DialogButtonChip(button: button, colorScheme: colorScheme) {
                         (button.isDefault ? GestureHaptic.medium : .light).trigger()
-                        return await sender.sendConfirmed(.triggerContextAction(id: button.id))
+                        return await sender.sendConfirmed(.contextAction(id: button.id))
                     }
                 }
             }
@@ -301,15 +301,15 @@ struct QuickActionsBar: View {
         HStack(spacing: 4) {
             IconButton(symbol: "macwindow.on.rectangle", colorScheme: colorScheme) {
                 GestureHaptic.medium.trigger()
-                Task { await sender.sendMacro("missioncontrol_trigger") }
+                Task { await sender.sendSystemAction(.missionControl) }
             }
             IconButton(symbol: "square.grid.3x3.fill", colorScheme: colorScheme) {
                 GestureHaptic.medium.trigger()
-                Task { await sender.sendMacro("launchpad_trigger") }
+                Task { await sender.sendSystemAction(.launchpad) }
             }
             IconButton(symbol: "macwindow", colorScheme: colorScheme) {
                 GestureHaptic.medium.trigger()
-                Task { await sender.sendMacro(SystemMacro.showDesktop.macroID) }
+                Task { await sender.sendSystemAction(.showDesktop) }
             }
         }
     }
@@ -318,15 +318,15 @@ struct QuickActionsBar: View {
         HStack(spacing: 4) {
             IconButton(symbol: "backward.fill", colorScheme: colorScheme) {
                 GestureHaptic.light.trigger()
-                Task { await sender.sendMediaAction("prev") }
+                Task { await sender.sendMediaKey(.previous) }
             }
             IconButton(symbol: "playpause.fill", colorScheme: colorScheme) {
                 GestureHaptic.medium.trigger()
-                Task { await sender.sendMediaAction("playpause") }
+                Task { await sender.sendMediaKey(.playPause) }
             }
             IconButton(symbol: "forward.fill", colorScheme: colorScheme) {
                 GestureHaptic.light.trigger()
-                Task { await sender.sendMediaAction("next") }
+                Task { await sender.sendMediaKey(.next) }
             }
         }
     }

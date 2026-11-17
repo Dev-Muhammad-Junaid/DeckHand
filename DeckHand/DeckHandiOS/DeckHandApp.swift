@@ -31,6 +31,9 @@ struct DeckHandApp: App {
                     // priority sort, and host-side auto-allow (DeckHandCloud).
                     cloudKit: DeckHandCloud.cloudKitConfiguration,
                     remoteSignaling: DeckHandCloud.remoteSignalingConfiguration,
+                    // `ph-proto` in the Bonjour TXT record, so the Mac's menu
+                    // bar can say "Please update" (PeerCompatibility).
+                    advertisementMetadata: PixelHandProtocol.advertisementMetadata,
                     // Manual lifecycle only — see MacHostApp for rationale.
                     retryPolicy: .disabled
                 )

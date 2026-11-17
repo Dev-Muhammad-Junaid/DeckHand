@@ -25,3 +25,19 @@ public enum ControlMessageCoding {
     /// One `JSONDecoder` reused for every inbound `ControlMessage`.
     public static let decoder = JSONDecoder()
 }
+
+public extension ControlMessageCoding {
+    /// Encodes `message` for the wire.
+    static func encode(_ message: ControlMessage) throws -> Data {
+        try encoder.encode(message)
+    }
+
+    /// Decodes one message, refusing anything larger than `maxBytes`
+    /// before parsing it.
+    static func decode(_ data: Data, maxBytes: Int = .max) throws -> ControlMessage {
+        guard data.count <= maxBytes else {
+            throw ProtocolError.messageTooLarge(bytes: data.count, limit: maxBytes)
+        }
+        return try decoder.decode(ControlMessage.self, from: data)
+    }
+}

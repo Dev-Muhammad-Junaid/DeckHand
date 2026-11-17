@@ -41,16 +41,16 @@ import Testing
 
     @Test func nonFiniteScrollIsDropped() {
         for value: Float in [.nan, .infinity, -.infinity] {
-            #expect(RemoteInputValidation.sanitize(.mouseScroll(dx: 0, dy: value, phase: .changed)) == nil)
-            #expect(RemoteInputValidation.sanitize(.mouseScroll(dx: value, dy: 0, phase: .changed)) == nil)
+            #expect(RemoteInputValidation.sanitize(.input(.mouseScroll(dx: 0, dy: value, phase: .changed))) == nil)
+            #expect(RemoteInputValidation.sanitize(.input(.mouseScroll(dx: value, dy: 0, phase: .changed))) == nil)
         }
     }
 
     @Test func hugeScrollIsClamped() throws {
         let message = try #require(RemoteInputValidation.sanitize(
-            .mouseScroll(dx: -.greatestFiniteMagnitude, dy: 1e9, phase: .end)
+            .input(.mouseScroll(dx: -.greatestFiniteMagnitude, dy: 1e9, phase: .end))
         ))
-        guard case let .mouseScroll(dx, dy, phase) = message else {
+        guard case let .input(.mouseScroll(dx, dy, phase)) = message else {
             Issue.record("Expected mouseScroll, got \(message)")
             return
         }
@@ -62,8 +62,8 @@ import Testing
     }
 
     @Test func normalScrollIsUnchanged() throws {
-        let message = try #require(RemoteInputValidation.sanitize(.mouseScroll(dx: 1.5, dy: -12, phase: .begin)))
-        guard case let .mouseScroll(dx, dy, _) = message else { Issue.record("\(message)"); return }
+        let message = try #require(RemoteInputValidation.sanitize(.input(.mouseScroll(dx: 1.5, dy: -12, phase: .begin))))
+        guard case let .input(.mouseScroll(dx, dy, _)) = message else { Issue.record("\(message)"); return }
         #expect(dx == 1.5)
         #expect(dy == -12)
     }
@@ -71,16 +71,16 @@ import Testing
     // MARK: - Pointer
 
     @Test func pointerDeltas() throws {
-        #expect(RemoteInputValidation.sanitize(.mouseDelta(dx: .nan, dy: 0)) == nil)
-        #expect(RemoteInputValidation.sanitize(.mouseDelta(dx: 0, dy: -.infinity)) == nil)
+        #expect(RemoteInputValidation.sanitize(.input(.mouseDelta(dx: .nan, dy: 0))) == nil)
+        #expect(RemoteInputValidation.sanitize(.input(.mouseDelta(dx: 0, dy: -.infinity))) == nil)
 
-        let clamped = try #require(RemoteInputValidation.sanitize(.mouseDelta(dx: 1e9, dy: -1e9)))
-        guard case let .mouseDelta(dx, dy) = clamped else { Issue.record("\(clamped)"); return }
+        let clamped = try #require(RemoteInputValidation.sanitize(.input(.mouseDelta(dx: 1e9, dy: -1e9))))
+        guard case let .input(.mouseDelta(dx, dy)) = clamped else { Issue.record("\(clamped)"); return }
         #expect(dx == RemoteInputValidation.maxPointerDelta)
         #expect(dy == -RemoteInputValidation.maxPointerDelta)
 
-        let normal = try #require(RemoteInputValidation.sanitize(.mouseDelta(dx: 3.25, dy: -0.5)))
-        guard case let .mouseDelta(ndx, ndy) = normal else { Issue.record("\(normal)"); return }
+        let normal = try #require(RemoteInputValidation.sanitize(.input(.mouseDelta(dx: 3.25, dy: -0.5))))
+        guard case let .input(.mouseDelta(ndx, ndy)) = normal else { Issue.record("\(normal)"); return }
         #expect(ndx == 3.25)
         #expect(ndy == -0.5)
     }
@@ -98,7 +98,7 @@ import Testing
         ]
         for mode in bad {
             #expect(RemoteInputValidation.sanitize(mode) == nil, "\(mode)")
-            #expect(RemoteInputValidation.sanitize(.requestScreenshot(requestID: "r", mode: mode)) == nil, "\(mode)")
+            #expect(RemoteInputValidation.sanitize(.capture(.requestScreenshot(requestID: "r", mode: mode, quality: .standard))) == nil, "\(mode)")
         }
     }
 
@@ -123,48 +123,60 @@ import Testing
             (20, 480, 20, 480),
         ]
         for (fps, width, expectedFPS, expectedWidth) in cases {
-            let message = try #require(RemoteInputValidation.sanitize(.startMirror(fps: fps, maxWidth: width, displayID: 7)))
-            guard case let .startMirror(outFPS, outWidth, displayID) = message else { Issue.record("\(message)"); return }
+            let message = try #require(RemoteInputValidation.sanitize(.mirror(.start(fps: fps, maxWidth: width, displayID: 7))))
+            guard case let .mirror(.start(outFPS, outWidth, displayID)) = message else { Issue.record("\(message)"); return }
             #expect(outFPS == expectedFPS)
             #expect(outWidth == expectedWidth)
             #expect(displayID == 7)
         }
     }
 
-    // MARK: - Wrappers and pass-through
+    // MARK: - Tracked runs, strings and pass-through
 
-    @Test func trackedCommandsAreValidatedToo() throws {
-        #expect(RemoteInputValidation.sanitize(.tracked(requestID: "t", command: .mouseScroll(dx: 0, dy: .nan, phase: .changed))) == nil)
+    @Test("A run is checked as the message its action stands for")
+    func runsAreValidatedToo() {
+        let tooManyKeys = Array(repeating: "a", count: ProtocolLimits.maxChordKeys + 1)
+        #expect(RemoteInputValidation.sanitize(.deck(.run(requestID: "t", action: .shortcut(keys: tooManyKeys)))) == nil)
+        let fine = ControlMessage.deck(.run(requestID: "t", action: .shortcut(keys: ["cmd", "c"])))
+        #expect(RemoteInputValidation.sanitize(fine) == fine)
+    }
 
-        let message = try #require(RemoteInputValidation.sanitize(
-            .tracked(requestID: "t", command: .mouseDelta(dx: 1e9, dy: 0))
-        ))
-        guard case let .tracked(requestID, .mouseDelta(dx, _)) = message else { Issue.record("\(message)"); return }
-        #expect(requestID == "t")
-        #expect(dx == RemoteInputValidation.maxPointerDelta)
+    @Test("Strings and chords past the limits are dropped")
+    func oversizeStringsAreDropped() {
+        let long = String(repeating: "x", count: ProtocolLimits.maxStringLength + 1)
+        #expect(RemoteInputValidation.sanitize(.apps(.launchApp(bundleID: long))) == nil)
+        #expect(RemoteInputValidation.sanitize(.apps(.triggerContextAction(id: long))) == nil)
+        #expect(RemoteInputValidation.sanitize(.capture(.requestWindowList(requestID: long))) == nil)
+        #expect(RemoteInputValidation.sanitize(.deck(.requestAppMenuShortcuts(bundleID: long))) == nil)
+        #expect(RemoteInputValidation.sanitize(.input(.keyboardShortcut(keys: [long]))) == nil)
+        #expect(RemoteInputValidation.sanitize(.deck(.run(requestID: long, action: .media(key: .next)))) == nil)
+        #expect(RemoteInputValidation.sanitize(.apps(.appShortcut(bundleID: "com.apple.Safari", keys: ["cmd", long]))) == nil)
     }
 
     @Test func messagesWithoutNumbersPassThrough() {
         let messages: [ControlMessage] = [
-            .mouseClick(button: .left),
-            .keyboardShortcut(keys: ["cmd", "c"]),
-            .macroButton(id: "showdesktop"),
-            .ping(seq: .max),
-            .requestAuthorizationStatus,
-            .switchSpace(direction: .next, displayID: UInt32.max),
+            .input(.mouseClick(button: .left)),
+            .input(.keyboardShortcut(keys: ["cmd", "c"])),
+            .input(.media(key: .playPause)),
+            .system(.run(action: .showDesktop)),
+            .session(.ping(seq: .max)),
+            .pairing(.requestAuthorizationStatus),
+            .system(.switchSpace(direction: .next, displayID: UInt32.max)),
+            .apps(.launchApp(bundleID: "com.apple.Safari")),
+            .deck(.run(requestID: "t", action: .contextAction(id: "rev|0|OK"))),
         ]
         for message in messages {
-            #expect(RemoteInputValidation.sanitize(message) != nil, "\(message)")
+            #expect(RemoteInputValidation.sanitize(message) == message, "\(message)")
         }
     }
 
     /// JSON can't carry NaN or ∞, but any finite float decodes, and 1e30
     /// used to crash the host through `Int32(-dy * 3)`.
     @Test func largestDecodableScrollIsSafeEndToEnd() throws {
-        let json = #"{"type":"mouseScroll","dx":0,"dy":1e30,"phase":"changed"}"#
-        let decoded = try JSONDecoder().decode(ControlMessage.self, from: Data(json.utf8))
+        let json = #"{"input":{"mouseScroll":{"dx":0,"dy":1e30,"phase":"changed"}},"v":2}"#
+        let decoded = try ControlMessageCoding.decode(Data(json.utf8))
         let message = try #require(RemoteInputValidation.sanitize(decoded))
-        guard case let .mouseScroll(_, dy, _) = message else { Issue.record("\(message)"); return }
+        guard case let .input(.mouseScroll(_, dy, _)) = message else { Issue.record("\(message)"); return }
         #expect(RemoteInputValidation.wheelUnits(forScrollDelta: dy) == Int32(-RemoteInputValidation.maxScrollDelta * 3))
     }
 }

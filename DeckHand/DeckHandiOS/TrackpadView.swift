@@ -259,12 +259,12 @@ struct GestureButtonBar: View {
                 Task { await sender.locateCursor() }
             }
             GestureButton(label: "Mission", icon: "macwindow.on.rectangle", color: DeckHandTheme.accent, haptic: .light, colorScheme: colorScheme) {
-                Task { await sender.sendMacro("missioncontrol_trigger") }
+                Task { await sender.sendSystemAction(.missionControl) }
             }
             GestureButton(label: "Desktop", icon: "menubar.rectangle",       color: DeckHandTheme.accent, haptic: .light, colorScheme: colorScheme) {
                 // fn+F11 is a symbolic hot key a posted shortcut never fires;
                 // the host runs Show Desktop itself.
-                Task { await sender.sendMacro(SystemMacro.showDesktop.macroID) }
+                Task { await sender.sendSystemAction(.showDesktop) }
             }
         }
     }

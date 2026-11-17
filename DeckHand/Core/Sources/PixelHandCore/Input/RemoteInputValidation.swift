@@ -29,37 +29,68 @@ public enum RemoteInputValidation {
 
     /// Returns `message` with every remote-supplied number made safe, or
     /// `nil` when the message must be dropped (a non-finite float, an empty
-    /// capture region). Messages without numbers pass through unchanged.
+    /// capture region, a string or list past `ProtocolLimits`). Messages
+    /// without numbers or strings pass through unchanged.
     public static func sanitize(_ message: ControlMessage) -> ControlMessage? {
         switch message {
-        case let .mouseDelta(dx, dy):
+        case let .input(.mouseDelta(dx, dy)):
             guard let safeDX = clamp(dx, limit: maxPointerDelta),
                   let safeDY = clamp(dy, limit: maxPointerDelta) else { return nil }
-            return .mouseDelta(dx: safeDX, dy: safeDY)
+            return .input(.mouseDelta(dx: safeDX, dy: safeDY))
 
-        case let .mouseScroll(dx, dy, phase):
+        case let .input(.mouseScroll(dx, dy, phase)):
             guard let safeDX = clamp(dx, limit: maxScrollDelta),
                   let safeDY = clamp(dy, limit: maxScrollDelta) else { return nil }
-            return .mouseScroll(dx: safeDX, dy: safeDY, phase: phase)
+            return .input(.mouseScroll(dx: safeDX, dy: safeDY, phase: phase))
 
-        case let .requestScreenshot(requestID, mode, quality):
-            guard let safeMode = sanitize(mode) else { return nil }
-            return .requestScreenshot(requestID: requestID, mode: safeMode, quality: quality)
+        case let .input(.keyboardShortcut(keys)):
+            return isAcceptableChord(keys) ? message : nil
 
-        case let .startMirror(fps, maxWidth, displayID):
-            return .startMirror(
+        case let .apps(.launchApp(bundleID)):
+            return isAcceptable(bundleID) ? message : nil
+
+        case let .apps(.appShortcut(bundleID, keys)):
+            return isAcceptable(bundleID) && isAcceptableChord(keys) ? message : nil
+
+        case let .apps(.triggerContextAction(id)):
+            return isAcceptable(id) ? message : nil
+
+        case let .deck(.requestAppMenuShortcuts(bundleID)):
+            return isAcceptable(bundleID) ? message : nil
+
+        case let .capture(.requestScreenshot(requestID, mode, quality)):
+            guard isAcceptable(requestID), let safeMode = sanitize(mode) else { return nil }
+            return .capture(.requestScreenshot(requestID: requestID, mode: safeMode, quality: quality))
+
+        case let .capture(.requestWindowList(requestID)):
+            return isAcceptable(requestID) ? message : nil
+
+        case let .mirror(.start(fps, maxWidth, displayID)):
+            return .mirror(.start(
                 fps: clamp(fps, to: mirrorFPSRange),
                 maxWidth: clamp(maxWidth, to: mirrorWidthRange),
                 displayID: displayID
-            )
+            ))
 
-        case let .tracked(requestID, command):
-            guard let safeCommand = sanitize(command) else { return nil }
-            return .tracked(requestID: requestID, command: safeCommand)
+        case let .deck(.run(requestID, action)):
+            // The action is checked as the message it stands for.
+            guard isAcceptable(requestID), sanitize(action.message) == action.message else { return nil }
+            return message
 
         default:
             return message
         }
+    }
+
+    /// A string from a remote: not longer than `ProtocolLimits.maxStringLength`.
+    public static func isAcceptable(_ string: String) -> Bool {
+        string.utf8.count <= ProtocolLimits.maxStringLength
+    }
+
+    /// A key chord from a remote: at most `ProtocolLimits.maxChordKeys` keys,
+    /// each a short name.
+    public static func isAcceptableChord(_ keys: [String]) -> Bool {
+        keys.count <= ProtocolLimits.maxChordKeys && keys.allSatisfy { $0.utf8.count <= 32 }
     }
 
     /// Region captures must lie inside the display (0…1) and be non-empty.

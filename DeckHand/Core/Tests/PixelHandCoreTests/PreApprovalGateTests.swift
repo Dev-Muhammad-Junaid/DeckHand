@@ -22,12 +22,13 @@ import Testing
     @Test func pendingInputIsDropped() throws {
         var filter = PreApprovalFilter()
         let input: [ControlMessage] = [
-            .mouseDelta(dx: 5, dy: 5),
-            .mouseClick(button: .left),
-            .keyboardShortcut(keys: ["cmd", "q"]),
-            .launchApp(bundleID: "com.apple.Terminal"),
-            .tracked(requestID: "t", command: .mouseClick(button: .left)),
-            .ping(seq: 1),
+            .input(.mouseDelta(dx: 5, dy: 5)),
+            .input(.mouseClick(button: .left)),
+            .input(.keyboardShortcut(keys: ["cmd", "q"])),
+            .apps(.launchApp(bundleID: "com.apple.Terminal")),
+            .deck(.run(requestID: "t", action: .shortcut(keys: ["cmd", "q"]))),
+            .system(.run(action: .showDesktop)),
+            .session(.ping(seq: 1)),
         ]
         for message in input {
             let admitted = filter.admit(try encode(message))
@@ -40,7 +41,7 @@ import Testing
 
     @Test func statusQueriesAreKeptUpToTheCap() throws {
         var filter = PreApprovalFilter()
-        let query = try encode(.requestAuthorizationStatus)
+        let query = try encode(.pairing(.requestAuthorizationStatus))
         for _ in 0..<PreApprovalFilter.maxHeldStatusQueries {
             let admitted = filter.admit(query)
             #expect(admitted)
@@ -51,10 +52,10 @@ import Testing
 
     @Test func everythingPassesOnceOpen() throws {
         var filter = PreApprovalFilter()
-        let beforeOpen = filter.admit(try encode(.mouseClick(button: .left)))
+        let beforeOpen = filter.admit(try encode(.input(.mouseClick(button: .left))))
         #expect(!beforeOpen)
         filter.open()
-        let afterOpen = filter.admit(try encode(.mouseClick(button: .left)))
+        let afterOpen = filter.admit(try encode(.input(.mouseClick(button: .left))))
         #expect(afterOpen)
         let anything = filter.admit(Data("anything".utf8))
         #expect(anything)
@@ -68,9 +69,9 @@ import Testing
         let gate = PreApprovalGate(source: source)
 
         // Sent while pending: two clicks and a status query.
-        let click = try encode(.mouseClick(button: .left))
-        let query = try encode(.requestAuthorizationStatus)
-        let afterAllow = try encode(.mouseDelta(dx: 1, dy: 2))
+        let click = try encode(.input(.mouseClick(button: .left)))
+        let query = try encode(.pairing(.requestAuthorizationStatus))
+        let afterAllow = try encode(.input(.mouseDelta(dx: 1, dy: 2)))
         sourceContinuation.yield(click)
         sourceContinuation.yield(query)
         sourceContinuation.yield(click)

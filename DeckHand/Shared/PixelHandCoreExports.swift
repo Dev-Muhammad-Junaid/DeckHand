@@ -15,3 +15,4 @@
 // files that also import SwiftUI (which has its own `ScrollPhase` on
 // iOS 18 / macOS 15).
 typealias ScrollPhase = PixelHandCore.ScrollPhase
+typealias Action = PixelHandCore.Action

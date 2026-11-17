@@ -22,7 +22,7 @@
 //    the peer;
 //  - whichever side gives up logs why, with the numbers.
 //
-//  The wire format is unchanged: `ping(seq)` and `pong(seq)` as before.
+//  On the wire: `session.ping(seq)` and `session.pong(seq)`.
 //
 
 import Foundation
@@ -166,15 +166,15 @@ public final class LivenessClock: @unchecked Sendable {
 /// Answers pings as they arrive, before the main-actor message loop sees
 /// them, and stamps every message on a `LivenessClock`.
 public enum HeartbeatResponder {
-    /// An encoded ping is about 30 bytes. Larger messages are never decoded
+    /// An encoded ping is under 60 bytes. Larger messages are never decoded
     /// here, so input and other traffic pass through untouched.
     public static let maxPingBytes = 96
 
     /// The ping's sequence number, if `data` is a ping.
     public static func pingSequence(in data: Data) -> UInt64? {
         guard data.count <= maxPingBytes,
-              let message = try? ControlMessageCoding.decoder.decode(ControlMessage.self, from: data),
-              case let .ping(seq) = message
+              let message = try? ControlMessageCoding.decode(data),
+              case let .session(.ping(seq)) = message
         else { return nil }
         return seq
     }
