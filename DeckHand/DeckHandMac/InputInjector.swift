@@ -81,7 +81,7 @@ final class InputInjector {
     /// display without us doing anything extra.
     func moveCursor(dx: Float, dy: Float) {
         guard isAccessibilityGranted else { noteInjectSkipped("mouseDelta"); return }
-        // ControlReceiver already sanitizes; this keeps a NaN/∞ from ever
+        // ControlReceiver already sanitizes every message; this keeps a NaN/∞ from ever
         // becoming a cursor position if another caller forgets to.
         guard let safeDX = RemoteInputValidation.clamp(dx, limit: RemoteInputValidation.maxPointerDelta),
               let safeDY = RemoteInputValidation.clamp(dy, limit: RemoteInputValidation.maxPointerDelta)

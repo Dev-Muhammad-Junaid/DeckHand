@@ -108,7 +108,7 @@ final class ContextObserver {
         buttonElementsByID[id] != nil
     }
 
-    /// Called from `ControlReceiver` when the iPad taps a dialog chip.
+    /// Called from `AppsHandler` when the iPad taps a dialog chip.
     /// Stale IDs (from an older snapshot) are silently ignored, which is
     /// the correct behaviour — the user saw a button that's gone now.
     func performAction(id: String) {
