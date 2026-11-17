@@ -80,3 +80,27 @@ Append a dated "Mac build results" section to
 end-to-end results, open bugs. Push, then give the owner a short summary.
 The coordinating cloud session ("Deckhand project status review") reads that
 section and routes bugs to cloud fix sessions.
+
+## Build loop (run with `/loop 1h …` in the Mac build session)
+
+Every tick:
+
+1. `git fetch origin claude/pixelhand-integration`, then read the last line of
+   `DeckHand/Integration/STATUS.md` on that branch.
+2. If it isn't `Status: READY FOR MAC BUILD (build N)`, or that commit is
+   already built, reply "no new build" and stop.
+3. Otherwise check out the head in your clean worktree, then:
+   - `xcodegen generate`, then build both apps;
+   - fix compile errors minimally (one commit each, pull first);
+   - run `swift test --scratch-path .build-local` with nothing skipped, the
+     PixelHandCore tests if `DeckHand/Core` exists, and `DeckHandTests`;
+   - install signed builds (Mac via `open`, iPad via `xcrun devicectl` if
+     unlocked);
+   - run the checks the "Build N queued" section asks for that you can do
+     yourself or from the simulator, and list hands-on checks for the owner
+     without blocking.
+4. Append "Mac build results (build N)" to `STATUS.md`: build, test counts,
+   fixes pushed, checks, open bugs. Set the last line to
+   `Status: BUILT (build N) — green` or `— N bugs`, and push.
+
+Never commit the apps' pins into the repo-root `Package.resolved`.
