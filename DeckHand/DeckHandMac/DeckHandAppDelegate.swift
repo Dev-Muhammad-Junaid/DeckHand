@@ -27,7 +27,7 @@ import SwiftUI
 final class DeckHandAppDelegate: NSObject, NSApplicationDelegate {
     /// The Loom runtime + receiver. Created here so its lifetime matches the
     /// app process (previously a SwiftUI @StateObject on MacHostApp).
-    private let daemon = MacDaemon()
+    private let daemon: MacDaemon
 
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
@@ -35,6 +35,15 @@ final class DeckHandAppDelegate: NSObject, NSApplicationDelegate {
     private var pendingRequestsObserver: AnyCancellable?
     private var pendingRequests = 0
     private var liveConnections = 0
+
+    override init() {
+        // Start Sentry before MacDaemon so Loom container failures are reported.
+        // Must run in init (not didFinishLaunching): `@NSApplicationDelegateAdaptor`
+        // constructs this delegate before MacHostApp.init()'s body runs.
+        DeckHandSentry.start()
+        daemon = MacDaemon()
+        super.init()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Accessory = menu-bar utility, no Dock icon, doesn't steal focus.

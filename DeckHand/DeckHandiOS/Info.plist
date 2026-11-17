@@ -44,5 +44,8 @@
     <string>Deck Hand needs permission to save screenshots of your Mac directly to your Photos library.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>Deck Hand needs permission to save screenshots of your Mac directly to your Photos library.</string>
+    <!-- Sentry DSN for widgetsflow / pixelhand-ios (US). Public client key. -->
+    <key>SENTRY_DSN</key>
+    <string>https://39ab9907703e2b99fc30f2d76e6b3ac5@o4512448017072128.ingest.us.sentry.io/4512448021069824</string>
 </dict>
 </plist>
