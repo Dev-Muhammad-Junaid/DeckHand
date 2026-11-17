@@ -96,7 +96,9 @@ extension AppUpdater: SPUUpdaterDelegate {
         shouldPostponeRelaunchForUpdate item: SUAppcastItem,
         untilInvokingBlock installHandler: @escaping () -> Void
     ) -> Bool {
-        MainActor.assumeIsolated {
+        // Sparkle calls this on the main thread, so the handler never leaves it.
+        nonisolated(unsafe) let installHandler = installHandler
+        return MainActor.assumeIsolated {
             guard liveConnections > 0 else { return false }
             let alert = NSAlert()
             alert.messageText = "Updating disconnects your devices"
