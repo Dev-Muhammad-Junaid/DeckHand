@@ -29,7 +29,8 @@ public enum PixelHandProtocol {
     ///   envelope, no version field, never advertised).
     /// - 2: one envelope over per-domain messages, typed actions with
     ///   receipts, `hostStatus`, `mirror.error`.
-    public static let version = 2
+    /// - 3: `session.tick` (Wi-Fi keep-alive) and `session.link(kind:)`.
+    public static let version = 3
 
     /// Bonjour TXT key carrying `version`. Short, because TXT keys should
     /// stay under 9 bytes.

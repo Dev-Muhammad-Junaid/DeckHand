@@ -2,9 +2,9 @@
 //  SessionMessage.swift
 //  PixelHandCore
 //
-//  Domain: session and liveness. Heartbeats, and what the host can do right
-//  now. Both ways. Owned by the network lane (S1's keep-alive tick replaces
-//  or joins `ping` here) together with `SessionHandler`.
+//  Domain: session and liveness. Heartbeats, the Wi-Fi keep-alive tick, the
+//  link the session runs over, and what the host can do right now. Both
+//  ways. Owned by the network lane together with `SessionHandler`.
 //
 
 import Foundation
@@ -20,6 +20,17 @@ public enum SessionMessage: Codable, Sendable, Equatable {
     /// so a permission granted mid-session reaches the remote's banner.
     /// Replaces version 1's `hostCapabilities` and `hostFeatures`.
     case hostStatus(status: HostStatus)
+    /// Remote → Mac, every `KeepAlivePolicy.tickInterval` while a session is
+    /// in front on a link that dozes (Wi-Fi). Carries nothing and needs no
+    /// answer: its only job is to keep the remote's radio out of power save,
+    /// which otherwise turns a 5 ms round trip into a 5–300 ms sawtooth.
+    /// The Mac stamps it as a sign of life off its main actor and drops it
+    /// there (`HeartbeatResponder`); handlers never see it.
+    case tick
+    /// Mac → remote: how the Mac judges the link carrying this session
+    /// (`LinkJudge`), for example `.wired` over a USB cable. Sent once the
+    /// path is known and again whenever the judgement changes.
+    case link(kind: LinkKind)
 }
 
 /// The Mac's permissions and optional protocol features.
