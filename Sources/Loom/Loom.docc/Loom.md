@@ -47,6 +47,7 @@ Authenticated Loom sessions also expose transport-facing metadata that higher-le
 - ``LoomNode``
 - ``LoomConnection``
 - ``LoomAuthenticatedSession``
+- ``LoomSessionNetworkPathSnapshot``
 - ``LoomConnectionCoordinator``
 - ``LoomTransferEngine``
 - ``LoomPeer``
