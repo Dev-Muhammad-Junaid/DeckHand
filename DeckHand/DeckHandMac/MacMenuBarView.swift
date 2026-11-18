@@ -381,6 +381,7 @@ private struct ConnectionRow: View {
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }
+                HostLinkBadge(connectionID: connection.id) // Network lane (S13)
                 // Surface the live connection id for matching against the iPad
                 // and spotting silent session swaps.
                 Text("session \(connection.id.uuidString.prefix(8))")

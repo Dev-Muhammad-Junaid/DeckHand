@@ -26,7 +26,7 @@ extension Notification.Name {
 @Observable
 final class ControlSessionModel {
     @ObservationIgnored let connection: LoomConnectionHandle
-    @ObservationIgnored private let onAuthStatusChanged: (String) -> Void
+    @ObservationIgnored let onAuthStatusChanged: (String) -> Void
 
     private(set) var sender: TrackpadSender?
     let capture = CaptureCoordinator()
@@ -68,13 +68,22 @@ final class ControlSessionModel {
     @ObservationIgnored private var hasReceivedAuthStatus = false
     /// Last status received — keeps a "denied" verdict from being stomped
     /// by a liveness timeout.
-    @ObservationIgnored private var lastAuthStatus = "pending"
+    @ObservationIgnored var lastAuthStatus = "pending"
 
-    // ── Liveness heartbeat ──────────────────────────────────────────
-    // A `LivenessClock` made per connection in `run`: every message from
-    // the Mac counts as a sign of life, not only pongs, and the timeout
-    // isn't enforced until the first pong (older hosts don't speak ping).
-    // See PixelHandCore's Liveness.swift.
+    // MARK: Network
+    // Heartbeat, keep-alive tick, background pause and the link judgement.
+    // Logic in ControlSessionModel+Network.swift (network lane).
+
+    /// The link this session runs over as shown to the user ("Wired" over
+    /// a USB cable). Set only by ControlSessionModel+Network.swift.
+    var link: LinkKind = .unknown
+    /// In front or not, this side's link and the Mac's report.
+    @ObservationIgnored var keepAlive = KeepAliveGate()
+    /// The current connection's liveness clock, made in `startNetwork`.
+    @ObservationIgnored var livenessClock: LivenessClock?
+    @ObservationIgnored var pingSeq: UInt64 = 0
+    @ObservationIgnored var networkTasks: [Task<Void, Never>] = []
+    @ObservationIgnored var lifecycleObservers: [NSObjectProtocol] = []
 
     // ── Host capabilities ───────────────────────────────────────────
     /// What the Mac can actually execute right now, as reported by the
@@ -127,38 +136,11 @@ final class ControlSessionModel {
             }
         }
 
-        // ── Liveness heartbeat ──────────────────────────────────
-        // Ping every 2 s; declare the host dead after 10 s with no
-        // traffic at all from it (any message counts, not only pongs).
-        // A check that runs late means this iPad stalled, and restarts
-        // the silence clock instead of blaming the Mac. Structured
-        // child of .task, so view teardown cancels it cleanly.
-        let liveness = LivenessClock(LivenessPolicy.remoteMonitor())
-        let heartbeat = Task { [weak self] in
-            var seq: UInt64 = 0
-            while !Task.isCancelled {
-                seq &+= 1
-                await s.sendPing(seq: seq)
-                try? await Task.sleep(for: .seconds(LivenessPolicy.pingInterval))
-                guard !Task.isCancelled else { return }
-                switch liveness.check() {
-                case let .localStall(gap):
-                    DeckHandLog.connection.info("Heartbeat check ran \(gap, format: .fixed(precision: 1), privacy: .public)s late (iPad stalled or suspended); restarting the silence clock")
-                case let .dead(silence, sinceHeartbeat):
-                    liveness.markGaveUp()
-                    let state = liveness.snapshot
-                    DeckHandLog.connection.error("Heartbeat: IPAD GAVE UP on the Mac: nothing received for \(silence, format: .fixed(precision: 1), privacy: .public)s (last pong \(sinceHeartbeat, format: .fixed(precision: 1), privacy: .public)s ago, \(state.inboundCount, privacy: .public) messages total, last ping seq \(seq, privacy: .public), timeout \(LivenessPolicy.remoteTimeout, privacy: .public)s)")
-                    guard let self else { return }
-                    if self.lastAuthStatus != "denied" {
-                        self.onAuthStatusChanged("host_disconnected")
-                    }
-                    return
-                case .alive, .notEstablished:
-                    break
-                }
-            }
-        }
-        defer { heartbeat.cancel() }
+        // ── Network: heartbeat, keep-alive tick, link ──────────
+        // See ControlSessionModel+Network.swift. Structured with this
+        // .task: everything stops when the view goes away.
+        let liveness = startNetwork(sender: s)
+        defer { stopNetwork() }
 
         // Single consolidated message loop — no competing consumers
         await listenForHostMessages(liveness: liveness)
@@ -251,6 +233,9 @@ final class ControlSessionModel {
     /// UI state changes for one inbound message.
     private func handleOnMain(_ message: ControlMessage) {
         switch message {
+        case let .session(.link(kind)):
+            applyHostLink(kind)
+
         case let .session(.hostStatus(hostStatus)):
             withAnimation(.easeInOut(duration: 0.2)) {
                 hostAccessibilityGranted = hostStatus.accessibility

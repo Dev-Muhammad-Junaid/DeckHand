@@ -206,3 +206,11 @@ import Testing
         #expect(gate.displayedLink == .ethernet)
     }
 }
+
+@Suite struct InterfaceAddressTableTests {
+    @Test func loopbackAddressIsOwnedByTheLoopbackInterface() {
+        let owners = InterfaceAddressTable.current()
+        let owner = owners["127.0.0.1"]
+        #expect(owner == "lo" || owner == "lo0", "\(owners)")
+    }
+}

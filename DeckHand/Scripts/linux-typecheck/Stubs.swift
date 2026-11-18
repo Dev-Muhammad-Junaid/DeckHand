@@ -12,8 +12,35 @@ typealias CGDirectDisplayID = UInt32
 public actor LoomConnectionHandle {
     public nonisolated let id: UUID = UUID()
     public nonisolated let messages: AsyncStream<Data> = AsyncStream { _ in }
+    public nonisolated let networkPathUpdates: AsyncStream<LoomSessionNetworkPathSnapshot> = AsyncStream { _ in }
     public func send(_ data: Data) async throws {}
     public func disconnect() async {}
+}
+
+public struct LoomNetworkHost: Sendable, Hashable { public let rawValue: String }
+public enum LoomNetworkEndpoint: Sendable, Hashable {
+    case hostPort(host: LoomNetworkHost, port: UInt16)
+    case opaque(description: String)
+    public var hostPort: (host: LoomNetworkHost, port: UInt16)? {
+        guard case let .hostPort(host, port) = self else { return nil }
+        return (host, port)
+    }
+}
+public struct LoomNetworkInterface: Sendable, Hashable {
+    public let name: String
+    public let index: Int?
+}
+public struct LoomSessionNetworkPathSnapshot: Sendable, Equatable {
+    public let interfaceNames: [String]
+    public let interfaces: [LoomNetworkInterface]
+    public var primaryInterface: LoomNetworkInterface? { interfaces.first }
+    public let usesWiFi: Bool
+    public let usesWiredEthernet: Bool
+    public let usesCellular: Bool
+    public let usesLoopback: Bool
+    public let usesOther: Bool
+    public let backendLocalEndpoint: LoomNetworkEndpoint?
+    public let backendRemoteEndpoint: LoomNetworkEndpoint?
 }
 
 // MARK: os.Logger stand-in
@@ -43,6 +70,9 @@ enum DeckHandLog {
 }
 
 // MARK: Mac services
+enum USBNetworkProbe {
+    static func isUSBTether(bsdName: String) -> Bool? { nil }
+}
 let NX_KEYTYPE_PLAY: Int32 = 16
 let NX_KEYTYPE_NEXT: Int32 = 17
 let NX_KEYTYPE_PREVIOUS: Int32 = 18

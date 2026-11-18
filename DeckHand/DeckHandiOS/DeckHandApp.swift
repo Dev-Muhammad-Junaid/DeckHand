@@ -31,6 +31,9 @@ struct DeckHandApp: App {
                     // priority sort, and host-side auto-allow (DeckHandCloud).
                     cloudKit: DeckHandCloud.cloudKitConfiguration,
                     remoteSignaling: DeckHandCloud.remoteSignalingConfiguration,
+                    // S1: no AWDL. Peer-to-peer Wi-Fi takes the radio off
+                    // channel every half second (p90 ~50 ms instead of ~4 ms).
+                    enablePeerToPeer: false,
                     // `ph-proto` in the Bonjour TXT record, so the Mac's menu
                     // bar can say "Please update" (PeerCompatibility).
                     advertisementMetadata: PixelHandProtocol.advertisementMetadata,

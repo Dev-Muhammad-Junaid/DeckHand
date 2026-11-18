@@ -2,9 +2,11 @@
 //  SessionHandler.swift
 //  DeckHandMac
 //
-//  Domain: session. Heartbeats and the host status report. Pongs are sent
-//  by `HeartbeatResponder` as pings arrive, off the main actor, before the
-//  message reaches this handler. Owned by the network lane (S1).
+//  Domain: session. Heartbeats, the link judgement and the host status
+//  report. Pongs are sent by `HeartbeatResponder` as pings arrive, off the
+//  main actor, before the message reaches this handler; keep-alive ticks
+//  are stamped and dropped there and never get here. Owned by the network
+//  lane (S1, S13).
 //
 
 import CoreGraphics
@@ -20,6 +22,9 @@ final class SessionHandler: DomainHandler {
         case let .ping(seq):
             // The pong already went out from HeartbeatResponder as the ping
             // arrived, so main-actor work here can't delay it.
+            // Judge the link once the session is live (idempotent): the
+            // remote shows "Wired" when this Mac sees the USB cable.
+            HostLinkMonitor.shared.monitor(connection)
             // Re-report capabilities every 5th ping (~10 s): if the user
             // grants/revokes a TCC permission mid-session the remote's
             // warning banner updates without reconnecting.
@@ -27,7 +32,10 @@ final class SessionHandler: DomainHandler {
                 await sendHostStatus(to: connection)
             }
 
-        case .pong, .hostStatus:
+        case .tick:
+            break // HeartbeatResponder drops ticks before the router
+
+        case .pong, .hostStatus, .link:
             break // Mac → remote only
         }
     }

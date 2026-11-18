@@ -23,12 +23,14 @@ cp "$here/Stubs.swift" "$work/"
 files=(
   "$app/DeckHandMac/ControlReceiver.swift"
   "$app"/DeckHandMac/Handlers/*.swift
+  "$app/DeckHandMac/Network/HostLinkMonitor.swift"
+  "$app/DeckHandMac/Network/LinkObservation+Loom.swift"
   "$app/DeckHandiOS/TrackpadSender.swift"
   "$app/Shared/LoomConnectionHandle+ControlMessage.swift"
   "$@"
 )
 for file in "${files[@]}"; do
-  sed -E '/^import (AppKit|LoomKit|Loom|CoreGraphics|os|QuartzCore|SwiftUI|UIKit)$/d' "$file" > "$work/$(basename "$file")"
+  sed -E '/^import (AppKit|LoomKit|Loom|CoreGraphics|IOKit|os|QuartzCore|SwiftUI|UIKit)$/d' "$file" > "$work/$(basename "$file")"
 done
 
 cd "$here"
