@@ -96,6 +96,7 @@ import Testing
         ("mirror.start", .mirror(.start(fps: 20, maxWidth: 480, displayID: nil))),
         ("mirror.start.display", .mirror(.start(fps: 20, maxWidth: 480, displayID: 1))),
         ("mirror.stop", .mirror(.stop)),
+        ("mirror.moveCursor", .mirror(.moveCursor(displayID: 2))),
         ("mirror.displayList", .mirror(.displayList(
             displays: [
                 DisplayInfo(displayID: 1, name: "Built-in Retina Display", isMain: true, width: 1728, height: 1117),
@@ -198,6 +199,7 @@ import Testing
             switch m {
             case .start: "mirror.start"
             case .stop: "mirror.stop"
+            case .moveCursor: "mirror.moveCursor"
             case .displayList: "mirror.displayList"
             case .error: "mirror.error"
             }
@@ -236,7 +238,7 @@ import Testing
     }
 
     /// Cases in this protocol version. Bump with every added or removed case.
-    static let expectedCaseCount = 36
+    static let expectedCaseCount = 37
 
     /// The current version, for the hand-written JSON below.
     static let v = PixelHandProtocol.version

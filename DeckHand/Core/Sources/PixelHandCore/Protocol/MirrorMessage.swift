@@ -25,6 +25,10 @@ public enum MirrorMessage: Codable, Sendable, Equatable {
     case start(fps: Int, maxWidth: Int, displayID: UInt32?)
     /// Stop the stream. Also implied by disconnecting.
     case stop
+    /// Move the Mac's pointer to the centre of `displayID` (the mirror's
+    /// "Cursor is on …" badge brings the pointer to the mirrored display).
+    /// Ignored for a display the Mac doesn't have.
+    case moveCursor(displayID: UInt32)
 
     // MARK: Mac → remote
 

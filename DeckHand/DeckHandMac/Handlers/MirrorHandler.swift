@@ -3,10 +3,12 @@
 //  DeckHandMac
 //
 //  Domain: mirror and displays. Starts and stops the live mirror for a
-//  connection. Owned by the mirror lane (`MirrorStreamService`, S3, S5, S6,
+//  connection; frames and the cursor go out on the binary mirror stream
+//  (`MirrorStreamService`, `DeckHandMac/Mirror/`). Owned by the mirror lane (`MirrorStreamService`, S3, S5, S6,
 //  the display picker, S14, S16).
 //
 
+import CoreGraphics
 import Foundation
 import LoomKit
 
@@ -31,8 +33,22 @@ final class MirrorHandler: DomainHandler {
             let subscriberID = connection.id
             Task { await MirrorStreamService.shared.stop(subscriberID: subscriberID) }
 
-        case .frame, .displayList, .error:
+        case let .moveCursor(displayID):
+            // Only displays the Mac has: CGDisplayBounds of an unknown id
+            // is empty and would park the pointer at the origin.
+            guard Self.activeDisplayIDs().contains(displayID) else { return }
+            InputInjector.shared.moveCursorToCenter(ofDisplay: CGDirectDisplayID(displayID))
+
+        case .displayList, .error:
             break // Mac → remote only
         }
+    }
+
+    private static func activeDisplayIDs() -> [UInt32] {
+        var count: UInt32 = 0
+        guard CGGetActiveDisplayList(0, nil, &count) == .success, count > 0 else { return [] }
+        var ids = [CGDirectDisplayID](repeating: 0, count: Int(count))
+        guard CGGetActiveDisplayList(count, &ids, &count) == .success else { return [] }
+        return Array(ids.prefix(Int(count)))
     }
 }

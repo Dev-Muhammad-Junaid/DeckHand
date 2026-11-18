@@ -2,4 +2,4 @@
 # recording; see Core/PROTOCOL.md. Changing any fixture changes the
 # digest, and the version must match PixelHandProtocol.version.
 version 3
-digest 419f4a3c1a93d041
+digest 97cc8cf3704f6055

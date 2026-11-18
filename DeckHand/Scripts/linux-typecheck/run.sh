@@ -23,6 +23,7 @@ cp "$here/Stubs.swift" "$work/"
 files=(
   "$app/DeckHandMac/ControlReceiver.swift"
   "$app"/DeckHandMac/Handlers/*.swift
+  "$app/DeckHandMac/Mirror/MirrorSubscriber.swift"
   "$app/DeckHandiOS/TrackpadSender.swift"
   "$app/Shared/LoomConnectionHandle+ControlMessage.swift"
   "$@"

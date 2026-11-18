@@ -43,7 +43,7 @@ final class SessionHandler: DomainHandler {
         try? await handle.send(.session(.hostStatus(status: HostStatus(
             accessibility: injector.isAccessibilityGranted,
             screenRecording: CGPreflightScreenCaptureAccess(),
-            features: [.commandReceipts]
+            features: [.binaryMirrorStream, .commandReceipts]
         ))))
     }
 }
