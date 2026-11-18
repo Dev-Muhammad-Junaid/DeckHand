@@ -39,7 +39,7 @@ final class ActiveAppMonitor {
         if let currentApp = NSWorkspace.shared.frontmostApplication,
            let name = currentApp.localizedName {
             Task {
-                try? await handle.send(.activeAppUpdate(name: name, bundleID: currentApp.bundleIdentifier))
+                try? await handle.send(.apps(.activeAppUpdate(name: name, bundleID: currentApp.bundleIdentifier)))
             }
         }
     }
@@ -49,7 +49,7 @@ final class ActiveAppMonitor {
     }
 
     private func broadcastActiveApp(name: String, bundleID: String?) async {
-        let msg = ControlMessage.activeAppUpdate(name: name, bundleID: bundleID)
+        let msg = ControlMessage.apps(.activeAppUpdate(name: name, bundleID: bundleID))
         for handle in activeConnections.values {
             try? await handle.send(msg)
         }

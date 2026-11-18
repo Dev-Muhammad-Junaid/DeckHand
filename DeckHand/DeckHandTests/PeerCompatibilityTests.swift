@@ -2,43 +2,45 @@
 //  PeerCompatibilityTests.swift
 //  DeckHandTests
 //
-//  The "Please update" check that runs before connecting. Loom refuses a
-//  session between different protocol versions, so the picker and the menu
-//  bar must name the side that's behind.
+//  The Loom side of the "Please update" check: reading both versions out of
+//  a real `LoomPeerAdvertisement`. The decision itself is tested in
+//  PixelHandCore (`PeerCompatibilityTests`).
 //
 
+import Foundation
 import Loom
-import XCTest
+import Testing
 
-final class PeerCompatibilityTests: XCTestCase {
-    func testSameVersionIsCompatible() {
-        let compatibility = PeerCompatibility(peerProtocolVersion: 3, localProtocolVersion: 3)
-        XCTAssertEqual(compatibility, .compatible)
-        XCTAssertNil(compatibility.updateMessage(thisDevice: "iPad", peer: "Mac"))
+@Suite struct PeerCompatibilityAdvertisementTests {
+
+    @Test("An advertisement from this build is compatible")
+    func thisBuildIsCompatible() {
+        let advertisement = LoomPeerAdvertisement(metadata: PixelHandProtocol.advertisementMetadata)
+        #expect(PeerCompatibility(advertisement: advertisement) == .compatible)
+        #expect(PeerCompatibility.localProtocolVersion == Int(Loom.protocolVersion))
     }
 
-    func testOlderPeerNeedsTheUpdate() {
-        let compatibility = PeerCompatibility(peerProtocolVersion: 2, localProtocolVersion: 3)
-        XCTAssertEqual(compatibility, .updatePeer)
-        XCTAssertEqual(
-            compatibility.updateMessage(thisDevice: "iPad", peer: "Mac"),
-            "Please update Pixel Hand on your Mac"
+    @Test("ph-proto survives the Bonjour TXT record")
+    func appVersionSurvivesTXT() {
+        let advertisement = LoomPeerAdvertisement(metadata: PixelHandProtocol.advertisementMetadata)
+        let received = LoomPeerAdvertisement.from(txtRecord: advertisement.toTXTRecord())
+        #expect(PixelHandProtocol.advertisedVersion(in: received.metadata) == PixelHandProtocol.version)
+    }
+
+    @Test("An older or newer app protocol names the side to update")
+    func appVersionMismatch() {
+        let older = LoomPeerAdvertisement(metadata: [PixelHandProtocol.advertisementKey: String(PixelHandProtocol.version - 1)])
+        #expect(PeerCompatibility(advertisement: older) == .updatePeer)
+        let newer = LoomPeerAdvertisement(metadata: [PixelHandProtocol.advertisementKey: String(PixelHandProtocol.version + 1)])
+        #expect(PeerCompatibility(advertisement: newer) == .updateThisDevice)
+    }
+
+    @Test("A different Loom protocol still wins over the app protocol")
+    func loomVersionMismatch() {
+        let advertisement = LoomPeerAdvertisement(
+            protocolVersion: Int(Loom.protocolVersion) + 1,
+            metadata: PixelHandProtocol.advertisementMetadata
         )
-    }
-
-    func testNewerPeerMeansThisDeviceNeedsTheUpdate() {
-        let compatibility = PeerCompatibility(peerProtocolVersion: 4, localProtocolVersion: 3)
-        XCTAssertEqual(compatibility, .updateThisDevice)
-        XCTAssertEqual(
-            compatibility.updateMessage(thisDevice: "iPad", peer: "Mac"),
-            "Please update Pixel Hand on your iPad"
-        )
-    }
-
-    func testAdvertisementFromThisBuildIsCompatible() {
-        // LoomPeerAdvertisement defaults to this build's Loom.protocolVersion.
-        let advertisement = LoomPeerAdvertisement()
-        XCTAssertEqual(PeerCompatibility(advertisement: advertisement), .compatible)
-        XCTAssertEqual(PeerCompatibility.localProtocolVersion, Int(Loom.protocolVersion))
+        #expect(PeerCompatibility(advertisement: advertisement) == .updateThisDevice)
     }
 }

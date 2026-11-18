@@ -168,6 +168,14 @@ xcodebuild -project DeckHand.xcodeproj -scheme DeckHandiOS  -destination 'generi
 xcodebuild -project DeckHand.xcodeproj -scheme DeckHandTests -destination 'platform=macOS' test
 ```
 
+The protocol, models and policies both apps share live in a separate
+Foundation-only package, `DeckHand/Core` (`PixelHandCore`), whose tests run
+anywhere Swift does, Linux included:
+
+```bash
+swift test --package-path DeckHand/Core
+```
+
 Launch the Mac app through Finder or LaunchServices rather than running the
 built executable directly — see [the note below](#a-macos-26-gotcha).
 
@@ -220,10 +228,13 @@ Foundation Models work.
 DeckHand/
   DeckHandMac/     macOS host: capture, input injection, Accessibility, menu bar
   DeckHandiOS/     iPad/iPhone remote: trackpad, mirror, capture UI, settings
-  Shared/          ControlMessage, every type that crosses the wire, and the
-                   shared theme, pixel art and motion
-  DeckHandTests/   Wire-format contract tests
-  Scripts/         App icon generation
+  Core/            PixelHandCore: the wire protocol (one envelope over
+                   per-domain messages), models, validation and policies;
+                   Foundation only, tested on Linux (see Core/PROTOCOL.md)
+  Shared/          Loom glue, theme, pixel art, motion, logging, Sentry
+  DeckHandTests/   App-side tests that need Loom
+  Scripts/         App icon generation, release scripts, Linux type check
+  Integration/     Build status, owner decisions and the lane map
   AppStore/        Store listing, privacy answers, export compliance, Sentry
                    setup and the release checklist
   project.yml      XcodeGen project definition

@@ -94,7 +94,7 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
         if isAuthorized(peerID: connection.peerID) {
             Task {
                 do {
-                    try await handle.send(.authorizationStatus(status: "granted"))
+                    try await handle.send(.pairing(.authorizationStatus(state: .granted)))
                 } catch {
                     // Recoverable: the iPad polls requestAuthorizationStatus
                     // and ControlReceiver answers it.
@@ -111,7 +111,7 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
             removePendingConnection(id: existing.id)
             if let oldHandle = pendingHandles.removeValue(forKey: existing.id) {
                 Task {
-                    try? await oldHandle.send(.authorizationStatus(status: "denied"))
+                    try? await oldHandle.send(.pairing(.authorizationStatus(state: .denied)))
                     try? await Task.sleep(nanoseconds: 100_000_000)
                     await oldHandle.disconnect()
                 }
@@ -126,7 +126,7 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
             pendingRequestedAt[connection.id] = Date()
             DeckHandLog.trust.info("🔑 New pending request from \(connection.peerName, privacy: .public) conn=\(connection.id, privacy: .public) — awaiting Allow/Deny (approve in menu bar or notification)")
             Task {
-                try? await handle.send(.authorizationStatus(status: "pending"))
+                try? await handle.send(.pairing(.authorizationStatus(state: .pending)))
             }
             showNotification(for: connection)
             schedulePendingExpiry(for: connection.id)
@@ -146,7 +146,7 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
             removePendingConnection(id: stale.id)
             if let staleHandle = pendingHandles.removeValue(forKey: stale.id) {
                 Task {
-                    try? await staleHandle.send(.authorizationStatus(status: "denied"))
+                    try? await staleHandle.send(.pairing(.authorizationStatus(state: .denied)))
                     try? await Task.sleep(nanoseconds: 100_000_000)
                     await staleHandle.disconnect()
                 }
@@ -177,7 +177,7 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
                 // push self-heals within one poll interval.
                 DeckHandLog.trust.info("🔑 Granting \(connection.peerName, privacy: .public); pushing granted on conn=\(target.id, privacy: .public)")
                 do {
-                    try await handle.send(.authorizationStatus(status: "granted"))
+                    try await handle.send(.pairing(.authorizationStatus(state: .granted)))
                 } catch {
                     DeckHandLog.trust.error("Failed to push granted status: \(error.localizedDescription, privacy: .public)")
                 }
@@ -195,7 +195,7 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
         removePendingConnection(id: connection.id)
         if let handle = pendingHandles.removeValue(forKey: connection.id) {
             Task {
-                try? await handle.send(.authorizationStatus(status: "denied"))
+                try? await handle.send(.pairing(.authorizationStatus(state: .denied)))
                 try? await Task.sleep(nanoseconds: 100_000_000) // allow packet to send
                 await loomContext.disconnect(connection)
             }
@@ -273,7 +273,7 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
                 self.removePendingConnection(id: connectionID)
                 if let handle = self.pendingHandles.removeValue(forKey: connectionID) {
                     Task {
-                        try? await handle.send(.authorizationStatus(status: "denied"))
+                        try? await handle.send(.pairing(.authorizationStatus(state: .denied)))
                         try? await Task.sleep(nanoseconds: 100_000_000)
                         await handle.disconnect()
                     }
@@ -333,7 +333,7 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
                         self.removePendingConnection(id: pending.id)
                         if let handle = self.pendingHandles.removeValue(forKey: pending.id) {
                             Task {
-                                try? await handle.send(.authorizationStatus(status: "denied"))
+                                try? await handle.send(.pairing(.authorizationStatus(state: .denied)))
                                 try? await Task.sleep(nanoseconds: 100_000_000)
                                 await handle.disconnect()
                             }

@@ -69,8 +69,8 @@ actor TrackpadSender {
     private var lastSendErrorLogAt: Double = 0
 
     // ── Delivery receipts ───────────────────────────────────────────
-    /// Set when the host announces `hostFeatures(commandReceipts:)`.
-    /// Older hosts never do, and never get a `tracked` command.
+    /// Set when the host's `hostStatus` lists `ProtocolFeature.commandReceipts`.
+    /// A host that doesn't is sent plain messages, never a `deck.run`.
     private var hostSendsReceipts = false
     private var pendingReceipts: [String: CheckedContinuation<CommandDelivery, Never>] = [:]
     /// How long to wait for a receipt before calling it lost.
@@ -115,7 +115,7 @@ actor TrackpadSender {
         if mouseSendCount % 120 == 1 {
             DeckHandLog.input.info("📤 iPad mouseDelta stream alive (\(self.mouseSendCount) sent)")
         }
-        await send(.mouseDelta(dx: dx, dy: dy))
+        await send(.input(.mouseDelta(dx: dx, dy: dy)))
     }
 
     // MARK: - Throttled scroll (120 Hz)
@@ -159,7 +159,7 @@ actor TrackpadSender {
             phase = .begin
             inScrollGesture = true
         }
-        await send(.mouseScroll(dx: dx, dy: dy, phase: phase))
+        await send(.input(.mouseScroll(dx: dx, dy: dy, phase: phase)))
     }
 
     /// Called when the iPad detects the scroll-driving fingers have lifted.
@@ -170,54 +170,55 @@ actor TrackpadSender {
             await flushScroll()
         }
         if inScrollGesture {
-            await send(.mouseScroll(dx: 0, dy: 0, phase: .end))
+            await send(.input(.mouseScroll(dx: 0, dy: 0, phase: .end)))
             inScrollGesture = false
         }
         // If the iPad reports residual velocity (true momentum), let the
         // host know so AppKit's scroll views can run their decay animation.
         if momentumDX != 0 || momentumDY != 0 {
-            await send(.mouseScroll(dx: momentumDX, dy: momentumDY, phase: .momentumBegin))
-            await send(.mouseScroll(dx: 0, dy: 0, phase: .momentumEnd))
+            await send(.input(.mouseScroll(dx: momentumDX, dy: momentumDY, phase: .momentumBegin)))
+            await send(.input(.mouseScroll(dx: 0, dy: 0, phase: .momentumEnd)))
         }
     }
 
     // MARK: - Immediate sends (clicks, shortcuts, etc.)
 
     func sendClick(_ button: MouseButton) async {
-        await send(.mouseClick(button: button))
+        await send(.input(.mouseClick(button: button)))
     }
 
     func sendDoubleClick(_ button: MouseButton) async {
-        await send(.mouseDoubleClick(button: button))
+        await send(.input(.mouseDoubleClick(button: button)))
     }
 
     func sendShortcut(_ keys: [String]) async {
-        await send(.keyboardShortcut(keys: keys))
+        await send(.input(.keyboardShortcut(keys: keys)))
     }
 
-    func sendMacro(_ id: String) async {
-        await send(.macroButton(id: id))
+    /// Runs a Mac-wide action (Mission Control, Show Desktop, …).
+    func sendSystemAction(_ action: SystemMacro) async {
+        await send(.system(.run(action: action)))
     }
 
     func sendLaunchApp(_ bundleID: String) async {
-        await send(.launchApp(bundleID: bundleID))
+        await send(.apps(.launchApp(bundleID: bundleID)))
     }
 
     /// Activate `bundleID` on the Mac and inject `keys` once it's frontmost.
     /// Single message — the host coordinates the ordering so the shortcut
     /// doesn't leak into whatever window was previously focused.
     func sendAppShortcut(bundleID: String, keys: [String]) async {
-        await send(.appShortcut(bundleID: bundleID, keys: keys))
+        await send(.apps(.appShortcut(bundleID: bundleID, keys: keys)))
     }
 
     /// Asks the Mac to walk `bundleID`'s menu bar via Accessibility and
     /// return every shortcut it advertises.
     func requestMenuShortcuts(bundleID: String) async {
-        await send(.requestAppMenuShortcuts(bundleID: bundleID))
+        await send(.deck(.requestAppMenuShortcuts(bundleID: bundleID)))
     }
 
-    func sendMediaAction(_ action: String) async {
-        await send(.mediaCommand(action: action))
+    func sendMediaKey(_ key: MediaKey) async {
+        await send(.input(.media(key: key)))
     }
 
     /// Issues a screenshot request tagged with `requestID` so the iPad can
@@ -229,35 +230,34 @@ actor TrackpadSender {
         mode: CaptureMode = .fullScreen,
         quality: CaptureQuality = .standard
     ) async {
-        await send(.requestScreenshot(requestID: requestID, mode: mode, quality: quality))
+        await send(.capture(.requestScreenshot(requestID: requestID, mode: mode, quality: quality)))
     }
 
     /// Asks the Mac to enumerate visible windows so the iPad can present a
     /// picker before issuing a `.window(windowID:)` capture.
     func requestWindowList(requestID: String) async {
-        await send(.requestWindowList(requestID: requestID))
+        await send(.capture(.requestWindowList(requestID: requestID)))
     }
 
     /// Briefly highlights the Mac cursor's current location with an animated
-    /// crosshair overlay. No-op on Macs running an older host that doesn't
-    /// recognize the macro id (silently dropped server-side).
+    /// crosshair overlay.
     func locateCursor() async {
-        await send(.macroButton(id: "locate_cursor"))
+        await send(.system(.run(action: .locateCursor)))
     }
 
     func requestAppList() async {
-        await send(.requestAppList)
+        await send(.apps(.requestAppList))
     }
 
     /// Resync query for the approval handshake — see
-    /// `ControlMessage.requestAuthorizationStatus`.
+    /// `PairingMessage.requestAuthorizationStatus`.
     func requestAuthorizationStatus() async {
-        await send(.requestAuthorizationStatus)
+        await send(.pairing(.requestAuthorizationStatus))
     }
 
-    /// Liveness heartbeat — see `ControlMessage.ping`.
+    /// Liveness heartbeat — see `SessionMessage.ping`.
     func sendPing(seq: UInt64) async {
-        await send(.ping(seq: seq))
+        await send(.session(.ping(seq: seq)))
     }
 
     // MARK: - Live mini mirror (WID-403)
@@ -267,15 +267,15 @@ actor TrackpadSender {
     /// far below anything that could starve the 120 Hz input path. The
     /// expanded thumbnail re-negotiates at a higher width (see ControlView).
     func startMirror(fps: Int = 20, maxWidth: Int = 640, displayID: UInt32? = nil) async {
-        await send(.startMirror(fps: fps, maxWidth: maxWidth, displayID: displayID))
+        await send(.mirror(.start(fps: fps, maxWidth: maxWidth, displayID: displayID)))
     }
 
     func stopMirror() async {
-        await send(.stopMirror)
+        await send(.mirror(.stop))
     }
 
     func switchSpace(_ direction: SpaceDirection, displayID: UInt32?) async {
-        await send(.switchSpace(direction: direction, displayID: displayID))
+        await send(.system(.switchSpace(direction: direction, displayID: displayID)))
     }
 
     /// Maps 3-finger swipe directions to the same keyboard shortcuts
@@ -283,11 +283,11 @@ actor TrackpadSender {
     func sendThreeFingerSwipe(_ direction: TrackpadGestureKind.ThreeFingerDirection) async {
         switch direction {
         case .left:
-            await send(.switchSpace(direction: .previous, displayID: nil))
+            await send(.system(.switchSpace(direction: .previous, displayID: nil)))
         case .right:
-            await send(.switchSpace(direction: .next, displayID: nil))
-        case .up:    await send(.macroButton(id: "missioncontrol_trigger"))
-        case .down:  await send(.macroButton(id: "expose_trigger"))
+            await send(.system(.switchSpace(direction: .next, displayID: nil)))
+        case .up:    await sendSystemAction(.missionControl)
+        case .down:  await sendSystemAction(.appExpose)
         }
     }
 
@@ -297,13 +297,13 @@ actor TrackpadSender {
         hostSendsReceipts = enabled
     }
 
-    /// Sends `message` and waits for the Mac's receipt, for controls that
+    /// Runs `action` and waits for the Mac's receipt, for controls that
     /// show whether the command arrived. Returns `.sent` straight away when
     /// the host doesn't send receipts. Other traffic isn't held up while it
     /// waits.
-    func sendConfirmed(_ message: ControlMessage) async -> CommandDelivery {
+    func sendConfirmed(_ action: Action) async -> CommandDelivery {
         guard hostSendsReceipts else {
-            await send(message)
+            await send(action.message)
             return .sent
         }
         let requestID = UUID().uuidString
@@ -313,7 +313,7 @@ actor TrackpadSender {
             // once: the receipt or the timeout, whichever comes first.
             pendingReceipts[requestID] = continuation
             Task {
-                await self.send(.tracked(requestID: requestID, command: message))
+                await self.send(.deck(.run(requestID: requestID, action: action)))
             }
             Task {
                 try? await Task.sleep(for: Self.receiptTimeout)
@@ -322,8 +322,8 @@ actor TrackpadSender {
         }
     }
 
-    func receivedReceipt(requestID: String, delivered: Bool) {
-        finishReceipt(requestID, with: delivered ? .confirmed : .failed)
+    func receivedReceipt(requestID: String, outcome: ActionOutcome) {
+        finishReceipt(requestID, with: outcome.isSuccess ? .confirmed : .failed)
     }
 
     private func finishReceipt(_ requestID: String, with delivery: CommandDelivery) {

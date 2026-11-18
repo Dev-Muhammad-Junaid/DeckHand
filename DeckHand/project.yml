@@ -11,6 +11,10 @@ options:
 packages:
   Loom:
     path: ../
+  # Platform-independent protocol, models and policies (Foundation only).
+  # Tested on Linux with `swift test --package-path DeckHand/Core`.
+  PixelHandCore:
+    path: Core
   # Crash and performance reporting (see Shared/DeckHandDiagnostics.swift).
   Sentry:
     url: https://github.com/getsentry/sentry-cocoa
@@ -51,6 +55,7 @@ targets:
     dependencies:
       - package: Loom
         product: LoomKit
+      - package: PixelHandCore
       - package: Sentry
         product: Sentry
       - package: Sparkle
@@ -123,6 +128,7 @@ targets:
     dependencies:
       - package: Loom
         product: LoomKit
+      - package: PixelHandCore
       - package: Sentry
         product: Sentry
     settings:
@@ -175,7 +181,8 @@ targets:
     scheme: {}
 
   # ─────────────────────────────────────────────────────────────
-  # Wire-format contract tests (WID-400)
+  # App-side tests: what needs Loom or the Shared/ sources.
+  # Pure logic is tested in PixelHandCore (Core/Tests), on Linux too.
   # Compiles Shared/ directly so the tests exercise the exact
   # sources both apps ship, without needing a host app.
   # ─────────────────────────────────────────────────────────────
@@ -191,6 +198,7 @@ targets:
     dependencies:
       - package: Loom
         product: LoomKit
+      - package: PixelHandCore
       # Shared/DeckHandDiagnostics.swift imports it. No DSN here, so the
       # tests never report anything.
       - package: Sentry

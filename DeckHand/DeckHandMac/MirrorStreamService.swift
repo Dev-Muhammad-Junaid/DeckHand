@@ -8,7 +8,7 @@
 //
 //    SCStream (GPU-downscaled BGRA, capped fps)
 //        → sample-handler queue: CVPixelBuffer → CGImage → JPEG (ImageIO)
-//        → MainActor: ControlMessage.mirrorFrame broadcast to subscribers
+//        → MainActor: ControlMessage.mirror(.frame) broadcast to subscribers
 //
 //  Performance / memory invariants:
 //
@@ -154,10 +154,9 @@ final class MirrorStreamService: NSObject {
             } catch {
                 DeckHandLog.app.error("Mirror stream failed to start: \(error.localizedDescription, privacy: .public)")
                 subscribers.removeValue(forKey: subscriberID)
-                try? await handle.send(.screenshotError(
-                    requestID: "mirror",
+                try? await handle.send(.mirror(.error(
                     message: "Live mirror unavailable: \(error.localizedDescription)"
-                ))
+                )))
                 return
             }
         }
@@ -258,10 +257,10 @@ final class MirrorStreamService: NSObject {
 
     private func sendDisplayList(to handle: LoomConnectionHandle) async {
         let displays = (try? await ScreenCaptureService.shared.enumerateDisplays()) ?? []
-        try? await handle.send(.displayListUpdate(
+        try? await handle.send(.mirror(.displayList(
             displays: displays,
             selectedDisplayID: currentDisplayID
-        ))
+        )))
     }
 
     /// Called by `MirrorFrameOutput` when ScreenCaptureKit reports the
@@ -275,10 +274,9 @@ final class MirrorStreamService: NSObject {
         currentDisplayID = 0
         for handle in handles {
             Task {
-                try? await handle.send(.screenshotError(
-                    requestID: "mirror",
+                try? await handle.send(.mirror(.error(
                     message: "Live mirror stopped: \(error.localizedDescription)"
-                ))
+                )))
             }
         }
     }
@@ -293,7 +291,7 @@ final class MirrorStreamService: NSObject {
         for (id, handle) in subscribers where !sendingTo.contains(id) {
             sendingTo.insert(id)
             Task { @MainActor [weak self] in
-                try? await handle.send(.mirrorFrame(seq: seq, data: data))
+                try? await handle.send(.mirror(.frame(seq: seq, data: data)))
                 self?.sendingTo.remove(id)
             }
         }

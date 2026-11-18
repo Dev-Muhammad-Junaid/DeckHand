@@ -3,17 +3,16 @@
 //  DeckHandMac
 //
 
-import AppKit
-import CoreGraphics
 import Foundation
 import LoomKit
 
-/// Receives incoming Loom connections and routes decoded ControlMessages
-/// to InputInjector and AppLauncher.
+/// Owns each authorized connection's lifecycle: liveness, the message loop,
+/// decoding and validation. Every message then goes to its domain's handler
+/// through `MacHandlers.router` (see `Handlers/`).
 @MainActor
 final class ControlReceiver {
-    private let injector = InputInjector.shared
-    private let launcher = AppLauncher.shared
+    /// One handler per protocol domain, registered in one place.
+    private let handlers = MacHandlers()
     /// Consume tasks keyed by `handle.id` so authorization revocation and
     /// liveness timeouts can cancel consumption *immediately* — buffered
     /// commands from a dead/revoked iPad are dropped, never replayed.
@@ -50,7 +49,7 @@ final class ControlReceiver {
         // still passed on, in order, to the main-actor loop below.
         let messages = HeartbeatResponder.relay(gatedMessages, clock: clock) { seq in
             do {
-                try await connectionHandle.send(.pong(seq: seq))
+                try await connectionHandle.send(.session(.pong(seq: seq)))
             } catch {
                 DeckHandLog.connection.error("Pong \(seq, privacy: .public) to \(key, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
             }
@@ -63,7 +62,7 @@ final class ControlReceiver {
             ContextObserver.shared.addConnection(connectionHandle, id: key)
             // Tell the remote up front what this host can actually do, so
             // it can explain missing permissions instead of failing silently.
-            await self?.sendCapabilities(to: connectionHandle)
+            await self?.handlers.session.sendHostStatus(to: connectionHandle)
             await self?.consumeMessages(from: connectionHandle, messages: messages)
             // The message loop has ended (stream finished, task cancelled
             // by revocation, or liveness timeout). Stop any mirror stream
@@ -137,18 +136,16 @@ final class ControlReceiver {
             if Task.isCancelled { return }
             let decoded: ControlMessage
             do {
-                decoded = try ControlMessageCoding.decoder.decode(ControlMessage.self, from: data)
+                decoded = try ControlMessageCoding.decode(data, maxBytes: ProtocolLimits.maxRemoteMessageBytes)
             } catch {
-                #if DEBUG
-                print("Pixel Hand: ⚠️ Failed to decode ControlMessage (\(data.count)B): \(error)")
-                #endif
+                DeckHandLog.connection.error("Dropped an undecodable message (\(data.count, privacy: .public) B) from \(connectionHandle.id, privacy: .public): \(String(describing: error), privacy: .public)")
                 continue
             }
             // Every number from the remote is checked here, once, before
             // any handler sees it: non-finite values drop the message and
             // the rest are clamped (PH-031).
             guard let message = RemoteInputValidation.sanitize(decoded) else {
-                DeckHandLog.input.error("Dropped a message with an invalid number from \(connectionHandle.id, privacy: .public)")
+                DeckHandLog.input.error("Dropped a message with an invalid number or an oversize field from \(connectionHandle.id, privacy: .public)")
                 continue
             }
             // Arrival visibility: when the iPad "does nothing", the first
@@ -157,7 +154,7 @@ final class ControlReceiver {
             // for release/TestFlight builds, not just Xcode-attached DEBUG.
             // High-rate input is sampled so the stream stays readable.
             switch message {
-            case .mouseDelta, .mouseScroll:
+            case .input(.mouseDelta), .input(.mouseScroll):
                 inputMessageCount += 1
                 if inputMessageCount % 120 == 1 {
                     DeckHandLog.input.info("📥 input stream alive (\(self.inputMessageCount) input messages received)")
@@ -165,7 +162,7 @@ final class ControlReceiver {
             default:
                 DeckHandLog.connection.debug("📥 dispatching \(String(describing: message), privacy: .public)")
             }
-            await dispatch(message, handle: connectionHandle)
+            await handlers.router.route(message, from: connectionHandle)
         }
         let id = connectionHandle.id
         if droppedForSilence.contains(id) {
@@ -176,428 +173,5 @@ final class ControlReceiver {
             let since = livenessClocks[id].map { Date().timeIntervalSince($0.snapshot.lastInboundAt) } ?? -1
             DeckHandLog.connection.info("📪 message loop ended for \(id, privacy: .public): the iPad closed the connection (IPAD GAVE UP or left; last message \(since, format: .fixed(precision: 1), privacy: .public)s ago)")
         }
-    }
-
-    private func dispatch(_ message: ControlMessage, handle: LoomConnectionHandle) async {
-        switch message {
-        case let .mouseDelta(dx, dy):
-            injector.moveCursor(dx: dx, dy: dy)
-
-        case let .mouseScroll(dx, dy, phase):
-            injector.scroll(dx: dx, dy: dy, phase: Self.injectorPhase(for: phase))
-
-        case let .mouseClick(button):
-            injector.click(button: button)
-
-        case let .mouseDoubleClick(button):
-            injector.click(button: button, double: true)
-
-        case let .keyboardShortcut(keys):
-            injector.sendShortcut(keys: keys)
-
-        // ── Slow / potentially-blocking operations ───────────────────
-        // CRITICAL: these run in their OWN tasks. The message loop awaits
-        // dispatch serially, and several of these can stall for seconds —
-        // ScreenCaptureKit calls are documented to hang outright when the
-        // TCC grant is wedged. One hung handler used to freeze the entire
-        // loop: input went dead, pongs stopped (so liveness killed the
-        // connection), and the queued backlog of commands fired all at
-        // once when the connection finally tore down.
-
-        case let .launchApp(bundleID):
-            Task { await self.launcher.launch(bundleID: bundleID) }
-
-        case let .appShortcut(bundleID, keys):
-            // Activate the target app, wait for it to become frontmost
-            // (≤600 ms), then inject — self-contained ordering inside its
-            // own task.
-            Task {
-                await self.launcher.activateAndWait(bundleID: bundleID)
-                self.injector.sendShortcut(keys: keys)
-            }
-
-        case let .macroButton(id):
-            Task { await self.dispatchMacro(id: id) }
-
-        case let .mediaCommand(action):
-            switch action {
-            case "playpause": injector.sendMediaKey(NX_KEYTYPE_PLAY)
-            case "next":      injector.sendMediaKey(NX_KEYTYPE_NEXT)
-            case "prev":      injector.sendMediaKey(NX_KEYTYPE_PREVIOUS)
-            default: break
-            }
-            
-        case let .requestScreenshot(requestID, mode, quality):
-            Task {
-                await self.handleScreenshotRequest(
-                    requestID: requestID,
-                    mode: mode,
-                    quality: quality,
-                    handle: handle
-                )
-            }
-
-        case let .requestWindowList(requestID):
-            Task { await self.handleWindowListRequest(requestID: requestID, handle: handle) }
-
-        case .requestAppList:
-            Task { await self.handleAppListRequest(handle: handle) }
-
-        case let .requestAppMenuShortcuts(bundleID):
-            Task { await self.handleMenuShortcutsRequest(bundleID: bundleID, handle: handle) }
-
-        case let .triggerContextAction(id):
-            // AXUIElementPerformAction can block up to the AX messaging
-            // timeout (~6 s) on an unresponsive app — own task.
-            Task { ContextObserver.shared.performAction(id: id) }
-
-        case let .startMirror(fps, maxWidth, displayID):
-            // SCShareableContent inside — the #1 hang candidate. Own task.
-            let subscriberID = handle.id
-            Task {
-                await MirrorStreamService.shared.start(
-                    subscriberID: subscriberID,
-                    handle: handle,
-                    fps: fps,
-                    maxWidth: maxWidth,
-                    displayID: displayID
-                )
-            }
-
-        case .stopMirror:
-            let subscriberID = handle.id
-            Task { await MirrorStreamService.shared.stop(subscriberID: subscriberID) }
-
-        case let .switchSpace(direction, displayID):
-            Task { await self.handleSwitchSpace(direction: direction, displayID: displayID) }
-
-        case let .ping(seq):
-            // The pong already went out from HeartbeatResponder as the ping
-            // arrived, so main-actor work here can't delay it.
-            // Re-report capabilities every 5th ping (~10 s): if the user
-            // grants/revokes a TCC permission mid-session the remote's
-            // warning banner updates without reconnecting.
-            if seq % 5 == 0 {
-                await sendCapabilities(to: handle)
-            }
-
-        case .pong:
-            break // host never receives pongs
-
-        case let .tracked(requestID, command):
-            // The decoder already rejects nested wrappers; this keeps the
-            // recursion to one level even if that ever changes.
-            if case .tracked = command { break }
-            var delivered = injector.isAccessibilityGranted
-            // A press for a dialog button from a superseded snapshot is
-            // dropped, so it mustn't read as confirmed on the remote.
-            // Checked now, before the press is queued in its own task.
-            if case let .triggerContextAction(id) = command {
-                delivered = delivered && ContextObserver.shared.hasAction(id: id)
-            }
-            await dispatch(command, handle: handle)
-            // Sent once the command is handed to injection. Slow commands
-            // (appShortcut, dialog presses) finish in their own tasks, so
-            // this confirms the Mac got it, not what the app did with it.
-            try? await handle.send(.commandReceipt(requestID: requestID, delivered: delivered))
-
-        case .requestAuthorizationStatus:
-            // Resync path: messages are only consumed for *authorized*
-            // connections (DeviceAuthorizationManager gates the handoff),
-            // so reaching this dispatch means the answer is "granted".
-            // The few queries sent while the request was pending are the
-            // only messages PreApprovalGate keeps; they're answered here
-            // right after approval — healing any lost/failed `granted` push.
-            do {
-                try await handle.send(.authorizationStatus(status: "granted"))
-            } catch {
-                DeckHandLog.connection.error("Failed to answer auth-status query: \(error.localizedDescription, privacy: .public)")
-            }
-
-        case .authorizationStatus:
-            break
-        case .screenshotData, .screenshotError, .activeAppUpdate, .appListResponse, .appMenuShortcutsResponse, .runningAppsUpdate, .uiContextUpdate, .windowListResponse, .mirrorFrame, .displayListUpdate, .hostCapabilities, .hostFeatures, .commandReceipt:
-            // Client-bound messages; host doesn't process them locally
-            break
-        }
-    }
-
-    // MARK: - Screenshot Capture
-
-    /// Captures the requested slice of the screen and sends it back as JPEG,
-    /// or sends a descriptive `screenshotError` so the iPad can dismiss its
-    /// spinner and show a useful message. `requestID` is echoed verbatim so
-    /// the iPad can drop responses belonging to a timed-out earlier tap.
-    private func handleScreenshotRequest(
-        requestID: String,
-        mode: CaptureMode,
-        quality: CaptureQuality,
-        handle: LoomConnectionHandle
-    ) async {
-        do {
-            // Format is per-mode now: full-screen is JPEG (small payloads
-            // for the common case), region and window are PNG (lossless,
-            // alpha-preserving). Callers on the iPad just decode via
-            // UIImage(data:) so they don't care which.
-            let payload: Data
-            switch mode {
-            case .fullScreen:
-                // Quality only moves the full-screen path; the region and
-                // window paths below already ship near-native pixels.
-                payload = try await ScreenCaptureService.shared.captureMainDisplayJPEG(
-                    maxWidth: quality.maxWidth,
-                    quality: quality.jpegQuality
-                )
-            case let .region(x, y, width, height):
-                let rect = CGRect(
-                    x: CGFloat(x),
-                    y: CGFloat(y),
-                    width: CGFloat(width),
-                    height: CGFloat(height)
-                )
-                payload = try await ScreenCaptureService.shared.captureRegion(normalizedRect: rect)
-            case let .window(windowID):
-                payload = try await ScreenCaptureService.shared.captureWindowJPEG(windowID: windowID)
-            }
-            try await handle.send(.screenshotData(requestID: requestID, data: payload))
-        } catch ScreenCaptureService.CaptureError.permissionDenied {
-            await sendError(requestID: requestID, to: handle,
-                            message: "Screen Recording permission required. Please allow Pixel Hand in System Settings > Privacy & Security > Screen Recording, then try again.")
-        } catch ScreenCaptureService.CaptureError.noDisplay {
-            await sendError(requestID: requestID, to: handle, message: "Display capture failed. No displays found.")
-        } catch ScreenCaptureService.CaptureError.windowNotFound {
-            await sendError(requestID: requestID, to: handle,
-                            message: "That window has closed. Refresh the window list and try again.")
-        } catch ScreenCaptureService.CaptureError.captureFailed(let detail) {
-            await sendError(requestID: requestID, to: handle, message: "Capture failed: \(detail)")
-        } catch ScreenCaptureService.CaptureError.encodeFailed {
-            await sendError(requestID: requestID, to: handle, message: "Image compression failed.")
-        } catch {
-            await sendError(requestID: requestID, to: handle,
-                            message: "Unexpected capture error: \(error.localizedDescription)")
-        }
-    }
-
-    private func handleWindowListRequest(requestID: String, handle: LoomConnectionHandle) async {
-        do {
-            let windows = try await ScreenCaptureService.shared.enumerateWindows()
-            try await handle.send(.windowListResponse(requestID: requestID, windows: windows))
-        } catch {
-            // Window enumeration failures share the same TCC requirement as
-            // capture, so route them through the same error channel — the
-            // iPad already knows how to surface this copy.
-            await sendError(
-                requestID: requestID,
-                to: handle,
-                message: "Couldn't read window list: \(error.localizedDescription)"
-            )
-        }
-    }
-
-    /// Mission Control's "Move left/right a space" is a *symbolic hotkey*,
-    /// not an app key equivalent. `CGEvent` HID posts (what `sendShortcut`
-    /// uses) never fire those — the same reason App Exposé already goes
-    /// through System Events. Control-Left/Right posted as HID also lands
-    /// in whatever window we just focused, so both chevrons looked like a
-    /// no-op on the same desktop.
-    private func handleSwitchSpace(direction: SpaceDirection, displayID: UInt32?) async {
-        let target = displayID.map { CGDirectDisplayID($0) }
-            ?? injector.displayIDUnderCursor()
-
-        let pointerBefore = injector.cursorPosition()
-        injector.moveCursorToMenuBar(ofDisplay: target)
-        try? await Task.sleep(for: .milliseconds(60))
-
-        switch direction {
-        case .previous, .next:
-            async let spaceChanged = waitForActiveSpaceChange()
-            postSystemSpaceKey(previous: direction == .previous)
-            if await spaceChanged {
-                injector.moveCursorToCenter(ofDisplay: target)
-                CursorLocator.shared.ping()
-            } else {
-                // No Space to go to (end of the strip, or a display with a
-                // single desktop): put the pointer back instead of yanking
-                // it to the centre and flashing Locate for nothing.
-                DeckHandLog.input.info("Space switch on display \(target, privacy: .public) changed nothing; pointer restored")
-                injector.moveCursor(to: pointerBefore)
-            }
-        case .missionControl:
-            await dispatchMacro(id: "missioncontrol_trigger")
-        }
-    }
-
-    /// `key code 123` = Left Arrow, `124` = Right Arrow. Control+Arrow is
-    /// the default Mission Control binding for adjacent Spaces.
-    private func postSystemSpaceKey(previous: Bool) {
-        let keyCode = previous ? 123 : 124
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        proc.arguments = [
-            "-e",
-            "tell application \"System Events\" to key code \(keyCode) using control down"
-        ]
-        try? proc.run()
-    }
-
-    /// Resolves when Mission Control finishes switching Space, or after a
-    /// short timeout if we were already at the end of the strip. Returns
-    /// whether the Space actually changed.
-    private func waitForActiveSpaceChange(timeout: Duration = .milliseconds(800)) async -> Bool {
-        await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
-            let once = OnceResume(continuation)
-            let center = NSWorkspace.shared.notificationCenter
-            let token = center.addObserver(
-                forName: NSWorkspace.activeSpaceDidChangeNotification,
-                object: nil,
-                queue: .main
-            ) { _ in
-                once.resume(returning: true)
-            }
-            once.setToken(token)
-            Task { @MainActor in
-                try? await Task.sleep(for: timeout)
-                once.resume(returning: false)
-            }
-        }
-    }
-
-    /// Reports what this host can actually execute. Accessibility is read
-    /// live (cheap); screen recording uses the preflight toggle — the
-    /// PermissionsMonitor probe is authoritative for local UI, but for the
-    /// remote's banner the toggle is a good-enough, allocation-free check.
-    private func sendCapabilities(to handle: LoomConnectionHandle) async {
-        try? await handle.send(.hostCapabilities(
-            accessibility: injector.isAccessibilityGranted,
-            screenRecording: CGPreflightScreenCaptureAccess()
-        ))
-        // Which protocol features this host understands, so the remote only
-        // asks for delivery receipts from a host that sends them. Repeated
-        // with every capability report, so a lost one heals within ~10 s.
-        try? await handle.send(.hostFeatures(commandReceipts: true))
-    }
-
-    private func sendError(requestID: String, to handle: LoomConnectionHandle, message: String) async {
-        try? await handle.send(.screenshotError(requestID: requestID, message: message))
-    }
-
-    private func dispatchMacro(id: String) async {
-        // System-level triggers that can't be done via CGEvent keyboard
-        // shortcuts. Resolved first, under every id a remote may send, so
-        // e.g. "showdesktop" never falls through to the default deck (whose
-        // ids are prefixed "shortcut-") and silently does nothing.
-        if let macro = SystemMacro(macroID: id) {
-            await runSystemMacro(macro)
-            return
-        }
-
-        // Standard MacroItem lookup
-        if let item = MacroItem.defaultDeck.first(where: { $0.id == id }) {
-            switch item {
-            case .app(let app):
-                await launcher.launch(bundleID: app.bundleID)
-            case .shortcut(let s):
-                injector.sendShortcut(keys: s.keys)
-            case .media(let m):
-                switch m.action {
-                case "playpause": injector.sendMediaKey(NX_KEYTYPE_PLAY)
-                case "next":      injector.sendMediaKey(NX_KEYTYPE_NEXT)
-                case "prev":      injector.sendMediaKey(NX_KEYTYPE_PREVIOUS)
-                default: break
-                }
-            }
-        }
-    }
-
-    private func runSystemMacro(_ macro: SystemMacro) async {
-        switch macro {
-        case .locateCursor:
-            CursorLocator.shared.ping()
-        case .missionControl:
-            runTool("/usr/bin/open", ["-a", "Mission Control"])
-        case .appExpose:
-            // App Exposé isn't a standalone app — trigger via AppleScript
-            runTool("/usr/bin/osascript", ["-e", "tell application \"System Events\" to key code 125 using control down"])
-        case .showDesktop, .launchpad:
-            // Neither depends on the user's shortcut settings any more, and
-            // neither uses the paths macOS 27 broke. See SystemActionTrigger.
-            await SystemActionTrigger.shared.run(macro)
-        }
-    }
-
-    private func runTool(_ path: String, _ arguments: [String]) {
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: path)
-        proc.arguments = arguments
-        do {
-            try proc.run()
-        } catch {
-            DeckHandLog.input.error("Couldn't run \(path, privacy: .public): \(error.localizedDescription, privacy: .public)")
-        }
-    }
-
-    // MARK: - App List
-
-    private func handleAppListRequest(handle: LoomConnectionHandle) async {
-        let apps = InstalledAppScanner.shared.installedApps()
-        try? await handle.send(.appListResponse(apps: apps))
-    }
-
-    private func handleMenuShortcutsRequest(bundleID: String, handle: LoomConnectionHandle) async {
-        let shortcuts = await MenuShortcutDiscovery.discover(bundleID: bundleID, launcher: launcher)
-        try? await handle.send(.appMenuShortcutsResponse(bundleID: bundleID, shortcuts: shortcuts))
-    }
-
-    func removeConnection(id: UUID) {
-        connectionTasks[id]?.cancel()
-        connectionTasks.removeValue(forKey: id)
-        ActiveAppMonitor.shared.removeConnection(id: id)
-        RunningAppMonitor.shared.removeConnection(id: id)
-        ContextObserver.shared.removeConnection(id: id)
-    }
-
-    /// Bridge from the Shared wire enum to the Mac-internal `InputInjector`
-    /// phase. We keep them as separate types so the iOS target doesn't
-    /// pull in `InputInjector` and the Mac internals stay free to evolve.
-    private static func injectorPhase(for phase: ScrollPhase) -> InputInjector.ScrollPhase {
-        switch phase {
-        case .begin:           return .begin
-        case .changed:         return .changed
-        case .end:             return .end
-        case .momentumBegin:   return .momentumBegin
-        case .momentumChanged: return .momentumChanged
-        case .momentumEnd:     return .momentumEnd
-        }
-    }
-}
-
-/// Resumes a continuation at most once and drops the matching workspace
-/// observer. Shared between the space-change notification and its timeout.
-private final class OnceResume: @unchecked Sendable {
-    private let lock = NSLock()
-    private var continuation: CheckedContinuation<Bool, Never>?
-    private var token: NSObjectProtocol?
-
-    init(_ continuation: CheckedContinuation<Bool, Never>) {
-        self.continuation = continuation
-    }
-
-    func setToken(_ token: NSObjectProtocol) {
-        lock.lock()
-        self.token = token
-        lock.unlock()
-    }
-
-    func resume(returning value: Bool) {
-        lock.lock()
-        let pending = continuation
-        continuation = nil
-        let token = self.token
-        self.token = nil
-        lock.unlock()
-        if let token {
-            NSWorkspace.shared.notificationCenter.removeObserver(token)
-        }
-        pending?.resume(returning: value)
     }
 }

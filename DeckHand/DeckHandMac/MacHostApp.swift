@@ -52,6 +52,9 @@ final class MacDaemon: ObservableObject {
                     // this provider lets verified identities through so the
                     // app-level Allow / Deny still runs.
                     trustProvider: DeckHandHandshakeTrustProvider(),
+                    // `ph-proto` in the Bonjour TXT record, so remotes can
+                    // say "Please update" before dialling (PeerCompatibility).
+                    advertisementMetadata: PixelHandProtocol.advertisementMetadata,
                     // No transport-level auto-retry: connection lifecycle is
                     // owned entirely by the app (explicit connect, ping/pong
                     // liveness). Retry created overlapping reconnect state

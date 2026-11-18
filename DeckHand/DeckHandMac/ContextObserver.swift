@@ -108,7 +108,7 @@ final class ContextObserver {
         buttonElementsByID[id] != nil
     }
 
-    /// Called from `ControlReceiver` when the iPad taps a dialog chip.
+    /// Called from `AppsHandler` when the iPad taps a dialog chip.
     /// Stale IDs (from an older snapshot) are silently ignored, which is
     /// the correct behaviour — the user saw a button that's gone now.
     func performAction(id: String) {
@@ -340,7 +340,7 @@ final class ContextObserver {
         }
         #endif
 
-        let msg = ControlMessage.uiContextUpdate(snapshot: snapshot)
+        let msg = ControlMessage.apps(.uiContextUpdate(snapshot: snapshot))
         let data: Data
         do {
             // Encode once, broadcast the same payload to every peer; reuse
@@ -858,6 +858,6 @@ final class ContextObserver {
     // MARK: - Send
 
     private func send(_ snapshot: UIContextSnapshot, to handle: LoomConnectionHandle) async throws {
-        try await handle.send(.uiContextUpdate(snapshot: snapshot))
+        try await handle.send(.apps(.uiContextUpdate(snapshot: snapshot)))
     }
 }
