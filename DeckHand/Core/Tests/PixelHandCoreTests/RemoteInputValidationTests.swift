@@ -173,7 +173,7 @@ import Testing
     /// JSON can't carry NaN or ∞, but any finite float decodes, and 1e30
     /// used to crash the host through `Int32(-dy * 3)`.
     @Test func largestDecodableScrollIsSafeEndToEnd() throws {
-        let json = #"{"input":{"mouseScroll":{"dx":0,"dy":1e30,"phase":"changed"}},"v":2}"#
+        let json = #"{"input":{"mouseScroll":{"dx":0,"dy":1e30,"phase":"changed"}},"v":\#(PixelHandProtocol.version)}"#
         let decoded = try ControlMessageCoding.decode(Data(json.utf8))
         let message = try #require(RemoteInputValidation.sanitize(decoded))
         guard case let .input(.mouseScroll(_, dy, _)) = message else { Issue.record("\(message)"); return }

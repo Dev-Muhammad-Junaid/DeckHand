@@ -45,6 +45,46 @@ import Testing
         ("system.run", .system(.run(action: .showDesktop))),
         ("system.switchSpace", .system(.switchSpace(direction: .next, displayID: nil))),
         ("system.switchSpace.display", .system(.switchSpace(direction: .missionControl, displayID: 1))),
+        ("system.displayState", .system(.displayState(layout: DisplayLayout(
+            displays: [
+                DisplaySpaces(
+                    displayID: 2,
+                    name: "HP E273",
+                    isMain: true,
+                    bounds: DisplayBounds(x: 0, y: 0, width: 1920, height: 1080),
+                    spaces: [.desktop],
+                    currentSpaceIndex: 0
+                ),
+                DisplaySpaces(
+                    displayID: 1,
+                    name: "Built-in Retina Display",
+                    isMain: false,
+                    bounds: DisplayBounds(x: -1728, y: 0, width: 1728, height: 1117),
+                    spaces: [.desktop, .desktop, SpaceInfo(kind: .fullScreen, appName: "Safari")],
+                    currentSpaceIndex: 1
+                ),
+            ],
+            cursorDisplayID: 1,
+            spacesKnown: true,
+            separateSpaces: true
+        )))),
+        ("system.displayState.noSpaces", .system(.displayState(layout: DisplayLayout(
+            displays: [
+                DisplaySpaces(
+                    displayID: 1,
+                    name: "Built-in Retina Display",
+                    isMain: true,
+                    bounds: DisplayBounds(x: 0, y: 0, width: 1512, height: 982),
+                    spaces: nil,
+                    currentSpaceIndex: nil
+                ),
+            ],
+            cursorDisplayID: nil,
+            spacesKnown: false,
+            separateSpaces: true
+        )))),
+        ("system.lockState", .system(.lockState(state: .screenLocked))),
+        ("system.lockState.offConsole", .system(.lockState(state: .offConsole))),
         // apps
         ("apps.launchApp", .apps(.launchApp(bundleID: "com.apple.Safari"))),
         ("apps.appShortcut", .apps(.appShortcut(bundleID: "com.todesktop.230313mzl4w4u92", keys: ["cmd", "k"]))),
@@ -90,6 +130,7 @@ import Testing
         ("deck.run.media", .deck(.run(requestID: "cmd-6", action: .media(key: .next)))),
         ("deck.receipt", .deck(.receipt(requestID: "cmd-1", outcome: .delivered))),
         ("deck.receipt.refused", .deck(.receipt(requestID: "cmd-2", outcome: .refused(reason: .staleContext)))),
+        ("deck.receipt.refused.macLocked", .deck(.receipt(requestID: "cmd-7", outcome: .refused(reason: .macLocked)))),
         ("deck.receipt.failed", .deck(.receipt(requestID: "cmd-3", outcome: .failed(reason: "App not running")))),
         ("deck.receipt.completed", .deck(.receipt(requestID: "cmd-4", outcome: .completed))),
         // mirror
@@ -153,6 +194,8 @@ import Testing
             switch m {
             case .run: "system.run"
             case .switchSpace: "system.switchSpace"
+            case .displayState: "system.displayState"
+            case .lockState: "system.lockState"
             }
         case let .apps(m):
             switch m {
@@ -214,8 +257,8 @@ import Testing
         switch message {}
     }
 
-    /// Cases in protocol version 2. Bump with every added or removed case.
-    static let expectedCaseCount = 35
+    /// Cases in protocol version 3. Bump with every added or removed case.
+    static let expectedCaseCount = 37
 
     // MARK: - Fixture plumbing
 
@@ -343,7 +386,7 @@ import Testing
 
     @Test("Host status skips feature names this build doesn't know")
     func hostStatusSkipsUnknownFeatures() throws {
-        let json = #"{"session":{"hostStatus":{"status":{"accessibility":true,"features":["commandReceipts","teleport"],"screenRecording":true}}},"v":2}"#
+        let json = #"{"session":{"hostStatus":{"status":{"accessibility":true,"features":["commandReceipts","teleport"],"screenRecording":true}}},"v":\#(PixelHandProtocol.version)}"#
         let decoded = try ControlMessageCoding.decode(Data(json.utf8))
         guard case let .session(.hostStatus(status)) = decoded else {
             Issue.record("decoded \(decoded)")
@@ -382,13 +425,13 @@ import Testing
     @Test("Unknown, missing and multiple domains are refused")
     func badDomainsAreRefused() {
         #expect(throws: ProtocolError.unknownDomain) {
-            try ControlMessageCoding.decode(Data(#"{"selfDestruct":{"now":{}},"v":2}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"selfDestruct":{"now":{}},"v":\#(PixelHandProtocol.version)}"#.utf8))
         }
         #expect(throws: ProtocolError.unknownDomain) {
-            try ControlMessageCoding.decode(Data(#"{"v":2}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"v":\#(PixelHandProtocol.version)}"#.utf8))
         }
         #expect(throws: ProtocolError.multipleDomains(["input", "session"])) {
-            try ControlMessageCoding.decode(Data(#"{"input":{"mouseClick":{"button":"left"}},"session":{"ping":{"seq":1}},"v":2}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"input":{"mouseClick":{"button":"left"}},"session":{"ping":{"seq":1}},"v":\#(PixelHandProtocol.version)}"#.utf8))
         }
         #expect(throws: (any Error).self) {
             try ControlMessageCoding.decode(Data("{}".utf8))
@@ -398,32 +441,32 @@ import Testing
     @Test("Reserved domains decode nothing yet")
     func reservedDomainsAreRefused() {
         #expect(throws: ProtocolError.unknownDomain) {
-            try ControlMessageCoding.decode(Data(#"{"sharing":{"clipboard":{}},"v":2}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"sharing":{"clipboard":{}},"v":\#(PixelHandProtocol.version)}"#.utf8))
         }
         #expect(throws: ProtocolError.unknownDomain) {
-            try ControlMessageCoding.decode(Data(#"{"diagnostics":{"stats":{}},"v":2}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"diagnostics":{"stats":{}},"v":\#(PixelHandProtocol.version)}"#.utf8))
         }
     }
 
     @Test("Unknown cases and missing fields are refused")
     func unknownCasesAreRefused() {
         #expect(throws: (any Error).self) {
-            try ControlMessageCoding.decode(Data(#"{"input":{"selfDestruct":{}},"v":2}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"input":{"selfDestruct":{}},"v":\#(PixelHandProtocol.version)}"#.utf8))
         }
         #expect(throws: (any Error).self) {
-            try ControlMessageCoding.decode(Data(#"{"input":{"mouseDelta":{"dx":1}},"v":2}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"input":{"mouseDelta":{"dx":1}},"v":\#(PixelHandProtocol.version)}"#.utf8))
         }
         #expect(throws: (any Error).self) {
-            try ControlMessageCoding.decode(Data(#"{"input":{"mouseDelta":{"dx":1,"dy":2},"mouseClick":{"button":"left"}},"v":2}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"input":{"mouseDelta":{"dx":1,"dy":2},"mouseClick":{"button":"left"}},"v":\#(PixelHandProtocol.version)}"#.utf8))
         }
         #expect(throws: (any Error).self) {
-            try ControlMessageCoding.decode(Data(#"{"system":{"run":{"action":"selfDestruct"}},"v":2}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"system":{"run":{"action":"selfDestruct"}},"v":\#(PixelHandProtocol.version)}"#.utf8))
         }
     }
 
     @Test("A run can't wrap a message, so runs can't nest")
     func runsCantNest() {
-        let nested = #"{"deck":{"run":{"action":{"deck":{"run":{"action":{"shortcut":{"keys":["a"]}},"requestID":"b"}}},"requestID":"a"}},"v":2}"#
+        let nested = #"{"deck":{"run":{"action":{"deck":{"run":{"action":{"shortcut":{"keys":["a"]}},"requestID":"b"}}},"requestID":"a"}},"v":\#(PixelHandProtocol.version)}"#
         #expect(throws: (any Error).self) { try ControlMessageCoding.decode(Data(nested.utf8)) }
     }
 

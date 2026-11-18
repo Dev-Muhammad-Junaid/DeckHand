@@ -16,7 +16,7 @@ protocol version and exactly one domain key.
 | Domain | File | What | Lane |
 | --- | --- | --- | --- |
 | `input` | `InputMessage.swift` | pointer, scroll, clicks, chords, media keys | iOS interaction (remote), Mac system control (`InputHandler`) |
-| `system` | `SystemMessage.swift` | Mission Control, Spaces, Show Desktop, Launchpad, Locate | Mac system control |
+| `system` | `SystemMessage.swift` | Mission Control, Spaces, Show Desktop, Launchpad, Locate; Mac → remote: display/Spaces snapshot, lock state | Mac system control |
 | `apps` | `AppsMessage.swift` | app list, running and frontmost app, dialog context | Mac system control (context side) |
 | `deck` | `DeckMessage.swift` | menu-shortcut import, `run` / `receipt` | deck (later), iOS interaction for now |
 | `mirror` | `MirrorMessage.swift` | mirror start/stop/frames, display list | Mirror |
@@ -68,3 +68,4 @@ one case, one key, one decode line.
 | --- | --- |
 | 1 | The flat `ControlMessage` of builds up to the foundation work: no envelope, no version, never advertised. |
 | 2 | Envelope with `v` and one domain key; messages split into ten domains. `macroButton(id:)` → `system.run(action: SystemMacro)`; `mediaCommand(action: String)` → `input.media(key: MediaKey)`; `authorizationStatus(status: String)` → `pairing.authorizationStatus(state: AuthState)`; `hostCapabilities` + `hostFeatures` → `session.hostStatus`; `tracked`/`commandReceipt` → `deck.run(requestID, Action)` / `deck.receipt(requestID, ActionOutcome)`; mirror errors get `mirror.error` instead of `screenshotError("mirror")`; `startMirror`/`stopMirror`/`mirrorFrame`/`displayListUpdate` → `mirror.start`/`stop`/`frame`/`displayList`. Every field is required (no back-compat defaults). `ph-proto` advertised in Bonjour TXT. |
+| 3 | `system.displayState(layout: DisplayLayout)`: displays, their Spaces (current index, full-screen apps) and the pointer's display, sent on connect and on every change; `system.lockState(state: MacLockState)`, sent on connect and on every change; `RefusalReason.macLocked` for runs the locked-Mac gate refuses. Mac → remote only; nothing a remote sends changed. |
