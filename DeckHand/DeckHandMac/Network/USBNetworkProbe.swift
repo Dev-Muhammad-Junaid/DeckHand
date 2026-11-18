@@ -44,7 +44,7 @@ enum USBNetworkProbe {
     }
 
     private static func node(for entry: io_registry_entry_t) -> RegistryNode {
-        let className = (IOObjectCopyClass(entry)?.takeRetainedValue() as String?) ?? ""
+        let className: String = IOObjectCopyClass(entry).map { $0.takeRetainedValue() as String } ?? ""
         var properties: [String: Int] = [:]
         for key in WiredLinkPolicy.propertyKeys {
             guard let value = IORegistryEntryCreateCFProperty(entry, key as CFString, kCFAllocatorDefault, 0)?
