@@ -25,7 +25,8 @@ final class StubSession: LoomSessionProtocol {
 public actor LoomConnectionHandle {
     public nonisolated let id: UUID = UUID()
     public nonisolated let messages: AsyncStream<Data> = AsyncStream { _ in }
-    public let session: any LoomSessionProtocol = StubSession()
+    // Cross-module, the real `let` needs `await`; this mirrors that.
+    public var session: any LoomSessionProtocol { get async { StubSession() } }
     public func send(_ data: Data) async throws {}
     public func disconnect() async {}
     public func openStream(label: String) async throws -> LoomMultiplexedStream { LoomMultiplexedStream() }
@@ -139,4 +140,8 @@ final class NSWorkspace: @unchecked Sendable {
 
 // MARK: iOS
 func CACurrentMediaTime() -> Double { 0 }
+final class UIImage: @unchecked Sendable {
+    init?(data: Data) {}
+    func preparingForDisplay() -> UIImage? { self }
+}
 enum TrackpadGestureKind { enum ThreeFingerDirection { case left, right, up, down } }

@@ -117,25 +117,9 @@ struct ControlView: View {
                 // to somewhere it can still be reached.
                 GeometryReader { proxy in
                     if session.isMirrorActive {
-                        MirrorThumbnailView(
-                            image: session.mirrorImage,
-                            containerSize: proxy.size,
-                            onClose: { session.toggleMirror(settings: settings) },
-                            onSwitchSpace: { direction in
-                                session.switchSpace(direction)
-                            },
-                            onStreamWidthChanged: { naturalWidth in
-                                session.mirrorNaturalWidth = naturalWidth
-                                session.renegotiateMirror(settings: settings)
-                            },
-                            initialLayout: settings.rememberMirrorLayout
-                                ? settings.mirrorLayout
-                                : nil,
-                            onLayoutChanged: { layout in
-                                guard settings.rememberMirrorLayout else { return }
-                                settings.mirrorLayout = layout
-                            }
-                        )
+                        // The mirror lane's wrapper: picture, pointer,
+                        // display picker, badge and stats.
+                        MirrorOverlay(session: session, containerSize: proxy.size)
                         .transition(.opacity.combined(with: .scale(scale: 0.9)))
                         .frame(
                             maxWidth: .infinity,

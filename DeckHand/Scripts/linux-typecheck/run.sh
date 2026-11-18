@@ -25,6 +25,7 @@ files=(
   "$app"/DeckHandMac/Handlers/*.swift
   "$app/DeckHandMac/Mirror/MirrorSubscriber.swift"
   "$app/DeckHandiOS/TrackpadSender.swift"
+  "$app/DeckHandiOS/Mirror/MirrorStreamReceiver.swift"
   "$app/Shared/LoomConnectionHandle+ControlMessage.swift"
   "$@"
 )

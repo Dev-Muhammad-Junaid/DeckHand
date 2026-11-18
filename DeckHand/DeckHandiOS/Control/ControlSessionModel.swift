@@ -31,11 +31,6 @@ final class ControlSessionModel {
     private(set) var sender: TrackpadSender?
     let capture = CaptureCoordinator()
 
-    /// Stream width the mirror's current on-screen size asks for, before the
-    /// sharpness preference gets a say. Kept so a settings change can
-    /// re-derive the effective width without waiting for another pinch.
-    var mirrorNaturalWidth = 640
-
     // Bidirectional state
     private(set) var activeAppName: String?
     private(set) var activeBundleID: String?
@@ -49,18 +44,45 @@ final class ControlSessionModel {
     /// surface them.
     private(set) var uiContext: UIContextSnapshot = .none
 
-    // ── Live mini mirror (WID-403) ──────────────────────────────────
+    // MARK: Mirror
+    // Live mirror (WID-403), binary stream, local cursor (S3), display
+    // picker and stats (S6). Logic in ControlSessionModel+Mirror.swift;
+    // frames arrive on the mirror's own stream (MirrorStreamReceiver), not
+    // through the message loop below. Setters are internal so that
+    // extension can write them.
+
+    /// Stream width the mirror's current on-screen size asks for, before the
+    /// sharpness preference gets a say. Kept so a settings change can
+    /// re-derive the effective width without waiting for another pinch.
+    var mirrorNaturalWidth = 640
     /// Whether the user has the floating mirror thumbnail enabled. Drives
-    /// startMirror/stopMirror on the wire and the overlay's visibility.
-    private(set) var isMirrorActive = false
-    /// Latest decoded mirror frame. Replaced wholesale per frame — at
-    /// ~480px these are ~1 MB decoded, and only one is ever retained.
-    private(set) var mirrorImage: UIImage?
-    /// Highest sequence number rendered; lower/equal arrivals are stale
-    /// (shouldn't happen on an ordered transport, but cheap to guard).
-    @ObservationIgnored private var mirrorLastSeq: UInt64 = 0
+    /// start/stop on the wire and the overlay's visibility.
+    var isMirrorActive = false
+    /// Latest decoded mirror frame. Replaced wholesale per frame; only one
+    /// is ever retained.
+    var mirrorImage: UIImage?
     /// Display the current stream is pointed at. `nil` until the host says.
-    private(set) var selectedMirrorDisplayID: UInt32?
+    var selectedMirrorDisplayID: UInt32?
+    /// Displays the Mac can mirror, from `mirror.displayList`.
+    var mirrorDisplays: [DisplayInfo] = []
+    /// Where the Mac's pointer is (S3). Only the cursor layer reads it, so
+    /// 60 updates a second don't redraw the rest of the mirror.
+    var mirrorCursor: MirrorCursorState?
+    /// The display the pointer is on. Changes rarely, so the badge reads
+    /// this instead of `mirrorCursor`.
+    var mirrorCursorDisplayID: UInt32?
+    /// The image for `mirrorCursor.shapeID`, once it has arrived.
+    var mirrorCursorSprite: MirrorCursorSprite?
+    @ObservationIgnored var mirrorCursorShapes = MirrorCursorShapeCache<UIImage>()
+    /// Follow-cursor timing (MirrorDisplayFollower).
+    @ObservationIgnored var mirrorFollower = MirrorDisplayFollower()
+    /// The latest stats from each end (S6), for the HUD.
+    var mirrorHostStats: MirrorHostStats?
+    var mirrorClientStats: MirrorClientStats?
+    @ObservationIgnored let mirrorStatsBox = MirrorClientStatsBox()
+    /// The settings the mirror was started with (frame rate, sharpness,
+    /// Follow cursor). Set by `run(settings:)`.
+    @ObservationIgnored weak var mirrorSettings: DeckHandSettings?
 
     /// `true` once any `authorizationStatus` has arrived from the host.
     /// Gates the resync poll below — we stop asking once we've heard
@@ -96,6 +118,7 @@ final class ControlSessionModel {
     func run(settings: DeckHandSettings) async {
         let s = TrackpadSender(handle: connection)
         sender = s
+        mirrorSettings = settings
         capture.sender = s
         await s.setSendRate(hz: settings.inputSendRate.rawValue)
         // Load cached app list for instant display
@@ -160,6 +183,15 @@ final class ControlSessionModel {
         }
         defer { heartbeat.cancel() }
 
+        // The mirror's binary stream has its own reader, and its stats go
+        // back to the Mac once a second while the mirror runs.
+        let mirror = Task { [weak self] in await self?.runMirrorReceiver() }
+        let mirrorStats = Task { [weak self] in await self?.runMirrorStatsLoop() }
+        defer {
+            mirror.cancel()
+            mirrorStats.cancel()
+        }
+
         // Single consolidated message loop — no competing consumers
         await listenForHostMessages(liveness: liveness)
     }
@@ -192,28 +224,10 @@ final class ControlSessionModel {
                 continue
             }
             #if DEBUG
-            print("DeckHandiOS: 📥 \(data.count)B \(messageTypeName(message))")
-            #endif
-            // Mirror frames are the only high-rate inbound payload (≤20/s)
-            // and JPEG decode is the heavy part — decode them off the main
-            // actor and only do the cheap state swap here.
-            if case let .mirror(.frame(seq, frameData)) = message {
-                // This loop runs on the main actor, so decode in a detached
-                // task; up to 20 frames a second otherwise compete with
-                // touch handling and the heartbeat.
-                let decodedFrame = await Task.detached(priority: .userInitiated) {
-                    UIImage(data: frameData)?.preparingForDisplay()
-                }.value
-                guard let decoded = decodedFrame else { continue }
-                guard isMirrorActive else { continue }
-                // Ordered transport: a sequence REGRESSION can only mean
-                // the host restarted the stream (quality re-negotiation),
-                // so adopt the new numbering. Only exact duplicates drop.
-                guard seq != mirrorLastSeq else { continue }
-                mirrorLastSeq = seq
-                mirrorImage = decoded
-                continue
+            if case .diagnostics = message {} else {
+                print("DeckHandiOS: 📥 \(data.count)B \(messageTypeName(message))")
             }
+            #endif
             // Feature flags and receipts only concern the sender actor; no
             // UI state changes, so they skip the UI handling below.
             switch message {
@@ -297,12 +311,7 @@ final class ControlSessionModel {
             capture.handleScreenshotData(requestID: requestID, data: data)
 
         case let .mirror(.error(message)):
-            // Stop the mirror and surface the reason.
-            if isMirrorActive {
-                isMirrorActive = false
-                mirrorImage = nil
-                capture.showMirrorError(message)
-            }
+            handleMirrorError(message)
 
         case let .capture(.screenshotError(requestID, message)):
             capture.handleScreenshotError(requestID: requestID, message: message)
@@ -337,8 +346,11 @@ final class ControlSessionModel {
                 uiContext = snapshot
             }
 
-        case let .mirror(.displayList(_, selectedDisplayID)):
-            selectedMirrorDisplayID = selectedDisplayID
+        case let .mirror(.displayList(displays, selectedDisplayID)):
+            handleMirrorDisplayList(displays, selected: selectedDisplayID)
+
+        case let .diagnostics(.mirrorStats(stats)):
+            mirrorHostStats = stats
 
         case let .deck(.appMenuShortcutsResponse(bundleID, shortcuts)):
             let added = ShortcutStore.shared.importBindings(shortcuts, for: bundleID)
@@ -355,61 +367,6 @@ final class ControlSessionModel {
         default:
             break
         }
-    }
-
-    // MARK: - Live mirror control (WID-403)
-
-    /// Flips the mirror on/off: updates local UI state immediately for
-    /// responsiveness, then tells the Mac. Frame state is reset on stop so
-    /// a later restart begins with the loading placeholder, and the last
-    /// (~1 MB decoded) frame isn't retained while the mirror is hidden.
-    func toggleMirror(settings: DeckHandSettings) {
-        guard let sender else { return }
-        isMirrorActive.toggle()
-        if isMirrorActive {
-            mirrorLastSeq = 0
-            mirrorImage = nil
-            // Seed from the layout the mirror will restore to, so a large
-            // saved mirror opens at the right resolution instead of starting
-            // small and immediately renegotiating.
-            if settings.rememberMirrorLayout, let saved = settings.mirrorLayout {
-                mirrorNaturalWidth = MirrorThumbnailView.streamWidth(for: CGFloat(saved.width))
-            }
-            let fps = settings.mirrorFrameRate.rawValue
-            let width = settings.mirrorStreamWidth(naturalWidth: mirrorNaturalWidth)
-            let displayID = selectedMirrorDisplayID
-            Task { await sender.startMirror(fps: fps, maxWidth: width, displayID: displayID) }
-        } else {
-            mirrorImage = nil
-            Task { await sender.stopMirror() }
-        }
-    }
-
-    /// Re-negotiates the mirror stream to match how large the user has
-    /// pinched the thumbnail and what the sharpness and frame-rate settings
-    /// ask for, so text stays legible as it grows without paying for pixels a
-    /// corner tile would throw away. Stop+start is cheap — a sub-second
-    /// hiccup — and the sequence counter resets with the new stream so fresh
-    /// frames aren't dropped as stale.
-    func renegotiateMirror(settings: DeckHandSettings) {
-        guard let sender, isMirrorActive else { return }
-        mirrorLastSeq = 0
-        let fps = settings.mirrorFrameRate.rawValue
-        let width = settings.mirrorStreamWidth(naturalWidth: mirrorNaturalWidth)
-        let displayID = selectedMirrorDisplayID
-        Task {
-            await sender.stopMirror()
-            await sender.startMirror(
-                fps: fps,
-                maxWidth: width,
-                displayID: displayID
-            )
-        }
-    }
-
-    func switchSpace(_ direction: SpaceDirection) {
-        let displayID = selectedMirrorDisplayID
-        Task { await sender?.switchSpace(direction, displayID: displayID) }
     }
 }
 
