@@ -61,7 +61,18 @@ final class RunningAppMonitor {
 
     func addConnection(_ handle: LoomConnectionHandle, id: UUID) {
         connections[id] = handle
+        guard !isWithheld else { return }
         Task { try? await send(orderedBundleIDs, to: handle) }
+    }
+
+    /// The Mac locked or unlocked. Running apps are withheld while locked
+    /// (`LockPolicy.withholdsContext`) and sent again at the unlock.
+    func contextVisibilityChanged() {
+        Task { await broadcast() }
+    }
+
+    private var isWithheld: Bool {
+        LockPolicy.withholdsContext(MacLockMonitor.shared.state)
     }
 
     func removeConnection(id: UUID) {
@@ -117,6 +128,7 @@ final class RunningAppMonitor {
     // MARK: - Broadcast
 
     private func broadcast() async {
+        guard !isWithheld else { return }
         let snapshot = orderedBundleIDs
         for handle in connections.values {
             try? await send(snapshot, to: handle)
