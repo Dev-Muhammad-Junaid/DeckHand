@@ -72,6 +72,9 @@ public enum RemoteInputValidation {
                 displayID: displayID
             ))
 
+        case let .diagnostics(.mirrorClientStats(stats)):
+            return .diagnostics(.mirrorClientStats(stats: stats.sanitized()))
+
         case let .deck(.run(requestID, action)):
             // The action is checked as the message it stands for.
             guard isAcceptable(requestID), sanitize(action.message) == action.message else { return nil }

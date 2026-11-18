@@ -40,7 +40,7 @@ public enum ControlMessage: Sendable, Equatable {
     case session(SessionMessage)
     /// Clipboard and file sharing. Reserved; no messages yet.
     case sharing(SharingMessage)
-    /// Diagnostics and stats. Reserved; no messages yet.
+    /// Stream stats (S6). Both ways.
     case diagnostics(DiagnosticsMessage)
 
     /// The domain this message belongs to.
@@ -93,10 +93,11 @@ extension ControlMessage: Codable {
         case .capture: self = .capture(try c.decode(CaptureMessage.self, forKey: key))
         case .pairing: self = .pairing(try c.decode(PairingMessage.self, forKey: key))
         case .session: self = .session(try c.decode(SessionMessage.self, forKey: key))
+        case .diagnostics: self = .diagnostics(try c.decode(DiagnosticsMessage.self, forKey: key))
         // Reserved domains with no messages yet: nothing can decode. When a
         // domain gets its first case, decode it here like the others (the
         // golden fixture round trip fails until you do).
-        case .sharing, .diagnostics, .v: throw ProtocolError.unknownDomain
+        case .sharing, .v: throw ProtocolError.unknownDomain
         }
     }
 

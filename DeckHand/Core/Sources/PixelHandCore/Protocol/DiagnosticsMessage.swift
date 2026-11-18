@@ -3,27 +3,17 @@
 //  PixelHandCore
 //
 //  Domain: diagnostics. Connection and stream statistics shared between the
-//  two ends (for example S6's stats line), and debug reports. Reserved: no
-//  messages yet.
-//
-//  When the first case lands, delete the hand-written `Codable` below and
-//  let Swift synthesize it like the other domains, then add its golden
-//  fixture.
+//  two ends. Owned by the mirror lane (S6's stats line and HUD); the stats
+//  maths is in `Mirror/MirrorStats.swift`.
 //
 
 import Foundation
 
-public enum DiagnosticsMessage: Sendable, Equatable {}
-
-extension DiagnosticsMessage: Codable {
-    public init(from decoder: Decoder) throws {
-        throw DecodingError.dataCorrupted(.init(
-            codingPath: decoder.codingPath,
-            debugDescription: "No diagnostics messages are defined in protocol version \(PixelHandProtocol.version)"
-        ))
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        switch self {}
-    }
+public enum DiagnosticsMessage: Codable, Sendable, Equatable {
+    /// Mac → remote, every `MirrorStatsPolicy.reportInterval` while that
+    /// remote's mirror runs.
+    case mirrorStats(stats: MirrorHostStats)
+    /// Remote → Mac, every `MirrorStatsPolicy.reportInterval` while its
+    /// mirror runs. The Mac logs it with its own numbers as one line.
+    case mirrorClientStats(stats: MirrorClientStats)
 }

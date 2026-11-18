@@ -29,7 +29,9 @@ public enum PixelHandProtocol {
     ///   envelope, no version field, never advertised).
     /// - 2: one envelope over per-domain messages, typed actions with
     ///   receipts, `hostStatus`, `mirror.error`.
-    public static let version = 2
+    /// - 3: mirror frames and the cursor move to the binary mirror stream
+    ///   (`mirror.frame` removed); `diagnostics` carries mirror stats.
+    public static let version = 3
 
     /// Bonjour TXT key carrying `version`. Short, because TXT keys should
     /// stay under 9 bytes.

@@ -62,7 +62,8 @@ public struct HostStatus: Codable, Sendable, Equatable {
 public enum ProtocolFeature: String, Codable, Sendable, CaseIterable {
     /// The host answers `deck.run` with `deck.receipt`.
     case commandReceipts
-    /// Reserved for S5: the host can stream the mirror on its own binary
-    /// Loom stream (`PixelHandStream.mirror`, `BinaryFrameHeader`).
+    /// The host sends mirror frames and the cursor on their own binary Loom
+    /// stream (`PixelHandStream.mirror`, `BinaryFrameHeader`), not on the
+    /// control stream, and draws no cursor into the video (S3).
     case binaryMirrorStream
 }
