@@ -56,7 +56,8 @@ final class MirrorCursorSampler {
         }
         // NSCursor's hot spot is measured from the image's top-left corner.
         let hotSpot = cursor.hotSpot
-        guard let raw = cgImage.dataProvider?.data as Data? else { return lastShape }
+        guard let cfData = cgImage.dataProvider?.data else { return lastShape }
+        let raw = cfData as Data
         let key = MirrorCursorShape.makeID(png: raw, hotSpotX: Double(hotSpot.x), hotSpotY: Double(hotSpot.y))
         if key == lastShapeKey, let lastShape { return lastShape }
 
