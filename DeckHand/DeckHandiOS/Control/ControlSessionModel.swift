@@ -84,6 +84,16 @@ final class ControlSessionModel {
     private(set) var hostAccessibilityGranted: Bool?
     private(set) var hostScreenRecordingGranted: Bool?
 
+    // MARK: Mac system
+    // Pushed by the Mac (protocol 3). Logic: ControlSessionModel+MacSystem.swift.
+
+    /// Whether the Mac is locked; most requests are refused while it is.
+    var macLockState: MacLockState = .unlocked
+    /// The Mac's displays, Spaces and pointer display. `nil` until the Mac
+    /// sends it. The Mirror lane builds the display picker, desktop dots
+    /// and cursor badge on it.
+    var displayLayout: DisplayLayout?
+
     init(connection: LoomConnectionHandle, onAuthStatusChanged: @escaping (String) -> Void) {
         self.connection = connection
         self.onAuthStatusChanged = onAuthStatusChanged
@@ -336,6 +346,9 @@ final class ControlSessionModel {
             withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
                 uiContext = snapshot
             }
+
+        case let .system(m):
+            handleSystemMessage(m)
 
         case let .mirror(.displayList(_, selectedDisplayID)):
             selectedMirrorDisplayID = selectedDisplayID
