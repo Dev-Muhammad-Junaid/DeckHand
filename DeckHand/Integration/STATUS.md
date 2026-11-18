@@ -374,5 +374,28 @@ PixelHandShowDesktopMechanism dockNotification|dedicatedKey` (and
 `PixelHandLaunchpadMechanism`), record which one works, and change the
 default order (one line).
 
-Status: READY FOR MAC BUILD (build 2)
+
+## Mac build results (build 2, 2026-11-18, recorded by the coordinator)
+
+The owner's Mac build loop session ("DeckHand MAC build loop") built
+`40262b1` (build 2 plus docs): Mac and iOS builds green, Loom package tests
+green, 89 app tests pass. It reported this in its session but didn't write
+it here. Show Desktop / Apps mechanisms on macOS 27 still need a hands-on
+check by the owner.
+
+## Build 3 queued (2026-11-18)
+
+Merged `claude/pixelhand-foundation` (PH-003/004/005/010; see
+`FOUNDATION.md`, `LANES.md`, `DeckHand/Core/PROTOCOL.md`): the
+`PixelHandCore` package (protocol split per domain, versioned envelope,
+models, policies), `ControlReceiver` split into `Handlers/*`, `ControlView`,
+`QuickActionsBar` and Settings split into smaller views, and a Linux
+type-check script. 181 files changed; merge was conflict-free.
+
+Mac should check: full Mac and iOS build (many moves under `DeckHand/Shared/`),
+`swift test --package-path DeckHand/Core`, `swift test --scratch-path
+.build-local`, `DeckHandTests`, Settings screens on both platforms, connect /
+Allow / trackpad / mirror / chips still work after the protocol reset.
+
+Status: READY FOR MAC BUILD (build 3)
 

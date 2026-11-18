@@ -10,8 +10,6 @@ weekly usage limit is close).
 
 | Work | Session | Branch | Done when |
 | --- | --- | --- | --- |
-| Foundation (PH-003/004/005/010) | session_01H5HwAUdxqkDoK2sHAUPRDx | claude/pixelhand-foundation | `FOUNDATION.md` ends `Foundation: READY TO MERGE` |
-| Design strategy (no code) | session_01H5HwASjmJ3sabrVjVJ9Q1D | claude/pixelhand-design-strategy | `DeckHand/Product/Design/README.md` ends `Design strategy: READY FOR REVIEW` |
 | Mac build loop (owner's Mac) | session_01H5HwATvLJkqCFPruLyBsX8 | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
 
 ## Queue (start in order, max 3 running)
@@ -36,3 +34,9 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
 ## Merge log
 
 - 2026-11-17: build1 fixes merged (`dd7479b`); build 2 queued (`202984a`).
+- 2026-11-18: build 2 green on the Mac (89 app tests). Foundation merged
+  (`3789fab`); build 3 queued. Design strategy done
+  (`claude/pixelhand-design-strategy`, board https://claude.ai/artifact/Aa8KTJubKeqahy3cmSjRTm).
+  The scheduled fresh-session coordinator couldn't push (no repo source) and
+  was deleted; coordination moved to a cloud coordinator session.
+
