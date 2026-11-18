@@ -116,6 +116,8 @@ public enum LockPolicy {
 
     /// The copy for a refused screenshot.
     public static let lockedErrorMessage = "The Mac is locked."
+    /// Why the mirror stopped when another user took the Mac's screen.
+    public static let offConsoleMirrorMessage = "Another user is using this Mac, so the mirror stopped. It can start again once your account is back on the Mac's screen."
 
     /// One reading from the witnesses, or `nil` while none has answered.
     /// Off console beats locked beats unlocked; any witness saying so wins.

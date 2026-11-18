@@ -133,6 +133,7 @@ enum MenuShortcutDiscovery {
 @MainActor final class MacLockMonitor {
     static let shared = MacLockMonitor()
     private(set) var state: MacLockState = .unlocked
+    var connectionHandles: [UUID: LoomConnectionHandle] { [:] }
     func addConnection(_ handle: LoomConnectionHandle, id: UUID) {}
     func removeConnection(id: UUID) {}
 }

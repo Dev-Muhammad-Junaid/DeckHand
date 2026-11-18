@@ -99,6 +99,9 @@ final class MacLockMonitor {
         look()
     }
 
+    /// Approved remotes, by connection id.
+    var connectionHandles: [UUID: LoomConnectionHandle] { connections }
+
     func removeConnection(id: UUID) {
         connections.removeValue(forKey: id)
         if connections.isEmpty {

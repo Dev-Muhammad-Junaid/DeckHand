@@ -128,6 +128,17 @@ enum MacSystemSession {
             ContextObserver.shared.contextVisibilityChanged()
         }
         SpacesMonitor.shared.scheduleBroadcast()
+        if next == .offConsole {
+            // A capture of this session's display off console shows its
+            // desktop behind the login window: stop every mirror now. The
+            // gate refuses a new start until this session is back.
+            for (id, handle) in MacLockMonitor.shared.connectionHandles {
+                Task {
+                    await MirrorStreamService.shared.stop(subscriberID: id)
+                    try? await handle.send(.mirror(.error(message: LockPolicy.offConsoleMirrorMessage)))
+                }
+            }
+        }
         if !next.isLocked {
             LockGate.shared.unlocked()
         }
