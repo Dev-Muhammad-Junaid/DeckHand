@@ -107,9 +107,9 @@ final class LockGate {
 @MainActor
 enum MacSystemSession {
     static func connectionAdded(_ handle: LoomConnectionHandle, id: UUID) {
-        // Lock state first: the other monitors read it.
+        // Lock state first: the other monitors read it. It also declares
+        // display activity for the connection.
         MacLockMonitor.shared.addConnection(handle, id: id)
-        DisplayWake.shared.note(.connected, lock: MacLockMonitor.shared.state)
         SpacesMonitor.shared.addConnection(handle, id: id)
     }
 

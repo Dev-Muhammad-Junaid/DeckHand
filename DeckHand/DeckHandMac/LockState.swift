@@ -55,6 +55,7 @@ final class MacLockMonitor {
     private var lookAgain = false
     private var unansweredLooks = 0
     private var gateDisabled = false
+    private var pendingConnectWake = false
     private let notificationRelay = LockNotificationRelay()
 
     private static let notifyName = "com.apple.sessionagent.screenIsLocked"
@@ -80,12 +81,20 @@ final class MacLockMonitor {
 
     // MARK: - Connections
 
-    /// Sends the current state to a new remote and keeps looking once a
-    /// second while any remote is connected.
+    /// Sends the current state to a new remote, declares display activity
+    /// for the connection, and keeps looking once a second while any
+    /// remote is connected. Before the first reading has finished (the
+    /// first connection after launch) both wait for it, so the remote
+    /// never sees a passing "off console" and the display still wakes.
     func addConnection(_ handle: LoomConnectionHandle, id: UUID) {
         connections[id] = handle
-        let current = state
-        Task { try? await handle.send(.system(.lockState(state: current))) }
+        if reader.hasFirstReading {
+            let current = state
+            Task { try? await handle.send(.system(.lockState(state: current))) }
+            DisplayWake.shared.note(.connected, lock: current)
+        } else {
+            pendingConnectWake = true
+        }
         startPollingIfNeeded()
         look()
     }
@@ -227,16 +236,24 @@ final class MacLockMonitor {
         }
         #endif
         let previous = state
+        let hadFirstReading = reader.hasFirstReading
         let next = reader.update(raw, at: now)
         scheduleSettleLook()
-        guard next != previous else { return }
+        let isFirstReading = !hadFirstReading && reader.hasFirstReading
+        guard next != previous || isFirstReading else { return }
         state = next
-        log(previous: previous, next: next)
+        if next != previous { log(previous: previous, next: next) }
         let message = ControlMessage.system(.lockState(state: next))
         for handle in connections.values {
             Task { try? await handle.send(message) }
         }
-        MacSystemSession.lockStateChanged(from: previous, to: next)
+        if isFirstReading, pendingConnectWake {
+            pendingConnectWake = false
+            DisplayWake.shared.note(.connected, lock: next)
+        }
+        if next != previous {
+            MacSystemSession.lockStateChanged(from: previous, to: next)
+        }
     }
 
     /// Looks again when a pending unlock will have settled.
