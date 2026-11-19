@@ -6,34 +6,49 @@
 import Foundation
 import Loom
 
-/// Lets an identity-verified device finish Loom's handshake so the Mac can ask
-/// Allow / Deny at the app level.
+/// Pixel Hand's trust hooks into Loom's handshake, backed by the Mac's
+/// `PairedDeviceStore` (S4).
 ///
-/// Loom 2.x fails closed: a trust provider that answers `.requiresApproval`
-/// denies the handshake before the device can reach `DeviceAuthorizationManager`.
-/// Pixel Hand's own approval runs after the session is up and is deliberately
-/// not persisted, so the handshake only checks that the peer proved ownership
-/// of the identity key it presented. Approval still gates every command:
-/// `ControlReceiver` only observes handles that `DeviceAuthorizationManager`
-/// authorized.
+/// - `evaluateTrustOutcome`: a device finishes the handshake only if it
+///   proved ownership of the identity key it presented. Loom 2.x fails
+///   closed (`.requiresApproval` is a denial), so every verified device is
+///   `.trusted` here; paired or not is decided right after, by
+///   `DeviceAuthorizationManager` through `PairedDeviceStore.admission(for:)`
+///   (paired: no prompt; unknown: Allow / Deny or a pairing code). Approval
+///   still gates every command: `ControlReceiver` only observes handles the
+///   manager authorized.
+/// - `grantTrust(to:)`: pairs the device (the manager calls it when a
+///   pairing code is accepted).
+/// - `revokeTrust(for:)`: forgets what was paired with that device ID.
 @MainActor
 final class DeckHandHandshakeTrustProvider: LoomTrustProvider {
+    private let store: PairedDeviceStore
+
+    init(store: PairedDeviceStore = .shared) {
+        self.store = store
+    }
+
     nonisolated func evaluateTrust(for peer: LoomPeerIdentity) async -> LoomTrustDecision {
         await evaluateTrustOutcome(for: peer).decision
     }
 
     nonisolated func evaluateTrustOutcome(for peer: LoomPeerIdentity) async -> LoomTrustEvaluation {
-        guard peer.isIdentityAuthenticated,
-              let identityKeyID = peer.identityKeyID,
-              let identityPublicKey = peer.identityPublicKey,
-              LoomIdentityManager.keyID(for: identityPublicKey) == identityKeyID else {
+        guard TrustCandidate(identity: peer) != nil else {
             return LoomTrustEvaluation(decision: .denied, shouldShowAutoTrustNotice: false)
         }
         return LoomTrustEvaluation(decision: .trusted, shouldShowAutoTrustNotice: false)
     }
 
-    /// Nothing is persisted: approval lasts for one host launch, by design.
-    nonisolated func grantTrust(to peer: LoomPeerIdentity) async throws {}
+    /// Pairs `peer` by its verified identity key. Throws when the key
+    /// wasn't verified.
+    func grantTrust(to peer: LoomPeerIdentity) async throws {
+        guard let candidate = TrustCandidate(identity: peer) else {
+            throw TrustList.TrustError.invalidIdentityKeyID
+        }
+        try store.pair(candidate, method: .code)
+    }
 
-    nonisolated func revokeTrust(for deviceID: UUID) async throws {}
+    func revokeTrust(for deviceID: UUID) async throws {
+        store.forgetAll(deviceID: deviceID)
+    }
 }

@@ -27,13 +27,17 @@ files=(
   "$app/DeckHandMac/Network/LinkObservation+Loom.swift"
   "$app/DeckHandMac/LockGate.swift"
   "$app/DeckHandMac/Mirror/MirrorSubscriber.swift"
+  "$app/DeckHandMac/DeviceAuthorizationManager.swift"
+  "$app/DeckHandMac/DeckHandHandshakeTrustProvider.swift"
+  "$app/DeckHandMac/Pairing/PairedDeviceStore.swift"
+  "$app/Shared/Pairing+Loom.swift"
   "$app/DeckHandiOS/TrackpadSender.swift"
   "$app/DeckHandiOS/Mirror/MirrorStreamReceiver.swift"
   "$app/Shared/LoomConnectionHandle+ControlMessage.swift"
   "$@"
 )
 for file in "${files[@]}"; do
-  sed -E '/^import (AppKit|LoomKit|Loom|CoreGraphics|IOKit|os|QuartzCore|SwiftUI|UIKit)$/d' "$file" > "$work/$(basename "$file")"
+  sed -E '/^import (AppKit|Combine|LoomKit|Loom|CoreGraphics|IOKit|os|QuartzCore|SwiftUI|UIKit|UserNotifications)$/d' "$file" > "$work/$(basename "$file")"
 done
 
 cd "$here"
