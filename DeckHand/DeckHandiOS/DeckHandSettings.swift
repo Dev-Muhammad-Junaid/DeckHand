@@ -36,6 +36,7 @@ final class DeckHandSettings: ObservableObject {
         static let mirrorFollowsCursor = "settings.mirrorFollowsCursor"
         static let showMirrorStats = "settings.showMirrorStats"
         static let mirrorPrefersHEVC = "settings.mirrorPrefersHEVC"
+        static let mirrorPlaysMacAudio = "settings.mirrorPlaysMacAudio"
         static let screenshotQuality = "settings.screenshotQuality"
         static let defaultCapture = "settings.defaultCapture"
         static let autoSaveToPhotos = "settings.autoSaveToPhotos"
@@ -146,6 +147,11 @@ final class DeckHandSettings: ObservableObject {
         didSet { defaults.set(mirrorPrefersHEVC, forKey: Key.mirrorPrefersHEVC) }
     }
 
+    /// Plays the Mac's sound while mirroring (S17). Off by default.
+    @Published var mirrorPlaysMacAudio: Bool {
+        didSet { defaults.set(mirrorPlaysMacAudio, forKey: Key.mirrorPlaysMacAudio) }
+    }
+
     // ── Screenshots ─────────────────────────────────────────────────
     @Published var screenshotQuality: CaptureQuality {
         didSet { defaults.set(screenshotQuality.rawValue, forKey: Key.screenshotQuality) }
@@ -201,6 +207,7 @@ final class DeckHandSettings: ObservableObject {
         mirrorFollowsCursor = defaults.bool(forKey: Key.mirrorFollowsCursor)
         showMirrorStats = defaults.bool(forKey: Key.showMirrorStats)
         mirrorPrefersHEVC = defaults.object(forKey: Key.mirrorPrefersHEVC) as? Bool ?? true
+        mirrorPlaysMacAudio = defaults.bool(forKey: Key.mirrorPlaysMacAudio)
 
         screenshotQuality = (defaults.string(forKey: Key.screenshotQuality)
             .flatMap(CaptureQuality.init(rawValue:))) ?? .standard

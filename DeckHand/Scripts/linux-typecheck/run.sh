@@ -39,6 +39,7 @@ files=(
   "$app/DeckHandiOS/TrackpadSender.swift"
   "$app/DeckHandiOS/Clipboard/RemoteClipboard.swift"
   "$app/DeckHandiOS/Mirror/MirrorStreamReceiver.swift"
+  "$app/DeckHandiOS/Audio/MirrorAudioReceiver.swift"
   "$app/Shared/LoomConnectionHandle+ControlMessage.swift"
   "$@"
 )

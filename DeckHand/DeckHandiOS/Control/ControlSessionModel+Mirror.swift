@@ -18,7 +18,9 @@
 //  - one window instead of a display (S14): the picker's "Window…" entry
 //    opens the capture window picker; the window ID rides every start
 //    until a display is picked or the Mac falls back (`mirror.error` with
-//    a `fallbackDisplayID`, shown as a passing notice).
+//    a `fallbackDisplayID`, shown as a passing notice);
+//  - the Mac's sound (S17) starts and stops with the mirror
+//    (ControlSessionModel+Audio.swift).
 //
 
 import LoomKit
@@ -36,7 +38,10 @@ extension ControlSessionModel: MirrorStreamSink {
 
     /// Reads the mirror stream until the session ends.
     func runMirrorReceiver() async {
+        // S17: the Mac's sound has its own stream and reader alongside.
+        async let audio: Void = runMirrorAudio()
         await MirrorStreamReceiver(stats: mirrorStatsBox).run(connection: connection, sink: self)
+        await audio
     }
 
     /// Four times a second, the HEVC watchdog's clock; once a second while
@@ -57,7 +62,8 @@ extension ControlSessionModel: MirrorStreamSink {
             guard elapsed >= .seconds(MirrorStatsPolicy.reportInterval) else { continue }
             windowStart = .now
             let seconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
-            let stats = mirrorStatsBox.takeStats(elapsed: seconds)
+            var stats = mirrorStatsBox.takeStats(elapsed: seconds)
+            stats.audio = mirrorAudio.takeStats() // S17; nil while no sound arrives
             guard isMirrorActive else { continue }
             mirrorClientStats = stats
             try? await connection.send(.diagnostics(.mirrorClientStats(stats: stats)))
@@ -164,6 +170,7 @@ extension ControlSessionModel: MirrorStreamSink {
         guard isMirrorActive else { return }
         isMirrorActive = false
         clearMirrorState()
+        syncMirrorAudio()
         capture.showMirrorError(message)
     }
 
@@ -196,6 +203,8 @@ extension ControlSessionModel: MirrorStreamSink {
             clearMirrorState()
             Task { await sender.stopMirror() }
         }
+        // S17: the Mac's sound comes and goes with the mirror.
+        syncMirrorAudio()
     }
 
     /// Re-negotiates the mirror to match how large the user has pinched the
@@ -257,7 +266,7 @@ extension ControlSessionModel: MirrorStreamSink {
     /// locked (the gate refuses window mirrors then).
     var canMirrorWindow: Bool { !macLockState.isLocked }
 
-    private func showMirrorNotice(_ message: String) {
+    func showMirrorNotice(_ message: String) {
         mirrorNoticeTask?.cancel()
         withAnimation(.easeInOut(duration: 0.2)) { mirrorNotice = message }
         mirrorNoticeTask = Task { @MainActor [weak self] in
