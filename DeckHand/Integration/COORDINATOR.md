@@ -24,23 +24,26 @@ weekly usage limit is close).
 
 | Work | Session | Branch | Done when |
 | --- | --- | --- | --- |
+| Fixes from Mac build 7 (started by the primary session) | (see primary) | claude/pixelhand-lane-build7-fixes | marker `Lane: READY TO MERGE`; then queue build 8 |
+| Lane: Design foundation (UX-001, UX-015, UX-002, UX-003; UX-008 if time) | session_01H5HwAV3VhDHk1ihCzNeneg | claude/pixelhand-lane-design-foundation | `LANE-design-foundation.md` ends `Lane: READY TO MERGE` |
+| Lane: Deck 2 model (D1 + Mac execution + DeckStore) | session_01H5HwAV6p8GVQAcj8VAQXfB | claude/pixelhand-lane-deck2-model | `LANE-deck2-model.md` ends `Lane: READY TO MERGE` |
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac) — **archived since 2026-11-18; start a new Mac session** | session_01H5HwATvLJkqCFPruLyBsX8 (archived) | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
 
 ## Queue (start in order, max 3 running)
 
-**Sill phase complete:** every lane is merged (Network, Mac system control,
-Mirror, Mirror 2, iOS interaction, Pairing, Mirror window, Network VPN,
-Audio, Store). No lane sessions are running.
+**Sill phase complete; roadmap + redesign phase started 2026-11-19.**
+Design: Option A "Dock & Canvas", tickets in `DeckHand/Product/Design/05-Implementation-Plan.md`.
 
-Next, the roadmap and redesign phase. It **waits for a green Mac build** of
-build 7 (the brief's gate). After that: merge the
-`claude/pixelhand-design-strategy` docs, take its recommended option, then
-design system + new layout, Deck 2, App Intents/widgets/Control Center,
-multi-Mac, sharing between paired devices, AI (on-device first), iPhone
-Fold two-pane, PiP live screen (backlog on `claude/pixelhand-product-spec`).
-S16 virtual display stays deferred. If build 7 has bugs, route them to one
-fix session first.
+Next, in order (max 3 running, counting fix sessions):
+1. After Design foundation merges: UX-004 Pointer surface (iOS interaction),
+   UX-005 context strip + app dock, UX-006 Screen surface (Mirror), UX-007
+   arrangements, UX-008 header, then UX-009…UX-019 (pixel identity).
+2. After Deck 2 model merges and the shell exists: UX-020 Deck 2 UI (D2/D3).
+3. App Intents / widgets / Control Center.
+4. Multi-Mac (UX-030), sharing between paired devices (UX-031).
+5. AI on-device first (UX-021, UX-022).
+6. iPhone Duo two-pane (UX-040), PiP live screen (UX-041).
 
 Lanes start only after Foundation is merged. Each lane: own branch from
 `claude/pixelhand-integration`, follows `LANES.md` file ownership,
@@ -86,3 +89,10 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
 - 2026-11-19 21:47 UTC: tick 6. Nothing new. Build 7 is still waiting. The
   recorded Mac loop session is archived, so no Mac will build until the owner
   starts a new Mac session with the `/loop` line at the top.
+- 2026-11-19 ~22:55 UTC: the primary session reported build 7 green on the
+  Mac (`2d14aff`, 5 compile fixes; 2 bugs that are Simulator-only or a flaky
+  test) and passed the redesign gate. It started the build 7 fix session and
+  recorded App Store Connect done (`7404f08`). The owner is testing by hand;
+  ticks are every 60 min while work runs. Merged the design-strategy docs
+  (`d38f34e`). Started Design foundation and Deck 2 model (3 running,
+  counting the fix session).
