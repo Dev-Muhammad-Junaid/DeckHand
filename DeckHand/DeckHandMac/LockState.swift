@@ -34,6 +34,7 @@ import CoreGraphics
 import Darwin
 import Foundation
 import LoomKit
+import notify
 import SystemConfiguration
 
 @MainActor
