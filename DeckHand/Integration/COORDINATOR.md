@@ -24,7 +24,7 @@ weekly usage limit is close).
 | Work | Session | Branch | Done when |
 | --- | --- | --- | --- |
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
-| Mac build loop (owner's Mac) | session_01H5HwATvLJkqCFPruLyBsX8 | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
+| Mac build loop (owner's Mac) — **archived since 2026-11-18; start a new Mac session** | session_01H5HwATvLJkqCFPruLyBsX8 (archived) | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
 
 ## Queue (start in order, max 3 running)
 
@@ -82,3 +82,6 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   (`project.yml` StoreKit config applied). Core 497 tests and the type check
   are green. Build 7 queued: the whole Sill phase. Roadmap waits for a green
   Mac build; ticks are now every 180 min.
+- 2026-11-19 21:47 UTC: tick 6. Nothing new. Build 7 is still waiting. The
+  recorded Mac loop session is archived, so no Mac will build until the owner
+  starts a new Mac session with the `/loop` line at the top.
