@@ -84,12 +84,14 @@ public enum RemoteInputValidation {
         case let .capture(.requestWindowList(requestID)):
             return isAcceptable(requestID) ? message : nil
 
-        case let .mirror(.start(fps, maxWidth, displayID, codec)):
+        case let .mirror(.start(fps, maxWidth, displayID, codec, windowID)):
             return .mirror(.start(
                 fps: clamp(fps, to: mirrorFPSRange),
                 maxWidth: clamp(maxWidth, to: mirrorWidthRange),
                 displayID: displayID,
-                codec: codec
+                codec: codec,
+                // S14: 0 is never a CGWindowID; read it as "a display".
+                windowID: windowID == 0 ? nil : windowID
             ))
 
         case let .diagnostics(.mirrorClientStats(stats)):

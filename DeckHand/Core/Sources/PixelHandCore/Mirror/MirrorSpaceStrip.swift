@@ -60,6 +60,10 @@ public struct MirrorSpaceStrip: Equatable, Sendable {
     /// watches).
     public static let unknown = MirrorSpaceStrip(dots: [], previous: .enabled, next: .enabled)
 
+    /// S14: a window is mirrored. Spaces belong to displays, so no dots and
+    /// no ‹ ›.
+    public static let window = MirrorSpaceStrip(dots: [], previous: .hidden, next: .hidden)
+
     /// Longest full-screen label, in characters, before it is cut with "…".
     public static let maxLabelLength = 10
 

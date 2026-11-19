@@ -14,7 +14,11 @@
 //  - the desktop dots and ‹ › states (`mirrorSpaceStrip`);
 //  - the stats window sent back to the Mac once a second (S6);
 //  - HEVC video (S5): which codec to ask for, feeding the display layer,
-//    and the watchdog (key frame requests, fallback to JPEG).
+//    and the watchdog (key frame requests, fallback to JPEG);
+//  - one window instead of a display (S14): the picker's "Window…" entry
+//    opens the capture window picker; the window ID rides every start
+//    until a display is picked or the Mac falls back (`mirror.error` with
+//    a `fallbackDisplayID`, shown as a passing notice).
 //
 
 import LoomKit
@@ -115,6 +119,9 @@ extension ControlSessionModel: MirrorStreamSink {
         if mirrorCursor != state {
             mirrorCursor = state
         }
+        if mirrorCursorInsideMirror != state.isOnMirroredDisplay {
+            mirrorCursorInsideMirror = state.isOnMirroredDisplay
+        }
         let cursorDisplayID: UInt32? = state.displayID == 0 ? nil : state.displayID
         if mirrorCursorDisplayID != cursorDisplayID {
             mirrorCursorDisplayID = cursorDisplayID
@@ -131,15 +138,28 @@ extension ControlSessionModel: MirrorStreamSink {
 
     // MARK: - Control-stream messages
 
-    func handleMirrorDisplayList(_ displays: [DisplayInfo], selected: UInt32) {
+    func handleMirrorDisplayList(_ displays: [DisplayInfo], selected: UInt32, window: MirroredWindow?) {
         mirrorDisplays = displays
         if selectedMirrorDisplayID != selected {
             selectedMirrorDisplayID = selected
             mirrorFollower.reset()
         }
+        if mirrorWindowSelection.window != window {
+            mirrorWindowSelection.hostReported(window: window)
+        }
     }
 
-    func handleMirrorError(_ message: String) {
+    func handleMirrorError(_ message: String, fallbackDisplayID: UInt32?) {
+        if let fallbackDisplayID {
+            // S14: the mirrored window ended; the Mac already shows its
+            // display. Keep the mirror, say why.
+            guard isMirrorActive else { return }
+            mirrorWindowSelection.windowEnded()
+            selectedMirrorDisplayID = fallbackDisplayID
+            mirrorFollower.reset()
+            showMirrorNotice(message)
+            return
+        }
         // Stop the mirror and surface the reason.
         guard isMirrorActive else { return }
         isMirrorActive = false
@@ -170,7 +190,8 @@ extension ControlSessionModel: MirrorStreamSink {
             let displayID = selectedMirrorDisplayID
             let codec = mirrorRequestedCodec(settings)
             mirrorLastRequestedCodec = codec
-            Task { await sender.startMirror(fps: fps, maxWidth: width, displayID: displayID, codec: codec) }
+            // A fresh mirror shows a display; a window is picked from it.
+            Task { await sender.startMirror(fps: fps, maxWidth: width, displayID: displayID, codec: codec, windowID: nil) }
         } else {
             clearMirrorState()
             Task { await sender.stopMirror() }
@@ -189,8 +210,10 @@ extension ControlSessionModel: MirrorStreamSink {
     /// Points the mirror at another display (the picker, Follow cursor, the
     /// badge).
     func selectMirrorDisplay(_ displayID: UInt32) {
-        guard displayID != selectedMirrorDisplayID else { return }
+        // Picking the window's own display leaves the window (S14).
+        guard displayID != selectedMirrorDisplayID || mirrorWindowSelection.isActive else { return }
         // Shown at once; the Mac confirms with `displayList`.
+        mirrorWindowSelection.selectDisplay()
         selectedMirrorDisplayID = displayID
         mirrorFollower.reset()
         restartMirror(displayID: displayID)
@@ -209,26 +232,66 @@ extension ControlSessionModel: MirrorStreamSink {
         Task { await sender?.switchSpace(direction, displayID: displayID) }
     }
 
+    // MARK: - Window mirror (S14)
+
+    /// The picker's "Window…": the capture window picker, whose pick
+    /// mirrors that window.
+    func openMirrorWindowPicker() {
+        guard isMirrorActive, !macLockState.isLocked else { return }
+        capture.onPickMirrorWindow = { [weak self] window in
+            self?.mirrorWindow(window.windowID)
+        }
+        capture.openWindowPicker(purpose: .mirror)
+    }
+
+    /// Mirrors one window; the Mac confirms with `displayList(window:)` or
+    /// falls back with `mirror.error`.
+    func mirrorWindow(_ windowID: UInt32) {
+        guard isMirrorActive, !macLockState.isLocked else { return }
+        mirrorWindowSelection.selectWindow(windowID)
+        mirrorFollower.reset()
+        restartMirror(displayID: selectedMirrorDisplayID)
+    }
+
+    /// Whether the picker's "Window…" can be used: not while the Mac is
+    /// locked (the gate refuses window mirrors then).
+    var canMirrorWindow: Bool { !macLockState.isLocked }
+
+    private func showMirrorNotice(_ message: String) {
+        mirrorNoticeTask?.cancel()
+        withAnimation(.easeInOut(duration: 0.2)) { mirrorNotice = message }
+        mirrorNoticeTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled, let self else { return }
+            withAnimation(.easeInOut(duration: 0.2)) { self.mirrorNotice = nil }
+        }
+    }
+
     /// What the mirror's display chrome shows now.
     var mirrorChrome: MirrorDisplayChrome {
         MirrorDisplayChrome.make(
             displays: mirrorDisplays,
             mirroredDisplayID: selectedMirrorDisplayID,
             cursorDisplayID: MirrorDisplayChrome.cursorDisplayID(stream: mirrorCursorDisplayID, layout: displayLayout),
-            followsCursor: mirrorSettings?.mirrorFollowsCursor ?? false
+            followsCursor: mirrorSettings?.mirrorFollowsCursor ?? false,
+            mirroringWindow: mirrorWindowSelection.isActive,
+            cursorOverWindow: mirrorCursorInsideMirror
         )
     }
 
     /// The desktop dots and ‹ › states for the mirrored display, from the
-    /// Mac's display snapshot (`displayLayout`, Mac system lane).
+    /// Mac's display snapshot (`displayLayout`, Mac system lane). None for
+    /// a window.
     var mirrorSpaceStrip: MirrorSpaceStrip {
-        MirrorSpaceStrip.make(layout: displayLayout, mirroredDisplayID: selectedMirrorDisplayID)
+        if mirrorWindowSelection.isActive { return .window }
+        return MirrorSpaceStrip.make(layout: displayLayout, mirroredDisplayID: selectedMirrorDisplayID)
     }
 
-    /// The mirrored display's width in points, for scaling the pointer.
+    /// The mirrored display's (or window's) width in points, for scaling
+    /// the pointer.
     var mirroredDisplayPointWidth: Double {
         let display = mirrorDisplays.first { $0.displayID == selectedMirrorDisplayID }
-        return Double(display?.width ?? 1_440)
+        return mirrorWindowSelection.pointWidth(displayWidth: Double(display?.width ?? 1_440))
     }
 
     // MARK: - Helpers
@@ -244,7 +307,8 @@ extension ControlSessionModel: MirrorStreamSink {
             mirrorWatchdog.reset(now: CACurrentMediaTime())
         }
         mirrorLastRequestedCodec = codec
-        Task { await sender.startMirror(fps: fps, maxWidth: width, displayID: displayID, codec: codec) }
+        let windowID = mirrorWindowSelection.requestedWindowID
+        Task { await sender.startMirror(fps: fps, maxWidth: width, displayID: displayID, codec: codec, windowID: windowID) }
     }
 
     /// The codec to ask the Mac for (S5).
@@ -273,7 +337,8 @@ extension ControlSessionModel: MirrorStreamSink {
     }
 
     private func followCursorIfNeeded(_ state: MirrorCursorState) {
-        guard mirrorSettings?.mirrorFollowsCursor == true else { return }
+        // A window mirror doesn't follow the pointer to another display.
+        guard mirrorSettings?.mirrorFollowsCursor == true, !mirrorWindowSelection.isActive else { return }
         let target = mirrorFollower.update(
             cursorDisplayID: state.displayID,
             mirroredDisplayID: selectedMirrorDisplayID,
@@ -292,7 +357,11 @@ extension ControlSessionModel: MirrorStreamSink {
         mirrorVideoRenderer.flush()
         mirrorWatchdog = MirrorVideoWatchdog(now: CACurrentMediaTime())
         mirrorCursor = nil
+        mirrorCursorInsideMirror = nil
         mirrorCursorDisplayID = nil
+        mirrorWindowSelection.selectDisplay()
+        mirrorNoticeTask?.cancel()
+        mirrorNotice = nil
         mirrorCursorSprite = nil
         mirrorHostStats = nil
         mirrorClientStats = nil

@@ -3,7 +3,8 @@
 //  DeckHandiOS
 //
 //  Modal sheet that shows every visible Mac window from the latest
-//  `windowListResponse` so the user can pick one to capture.
+//  `windowListResponse` so the user can pick one to capture, or to mirror
+//  (S14: the live mirror's "Window…" entry).
 //
 //  Layout: an adaptive `LazyVGrid` so wider devices (iPad, iPhone Pro Max
 //  in landscape) see more cells per row and selection stays fast. Cells
@@ -31,6 +32,9 @@ struct WindowPickerView: View {
     let onPick: (WindowInfo) -> Void
     let onRefresh: () -> Void
     let onCancel: () -> Void
+    /// "Capture Window", or "Mirror Window" when the live mirror's picker
+    /// opened it (S14).
+    var title: String = "Capture Window"
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -69,7 +73,7 @@ struct WindowPickerView: View {
                     grid
                 }
             }
-            .navigationTitle("Capture Window")
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

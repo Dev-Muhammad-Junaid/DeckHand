@@ -25,12 +25,22 @@ final class MirrorCursorSampler {
 
     /// Where the pointer is relative to `mirroredDisplayID`.
     func state(mirroredDisplayID: CGDirectDisplayID, shapeID: UInt32) -> MirrorCursorState? {
-        guard let location = CGEvent(source: nil)?.location else { return nil }
         let bounds = CGDisplayBounds(mirroredDisplayID)
+        return state(
+            in: MirrorRect(x: bounds.origin.x, y: bounds.origin.y, width: bounds.width, height: bounds.height),
+            shapeID: shapeID
+        )
+    }
+
+    /// Where the pointer is relative to `region` (global points): the
+    /// mirrored display, or a mirrored window's frame (S14), where
+    /// `isOnMirroredDisplay` means "over the window".
+    func state(in region: MirrorRect, shapeID: UInt32) -> MirrorCursorState? {
+        guard let location = CGEvent(source: nil)?.location else { return nil }
         let position = MirrorCursorGeometry.normalized(
             x: Double(location.x),
             y: Double(location.y),
-            in: MirrorRect(x: bounds.origin.x, y: bounds.origin.y, width: bounds.width, height: bounds.height)
+            in: region
         )
         return MirrorCursorState(
             x: position.x,

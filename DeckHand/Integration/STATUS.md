@@ -495,3 +495,19 @@ Mac should check:
    sides.
 
 Status: READY FOR MAC BUILD (build 5)
+
+## Build 6 queued (2026-11-19)
+
+Build 5 hasn't been built yet. Build 6 replaces it: everything in builds
+3–5 plus **Mirror window** (`LANE-mirror-window.md`): S14 single-window
+streaming. `mirror.start` gains an optional `windowID`; there's a "Window…"
+entry in the display picker; the cursor maps into the window; and when the
+window closes, the mirror falls back to its display. Protocol is now
+**version 9**. Linux: Core **389 tests pass**, type check clean. The apps
+were not compiled here.
+
+Mac should check: everything listed for build 5, then `LANE-mirror-window.md`'s
+check table (mirror one Safari window with JPEG and HEVC, resize it, close
+it, lock the Mac while it runs).
+
+Status: READY FOR MAC BUILD (build 6)
