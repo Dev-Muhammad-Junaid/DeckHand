@@ -339,8 +339,8 @@ actor TrackpadSender {
     /// 640px @ 20 fps keeps frames in the 20–50 KB range — smooth on LAN,
     /// far below anything that could starve the 120 Hz input path. The
     /// expanded thumbnail re-negotiates at a higher width (see ControlView).
-    func startMirror(fps: Int = 20, maxWidth: Int = 640, displayID: UInt32? = nil, codec: MirrorCodec = .jpeg) async {
-        await send(.mirror(.start(fps: fps, maxWidth: maxWidth, displayID: displayID, codec: codec)))
+    func startMirror(fps: Int = 20, maxWidth: Int = 640, displayID: UInt32? = nil, codec: MirrorCodec = .jpeg, windowID: UInt32? = nil) async {
+        await send(.mirror(.start(fps: fps, maxWidth: maxWidth, displayID: displayID, codec: codec, windowID: windowID)))
     }
 
     func stopMirror() async {

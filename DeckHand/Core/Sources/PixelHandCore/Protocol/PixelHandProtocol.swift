@@ -40,8 +40,9 @@ public enum PixelHandProtocol {
     ///   `sharing` domain for clipboard text.
     /// - 8: persistent pairing (S4): `pairing.submitCode`, `codeResult`,
     ///   `pairedStatus` and `forget`.
-    /// - 9: remote access over a VPN (S15): `session.remoteHosts`.
-    public static let version = 9
+    /// - 9: single-window mirror (S14): `mirror.start` gains `windowID`.
+    /// - 10: remote access over a VPN (S15): `session.remoteHosts`.
+    public static let version = 10
 
     /// Bonjour TXT key carrying `version`. Short, because TXT keys should
     /// stay under 9 bytes.

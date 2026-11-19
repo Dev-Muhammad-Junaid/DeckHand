@@ -123,12 +123,20 @@ import Testing
             (20, 480, 20, 480),
         ]
         for (fps, width, expectedFPS, expectedWidth) in cases {
-            let message = try #require(RemoteInputValidation.sanitize(.mirror(.start(fps: fps, maxWidth: width, displayID: 7, codec: .jpeg))))
-            guard case let .mirror(.start(outFPS, outWidth, displayID, _)) = message else { Issue.record("\(message)"); return }
+            let message = try #require(RemoteInputValidation.sanitize(.mirror(.start(fps: fps, maxWidth: width, displayID: 7, codec: .jpeg, windowID: nil))))
+            guard case let .mirror(.start(outFPS, outWidth, displayID, _, _)) = message else { Issue.record("\(message)"); return }
             #expect(outFPS == expectedFPS)
             #expect(outWidth == expectedWidth)
             #expect(displayID == 7)
         }
+    }
+
+    @Test("A window mirror's ID passes through; 0 reads as a display (S14)")
+    func mirrorWindowID() throws {
+        let window = try #require(RemoteInputValidation.sanitize(.mirror(.start(fps: 20, maxWidth: 640, displayID: 1, codec: .hevc, windowID: 42))))
+        #expect(window == .mirror(.start(fps: 20, maxWidth: 640, displayID: 1, codec: .hevc, windowID: 42)))
+        let zero = try #require(RemoteInputValidation.sanitize(.mirror(.start(fps: 20, maxWidth: 640, displayID: 1, codec: .jpeg, windowID: 0))))
+        #expect(zero == .mirror(.start(fps: 20, maxWidth: 640, displayID: 1, codec: .jpeg, windowID: nil)))
     }
 
     // MARK: - Tracked runs, strings and pass-through

@@ -178,7 +178,7 @@ func CGGetActiveDisplayList(_ max: UInt32, _ ids: UnsafeMutablePointer<CGDirectD
 }
 @MainActor final class MirrorStreamService {
     static let shared = MirrorStreamService()
-    func start(subscriberID: UUID, handle: LoomConnectionHandle, fps: Int, maxWidth: Int, displayID: UInt32?, codec: MirrorCodec) async {}
+    func start(subscriberID: UUID, handle: LoomConnectionHandle, fps: Int, maxWidth: Int, displayID: UInt32?, codec: MirrorCodec, windowID: UInt32? = nil) async {}
     func stop(subscriberID: UUID) async {}
     func requestKeyFrame(subscriberID: UUID) {}
     var lastHostStats: [UUID: MirrorHostStats] = [:]

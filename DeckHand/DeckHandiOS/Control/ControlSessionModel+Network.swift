@@ -212,7 +212,7 @@ extension ControlSessionModel {
 
     /// Sends `mirror.start` through the away policy. The Mirror code calls
     /// this with what its settings ask for; at home it goes out unchanged.
-    func sendMirrorStart(_ sender: TrackpadSender, fps: Int, maxWidth: Int, displayID: UInt32?, codec: MirrorCodec) async {
+    func sendMirrorStart(_ sender: TrackpadSender, fps: Int, maxWidth: Int, displayID: UInt32?, codec: MirrorCodec, windowID: UInt32?) async {
         let hevcAvailable = MirrorVideoRenderer.hevcDecodeAvailable && !mirrorHEVCFellBack
         let shape = awayQuality.adjust(MirrorRequestShape(fps: fps, maxWidth: maxWidth, codec: codec), hevcAvailable: hevcAvailable)
         if let sent = awaySentMirrorCodec, sent != shape.codec, codec == mirrorLastRequestedCodec {
@@ -221,6 +221,6 @@ extension ControlSessionModel {
             mirrorWatchdog.reset(now: CACurrentMediaTime())
         }
         awaySentMirrorCodec = shape.codec
-        await sender.startMirror(fps: shape.fps, maxWidth: shape.maxWidth, displayID: displayID, codec: shape.codec)
+        await sender.startMirror(fps: shape.fps, maxWidth: shape.maxWidth, displayID: displayID, codec: shape.codec, windowID: windowID)
     }
 }

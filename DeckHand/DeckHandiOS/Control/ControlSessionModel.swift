@@ -94,6 +94,14 @@ final class ControlSessionModel {
     /// HEVC gave up in this session; the mirror asks for JPEG from now on.
     @ObservationIgnored var mirrorHEVCFellBack = false
     @ObservationIgnored var mirrorLastRequestedCodec: MirrorCodec?
+    /// S14: the window the mirror asked for and the one the Mac shows.
+    var mirrorWindowSelection = MirrorWindowSelection()
+    /// The latest cursor update's "over the mirrored display / window".
+    var mirrorCursorInsideMirror: Bool?
+    /// A passing notice over the mirror (a mirrored window ended and the
+    /// mirror went back to its display), and the task that clears it.
+    var mirrorNotice: String?
+    @ObservationIgnored var mirrorNoticeTask: Task<Void, Never>?
 
     // MARK: Pairing
     // Approval status, the resync poll, pairing codes and "Forget" (S4).
@@ -311,8 +319,8 @@ final class ControlSessionModel {
         case let .capture(.screenshotData(requestID, data)):
             capture.handleScreenshotData(requestID: requestID, data: data)
 
-        case let .mirror(.error(message)):
-            handleMirrorError(message)
+        case let .mirror(.error(message, fallbackDisplayID)):
+            handleMirrorError(message, fallbackDisplayID: fallbackDisplayID)
 
         case let .capture(.screenshotError(requestID, message)):
             capture.handleScreenshotError(requestID: requestID, message: message)
@@ -350,8 +358,8 @@ final class ControlSessionModel {
         case let .system(m):
             handleSystemMessage(m)
 
-        case let .mirror(.displayList(displays, selectedDisplayID)):
-            handleMirrorDisplayList(displays, selected: selectedDisplayID)
+        case let .mirror(.displayList(displays, selectedDisplayID, window)):
+            handleMirrorDisplayList(displays, selected: selectedDisplayID, window: window)
 
         case let .diagnostics(.mirrorStats(stats)):
             mirrorHostStats = stats
