@@ -9,13 +9,20 @@
 //
 //  Rules:
 //
-//  - Only the identity key decides. A device ID, a name or anything a peer
-//    advertises is display data; a record never matches on them. A device
-//    that presents a known device ID with a different key is a stranger.
-//  - One record per key, and one key per device ID: pairing a device again
-//    with a new key (reinstall, new keychain) replaces its old record, so
-//    the old key stops being trusted.
-//  - Forgetting removes the record. Nothing is kept for a forgotten key.
+//  - The identity key is the trust anchor: a record matches only a peer
+//    that proved its key. A peer that presents a known device ID with a
+//    different key is a stranger.
+//  - A record also names the Loom device ID, and matching needs both. The
+//    device ID is signed by the identity key in Loom's hello, so it is as
+//    proven as the key. It matters because Loom's account key is kept in
+//    iCloud Keychain by default: one owner's iPad and iPhone can present
+//    the same key, and pairing (or forgetting) one of them must not pair
+//    (or forget) the other. A name or anything else a peer advertises is
+//    display data only.
+//  - One key per device ID: pairing a device again with a new key
+//    (reinstall, new keychain) replaces its old record, so the old key
+//    stops being trusted for that device.
+//  - Forgetting removes the record. Nothing is kept for a forgotten device.
 //  - At most `capacity` records; pairing one more drops the device seen
 //    least recently.
 //  - Names are cleaned (no control characters, at most
@@ -60,20 +67,32 @@ public enum PairingMethod: String, Codable, Sendable {
     }
 }
 
+/// Which paired device: the identity key it proved and the Loom device ID
+/// that key signed.
+public struct PairedDeviceRef: Codable, Hashable, Sendable {
+    public let identityKeyID: String
+    public let deviceID: UUID
+
+    public init(identityKeyID: String, deviceID: UUID) {
+        self.identityKeyID = identityKeyID
+        self.deviceID = deviceID
+    }
+}
+
 /// One paired device.
 public struct PairedDevice: Codable, Equatable, Sendable, Identifiable {
-    /// The Loom identity key ID. The only field trust is decided on.
+    /// The Loom identity key ID: the trust anchor.
     public let identityKeyID: String
-    /// The Loom device ID last seen with this key. Display and bookkeeping
-    /// only (Loom's `revokeTrust(for:)` is keyed on it).
-    public var deviceID: UUID
+    /// The Loom device ID, signed by the identity key in the handshake.
+    public let deviceID: UUID
     public var name: String
     public var kind: PairedDeviceKind
     public let method: PairingMethod
     public let pairedAt: Date
     public var lastSeenAt: Date
 
-    public var id: String { identityKeyID }
+    public var ref: PairedDeviceRef { PairedDeviceRef(identityKeyID: identityKeyID, deviceID: deviceID) }
+    public var id: PairedDeviceRef { ref }
 
     public init(
         identityKeyID: String,
@@ -107,6 +126,8 @@ public struct TrustCandidate: Equatable, Sendable {
         self.name = name
         self.kind = kind
     }
+
+    public var ref: PairedDeviceRef { PairedDeviceRef(identityKeyID: identityKeyID, deviceID: deviceID) }
 }
 
 public struct TrustList: Equatable, Sendable {
@@ -139,22 +160,34 @@ public struct TrustList: Equatable, Sendable {
 
     public var isEmpty: Bool { devices.isEmpty }
 
-    /// The record for `identityKeyID`, if that key is trusted.
-    public func device(identityKeyID: String?) -> PairedDevice? {
-        guard let identityKeyID, !identityKeyID.isEmpty else { return nil }
-        return devices.first { $0.identityKeyID == identityKeyID }
+    /// The record for a device that proved `identityKeyID` and presented
+    /// `deviceID`, if it is paired.
+    public func device(identityKeyID: String?, deviceID: UUID?) -> PairedDevice? {
+        guard let identityKeyID, !identityKeyID.isEmpty, let deviceID else { return nil }
+        return devices.first { $0.identityKeyID == identityKeyID && $0.deviceID == deviceID }
     }
 
-    /// Whether a device that proved `identityKeyID` is paired.
-    public func isTrusted(identityKeyID: String?) -> Bool {
-        device(identityKeyID: identityKeyID) != nil
+    public func device(_ ref: PairedDeviceRef) -> PairedDevice? {
+        device(identityKeyID: ref.identityKeyID, deviceID: ref.deviceID)
+    }
+
+    /// Whether a device that proved `identityKeyID` and presented
+    /// `deviceID` is paired.
+    public func isTrusted(identityKeyID: String?, deviceID: UUID?) -> Bool {
+        device(identityKeyID: identityKeyID, deviceID: deviceID) != nil
+    }
+
+    /// Every paired device that uses `identityKeyID` (one owner's devices
+    /// sharing an iCloud Keychain key).
+    public func devices(identityKeyID: String) -> [PairedDevice] {
+        devices.filter { $0.identityKeyID == identityKeyID }
     }
 
     // MARK: - Changing
 
-    /// Pairs `candidate`, or refreshes its record if its key is already
-    /// paired (keeping the original pairing date and method). Any other
-    /// record for the same device ID is dropped: the device has a new key.
+    /// Pairs `candidate`, or refreshes its record if it is already paired
+    /// (keeping the original pairing date and method). A record for the
+    /// same device ID with another key is dropped: the device has a new key.
     ///
     /// - Returns: The stored record.
     @discardableResult
@@ -162,13 +195,11 @@ public struct TrustList: Equatable, Sendable {
         guard Self.isValidIdentityKeyID(candidate.identityKeyID) else {
             throw TrustError.invalidIdentityKeyID
         }
-        if let index = devices.firstIndex(where: { $0.identityKeyID == candidate.identityKeyID }) {
-            devices[index].deviceID = candidate.deviceID
+        if let index = devices.firstIndex(where: { $0.ref == candidate.ref }) {
             devices[index].name = Self.cleanName(candidate.name)
             devices[index].kind = candidate.kind
             devices[index].lastSeenAt = now
-            devices.removeAll { $0.deviceID == candidate.deviceID && $0.identityKeyID != candidate.identityKeyID }
-            return devices.first { $0.identityKeyID == candidate.identityKeyID }!
+            return devices[index]
         }
         devices.removeAll { $0.deviceID == candidate.deviceID }
         let record = PairedDevice(
@@ -185,12 +216,12 @@ public struct TrustList: Equatable, Sendable {
     }
 
     /// Stamps a paired device as seen and takes its current name. Does
-    /// nothing for a key that isn't paired.
+    /// nothing for a device that isn't paired.
     ///
     /// - Returns: Whether a record changed.
     @discardableResult
-    public mutating func noteSeen(identityKeyID: String, name: String?, at now: Date) -> Bool {
-        guard let index = devices.firstIndex(where: { $0.identityKeyID == identityKeyID }) else { return false }
+    public mutating func noteSeen(_ ref: PairedDeviceRef, name: String?, at now: Date) -> Bool {
+        guard let index = devices.firstIndex(where: { $0.ref == ref }) else { return false }
         devices[index].lastSeenAt = now
         if let name {
             devices[index].name = Self.cleanName(name)
@@ -198,13 +229,24 @@ public struct TrustList: Equatable, Sendable {
         return true
     }
 
-    /// Forgets the device with `identityKeyID`.
+    /// Forgets one device.
     ///
     /// - Returns: The removed record, or `nil` if it wasn't paired.
     @discardableResult
-    public mutating func revoke(identityKeyID: String) -> PairedDevice? {
-        guard let index = devices.firstIndex(where: { $0.identityKeyID == identityKeyID }) else { return nil }
+    public mutating func revoke(_ ref: PairedDeviceRef) -> PairedDevice? {
+        guard let index = devices.firstIndex(where: { $0.ref == ref }) else { return nil }
         return devices.remove(at: index)
+    }
+
+    /// Forgets every device that uses `identityKeyID`, for a key that must
+    /// no longer be trusted anywhere.
+    ///
+    /// - Returns: The removed records.
+    @discardableResult
+    public mutating func revokeAll(identityKeyID: String) -> [PairedDevice] {
+        let removed = devices.filter { $0.identityKeyID == identityKeyID }
+        devices.removeAll { $0.identityKeyID == identityKeyID }
+        return removed
     }
 
     /// Forgets every record last seen with `deviceID` (Loom's
@@ -256,7 +298,7 @@ public struct TrustList: Equatable, Sendable {
     }
 
     private mutating func insert(_ record: PairedDevice) {
-        devices.removeAll { $0.identityKeyID == record.identityKeyID }
+        devices.removeAll { $0.ref == record.ref || $0.deviceID == record.deviceID }
         devices.append(record)
         while devices.count > Self.capacity {
             // Drop the device seen least recently (ties: paired earliest).

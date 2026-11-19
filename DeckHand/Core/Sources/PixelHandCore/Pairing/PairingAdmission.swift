@@ -19,29 +19,32 @@ public enum PairingAdmission: Equatable, Sendable {
     /// Paired: grant at once, no prompt.
     case autoGrant(PairedDevice)
     /// Unknown but proven: ask the user (or take a pairing code).
-    case askUser(identityKeyID: String)
+    case askUser(PairedDeviceRef)
     /// No proven identity key: disconnect.
     case refuse
 
     /// - Parameters:
     ///   - identityKeyID: `LoomPeerIdentity.identityKeyID` from the session
     ///     context, or `nil` when the context is missing.
+    ///   - deviceID: `LoomPeerIdentity.deviceID` (signed by that key).
     ///   - isIdentityAuthenticated: `LoomPeerIdentity.isIdentityAuthenticated`.
     ///   - trustList: The Mac's paired devices.
     public static func decide(
         identityKeyID: String?,
+        deviceID: UUID?,
         isIdentityAuthenticated: Bool,
         trustList: TrustList
     ) -> PairingAdmission {
         guard isIdentityAuthenticated,
               let identityKeyID,
+              let deviceID,
               TrustList.isValidIdentityKeyID(identityKeyID) else {
             return .refuse
         }
-        if let device = trustList.device(identityKeyID: identityKeyID) {
+        if let device = trustList.device(identityKeyID: identityKeyID, deviceID: deviceID) {
             return .autoGrant(device)
         }
-        return .askUser(identityKeyID: identityKeyID)
+        return .askUser(PairedDeviceRef(identityKeyID: identityKeyID, deviceID: deviceID))
     }
 }
 
@@ -58,13 +61,13 @@ public struct RemotePairingBook: Equatable, Sendable {
     public static let maxPendingForgets = 32
 
     public private(set) var macs: TrustList
-    /// Identity key IDs of Macs to send `pairing.forget` to on next contact.
-    public private(set) var pendingForgets: [String]
+    /// Macs to send `pairing.forget` to on next contact.
+    public private(set) var pendingForgets: [PairedDeviceRef]
 
-    public init(macs: TrustList = TrustList(), pendingForgets: [String] = []) {
+    public init(macs: TrustList = TrustList(), pendingForgets: [PairedDeviceRef] = []) {
         self.macs = macs
         self.pendingForgets = Array(
-            pendingForgets.filter(TrustList.isValidIdentityKeyID).suffix(Self.maxPendingForgets)
+            pendingForgets.filter { TrustList.isValidIdentityKeyID($0.identityKeyID) }.suffix(Self.maxPendingForgets)
         )
     }
 
@@ -83,15 +86,15 @@ public struct RemotePairingBook: Equatable, Sendable {
     ///
     /// - Parameter mac: The Mac as the handshake proved it on this remote.
     public mutating func macReported(paired: Bool, mac: TrustCandidate, at now: Date) -> Action {
-        if pendingForgets.contains(mac.identityKeyID) {
-            pendingForgets.removeAll { $0 == mac.identityKeyID }
-            macs.revoke(identityKeyID: mac.identityKeyID)
+        if pendingForgets.contains(mac.ref) {
+            pendingForgets.removeAll { $0 == mac.ref }
+            macs.revoke(mac.ref)
             return paired ? .sendForget : .none
         }
         if paired {
             return (try? macs.trust(mac, method: .remoteRecord, at: now)) == nil ? .none : .recorded
         }
-        return macs.revoke(identityKeyID: mac.identityKeyID) == nil ? .none : .removed
+        return macs.revoke(mac.ref) == nil ? .none : .removed
     }
 
     /// The user chose "Forget" for a Mac.
@@ -102,10 +105,10 @@ public struct RemotePairingBook: Equatable, Sendable {
     ///     held for the next contact.
     /// - Returns: The removed record, if there was one.
     @discardableResult
-    public mutating func forget(identityKeyID: String, isConnected: Bool) -> PairedDevice? {
-        let removed = macs.revoke(identityKeyID: identityKeyID)
-        if !isConnected, TrustList.isValidIdentityKeyID(identityKeyID), !pendingForgets.contains(identityKeyID) {
-            pendingForgets.append(identityKeyID)
+    public mutating func forget(_ mac: PairedDeviceRef, isConnected: Bool) -> PairedDevice? {
+        let removed = macs.revoke(mac)
+        if !isConnected, TrustList.isValidIdentityKeyID(mac.identityKeyID), !pendingForgets.contains(mac) {
+            pendingForgets.append(mac)
             if pendingForgets.count > Self.maxPendingForgets {
                 pendingForgets.removeFirst(pendingForgets.count - Self.maxPendingForgets)
             }
@@ -118,7 +121,7 @@ public struct RemotePairingBook: Equatable, Sendable {
     private struct Stored: Codable {
         var version: Int
         var macs: Data
-        var pendingForgets: [String]
+        var pendingForgets: [PairedDeviceRef]
     }
 
     public func encoded() throws -> Data {
