@@ -78,6 +78,7 @@ struct SettingsPointerSection: View {
 
         Section {
             Toggle("Share clipboard", isOn: $settings.clipboardSync)
+                .requiresPro(.sharing) // Store lane
             Toggle("Paste on the Mac right away", isOn: $settings.pasteRightAway)
         } header: {
             Text("Clipboard")

@@ -1,0 +1,102 @@
+{
+  "identifier" : "6F3C1B2A",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21582950",
+      "localizations" : [
+        {
+          "description" : "Chips and decks, the live mirror, capture and text recognition, clipboard sharing and all your Macs.",
+          "displayName" : "Pixel Hand Pro",
+          "locale" : "en_US"
+        }
+      ],
+      "name" : "Pixel Hand Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "19.99",
+          "familyShareable" : true,
+          "groupNumber" : 1,
+          "internalID" : "6835622971",
+          "introductoryOffer" : {
+            "internalID" : "6835622981",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P2W"
+          },
+          "localizations" : [
+            {
+              "description" : "Every Pro feature, billed once a year.",
+              "displayName" : "Pixel Hand Pro (Yearly)",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.widgetsflow.pixelhand.pro.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Pixel Hand Pro Yearly",
+          "subscriptionGroupID" : "21582950",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "2.99",
+          "familyShareable" : true,
+          "groupNumber" : 2,
+          "internalID" : "6835622972",
+          "introductoryOffer" : {
+            "internalID" : "6835622982",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P2W"
+          },
+          "localizations" : [
+            {
+              "description" : "Every Pro feature, billed monthly.",
+              "displayName" : "Pixel Hand Pro (Monthly)",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.widgetsflow.pixelhand.pro.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Pixel Hand Pro Monthly",
+          "subscriptionGroupID" : "21582950",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

@@ -99,5 +99,6 @@ struct ClipboardRow: View {
             }
             Spacer(minLength: 0)
         }
+        .requiresPro(.sharing) // Store lane
     }
 }

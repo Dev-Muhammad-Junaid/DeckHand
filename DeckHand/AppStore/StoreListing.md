@@ -96,8 +96,9 @@ switched off, drop the last sentence of "Private by design").
 - **Primary category:** Utilities. **Secondary:** Productivity.
 - **Age rating:** 4+ (answer "None" to every content question; the app has no
   web browser, user-generated content or chat).
-- **Price:** paid, owner's call. Remember the paid app is the *only* revenue:
-  the Mac app is free.
+- **Price:** free download with the Pixel Hand Pro subscription
+  ($2.99/month, $19.99/year, 2-week free trial). Setup and copy:
+  `Subscription.md`. The Mac app is free.
 - **Availability:** all territories is fine export-wise (see
   `ExportCompliance.md`).
 - **Devices:** iPhone and iPad. Under "Apple silicon Mac availability" turn
@@ -120,9 +121,14 @@ switched off, drop the last sentence of "Private by design").
 > The Mac app is distributed outside the Mac App Store as a free, notarized
 > Developer ID download from https://<domain>/ *[replace]*, because it has to
 > control the pointer and keyboard through macOS Accessibility, which the Mac
-> App Store sandbox doesn't allow. It's free: there are no purchases,
-> subscriptions or accounts anywhere, and the iOS app unlocks nothing outside
-> the App Store.
+> App Store sandbox doesn't allow. The Mac app is free and has no purchases.
+> The iPhone/iPad app is free with an optional auto-renewable subscription,
+> Pixel Hand Pro (monthly or yearly, 2-week free trial): the trackpad,
+> keyboard and media keys work for free with one Mac; Pro unlocks shortcut
+> chips, the app launcher, the live mirror, capture/OCR, clipboard sharing
+> and more than one Mac. Locked controls show a lock and open the paywall,
+> which is also in Settings › Subscription with Restore Purchases. Nothing
+> is unlocked outside the App Store.
 >
 > To test:
 > 1. On a Mac with macOS 14 or later, download and open Pixel Hand for Mac. It

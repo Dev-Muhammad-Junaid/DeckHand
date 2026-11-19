@@ -123,6 +123,10 @@ targets:
     sources:
       - path: DeckHandiOS
         type: group
+        excludes:
+          - Store/PixelHand.storekit
+      - path: DeckHandiOS/Store/PixelHand.storekit
+        buildPhase: none
       - path: Shared
         type: group
     dependencies:
@@ -178,7 +182,8 @@ targets:
           fi
           sentry-cli debug-files upload --org "$SENTRY_ORG" --project "$SENTRY_PROJECT" "$DWARF_DSYM_FOLDER_PATH" \
             || echo "warning: Sentry dSYM upload failed; crashes from this build won't be symbolicated"
-    scheme: {}
+    scheme:
+      storeKitConfiguration: DeckHandiOS/Store/PixelHand.storekit
 
   # ─────────────────────────────────────────────────────────────
   # App-side tests: what needs Loom or the Shared/ sources.
