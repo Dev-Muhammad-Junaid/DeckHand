@@ -16,7 +16,7 @@ import LoomKit
 final class MirrorHandler: DomainHandler {
     func handle(_ message: MirrorMessage, from connection: LoomConnectionHandle) async {
         switch message {
-        case let .start(fps, maxWidth, displayID):
+        case let .start(fps, maxWidth, displayID, codec):
             // SCShareableContent inside — the #1 hang candidate. Own task.
             let subscriberID = connection.id
             Task {
@@ -25,9 +25,14 @@ final class MirrorHandler: DomainHandler {
                     handle: connection,
                     fps: fps,
                     maxWidth: maxWidth,
-                    displayID: displayID
+                    displayID: displayID,
+                    codec: codec
                 )
             }
+
+        case .requestKeyFrame:
+            // S5: rate-limited by the encoder's MirrorKeyFramePolicy.
+            MirrorStreamService.shared.requestKeyFrame(subscriberID: connection.id)
 
         case .stop:
             let subscriberID = connection.id

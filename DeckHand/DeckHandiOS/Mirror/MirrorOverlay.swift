@@ -10,7 +10,10 @@
 //  - the display picker with Follow cursor, when the Mac has more than one
 //    display;
 //  - the "Cursor is on <display>" badge, with Bring here / Show;
-//  - the stream stats line (S6), when turned on in Settings.
+//  - the stream stats line (S6), when turned on in Settings;
+//  - the HEVC display layer in place of the JPEG image (S5);
+//  - the desktop dots under the mirror, and ‹ › dimmed or hidden at the
+//    ends of the mirrored display's Spaces (from `system.displayState`).
 //
 
 import SwiftUI
@@ -22,6 +25,7 @@ struct MirrorOverlay: View {
     @EnvironmentObject private var settings: DeckHandSettings
 
     var body: some View {
+        let strip = session.mirrorSpaceStrip
         MirrorThumbnailView(
             image: session.mirrorImage,
             containerSize: containerSize,
@@ -42,8 +46,19 @@ struct MirrorOverlay: View {
             },
             cursorLayer: AnyView(MirrorCursorLayer(session: session)),
             topLeadingAccessory: AnyView(MirrorDisplayPicker(session: session)),
-            bottomAccessory: AnyView(MirrorBottomChrome(session: session))
+            bottomAccessory: AnyView(MirrorBottomChrome(session: session)),
+            belowAccessory: AnyView(MirrorSpaceDots(strip: strip)),
+            previousChevron: strip.previous,
+            nextChevron: strip.next,
+            videoLayer: session.mirrorShowsVideo
+                ? AnyView(MirrorVideoLayerView(renderer: session.mirrorVideoRenderer))
+                : nil,
+            videoSize: session.mirrorVideoSize
         )
+        // S5: HEVC on or off takes effect at once.
+        .onChange(of: settings.mirrorPrefersHEVC) {
+            session.renegotiateMirror(settings: settings)
+        }
     }
 }
 
@@ -135,6 +150,46 @@ struct MirrorDisplayPicker: View {
 
     private var selectedLabel: String {
         session.mirrorDisplays.first { $0.displayID == session.selectedMirrorDisplayID }?.shortLabel ?? "Display"
+    }
+}
+
+// MARK: - Desktop dots
+
+/// One dot per Space of the mirrored display, the current one filled;
+/// full-screen apps as short labels. Nothing when Spaces aren't known.
+struct MirrorSpaceDots: View {
+    let strip: MirrorSpaceStrip
+
+    var body: some View {
+        if !strip.dots.isEmpty {
+            HStack(spacing: 5) {
+                ForEach(strip.dots) { dot in
+                    switch dot.kind {
+                    case .desktop:
+                        Circle()
+                            .fill(dot.isCurrent ? Color.white : Color.white.opacity(0.35))
+                            .frame(width: 6, height: 6)
+                    case let .fullScreen(label):
+                        Text(label)
+                            .font(.system(size: 9, weight: .semibold))
+                            .lineLimit(1)
+                            .foregroundStyle(dot.isCurrent ? Color.black : Color.white.opacity(0.75))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(
+                                Capsule().fill(dot.isCurrent ? Color.white : Color.white.opacity(0.18))
+                            )
+                    }
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.black.opacity(0.55), in: Capsule())
+            .animation(.easeInOut(duration: 0.2), value: strip)
+            .allowsHitTesting(false)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(strip.accessibilitySummary ?? "")
+        }
     }
 }
 

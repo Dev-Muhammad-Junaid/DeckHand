@@ -11,7 +11,8 @@
 //
 //  The view is intentionally dumb: frame decode, the cursor and the
 //  start/stop protocol live in `ControlSessionModel+Mirror` and the binary
-//  stream reader. This shows whatever `image` it's handed with the layers
+//  stream reader. This shows whatever `image` (JPEG) or `videoLayer` (HEVC,
+//  S5) it's handed with the layers
 //  `MirrorOverlay` passes in (pointer, display picker, badge, stats), and
 //  reports the stream width its current size warrants.
 //
@@ -41,6 +42,17 @@ struct MirrorThumbnailView: View {
     var topLeadingAccessory: AnyView = AnyView(EmptyView())
     /// Bottom-edge chrome (the cursor badge, the stats line).
     var bottomAccessory: AnyView = AnyView(EmptyView())
+    /// Drawn just under the mirror, outside its frame (the desktop dots).
+    /// Doesn't take part in layout, so drag and pinch bounds are unchanged.
+    var belowAccessory: AnyView = AnyView(EmptyView())
+    /// How ‹ and › are drawn: dimmed at either end of the mirrored
+    /// display's Spaces, hidden when it has only one (`MirrorSpaceStrip`).
+    var previousChevron: MirrorChevronState = .enabled
+    var nextChevron: MirrorChevronState = .enabled
+    /// HEVC video (S5): when set, drawn instead of `image` (the display
+    /// layer), at `videoSize`'s aspect.
+    var videoLayer: AnyView?
+    var videoSize: CGSize?
 
     /// Persisted drag offset (committed at drag end) + live in-drag delta.
     @State private var committedOffset: CGSize = .zero
@@ -83,6 +95,10 @@ struct MirrorThumbnailView: View {
     /// Aspect (height / width) of the streamed frame. Falls back to 16:10
     /// until the first frame lands, matching the placeholder.
     private var frameAspect: CGFloat {
+        if videoLayer != nil {
+            guard let videoSize, videoSize.width > 0 else { return 10.0 / 16.0 }
+            return videoSize.height / videoSize.width
+        }
         guard let image, image.size.width > 0 else { return 10.0 / 16.0 }
         return image.size.height / image.size.width
     }
@@ -186,12 +202,13 @@ struct MirrorThumbnailView: View {
     var body: some View {
         ZStack {
             frameStack
+                .contentShape(Rectangle())
                 .onTapGesture { toggleSize() }
 
             HStack {
-                spaceChevron(direction: .previous, symbol: "chevron.left.circle.fill", label: "Previous desktop")
+                spaceChevron(direction: .previous, state: previousChevron, symbol: "chevron.left.circle.fill", label: "Previous desktop")
                 Spacer(minLength: 0)
-                spaceChevron(direction: .next, symbol: "chevron.right.circle.fill", label: "Next desktop")
+                spaceChevron(direction: .next, state: nextChevron, symbol: "chevron.right.circle.fill", label: "Next desktop")
             }
             .padding(.horizontal, 6)
         }
@@ -203,6 +220,10 @@ struct MirrorThumbnailView: View {
         )
         .overlay(alignment: .topLeading) { topLeadingAccessory }
         .overlay(alignment: .bottom) { bottomAccessory }
+        .overlay(alignment: .bottom) {
+            belowAccessory
+                .alignmentGuide(.bottom) { dimensions in dimensions[.top] - 4 }
+        }
         .overlay(alignment: .topTrailing) {
             Button(action: onClose) {
                 Image(systemName: "xmark.circle.fill")
@@ -285,7 +306,12 @@ struct MirrorThumbnailView: View {
 
     @ViewBuilder
     private var liveFrame: some View {
-        if let image {
+        if let videoLayer {
+            videoLayer
+                .aspectRatio(1 / frameAspect, contentMode: .fit)
+                .allowsHitTesting(false)
+                .overlay { cursorLayer }
+        } else if let image {
             Image(uiImage: image)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
@@ -336,20 +362,30 @@ struct MirrorThumbnailView: View {
         }
     }
 
+    @ViewBuilder
     private func spaceChevron(
         direction: SpaceDirection,
+        state: MirrorChevronState,
         symbol: String,
         label: String
     ) -> some View {
-        Button {
-            performSpaceSwitch(direction)
-        } label: {
-            Image(systemName: symbol)
-                .font(.system(size: 28))
-                .symbolRenderingMode(.palette)
-                .foregroundStyle(.white, .black.opacity(0.45))
+        if state == .hidden {
+            // Keeps the HStack's shape; nothing to tap or read out.
+            Color.clear.frame(width: 28, height: 28).accessibilityHidden(true)
+        } else {
+            Button {
+                performSpaceSwitch(direction)
+            } label: {
+                Image(systemName: symbol)
+                    .font(.system(size: 28))
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(.white, .black.opacity(0.45))
+            }
+            .buttonStyle(.plain)
+            .disabled(state == .dimmed)
+            .opacity(state == .dimmed ? 0.3 : 1)
+            .animation(.easeInOut(duration: 0.2), value: state)
+            .accessibilityLabel(label)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
     }
 }

@@ -138,9 +138,32 @@ func CGGetActiveDisplayList(_ max: UInt32, _ ids: UnsafeMutablePointer<CGDirectD
 }
 @MainActor final class MirrorStreamService {
     static let shared = MirrorStreamService()
-    func start(subscriberID: UUID, handle: LoomConnectionHandle, fps: Int, maxWidth: Int, displayID: UInt32?) async {}
+    func start(subscriberID: UUID, handle: LoomConnectionHandle, fps: Int, maxWidth: Int, displayID: UInt32?, codec: MirrorCodec) async {}
     func stop(subscriberID: UUID) async {}
+    func requestKeyFrame(subscriberID: UUID) {}
     var lastHostStats: [UUID: MirrorHostStats] = [:]
+}
+// iOS Mirror/MirrorHEVCSampleBuilder.swift (CoreMedia) can't build here.
+final class CMSampleBuffer {}
+enum MirrorVideoEvent: @unchecked Sendable {
+    case parameterSets(valid: Bool, dimensions: CGSize?)
+    case frame(kind: MirrorVideoWatchdog.FrameKind, afterDrop: Bool, sample: CMSampleBuffer?)
+}
+final class MirrorHEVCSampleBuilder {
+    var dimensions: CGSize? { nil }
+    func setParameterSets(_ payload: Data) -> Bool { false }
+    func sampleBuffer(payload: Data, isKeyFrame: Bool, presentationTimeMicros: UInt64) -> CMSampleBuffer? { nil }
+}
+
+// Mac Mirror/MirrorHEVCEncoder.swift (VideoToolbox) can't build here.
+struct MirrorHEVCEncodedFrame: Sendable {
+    let isKeyFrame: Bool
+    let parameterSets: Data?
+    let payload: Data
+    let presentationTimeMicros: UInt64
+    let encodeSeconds: Double
+    let width: Int
+    let height: Int
 }
 @MainActor final class ScreenCaptureService {
     static let shared = ScreenCaptureService()

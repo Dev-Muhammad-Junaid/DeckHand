@@ -34,7 +34,9 @@ public enum PixelHandProtocol {
     ///   `system.lockState`; `RefusalReason.macLocked`.
     /// - 5: mirror frames and the cursor move to the binary mirror stream
     ///   (`mirror.frame` removed); `diagnostics` carries mirror stats.
-    public static let version = 5
+    /// - 6: HEVC mirror (S5): `mirror.start` gains `codec`, new
+    ///   `mirror.requestKeyFrame`; the `hevc*` binary frame kinds are used.
+    public static let version = 6
 
     /// Bonjour TXT key carrying `version`. Short, because TXT keys should
     /// stay under 9 bytes.

@@ -65,11 +65,12 @@ public enum RemoteInputValidation {
         case let .capture(.requestWindowList(requestID)):
             return isAcceptable(requestID) ? message : nil
 
-        case let .mirror(.start(fps, maxWidth, displayID)):
+        case let .mirror(.start(fps, maxWidth, displayID, codec)):
             return .mirror(.start(
                 fps: clamp(fps, to: mirrorFPSRange),
                 maxWidth: clamp(maxWidth, to: mirrorWidthRange),
-                displayID: displayID
+                displayID: displayID,
+                codec: codec
             ))
 
         case let .diagnostics(.mirrorClientStats(stats)):

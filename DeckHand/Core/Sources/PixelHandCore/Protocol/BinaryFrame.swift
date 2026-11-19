@@ -4,7 +4,7 @@
 //
 //  Framing for bulk binary data on its own Loom stream, kept apart from the
 //  JSON control stream so a large frame never queues ahead of input or a
-//  heartbeat. The mirror stream carries JPEG frames today (HEVC with S5),
+//  heartbeat. The mirror stream carries JPEG frames or an HEVC stream (S5),
 //  plus the Mac's cursor position and shape, which the remote draws over
 //  the video itself (S3).
 //
@@ -29,7 +29,11 @@
 //  Payload by kind:
 //
 //      jpeg            a JPEG image of the captured display
-//      hevc*           reserved for S5
+//      hevcParameterSets  `MirrorHEVCParameterSets.encoded()`, before
+//                         every key frame (S5)
+//      hevcKeyFrame       length-prefixed HEVC NAL units of an IDR frame
+//      hevcDeltaFrame     the same for a frame that needs earlier ones
+//                         (layouts and rules: `Mirror/MirrorVideo.swift`)
 //      cursor          `MirrorCursorState.encoded()` (18 bytes)
 //      cursorShape     `MirrorCursorShape.encoded()` (20 bytes + PNG)
 //
