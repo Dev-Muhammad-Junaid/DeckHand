@@ -185,12 +185,12 @@ enum MenuShortcutDiscovery {
     }
 
     /// The attributes read for every element, in one round trip.
-    private static let walkAttributes: [CFString] = [
-        kAXTitleAttribute as CFString,
-        kAXChildrenAttribute as CFString,
-        kAXMenuItemCmdCharAttribute as CFString,
-        kAXMenuItemCmdVirtualKeyAttribute as CFString,
-        kAXMenuItemCmdModifiersAttribute as CFString,
+    private static let walkAttributes: [String] = [
+        kAXTitleAttribute,
+        kAXChildrenAttribute,
+        kAXMenuItemCmdCharAttribute,
+        kAXMenuItemCmdVirtualKeyAttribute,
+        kAXMenuItemCmdModifiersAttribute,
     ]
 
     private static func walkMenuElement(
