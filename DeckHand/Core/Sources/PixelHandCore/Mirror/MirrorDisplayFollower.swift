@@ -16,10 +16,14 @@ public struct MirrorDisplayChrome: Equatable, Sendable {
     /// The display the pointer is on, when that isn't the mirrored one and
     /// "Follow cursor" is off. `nil`: no badge.
     public var cursorElsewhere: DisplayInfo?
+    /// S14: a window is mirrored and the pointer isn't over it ("Pointer
+    /// outside the window").
+    public var cursorOutsideWindow: Bool
 
-    public init(showsPicker: Bool, cursorElsewhere: DisplayInfo?) {
+    public init(showsPicker: Bool, cursorElsewhere: DisplayInfo?, cursorOutsideWindow: Bool = false) {
         self.showsPicker = showsPicker
         self.cursorElsewhere = cursorElsewhere
+        self.cursorOutsideWindow = cursorOutsideWindow
     }
 
     public static func make(
@@ -27,7 +31,8 @@ public struct MirrorDisplayChrome: Equatable, Sendable {
         mirroredDisplayID: UInt32?,
         cursorDisplayID: UInt32?,
         followsCursor: Bool,
-        mirroringWindow: Bool = false
+        mirroringWindow: Bool = false,
+        cursorOverWindow: Bool? = nil
     ) -> MirrorDisplayChrome {
         var elsewhere: DisplayInfo?
         // S14: a window mirror says whether the pointer is over the
@@ -37,7 +42,12 @@ public struct MirrorDisplayChrome: Equatable, Sendable {
            let mirroredDisplayID, cursorDisplayID != mirroredDisplayID {
             elsewhere = displays.first { $0.displayID == cursorDisplayID }
         }
-        return MirrorDisplayChrome(showsPicker: displays.count > 1, cursorElsewhere: elsewhere)
+        return MirrorDisplayChrome(
+            showsPicker: displays.count > 1,
+            cursorElsewhere: elsewhere,
+            // Unknown (no cursor update yet) shows nothing.
+            cursorOutsideWindow: mirroringWindow && cursorOverWindow == false
+        )
     }
 }
 

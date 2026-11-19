@@ -249,5 +249,14 @@ import Testing
         #expect(display.cursorElsewhere?.displayID == 2)
         let window = MirrorDisplayChrome.make(displays: displays, mirroredDisplayID: 1, cursorDisplayID: 2, followsCursor: false, mirroringWindow: true)
         #expect(window.cursorElsewhere == nil)
+        #expect(!window.cursorOutsideWindow) // not known yet
+        let outside = MirrorDisplayChrome.make(displays: displays, mirroredDisplayID: 1, cursorDisplayID: 1, followsCursor: false, mirroringWindow: true, cursorOverWindow: false)
+        #expect(outside.cursorOutsideWindow && outside.cursorElsewhere == nil)
+        let over = MirrorDisplayChrome.make(displays: displays, mirroredDisplayID: 1, cursorDisplayID: 1, followsCursor: false, mirroringWindow: true, cursorOverWindow: true)
+        #expect(!over.cursorOutsideWindow)
+        // A display mirror never says "outside the window".
+        #expect(!MirrorDisplayChrome.make(displays: displays, mirroredDisplayID: 1, cursorDisplayID: 1, followsCursor: false, cursorOverWindow: false).cursorOutsideWindow)
+        // No dots and no ‹ › for a window.
+        #expect(MirrorSpaceStrip.window.dots.isEmpty && MirrorSpaceStrip.window.previous == .hidden && MirrorSpaceStrip.window.next == .hidden)
     }
 }

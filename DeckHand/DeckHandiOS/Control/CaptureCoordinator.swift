@@ -50,6 +50,15 @@ final class CaptureCoordinator {
     var isWindowPickerPresented = false
     var isWindowListLoading = false
     var windowListRequestID: String?
+    /// What a pick in the window picker does: capture the window, or (S14)
+    /// mirror it, through `onPickMirrorWindow` (set by the session model).
+    var windowPickerPurpose: WindowPickerPurpose = .capture
+    @ObservationIgnored var onPickMirrorWindow: ((WindowInfo) -> Void)?
+
+    enum WindowPickerPurpose: Equatable {
+        case capture
+        case mirror
+    }
 
     /// Drives post-arrival routing for `screenshotData`. Each tap path sets
     /// the matching intent so the response flows into the right UI without
@@ -141,9 +150,10 @@ final class CaptureCoordinator {
     /// Triggered from the capture menu's "Window…" item. Opens the picker
     /// sheet with whatever cached list we have, then refreshes from the Mac
     /// in parallel so the rows update under the user's finger.
-    func openWindowPicker() {
+    func openWindowPicker(purpose: WindowPickerPurpose = .capture) {
         guard sender != nil else { return }
         GestureHaptic.light.trigger()
+        windowPickerPurpose = purpose
         isWindowPickerPresented = true
         refreshWindowList()
     }
@@ -165,6 +175,18 @@ final class CaptureCoordinator {
                 self.isWindowListLoading = false
             }
         }
+    }
+
+    /// A window was picked in the picker: capture it, or mirror it.
+    func handleWindowPicked(_ window: WindowInfo, quality: CaptureQuality) {
+        isWindowPickerPresented = false
+        switch windowPickerPurpose {
+        case .capture:
+            beginCapture(intent: .window(window), mode: .window(windowID: window.windowID), quality: quality)
+        case .mirror:
+            onPickMirrorWindow?(window)
+        }
+        windowPickerPurpose = .capture
     }
 
     // MARK: - Region crop confirmation

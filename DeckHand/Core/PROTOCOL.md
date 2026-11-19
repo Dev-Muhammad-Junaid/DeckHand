@@ -19,7 +19,7 @@ protocol version and exactly one domain key.
 | `system` | `SystemMessage.swift` | Mission Control, Spaces, Show Desktop, Launchpad, Locate; Mac → remote: display/Spaces snapshot, lock state | Mac system control |
 | `apps` | `AppsMessage.swift` | app list, running and frontmost app, dialog context | Mac system control (context side) |
 | `deck` | `DeckMessage.swift` | menu-shortcut import, `run` / `receipt` | deck (later), iOS interaction for now |
-| `mirror` | `MirrorMessage.swift` | mirror start/stop/frames, display list | Mirror |
+| `mirror` | `MirrorMessage.swift` | mirror start/stop, display list, single-window mirror (S14) | Mirror |
 | `capture` | `CaptureMessage.swift` | screenshots, window list | Mirror |
 | `pairing` | `PairingMessage.swift` | approval handshake; S4 pairing | Pairing |
 | `session` | `SessionMessage.swift` | ping/pong, keep-alive `tick`, `link`, `hostStatus` | Network |

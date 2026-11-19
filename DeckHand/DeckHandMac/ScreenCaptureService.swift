@@ -150,6 +150,17 @@ final class ScreenCaptureService {
         return try await primaryDisplay()
     }
 
+    /// S14: the on-screen window with this `CGWindowID`, from a fresh
+    /// listing (the window may have opened since the cache was filled), or
+    /// `nil` when it isn't on screen.
+    func window(matching windowID: UInt32) async throws -> SCWindow? {
+        if let cached = cachedContent?.windows.first(where: { $0.windowID == windowID }), cached.isOnScreen {
+            return cached
+        }
+        let content = try await loadContent(forceRefresh: true)
+        return content.windows.first { $0.windowID == windowID }
+    }
+
     /// Captures the main display at full native resolution, then crops it
     /// to `normalizedRect` (0…1, origin top-left) and returns lossless PNG
     /// data. Region capture is intentionally driven from the Mac so the

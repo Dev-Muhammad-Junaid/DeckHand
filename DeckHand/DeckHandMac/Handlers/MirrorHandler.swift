@@ -16,7 +16,7 @@ import LoomKit
 final class MirrorHandler: DomainHandler {
     func handle(_ message: MirrorMessage, from connection: LoomConnectionHandle) async {
         switch message {
-        case let .start(fps, maxWidth, displayID, codec):
+        case let .start(fps, maxWidth, displayID, codec, windowID):
             // SCShareableContent inside — the #1 hang candidate. Own task.
             let subscriberID = connection.id
             Task {
@@ -26,7 +26,8 @@ final class MirrorHandler: DomainHandler {
                     fps: fps,
                     maxWidth: maxWidth,
                     displayID: displayID,
-                    codec: codec
+                    codec: codec,
+                    windowID: windowID // S14; refused by the lock gate while locked
                 )
             }
 
