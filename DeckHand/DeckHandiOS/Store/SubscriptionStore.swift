@@ -22,6 +22,7 @@
 import Foundation
 import Observation
 import StoreKit
+import SwiftUI
 
 @MainActor
 @Observable
@@ -228,7 +229,7 @@ final class SubscriptionStore {
 
     // MARK: - Internals
 
-    private func handle(_ result: VerificationResult<Transaction>) async {
+    private func handle(_ result: VerificationResult<StoreKit.Transaction>) async {
         if case let .verified(transaction) = result {
             await transaction.finish()
         }
@@ -286,7 +287,7 @@ final class SubscriptionStore {
 
     // MARK: - StoreKit → Core
 
-    private static func fact(_ transaction: Transaction) -> SubscriptionFact? {
+    private static func fact(_ transaction: StoreKit.Transaction) -> SubscriptionFact? {
         guard let plan = SubscriptionPlan(productID: transaction.productID) else { return nil }
         return SubscriptionFact(
             plan: plan,
@@ -302,7 +303,7 @@ final class SubscriptionStore {
 
     private static func statusFact(_ status: Product.SubscriptionInfo.Status) -> SubscriptionStatusFact? {
         guard case let .verified(transaction) = status.transaction, let fact = fact(transaction) else { return nil }
-        let state: SubscriptionRenewalState
+        let state: PixelHandCore.SubscriptionRenewalState
         switch status.state {
         case .subscribed: state = .subscribed
         case .inGracePeriod: state = .inGracePeriod
