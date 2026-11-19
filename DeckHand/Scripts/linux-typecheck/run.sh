@@ -25,6 +25,7 @@ files=(
   "$app"/DeckHandMac/Handlers/*.swift
   "$app/DeckHandMac/Network/HostLinkMonitor.swift"
   "$app/DeckHandMac/Network/LinkObservation+Loom.swift"
+  "$app/DeckHandMac/Network/RemoteAccessGate.swift"
   "$app/DeckHandMac/LockGate.swift"
   "$app/DeckHandMac/Input/DragGuard.swift"
   "$app/DeckHandMac/Input/TypingQueue.swift"

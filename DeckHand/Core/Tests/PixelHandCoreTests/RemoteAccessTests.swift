@@ -374,6 +374,8 @@ struct RemoteAdmissionTests {
         #expect(RemoteAccessPolicy.isRemotePath(link: .unknown, remoteHost: "fd7a:115c:a1e0::9"))
         #expect(RemoteAccessPolicy.isRemotePath(link: .cellular, remoteHost: nil))
         #expect(RemoteAccessPolicy.isRemotePath(link: .loopback, remoteHost: "127.0.0.1"))
+        #expect(RemoteAccessPolicy.isRemotePath(link: .unknown, remoteHost: "::1"))
+        #expect(RemoteAccessPolicy.isRemotePath(link: .unknown, remoteHost: "127.0.0.1"))
     }
 
     @Test("LAN links are not remote paths")

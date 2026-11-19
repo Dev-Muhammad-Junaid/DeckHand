@@ -18,11 +18,29 @@ public final class LoomMultiplexedStream: @unchecked Sendable {
 }
 public protocol LoomSessionProtocol: Sendable {
     func makeIncomingStreamObserver() -> AsyncStream<LoomMultiplexedStream>
+    func makePathObserver() async -> AsyncStream<LoomSessionNetworkPathSnapshot>
     var context: LoomAuthenticatedSessionContext? { get async }
 }
 final class StubSession: LoomSessionProtocol {
     func makeIncomingStreamObserver() -> AsyncStream<LoomMultiplexedStream> { AsyncStream { _ in } }
+    func makePathObserver() async -> AsyncStream<LoomSessionNetworkPathSnapshot> { AsyncStream { _ in } }
     var context: LoomAuthenticatedSessionContext? { get async { nil } }
+}
+public actor LoomAuthenticatedSession: LoomSessionProtocol {
+    public nonisolated func makeIncomingStreamObserver() -> AsyncStream<LoomMultiplexedStream> { AsyncStream { _ in } }
+    public func makePathObserver() -> AsyncStream<LoomSessionNetworkPathSnapshot> { AsyncStream { _ in } }
+    public var context: LoomAuthenticatedSessionContext? { nil }
+    public var backendRemoteEndpoint: LoomNetworkEndpoint? { nil }
+}
+public struct LoomOverlaySeed: Hashable, Sendable {
+    public let host: String
+    public let probePort: UInt16?
+    public init(host: String, probePort: UInt16? = nil) { self.host = host; self.probePort = probePort }
+}
+public struct LoomOverlayDirectoryConfiguration: Sendable {
+    public typealias SeedProvider = @Sendable () async throws -> [LoomOverlaySeed]
+    public init(probePort: UInt16? = nil, refreshInterval: Duration = .seconds(30), probeTimeout: Duration = .seconds(2), probeAttempts: Int, probeRetryDelay: Duration = .zero, seedProvider: @escaping SeedProvider) {}
+    public init(probePort: UInt16? = nil, refreshInterval: Duration = .seconds(30), probeTimeout: Duration = .seconds(2), seedProvider: @escaping SeedProvider) {}
 }
 public actor LoomConnectionHandle {
     public nonisolated let id: UUID = UUID()

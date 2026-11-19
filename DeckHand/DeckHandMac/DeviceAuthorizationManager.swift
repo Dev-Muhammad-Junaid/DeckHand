@@ -123,7 +123,9 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
         gates[connectionID] = gate
         Task {
             let identity = await handle.verifiedPeerIdentity()
-            admit(connection, handle: handle, gate: gate, identity: identity)
+            // S15 (network lane): over a VPN or tunnel only paired devices get in; no identity means refuse.
+            let allowed = await RemoteAccessGate.allows(identity, handle: handle, store: store)
+            admit(connection, handle: handle, gate: gate, identity: allowed ? identity : nil)
         }
     }
 

@@ -47,6 +47,11 @@ final class MacDaemon: ObservableObject {
                     cloudKit: DeckHandCloud.cloudKitConfiguration,
                     // Over-the-internet reachability: plumbed through, but
                     // inert until a relay is deployed (returns nil today).
+                    // S15: answer Loom's overlay probe, so a paired remote
+                    // can find this Mac by its Tailscale / VPN address.
+                    // Unpaired devices are refused on that path
+                    // (RemoteAccessGate).
+                    overlayDirectory: RemoteAccessGate.overlayProbeConfiguration,
                     remoteSignaling: DeckHandCloud.remoteSignalingConfiguration,
                     // Loom 2.x denies `.requiresApproval` during the handshake;
                     // this provider lets verified identities through so the

@@ -50,6 +50,7 @@ final class HostLinkMonitor {
     func forget(_ id: UUID) {
         tasks.removeValue(forKey: id)?.cancel()
         kinds.removeValue(forKey: id)
+        RemoteAccessGate.forget(id)
     }
 
     /// Reads interface addresses and walks IOKit off the main actor.

@@ -99,6 +99,8 @@ public enum RemoteAccessPolicy {
     /// local network the Allow prompt was designed for.
     public static func isRemotePath(link: LinkKind, remoteHost: String?) -> Bool {
         if RemoteHost.isOverlayAddress(remoteHost) { return true }
+        // Loopback on the Mac means an SSH port forward or another relay.
+        if LinkJudge.isLoopback(remoteHost) { return true }
         switch link {
         case .tunnel, .cellular:
             return true
