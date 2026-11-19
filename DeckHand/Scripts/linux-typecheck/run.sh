@@ -31,6 +31,7 @@ files=(
   "$app/DeckHandMac/DeckHandHandshakeTrustProvider.swift"
   "$app/DeckHandMac/Pairing/PairedDeviceStore.swift"
   "$app/Shared/Pairing+Loom.swift"
+  "$app/DeckHandiOS/Pairing/PairedMacsStore.swift"
   "$app/DeckHandiOS/TrackpadSender.swift"
   "$app/DeckHandiOS/Mirror/MirrorStreamReceiver.swift"
   "$app/Shared/LoomConnectionHandle+ControlMessage.swift"

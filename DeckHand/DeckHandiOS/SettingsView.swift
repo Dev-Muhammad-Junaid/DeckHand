@@ -28,6 +28,7 @@ struct SettingsView: View {
                 SettingsAppsSection()
                 SettingsAppearanceSection()
                 SettingsConnectionSection()
+                SettingsPairingSection()
                 SettingsPrivacySection()
                 SettingsAboutSection()
             }

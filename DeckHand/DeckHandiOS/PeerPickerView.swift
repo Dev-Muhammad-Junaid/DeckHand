@@ -24,6 +24,10 @@ struct PeerPickerView: View {
     @State private var connecting: UUID?
     @State private var errorMessage: String?
     @State private var isSettingsPresented = false
+    /// Pairing (S4): scanning a Mac's pairing QR code from here dials that
+    /// Mac and sends its code once the Mac answers.
+    @State private var isScanningInvite = false
+    private let pairing = PairedMacsStore.shared
 
     private enum Layout {
         /// Caps the content column so cards stay a readable width on a 13"
@@ -70,6 +74,11 @@ struct PeerPickerView: View {
         .sheet(isPresented: $isSettingsPresented) {
             SettingsView()
         }
+        .sheet(isPresented: $isScanningInvite) {
+            PairingQRScannerSheet { invite in
+                connect(with: invite)
+            }
+        }
         // The picker is a branded surface, not a system one: it stays dark
         // regardless of the appearance preference, the same way the icon does.
         .preferredColorScheme(.dark)
@@ -79,6 +88,19 @@ struct PeerPickerView: View {
         VStack {
             HStack {
                 Spacer()
+                Button {
+                    isScanningInvite = true
+                } label: {
+                    Image(systemName: "qrcode.viewfinder")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .frame(width: 40, height: 40)
+                        .background(
+                            Circle().fill(Color.white.opacity(0.06))
+                        )
+                }
+                .buttonStyle(PressableButtonStyle())
+                .accessibilityLabel("Pair with a QR code")
                 Button {
                     isSettingsPresented = true
                 } label: {
@@ -133,6 +155,7 @@ struct PeerPickerView: View {
             ForEach(Array(orderedPeers.enumerated()), id: \.element.id) { index, peer in
                 PeerCard(
                     peer: peer,
+                    isPaired: pairing.isPaired(deviceID: peer.deviceID),
                     isConnecting: connecting == peer.deviceID,
                     isDimmed: connecting != nil && connecting != peer.deviceID
                 ) {
@@ -232,6 +255,18 @@ struct PeerPickerView: View {
         }
     }
 
+    /// A scanned pairing QR code: dial the Mac it names. The code goes out
+    /// once that Mac proves the key in the QR code and answers
+    /// (ControlSessionModel+Pairing).
+    private func connect(with invite: PairingInvite) {
+        guard let peer = peers.first(where: { $0.deviceID == invite.macDeviceID }) else {
+            showError("That Mac isn’t nearby. Make sure Pixel Hand is open on it and both devices are on the same Wi-Fi.")
+            return
+        }
+        pairing.pendingInvite = invite
+        connectTo(peer)
+    }
+
     private func showError(_ message: String) {
         withAnimation(.easeOut(duration: 0.22)) {
             errorMessage = message
@@ -249,6 +284,8 @@ struct PeerPickerView: View {
 
 private struct PeerCard: View {
     let peer: LoomPeerSnapshot
+    /// This device is paired with the Mac (S4): it connects without asking.
+    let isPaired: Bool
     let isConnecting: Bool
     /// Set while a different peer is connecting, so the tapped card is the
     /// only one that still reads as active.
@@ -287,6 +324,17 @@ private struct PeerCard: View {
                                     Capsule().fill(DeckHandTheme.Brand.mint.opacity(0.14))
                                 )
                         }
+                    }
+
+                    if isPaired, updateMessage == nil {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 11, weight: .semibold))
+                            Text("Paired")
+                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                        }
+                        .foregroundStyle(DeckHandTheme.Brand.mint)
+                        .accessibilityLabel("Paired: connects without asking")
                     }
 
                     if let updateMessage {
