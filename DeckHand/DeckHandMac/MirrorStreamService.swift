@@ -24,6 +24,17 @@
 //  / `error` and the stats, so a frame never queues ahead of input or a
 //  heartbeat.
 //
+//  S14, one window instead of a display: `mirror.start(windowID:)` captures
+//  with `SCContentFilter(desktopIndependentWindow:)`, sized to the window's
+//  frame (`MirrorWindowGeometry`). Twice a second the window is looked at
+//  (`MirrorWindowProbe` → `MirrorWindowTracker`): a resize updates the
+//  capture's size in place (a new HEVC session, so a key frame, and a new
+//  `displayList` with the window's size); a window that closed, was
+//  minimised or left the screen, or a Mac that locked, ends the window
+//  mirror: each remote gets `mirror.error` with a `fallbackDisplayID` and
+//  the capture switches to the display the window was on. The pointer is
+//  sent as fractions of the window.
+//
 //  Performance / memory invariants:
 //
 //   • HEVC frames depend on each other: they go out in order, and a remote
@@ -86,7 +97,17 @@ final class MirrorStreamService: NSObject {
     private var output: MirrorFrameOutput?
     /// Display currently being captured. `0` is not a valid CGDirectDisplayID
     /// in practice; treated as "unset" until the first successful start.
+    /// While a window is mirrored: the display it sits on (the fallback).
     private var currentDisplayID: CGDirectDisplayID = 0
+    /// What the capture shows; `nil` while nothing is captured.
+    private var currentTarget: MirrorTarget?
+    /// S14: the mirrored window, as told to the remotes, its tracker and
+    /// its pixels per point. `nil` while a display is mirrored.
+    private var currentWindow: MirroredWindow?
+    private var windowTracker: MirrorWindowTracker?
+    private var windowPixelScale: Double = 2
+    /// Look at the window every Nth cursor tick (about twice a second).
+    private static let windowEveryTicks = 30
     private var currentFPS = 20
     private var currentMaxWidth = 640
     /// The capture's pixel format: NV12 while an HEVC remote watches (the
@@ -149,7 +170,8 @@ final class MirrorStreamService: NSObject {
         fps: Int,
         maxWidth: Int,
         displayID: UInt32?,
-        codec: MirrorCodec
+        codec: MirrorCodec,
+        windowID: UInt32? = nil
     ) async {
         await lifecycle.run { [weak self] in
             await self?.performStart(
@@ -158,7 +180,8 @@ final class MirrorStreamService: NSObject {
                 fps: fps,
                 maxWidth: maxWidth,
                 displayID: displayID,
-                codec: codec
+                codec: codec,
+                windowID: windowID
             )
         }
     }
@@ -175,7 +198,8 @@ final class MirrorStreamService: NSObject {
         fps: Int,
         maxWidth: Int,
         displayID: UInt32?,
-        codec: MirrorCodec
+        codec: MirrorCodec,
+        windowID: UInt32?
     ) async {
         let subscriber = subscribers[subscriberID] ?? MirrorSubscriber(id: subscriberID, handle: handle)
         // This Mac has no HEVC encoder: JPEG it is (the remote shows what
@@ -193,8 +217,9 @@ final class MirrorStreamService: NSObject {
         let clampedFPS = max(1, min(fps, Self.maxAllowedFPS))
         let clampedWidth = max(120, min(maxWidth, Self.maxAllowedWidth))
         let requestedID = displayID.map { CGDirectDisplayID($0) }
+        let target = MirrorTarget.requested(displayID: displayID, windowID: windowID)
         let needsNewStream = stream == nil
-            || (requestedID != nil && requestedID != currentDisplayID)
+            || MirrorTarget.needsNewCapture(current: currentTarget, requested: target)
         let needsReconfigure = !needsNewStream
             && (clampedFPS != currentFPS || clampedWidth != currentMaxWidth || pixelFormat != currentPixelFormat)
         currentFPS = clampedFPS
@@ -203,12 +228,21 @@ final class MirrorStreamService: NSObject {
         if needsNewStream {
             await teardownStream()
             do {
-                try await startStream(
-                    fps: clampedFPS,
-                    maxWidth: clampedWidth,
-                    preferredDisplayID: requestedID
-                )
-                DeckHandLog.app.info("Mirror stream started (\(clampedFPS, privacy: .public) fps, \(clampedWidth, privacy: .public)px, display \(self.currentDisplayID, privacy: .public))")
+                if case let .window(id) = target {
+                    try await startWindowOrFallBack(
+                        windowID: id,
+                        fps: clampedFPS,
+                        maxWidth: clampedWidth,
+                        fallbackDisplayID: requestedID
+                    )
+                } else {
+                    try await startStream(
+                        fps: clampedFPS,
+                        maxWidth: clampedWidth,
+                        preferredDisplayID: requestedID
+                    )
+                }
+                DeckHandLog.app.info("Mirror stream started (\(clampedFPS, privacy: .public) fps, \(clampedWidth, privacy: .public)px, display \(self.currentDisplayID, privacy: .public), window \(self.currentWindow?.windowID ?? 0, privacy: .public))")
             } catch {
                 DeckHandLog.app.error("Mirror stream failed to start: \(error.localizedDescription, privacy: .public)")
                 subscribers.removeValue(forKey: subscriberID)
@@ -219,6 +253,10 @@ final class MirrorStreamService: NSObject {
                 return
             }
             for other in subscribers.values { other.markFormatChanged() }
+            updateOutputModes()
+            // Every remote shares the capture: tell them all what it shows.
+            await broadcastDisplayList()
+            return
         } else if needsReconfigure {
             await reconfigureStream()
         }
@@ -276,6 +314,35 @@ final class MirrorStreamService: NSObject {
         return config
     }
 
+    /// S14: a window's capture, sized to its frame. `nil` when the window
+    /// has no area.
+    private func windowConfiguration(windowWidth: Double, windowHeight: Double, fps: Int, maxWidth: Int) -> SCStreamConfiguration? {
+        guard let size = MirrorWindowGeometry.captureSize(
+            width: windowWidth,
+            height: windowHeight,
+            pixelScale: windowPixelScale,
+            maxWidth: maxWidth
+        ) else { return nil }
+        let config = SCStreamConfiguration()
+        config.width = size.width
+        config.height = size.height
+        config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(fps))
+        let format = pixelFormat
+        config.pixelFormat = format
+        currentPixelFormat = format
+        config.queueDepth = 3
+        config.showsCursor = false
+        config.capturesAudio = false
+        // The window's content fills the frame (its aspect is the frame's),
+        // without the drop shadow, so pointer fractions of the window's
+        // frame land on the same pixels.
+        config.scalesToFit = true
+        config.preservesAspectRatio = true
+        config.ignoreShadowsSingleWindow = true
+        return config
+    }
+
+    /// Display mode: captures `preferredDisplayID` (or the main display).
     private func startStream(
         fps: Int,
         maxWidth: Int,
@@ -285,9 +352,77 @@ final class MirrorStreamService: NSObject {
         currentDisplayID = display.displayID
 
         let config = configuration(for: display, fps: fps, maxWidth: maxWidth)
+        let filter = SCContentFilter(display: display, excludingWindows: [])
+        try await runCapture(filter: filter, config: config)
+        currentTarget = .display(display.displayID)
+        currentWindow = nil
+        windowTracker = nil
+    }
+
+    /// S14: captures the window, or, when it isn't on screen any more,
+    /// falls back to `fallbackDisplayID` and tells the remotes why.
+    private func startWindowOrFallBack(
+        windowID: UInt32,
+        fps: Int,
+        maxWidth: Int,
+        fallbackDisplayID: CGDirectDisplayID?
+    ) async throws {
+        if MacLockMonitor.shared.state.isLocked {
+            // The gate refuses this start while locked; a lock that came in
+            // between still mustn't capture a window.
+            try await startStream(fps: fps, maxWidth: maxWidth, preferredDisplayID: fallbackDisplayID)
+            await sendWindowEnded(message: MirrorWindowCopy.ended(.locked, appName: "", displayName: await currentDisplayName()))
+            return
+        }
+        if let window = try await ScreenCaptureService.shared.window(matching: windowID),
+           window.frame.width >= 1, window.frame.height >= 1 {
+            do {
+                try await startWindowStream(window, fps: fps, maxWidth: maxWidth)
+                return
+            } catch {
+                DeckHandLog.app.error("Mirror: window \(windowID, privacy: .public) couldn't be captured: \(error.localizedDescription, privacy: .public)")
+                try await startStream(fps: fps, maxWidth: maxWidth, preferredDisplayID: Self.homeDisplay(of: window.frame) ?? fallbackDisplayID)
+                await sendWindowEnded(message: MirrorWindowCopy.ended(
+                    .captureFailed,
+                    appName: window.owningApplication?.applicationName ?? "",
+                    displayName: await currentDisplayName()
+                ))
+                return
+            }
+        }
+        try await startStream(fps: fps, maxWidth: maxWidth, preferredDisplayID: fallbackDisplayID)
+        await sendWindowEnded(message: MirrorWindowCopy.notFound(displayName: await currentDisplayName()))
+    }
+
+    private func startWindowStream(_ window: SCWindow, fps: Int, maxWidth: Int) async throws {
+        let filter = SCContentFilter(desktopIndependentWindow: window)
+        // Points of the window's content and pixels per point (macOS 14).
+        windowPixelScale = Double(filter.pointPixelScale)
+        let frame = window.frame
+        guard let config = windowConfiguration(
+            windowWidth: Double(frame.width),
+            windowHeight: Double(frame.height),
+            fps: fps,
+            maxWidth: maxWidth
+        ) else { throw ScreenCaptureService.CaptureError.windowNotFound }
+        try await runCapture(filter: filter, config: config)
+        currentDisplayID = Self.homeDisplay(of: frame) ?? CGMainDisplayID()
+        currentTarget = .window(window.windowID)
+        currentWindow = MirroredWindow(
+            windowID: window.windowID,
+            title: window.title ?? "",
+            appName: window.owningApplication?.applicationName ?? "",
+            width: Int(frame.width.rounded()),
+            height: Int(frame.height.rounded())
+        )
+        windowTracker = MirrorWindowTracker(frame: Self.rect(frame), now: Self.uptime())
+    }
+
+    /// Builds the frame output and the stream for `filter`, and starts it.
+    private func runCapture(filter: SCContentFilter, config: SCStreamConfiguration) async throws {
         frameWidth = config.width
         frameHeight = config.height
-        let filter = SCContentFilter(display: display, excludingWindows: [])
+        let fps = currentFPS
 
         let output = MirrorFrameOutput(fps: fps) { [weak self] source, frame in
             // Called on `sampleQueue` after encode. Hop to the MainActor to
@@ -325,13 +460,130 @@ final class MirrorStreamService: NSObject {
         startCursorLoop()
     }
 
+    // MARK: - Window mirror (S14)
+
+    /// Twice a second while a window is mirrored, from the cursor loop.
+    private func checkWindow() {
+        guard case let .window(windowID) = currentTarget, var tracker = windowTracker, !tracker.hasEnded else { return }
+        let event = tracker.observe(MirrorWindowProbe.observe(windowID: windowID), now: Self.uptime())
+        windowTracker = tracker
+        handleWindowEvent(event)
+    }
+
+    private func handleWindowEvent(_ event: MirrorWindowTracker.Event) {
+        switch event {
+        case .none:
+            break
+        case let .resize(width, height):
+            lifecycle.enqueue { [weak self] in
+                await self?.resizeWindowCapture(width: width, height: height)
+            }
+        case let .ended(reason):
+            let appName = currentWindow?.appName ?? ""
+            let frame = windowTracker?.frame
+            lifecycle.enqueue { [weak self] in
+                await self?.fallBackFromWindow(reason: reason, appName: appName, lastFrame: frame)
+            }
+        }
+    }
+
+    /// The window was resized: capture at its new size, in place.
+    private func resizeWindowCapture(width: Double, height: Double) async {
+        guard let stream, currentTarget?.windowID != nil,
+              let config = windowConfiguration(windowWidth: width, windowHeight: height, fps: currentFPS, maxWidth: currentMaxWidth)
+        else { return }
+        do {
+            try await stream.updateConfiguration(config)
+        } catch {
+            DeckHandLog.app.error("Mirror: window resize not applied: \(error.localizedDescription, privacy: .public)")
+            return
+        }
+        frameWidth = config.width
+        frameHeight = config.height
+        // A new size makes a new HEVC session, whose first frame is a key frame.
+        for subscriber in subscribers.values { subscriber.markFormatChanged() }
+        if let window = currentWindow {
+            currentWindow = MirroredWindow(
+                windowID: window.windowID,
+                title: window.title,
+                appName: window.appName,
+                width: Int(width.rounded()),
+                height: Int(height.rounded())
+            )
+        }
+        if let frame = windowTracker?.frame {
+            currentDisplayID = Self.homeDisplay(of: CGRect(x: frame.x, y: frame.y, width: frame.width, height: frame.height)) ?? currentDisplayID
+        }
+        await broadcastDisplayList()
+    }
+
+    /// The window ended: tell every remote, then mirror its display.
+    private func fallBackFromWindow(reason: MirrorWindowTracker.EndReason, appName: String, lastFrame: MirrorRect?) async {
+        guard currentTarget?.windowID != nil, !subscribers.isEmpty else { return }
+        let home = lastFrame.flatMap {
+            Self.homeDisplay(of: CGRect(x: $0.x, y: $0.y, width: $0.width, height: $0.height))
+        } ?? currentDisplayID
+        DeckHandLog.app.info("Mirror: window mirror ended (\(reason.rawValue, privacy: .public)), back to display \(home, privacy: .public)")
+        await teardownStream()
+        do {
+            try await startStream(fps: currentFPS, maxWidth: currentMaxWidth, preferredDisplayID: home == 0 ? nil : home)
+        } catch {
+            handleStreamFailure(error)
+            return
+        }
+        for subscriber in subscribers.values { subscriber.markFormatChanged() }
+        updateOutputModes()
+        await sendWindowEnded(message: MirrorWindowCopy.ended(reason, appName: appName, displayName: await currentDisplayName()))
+        await broadcastDisplayList()
+    }
+
+    /// `mirror.error` with the display now shown: every remote keeps its
+    /// mirror open.
+    private func sendWindowEnded(message: String) async {
+        let displayID = currentDisplayID
+        for subscriber in subscribers.values {
+            try? await subscriber.handle.send(.mirror(.error(message: message, fallbackDisplayID: displayID)))
+        }
+    }
+
+    private func currentDisplayName() async -> String {
+        let displays = (try? await ScreenCaptureService.shared.enumerateDisplays()) ?? []
+        return displays.first { $0.displayID == currentDisplayID }?.name ?? "the display"
+    }
+
+    /// The active display a window frame overlaps most.
+    private static func homeDisplay(of frame: CGRect) -> CGDirectDisplayID? {
+        var count: UInt32 = 0
+        guard CGGetActiveDisplayList(0, nil, &count) == .success, count > 0 else { return nil }
+        var ids = [CGDirectDisplayID](repeating: 0, count: Int(count))
+        guard CGGetActiveDisplayList(count, &ids, &count) == .success else { return nil }
+        let displays = ids.prefix(Int(count)).map { id in
+            (id: UInt32(id), bounds: rect(CGDisplayBounds(id)))
+        }
+        return MirrorWindowGeometry.homeDisplay(window: rect(frame), displays: displays)
+    }
+
+    private static func rect(_ r: CGRect) -> MirrorRect {
+        MirrorRect(x: Double(r.origin.x), y: Double(r.origin.y), width: Double(r.width), height: Double(r.height))
+    }
+
+    private static func uptime() -> Double {
+        Double(DispatchTime.now().uptimeNanoseconds) / 1_000_000_000
+    }
+
     /// Applies a new rate or size to the running capture without
     /// restarting it; restarts if ScreenCaptureKit refuses.
     private func reconfigureStream() async {
         guard let stream else { return }
         do {
-            let display = try await ScreenCaptureService.shared.display(matching: currentDisplayID)
-            let config = configuration(for: display, fps: currentFPS, maxWidth: currentMaxWidth)
+            let config: SCStreamConfiguration
+            if currentTarget?.windowID != nil, let frame = windowTracker?.capturedSize,
+               let windowConfig = windowConfiguration(windowWidth: frame.width, windowHeight: frame.height, fps: currentFPS, maxWidth: currentMaxWidth) {
+                config = windowConfig
+            } else {
+                let display = try await ScreenCaptureService.shared.display(matching: currentDisplayID)
+                config = configuration(for: display, fps: currentFPS, maxWidth: currentMaxWidth)
+            }
             try await stream.updateConfiguration(config)
             frameWidth = config.width
             frameHeight = config.height
@@ -340,10 +592,16 @@ final class MirrorStreamService: NSObject {
             DeckHandLog.app.info("Mirror stream reconfigured (\(self.currentFPS, privacy: .public) fps, \(self.currentMaxWidth, privacy: .public)px)")
         } catch {
             DeckHandLog.app.error("Mirror reconfigure failed, restarting: \(error.localizedDescription, privacy: .public)")
+            let windowID = currentTarget?.windowID
             await teardownStream()
             do {
-                try await startStream(fps: currentFPS, maxWidth: currentMaxWidth, preferredDisplayID: currentDisplayID)
+                if let windowID {
+                    try await startWindowOrFallBack(windowID: windowID, fps: currentFPS, maxWidth: currentMaxWidth, fallbackDisplayID: currentDisplayID)
+                } else {
+                    try await startStream(fps: currentFPS, maxWidth: currentMaxWidth, preferredDisplayID: currentDisplayID)
+                }
                 for subscriber in subscribers.values { subscriber.markFormatChanged() }
+                if windowID != nil { await broadcastDisplayList() }
             } catch {
                 handleStreamFailure(error)
             }
@@ -352,6 +610,9 @@ final class MirrorStreamService: NSObject {
 
     private func teardownStream() async {
         stopCursorLoop()
+        currentTarget = nil
+        currentWindow = nil
+        windowTracker = nil
         guard let stream else { return }
         self.stream = nil
         self.output = nil
@@ -365,7 +626,13 @@ final class MirrorStreamService: NSObject {
         guard stream != nil, !subscribers.isEmpty else { return }
         let displays = (try? await ScreenCaptureService.shared.enumerateDisplays()) ?? []
         let stillPresent = displays.contains { $0.displayID == currentDisplayID }
-        if !stillPresent {
+        if currentTarget?.windowID != nil {
+            // A window capture doesn't depend on a display; only its home
+            // (the fallback) may have moved.
+            if let frame = windowTracker?.frame {
+                currentDisplayID = Self.homeDisplay(of: CGRect(x: frame.x, y: frame.y, width: frame.width, height: frame.height)) ?? CGMainDisplayID()
+            }
+        } else if !stillPresent {
             await teardownStream()
             do {
                 try await startStream(
@@ -379,22 +646,42 @@ final class MirrorStreamService: NSObject {
                 return
             }
         }
-        for subscriber in subscribers.values {
-            await sendDisplayList(to: subscriber.handle)
-        }
+        await broadcastDisplayList()
     }
 
     private func sendDisplayList(to handle: LoomConnectionHandle) async {
         let displays = (try? await ScreenCaptureService.shared.enumerateDisplays()) ?? []
         try? await handle.send(.mirror(.displayList(
             displays: displays,
-            selectedDisplayID: currentDisplayID
+            selectedDisplayID: currentDisplayID,
+            window: currentWindow
         )))
+    }
+
+    private func broadcastDisplayList() async {
+        for subscriber in subscribers.values {
+            await sendDisplayList(to: subscriber.handle)
+        }
     }
 
     /// Called by `MirrorFrameOutput` when ScreenCaptureKit reports the
     /// stream died (display unplugged, TCC revoked mid-stream, …).
-    fileprivate func handleStreamFailure(_ error: Error) {
+    fileprivate func handleStreamFailure(_ error: Error, from source: MirrorFrameOutput? = nil) {
+        // A stream that has since been replaced reports nothing.
+        if let source, source !== output { return }
+        if source != nil, currentTarget?.windowID != nil, windowTracker?.hasEnded == false {
+            // S14: a window capture stops when its window goes away. Fall
+            // back to its display instead of ending every mirror.
+            DeckHandLog.app.info("Mirror: window capture stopped: \(error.localizedDescription, privacy: .public)")
+            let windowID = currentTarget?.windowID ?? 0
+            let reason: MirrorWindowTracker.EndReason = MirrorWindowProbe.listing(windowID: windowID) == nil ? .closed : .captureFailed
+            if var tracker = windowTracker {
+                let event = tracker.end(reason)
+                windowTracker = tracker
+                handleWindowEvent(event)
+            }
+            return
+        }
         DeckHandLog.app.error("Mirror stream error: \(error.localizedDescription, privacy: .public)")
         let dropped = Array(subscribers.values)
         subscribers.removeAll()
@@ -403,6 +690,9 @@ final class MirrorStreamService: NSObject {
         stream = nil
         output = nil
         currentDisplayID = 0
+        currentTarget = nil
+        currentWindow = nil
+        windowTracker = nil
         for subscriber in dropped {
             Task {
                 await subscriber.close()
@@ -476,6 +766,10 @@ final class MirrorStreamService: NSObject {
                 if tick % Self.shapeEveryTicks == 0 {
                     shape = self.cursorSampler.currentShape()
                 }
+                if tick % Self.windowEveryTicks == 0 {
+                    self.checkWindow()
+                }
+                self.checkLockForWindow()
                 self.sendCursor(shape: shape)
                 self.sendStatsIfDue()
                 tick &+= 1
@@ -489,10 +783,30 @@ final class MirrorStreamService: NSObject {
         cursorTask = nil
     }
 
+    /// S14: a window capture draws the window over the lock screen; a lock
+    /// ends it at once (read every tick, it's a stored property).
+    private func checkLockForWindow() {
+        guard currentTarget?.windowID != nil, MacLockMonitor.shared.state.isLocked,
+              var tracker = windowTracker, !tracker.hasEnded else { return }
+        let event = tracker.end(.locked)
+        windowTracker = tracker
+        // Stop sending its frames now, before the fallback has run.
+        output?.setModes(jpeg: false, hevc: false)
+        handleWindowEvent(event)
+    }
+
     private func sendCursor(shape: MirrorCursorShape?) {
-        guard currentDisplayID != 0,
-              let state = cursorSampler.state(mirroredDisplayID: currentDisplayID, shapeID: shape?.id ?? 0)
-        else { return }
+        let state: MirrorCursorState?
+        if currentTarget?.windowID != nil {
+            // S14: fractions of the window; "on the mirrored display" means
+            // over the window.
+            guard let frame = windowTracker?.frame, windowTracker?.hasEnded == false else { return }
+            state = cursorSampler.state(in: frame, shapeID: shape?.id ?? 0)
+        } else {
+            guard currentDisplayID != 0 else { return }
+            state = cursorSampler.state(mirroredDisplayID: currentDisplayID, shapeID: shape?.id ?? 0)
+        }
+        guard let state else { return }
         let now = Double(DispatchTime.now().uptimeNanoseconds) / 1_000_000_000
         let micros = DispatchTime.now().uptimeNanoseconds / 1_000
         for subscriber in subscribers.values where subscriber.cursorThrottle.shouldSend(state, now: now) {
@@ -674,8 +988,8 @@ private final class MirrorFrameOutput: NSObject, SCStreamOutput, SCStreamDelegat
     }
 
     func stream(_ stream: SCStream, didStopWithError error: Error) {
-        Task { @MainActor in
-            MirrorStreamService.shared.handleStreamFailure(error)
+        Task { @MainActor [weak self] in
+            MirrorStreamService.shared.handleStreamFailure(error, from: self)
         }
     }
 

@@ -13,7 +13,10 @@
 //  - the stream stats line (S6), when turned on in Settings;
 //  - the HEVC display layer in place of the JPEG image (S5);
 //  - the desktop dots under the mirror, and ‹ › dimmed or hidden at the
-//    ends of the mirrored display's Spaces (from `system.displayState`).
+//    ends of the mirrored display's Spaces (from `system.displayState`);
+//  - S14: "Window…" in the picker (mirror one window), "Pointer outside
+//    the window" while a window is mirrored, and the notice when a
+//    mirrored window ends and the mirror goes back to its display.
 //
 
 import SwiftUI
@@ -105,22 +108,28 @@ struct MirrorCursorLayer: View {
 
 // MARK: - Display picker
 
-/// Which display the mirror shows, and Follow cursor. Only when the Mac
-/// has more than one display.
+/// Which display (or, S14, window) the mirror shows, and Follow cursor.
+/// Shown once the Mac has listed its displays: with one display it still
+/// offers "Window…".
 struct MirrorDisplayPicker: View {
     let session: ControlSessionModel
 
     @EnvironmentObject private var settings: DeckHandSettings
 
     var body: some View {
-        if session.mirrorDisplays.count > 1 {
+        if !session.mirrorDisplays.isEmpty {
+            let window = session.mirrorWindowSelection.window
+            let windowActive = session.mirrorWindowSelection.isActive
             Menu {
+                if let window {
+                    Label(window.longLabel, systemImage: "checkmark")
+                }
                 ForEach(session.mirrorDisplays) { display in
                     Button {
                         settings.mirrorFollowsCursor = false
                         session.selectMirrorDisplay(display.displayID)
                     } label: {
-                        if display.displayID == session.selectedMirrorDisplayID {
+                        if !windowActive, display.displayID == session.selectedMirrorDisplayID {
                             Label(display.name, systemImage: "checkmark")
                         } else {
                             Text(display.name)
@@ -128,12 +137,21 @@ struct MirrorDisplayPicker: View {
                     }
                 }
                 Divider()
-                Toggle(isOn: $settings.mirrorFollowsCursor) {
-                    Label("Follow Cursor", systemImage: "cursorarrow.motionlines")
+                Button {
+                    settings.mirrorFollowsCursor = false
+                    session.openMirrorWindowPicker()
+                } label: {
+                    Label("Window…", systemImage: "macwindow")
+                }
+                .disabled(!session.canMirrorWindow)
+                if session.mirrorDisplays.count > 1, !windowActive {
+                    Toggle(isOn: $settings.mirrorFollowsCursor) {
+                        Label("Follow Cursor", systemImage: "cursorarrow.motionlines")
+                    }
                 }
             } label: {
                 HStack(spacing: 4) {
-                    Image(systemName: settings.mirrorFollowsCursor ? "cursorarrow.motionlines" : "display.2")
+                    Image(systemName: chipSymbol(windowActive: windowActive))
                     Text(selectedLabel)
                         .lineLimit(1)
                 }
@@ -144,12 +162,20 @@ struct MirrorDisplayPicker: View {
                 .background(.black.opacity(0.55), in: Capsule())
             }
             .padding(6)
-            .accessibilityLabel("Mirrored display: \(selectedLabel)")
+            .accessibilityLabel(window.map { "Mirrored window: \($0.longLabel)" } ?? "Mirrored display: \(selectedLabel)")
         }
     }
 
+    private func chipSymbol(windowActive: Bool) -> String {
+        if windowActive { return "macwindow" }
+        if settings.mirrorFollowsCursor { return "cursorarrow.motionlines" }
+        return session.mirrorDisplays.count > 1 ? "display.2" : "display"
+    }
+
     private var selectedLabel: String {
-        session.mirrorDisplays.first { $0.displayID == session.selectedMirrorDisplayID }?.shortLabel ?? "Display"
+        if let window = session.mirrorWindowSelection.window { return window.shortLabel }
+        if session.mirrorWindowSelection.isActive { return "Window" }
+        return session.mirrorDisplays.first { $0.displayID == session.selectedMirrorDisplayID }?.shortLabel ?? "Display"
     }
 }
 
@@ -203,9 +229,32 @@ struct MirrorBottomChrome: View {
     @EnvironmentObject private var settings: DeckHandSettings
 
     var body: some View {
+        let chrome = session.mirrorChrome
         VStack(alignment: .leading, spacing: 4) {
-            if let display = session.mirrorChrome.cursorElsewhere {
+            if let notice = session.mirrorNotice {
+                // S14: the mirrored window ended; the mirror shows its display.
+                Label(notice, systemImage: "macwindow.badge.plus")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(3)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .transition(.opacity)
+            }
+            if let display = chrome.cursorElsewhere {
                 cursorBadge(display)
+                    .transition(.opacity)
+            }
+            if chrome.cursorOutsideWindow {
+                // S14: the pointer is somewhere else on the Mac.
+                Label("Pointer outside the window", systemImage: "cursorarrow.rays")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(.black.opacity(0.6), in: Capsule())
+                    .allowsHitTesting(false)
                     .transition(.opacity)
             }
             if settings.showMirrorStats {
@@ -226,7 +275,7 @@ struct MirrorBottomChrome: View {
         }
         .padding(6)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .animation(.easeInOut(duration: 0.2), value: session.mirrorChrome.cursorElsewhere)
+        .animation(.easeInOut(duration: 0.2), value: chrome)
     }
 
     private func cursorBadge(_ display: DisplayInfo) -> some View {

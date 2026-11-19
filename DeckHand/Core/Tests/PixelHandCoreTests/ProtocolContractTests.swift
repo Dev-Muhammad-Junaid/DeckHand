@@ -137,9 +137,10 @@ import Testing
         ("deck.receipt.failed", .deck(.receipt(requestID: "cmd-3", outcome: .failed(reason: "App not running")))),
         ("deck.receipt.completed", .deck(.receipt(requestID: "cmd-4", outcome: .completed))),
         // mirror
-        ("mirror.start", .mirror(.start(fps: 20, maxWidth: 480, displayID: nil, codec: .jpeg))),
-        ("mirror.start.display", .mirror(.start(fps: 20, maxWidth: 480, displayID: 1, codec: .jpeg))),
-        ("mirror.start.hevc", .mirror(.start(fps: 30, maxWidth: 1440, displayID: 2, codec: .hevc))),
+        ("mirror.start", .mirror(.start(fps: 20, maxWidth: 480, displayID: nil, codec: .jpeg, windowID: nil))),
+        ("mirror.start.display", .mirror(.start(fps: 20, maxWidth: 480, displayID: 1, codec: .jpeg, windowID: nil))),
+        ("mirror.start.hevc", .mirror(.start(fps: 30, maxWidth: 1440, displayID: 2, codec: .hevc, windowID: nil))),
+        ("mirror.start.window", .mirror(.start(fps: 20, maxWidth: 960, displayID: 1, codec: .hevc, windowID: 4242))),
         ("mirror.requestKeyFrame", .mirror(.requestKeyFrame)),
         ("mirror.stop", .mirror(.stop)),
         ("mirror.moveCursor", .mirror(.moveCursor(displayID: 2))),
@@ -148,9 +149,18 @@ import Testing
                 DisplayInfo(displayID: 1, name: "Built-in Retina Display", isMain: true, width: 1728, height: 1117),
                 DisplayInfo(displayID: 2, name: "Studio Display", isMain: false, width: 5120, height: 2880),
             ],
-            selectedDisplayID: 2
+            selectedDisplayID: 2,
+            window: nil
         ))),
-        ("mirror.error", .mirror(.error(message: "Screen Recording is off"))),
+        ("mirror.displayList.window", .mirror(.displayList(
+            displays: [
+                DisplayInfo(displayID: 1, name: "Built-in Retina Display", isMain: true, width: 1728, height: 1117),
+            ],
+            selectedDisplayID: 1,
+            window: MirroredWindow(windowID: 4242, title: "Pixel Hand — Notes", appName: "Notes", width: 900, height: 640)
+        ))),
+        ("mirror.error", .mirror(.error(message: "Screen Recording is off", fallbackDisplayID: nil))),
+        ("mirror.error.windowFallback", .mirror(.error(message: "The Notes window closed. Showing its display instead.", fallbackDisplayID: 1))),
         // capture
         ("capture.requestScreenshot", .capture(.requestScreenshot(requestID: "req-1", mode: .fullScreen, quality: .standard))),
         ("capture.requestScreenshot.region", .capture(.requestScreenshot(
@@ -434,7 +444,7 @@ import Testing
 
     @Test("Optional fields are omitted when nil, not encoded as null")
     func nilOptionalsAreOmitted() throws {
-        let mirror = try ControlMessageCoding.encode(.mirror(.start(fps: 15, maxWidth: 640, displayID: nil, codec: .jpeg)))
+        let mirror = try ControlMessageCoding.encode(.mirror(.start(fps: 15, maxWidth: 640, displayID: nil, codec: .jpeg, windowID: nil)))
         #expect(!String(decoding: mirror, as: UTF8.self).contains("displayID"))
         let app = try ControlMessageCoding.encode(.apps(.activeAppUpdate(name: "X", bundleID: nil)))
         #expect(!String(decoding: app, as: UTF8.self).contains("bundleID"))

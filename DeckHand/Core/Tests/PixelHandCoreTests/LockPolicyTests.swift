@@ -156,7 +156,7 @@ import Testing
             #expect(LockPolicy.decide(message, state: .offConsole) == .refuse(reply: .none))
         }
         #expect(LockPolicy.decide(.system(.run(action: .locateCursor)), state: .offConsole) == .refuse(reply: .none))
-        #expect(LockPolicy.decide(.mirror(.start(fps: 20, maxWidth: 640, displayID: nil, codec: .jpeg)), state: .offConsole) == .refuse(reply: .none))
+        #expect(LockPolicy.decide(.mirror(.start(fps: 20, maxWidth: 640, displayID: nil, codec: .jpeg, windowID: nil)), state: .offConsole) == .refuse(reply: .none))
     }
 
     @Test("A held button can always be released, whatever the state")
@@ -177,7 +177,7 @@ import Testing
 
     @Test("Mirror: the lock screen may be shown, another session's desktop may not")
     func mirrorRules() {
-        let start = ControlMessage.mirror(.start(fps: 20, maxWidth: 640, displayID: nil, codec: .jpeg))
+        let start = ControlMessage.mirror(.start(fps: 20, maxWidth: 640, displayID: nil, codec: .jpeg, windowID: nil))
         #expect(LockPolicy.decide(start, state: .screenLocked) == .allow)
         #expect(LockPolicy.decide(start, state: .offConsole) == .refuse(reply: .none))
         let move = ControlMessage.mirror(.moveCursor(displayID: 1))
@@ -186,6 +186,17 @@ import Testing
         let stats = ControlMessage.diagnostics(.mirrorClientStats(stats: MirrorClientStats(receivedFPS: 20, displayedFPS: 20, droppedFrames: 0, decodeMilliseconds: 4, kilobitsPerSecond: 1_000)))
         #expect(LockPolicy.decide(stats, state: .screenLocked) == .allow)
         #expect(LockPolicy.decide(stats, state: .offConsole) == .allow)
+    }
+
+    @Test("Mirror: a window is never mirrored while locked (S14)")
+    func windowMirrorRules() {
+        let window = ControlMessage.mirror(.start(fps: 20, maxWidth: 640, displayID: 1, codec: .hevc, windowID: 42))
+        #expect(LockPolicy.decide(window, state: .unlocked) == .allow)
+        #expect(LockPolicy.decide(window, state: .screenLocked) == .refuse(reply: .none))
+        #expect(LockPolicy.decide(window, state: .offConsole) == .refuse(reply: .none))
+        // A zero window ID means a display (the sanitizer makes it nil).
+        let zero = ControlMessage.mirror(.start(fps: 20, maxWidth: 640, displayID: 1, codec: .jpeg, windowID: 0))
+        #expect(LockPolicy.decide(zero, state: .screenLocked) == .allow)
     }
 
     @Test("Capture: the display may be shot at the lock screen, windows never")
@@ -233,7 +244,7 @@ import Testing
         #expect(DisplayWakePolicy.isPersonAction(.capture(.requestScreenshot(requestID: "r", mode: .fullScreen, quality: .standard))))
         #expect(!DisplayWakePolicy.isPersonAction(.session(.ping(seq: 1))))
         #expect(!DisplayWakePolicy.isPersonAction(.apps(.requestAppList)))
-        #expect(!DisplayWakePolicy.isPersonAction(.mirror(.start(fps: 20, maxWidth: 640, displayID: nil, codec: .jpeg))))
+        #expect(!DisplayWakePolicy.isPersonAction(.mirror(.start(fps: 20, maxWidth: 640, displayID: nil, codec: .jpeg, windowID: nil))))
         #expect(!DisplayWakePolicy.isPersonAction(.pairing(.requestAuthorizationStatus)))
     }
 

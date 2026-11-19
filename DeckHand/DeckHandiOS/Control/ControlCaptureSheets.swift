@@ -78,17 +78,14 @@ struct ControlCaptureSheets: ViewModifier {
                     runningBundleIDs: runningBundleIDs,
                     isLoading: capture.isWindowListLoading,
                     onPick: { window in
-                        capture.isWindowPickerPresented = false
-                        capture.beginCapture(
-                            intent: .window(window),
-                            mode: .window(windowID: window.windowID),
-                            quality: settings.screenshotQuality
-                        )
+                        // Capture it, or mirror it (S14, the mirror's "Window…").
+                        capture.handleWindowPicked(window, quality: settings.screenshotQuality)
                     },
                     onRefresh: {
                         capture.refreshWindowList()
                     },
-                    onCancel: { capture.isWindowPickerPresented = false }
+                    onCancel: { capture.isWindowPickerPresented = false },
+                    title: capture.windowPickerPurpose == .mirror ? "Mirror Window" : "Capture Window"
                 )
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)

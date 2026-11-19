@@ -61,3 +61,40 @@ public enum SpaceDirection: String, Codable, Sendable {
     /// Open Mission Control, which is the OS overview of every Space.
     case missionControl
 }
+
+/// The window a single-window mirror shows (S14), as the Mac describes it
+/// in `mirror.displayList`. Sizes are the window's frame in points; the
+/// mirror's frames have the same aspect.
+public struct MirroredWindow: Codable, Hashable, Sendable {
+    /// Native `CGWindowID`, as in `WindowInfo`.
+    public let windowID: UInt32
+    public let title: String
+    public let appName: String
+    public let width: Int
+    public let height: Int
+
+    public init(windowID: UInt32, title: String, appName: String, width: Int, height: Int) {
+        self.windowID = windowID
+        self.title = title
+        self.appName = appName
+        self.width = width
+        self.height = height
+    }
+
+    /// Compact chip label for the mirror's picker: the app's name, else
+    /// the title, cut to 14 characters.
+    public var shortLabel: String {
+        let base = appName.isEmpty ? (title.isEmpty ? "Window" : title) : appName
+        return base.count <= 14 ? base : String(base.prefix(12)) + "…"
+    }
+
+    /// For VoiceOver and the picker's menu: "Notes — Shopping list".
+    public var longLabel: String {
+        switch (appName.isEmpty, title.isEmpty) {
+        case (false, false): "\(appName) — \(title)"
+        case (false, true): appName
+        case (true, false): title
+        case (true, true): "Window"
+        }
+    }
+}
