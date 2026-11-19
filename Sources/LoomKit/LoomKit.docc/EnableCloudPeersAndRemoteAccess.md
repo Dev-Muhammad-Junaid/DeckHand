@@ -59,6 +59,8 @@ let configuration = LoomContainerConfiguration(
 )
 ```
 
+A container that only dials overlay peers and never needs to answer probes can pass a dial-only directory, `LoomOverlayDirectoryConfiguration(...).dialOnly()`. LoomKit then opens no overlay probe listener for that container, while the directory keeps probing remote seeds.
+
 ## Pin Identities For Off-LAN Peers
 
 Overlay and signaling peers are found through host names and presence records, not the local network. When your app stored a peer's identity key earlier, dial it with ``LoomContext/connect(_:pinnedIdentity:)`` so the handshake accepts only that key instead of the one the peer advertised:

@@ -28,6 +28,13 @@ public struct LoomOverlayDirectoryConfiguration: Sendable {
     public let retainedPeerExpiration: Duration
     /// Policy used to rank direct transports when several seeds describe the same peer.
     public let directConnectionPolicy: LoomDirectConnectionPolicy
+    /// Whether a node that uses this directory also opens its own overlay probe listener.
+    ///
+    /// The default is `true`: the local node listens on ``probePort`` so other overlay
+    /// directories can discover it. Set it to `false` (or use ``dialOnly()``) for a node
+    /// that only resolves and dials overlay peers and never needs to be discovered
+    /// through an overlay probe. The directory still probes remote seeds on ``probePort``.
+    public var listensForProbes: Bool = true
     package let usesDefaultProbePort: Bool
 
     public init(
@@ -108,5 +115,15 @@ public struct LoomOverlayDirectoryConfiguration: Sendable {
         self.retainedPeerExpiration = retainedPeerExpiration
         self.directConnectionPolicy = directConnectionPolicy
         self.usesDefaultProbePort = usesDefaultProbePort
+    }
+
+    /// Returns a copy that resolves and dials overlay peers without opening a local probe listener.
+    ///
+    /// Use this on nodes that only connect outward, so they never bind ``probePort``
+    /// locally. Probes of remote seeds are unchanged.
+    public func dialOnly() -> LoomOverlayDirectoryConfiguration {
+        var configuration = self
+        configuration.listensForProbes = false
+        return configuration
     }
 }
