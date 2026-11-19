@@ -69,6 +69,11 @@ public enum LinkJudge {
         if let name, tunnelPrefixes.contains(where: name.hasPrefix) {
             return .tunnel
         }
+        // A Tailscale address on the other end is a tunnel even where the
+        // interface name doesn't say so (S15).
+        if RemoteHost.isOverlayAddress(o.remoteHost) {
+            return .tunnel
+        }
         if o.usesWiredEthernet || (o.usesOther && !o.usesWiFi && !o.usesCellular) {
             // Without IOKit (the remote, public API only): a wired interface
             // to a link-local peer is the USB cable to the Mac. A LAN peer

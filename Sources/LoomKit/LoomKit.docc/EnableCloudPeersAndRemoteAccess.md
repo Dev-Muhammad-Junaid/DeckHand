@@ -59,6 +59,18 @@ let configuration = LoomContainerConfiguration(
 )
 ```
 
+## Pin Identities For Off-LAN Peers
+
+Overlay and signaling peers are found through host names and presence records, not the local network. When your app stored a peer's identity key earlier, dial it with ``LoomContext/connect(_:pinnedIdentity:)`` so the handshake accepts only that key instead of the one the peer advertised:
+
+```swift
+if let pin = LoomPeerIdentityPin(identityKeyID: storedKeyID) {
+    let handle = try await context.connect(peer, pinnedIdentity: pin)
+}
+```
+
+A peer that proves another identity fails with `LoomError.authenticationFailed`. Pinned connections are not available in macOS shared host mode.
+
 ## Trust Modes
 
 Use ``LoomTrustMode`` to decide how much approval friction to keep:

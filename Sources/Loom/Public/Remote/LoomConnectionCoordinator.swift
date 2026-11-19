@@ -40,6 +40,21 @@ public struct LoomConnectionTarget: Sendable {
         self.expectedIdentityKeyID = expectedIdentityKeyID
         self.expectedIdentityPublicKey = expectedIdentityPublicKey
     }
+
+    /// Returns this target with its expected peer identity replaced by `pin`.
+    ///
+    /// The advertised expectation is discarded, including any advertised public key, so
+    /// the handshake accepts only the pinned identity.
+    public func pinned(to pin: LoomPeerIdentityPin) -> LoomConnectionTarget {
+        LoomConnectionTarget(
+            source: source,
+            transportKind: transportKind,
+            endpoint: endpoint,
+            requiredLocalPort: requiredLocalPort,
+            expectedIdentityKeyID: pin.identityKeyID,
+            expectedIdentityPublicKey: pin.identityPublicKey
+        )
+    }
 }
 
 /// Ordered direct-connect plan resolved from discovery and remote signaling presence.
@@ -48,6 +63,15 @@ public struct LoomConnectionPlan: Sendable {
 
     public init(targets: [LoomConnectionTarget]) {
         self.targets = targets
+    }
+
+    /// Returns this plan with every target pinned to `pin`, or the plan unchanged when
+    /// `pin` is `nil`.
+    public func pinned(to pin: LoomPeerIdentityPin?) -> LoomConnectionPlan {
+        guard let pin else {
+            return self
+        }
+        return LoomConnectionPlan(targets: targets.map { $0.pinned(to: pin) })
     }
 }
 
@@ -157,11 +181,31 @@ public final class LoomConnectionCoordinator {
         return advertisedSignalingSessionID
     }
 
+    /// Resolves the ordered direct-connect plan for a peer.
+    ///
+    /// - Parameter pinnedPeerIdentity: When set, every target expects this identity
+    ///   instead of the key the peer advertised. See ``LoomPeerIdentityPin``.
     public func makePlan(
         localPeer: LoomPeer? = nil,
         overlayPeer: LoomPeer? = nil,
         signalingSessionID: String? = nil,
-        requiredLocalPort: UInt16? = nil
+        requiredLocalPort: UInt16? = nil,
+        pinnedPeerIdentity: LoomPeerIdentityPin? = nil
+    ) async throws -> LoomConnectionPlan {
+        try await makeAdvertisedPlan(
+            localPeer: localPeer,
+            overlayPeer: overlayPeer,
+            signalingSessionID: signalingSessionID,
+            requiredLocalPort: requiredLocalPort
+        )
+        .pinned(to: pinnedPeerIdentity)
+    }
+
+    private func makeAdvertisedPlan(
+        localPeer: LoomPeer?,
+        overlayPeer: LoomPeer?,
+        signalingSessionID: String?,
+        requiredLocalPort: UInt16?
     ) async throws -> LoomConnectionPlan {
         var targets: [LoomConnectionTarget] = []
 
@@ -208,18 +252,25 @@ public final class LoomConnectionCoordinator {
         return LoomConnectionPlan(targets: targets)
     }
 
+    /// Resolves a plan and connects to the first target that completes the handshake.
+    ///
+    /// - Parameter pinnedPeerIdentity: When set, the session is established only with a
+    ///   peer that proves this identity; the identity the peer advertised is ignored.
+    ///   A peer that proves another key fails with ``LoomError/authenticationFailed``.
     public func connect(
         hello: LoomSessionHelloRequest,
         localPeer: LoomPeer? = nil,
         overlayPeer: LoomPeer? = nil,
         signalingSessionID: String? = nil,
-        requiredLocalPort: UInt16? = nil
+        requiredLocalPort: UInt16? = nil,
+        pinnedPeerIdentity: LoomPeerIdentityPin? = nil
     ) async throws -> LoomAuthenticatedSession {
         let plan = try await makePlan(
             localPeer: localPeer,
             overlayPeer: overlayPeer,
             signalingSessionID: signalingSessionID,
-            requiredLocalPort: requiredLocalPort
+            requiredLocalPort: requiredLocalPort,
+            pinnedPeerIdentity: pinnedPeerIdentity
         )
         guard !plan.targets.isEmpty else {
             throw LoomError.sessionNotFound

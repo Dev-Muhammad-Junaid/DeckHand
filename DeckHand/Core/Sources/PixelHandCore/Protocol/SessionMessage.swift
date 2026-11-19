@@ -3,7 +3,8 @@
 //  PixelHandCore
 //
 //  Domain: session and liveness. Heartbeats, the Wi-Fi keep-alive tick, the
-//  link the session runs over, and what the host can do right now. Both
+//  link the session runs over, the Mac's VPN addresses, and what the host
+//  can do right now. Both
 //  ways. Owned by the network lane together with `SessionHandler`.
 //
 
@@ -31,6 +32,14 @@ public enum SessionMessage: Codable, Sendable, Equatable {
     /// (`LinkJudge`), for example `.wired` over a USB cable. Sent once the
     /// path is known and again whenever the judgement changes.
     case link(kind: LinkKind)
+    /// Mac → remote, to a paired remote only: the Mac's own addresses on a
+    /// VPN or overlay network (Tailscale and other tunnel interfaces), at
+    /// most `RemoteAccessPolicy.maxReportedHosts`, so the remote can reach
+    /// it later when Bonjour can't see it (S15). Sent once per session and
+    /// again when they change; an empty list clears what the remote saved
+    /// from earlier reports. The remote re-validates every entry
+    /// (`RemoteHost.parse`) and keeps them only for a paired Mac.
+    case remoteHosts(hosts: [String])
 }
 
 /// The Mac's permissions and optional protocol features.

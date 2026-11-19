@@ -239,7 +239,7 @@ struct PeerPickerView: View {
         DeckHandLog.connection.info("📡 Connecting to \(peer.name, privacy: .public) id=\(peer.deviceID, privacy: .public) nearby=\(peer.isNearby)")
         Task {
             do {
-                let handle = try await loomContext.connect(peer)
+                let handle = try await RemoteConnect.connect(peer, using: loomContext) // S15: VPN peers paired-only, key pinned
                 await MainActor.run {
                     DeckHandLog.connection.info("📡 Connected to \(peer.name, privacy: .public); awaiting authorization")
                     connecting = nil

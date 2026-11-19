@@ -25,6 +25,7 @@ files=(
   "$app"/DeckHandMac/Handlers/*.swift
   "$app/DeckHandMac/Network/HostLinkMonitor.swift"
   "$app/DeckHandMac/Network/LinkObservation+Loom.swift"
+  "$app/DeckHandMac/Network/RemoteAccessGate.swift"
   "$app/DeckHandMac/LockGate.swift"
   "$app/DeckHandMac/Input/DragGuard.swift"
   "$app/DeckHandMac/Input/TypingQueue.swift"
@@ -34,6 +35,9 @@ files=(
   "$app/DeckHandMac/Pairing/PairedDeviceStore.swift"
   "$app/Shared/Pairing+Loom.swift"
   "$app/DeckHandiOS/Pairing/PairedMacsStore.swift"
+  "$app/DeckHandiOS/Network/RemoteHostsStore.swift"
+  "$app/DeckHandiOS/Network/RemoteConnect.swift"
+  "$app/DeckHandiOS/Network/RemoteHostTester.swift"
   "$app/DeckHandiOS/TrackpadSender.swift"
   "$app/DeckHandiOS/Clipboard/RemoteClipboard.swift"
   "$app/DeckHandiOS/Mirror/MirrorStreamReceiver.swift"

@@ -197,6 +197,8 @@ import Testing
         ("session.tick", .session(.tick)),
         ("session.link", .session(.link(kind: .wired))),
         ("session.link.wifi", .session(.link(kind: .wifi))),
+        ("session.remoteHosts", .session(.remoteHosts(hosts: ["100.101.102.103", "fd7a:115c:a1e0::1"]))),
+        ("session.remoteHosts.empty", .session(.remoteHosts(hosts: []))),
         ("session.hostStatus", .session(.hostStatus(status: HostStatus(
             accessibility: true,
             screenRecording: false,
@@ -305,6 +307,7 @@ import Testing
             case .hostStatus: "session.hostStatus"
             case .tick: "session.tick"
             case .link: "session.link"
+            case .remoteHosts: "session.remoteHosts"
             }
         case let .sharing(m):
             switch m {
@@ -321,7 +324,7 @@ import Testing
     }
 
     /// Cases in protocol version 8. Bump with every added or removed case.
-    static let expectedCaseCount = 52
+    static let expectedCaseCount = 53
 
     /// The current version, for the hand-written JSON below.
     static let v = PixelHandProtocol.version

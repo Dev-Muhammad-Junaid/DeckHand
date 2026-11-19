@@ -191,7 +191,7 @@ extension ControlSessionModel: MirrorStreamSink {
             let codec = mirrorRequestedCodec(settings)
             mirrorLastRequestedCodec = codec
             // A fresh mirror shows a display; a window is picked from it.
-            Task { await sender.startMirror(fps: fps, maxWidth: width, displayID: displayID, codec: codec, windowID: nil) }
+            Task { await sendMirrorStart(sender, fps: fps, maxWidth: width, displayID: displayID, codec: codec, windowID: nil) } // S15 away quality (network lane)
         } else {
             clearMirrorState()
             Task { await sender.stopMirror() }
@@ -308,7 +308,7 @@ extension ControlSessionModel: MirrorStreamSink {
         }
         mirrorLastRequestedCodec = codec
         let windowID = mirrorWindowSelection.requestedWindowID
-        Task { await sender.startMirror(fps: fps, maxWidth: width, displayID: displayID, codec: codec, windowID: windowID) }
+        Task { await sendMirrorStart(sender, fps: fps, maxWidth: width, displayID: displayID, codec: codec, windowID: windowID) } // S15 away quality (network lane)
     }
 
     /// The codec to ask the Mac for (S5).

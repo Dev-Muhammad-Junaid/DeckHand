@@ -112,6 +112,113 @@ struct LoomConnectionCoordinatorTests {
         ])
     }
 
+    @MainActor
+    @Test("A pinned plan expects the pinned identity on every target, not the advertised one")
+    func pinnedPlanReplacesAdvertisedIdentity() async throws {
+        let node = LoomNode(
+            configuration: LoomNetworkConfiguration(
+                directConnectionPolicy: LoomDirectConnectionPolicy(
+                    preferredTransportOrder: [.quic, .tcp],
+                    racesLocalCandidates: false,
+                    racesRemoteCandidates: false
+                )
+            )
+        )
+        let coordinator = LoomConnectionCoordinator(node: node)
+        let overlayPeer = makeCoordinatorTestPeer(
+            name: "Overlay Host",
+            endpointHost: "overlay.internal",
+            tcpPort: 4600,
+            quicPort: 5600,
+            identityKeyID: "advertised-key"
+        )
+        let pin = try #require(LoomPeerIdentityPin(identityKeyID: "stored-key", identityPublicKey: Data([1, 2, 3])))
+
+        let advertised = try await coordinator.makePlan(overlayPeer: overlayPeer)
+        let pinned = try await coordinator.makePlan(overlayPeer: overlayPeer, pinnedPeerIdentity: pin)
+
+        #expect(advertised.targets.map(\.expectedIdentityKeyID) == ["advertised-key", "advertised-key"])
+        #expect(pinned.targets.count == advertised.targets.count)
+        #expect(pinned.targets.map(\.expectedIdentityKeyID) == ["stored-key", "stored-key"])
+        #expect(pinned.targets.allSatisfy { $0.expectedIdentityPublicKey == Data([1, 2, 3]) })
+        #expect(pinned.targets.map(\.endpoint) == advertised.targets.map(\.endpoint))
+        #expect(pinned.targets.map(\.source) == [.overlayDirectory, .overlayDirectory])
+    }
+
+    @MainActor
+    @Test("A plan without a pin keeps the advertised identity")
+    func unpinnedPlanKeepsAdvertisedIdentity() async throws {
+        let node = LoomNode(configuration: LoomNetworkConfiguration())
+        let coordinator = LoomConnectionCoordinator(node: node)
+        let peer = makeCoordinatorTestPeer(
+            name: "Nearby Mac",
+            endpointHost: "127.0.0.1",
+            tcpPort: 4444,
+            quicPort: nil,
+            identityKeyID: "advertised-key"
+        )
+        let plan = try await coordinator.makePlan(localPeer: peer, pinnedPeerIdentity: nil)
+        #expect(plan.targets.map(\.expectedIdentityKeyID) == ["advertised-key"])
+        #expect(plan.pinned(to: nil).targets.map(\.expectedIdentityKeyID) == ["advertised-key"])
+    }
+
+    @MainActor
+    @Test("Pinned connects hand the pinned identity to every connection attempt")
+    func pinnedConnectPassesPinToConnector() async throws {
+        let recorder = ExpectedIdentityRecorder()
+        let node = LoomNode(
+            configuration: LoomNetworkConfiguration(
+                directConnectionPolicy: LoomDirectConnectionPolicy(
+                    preferredTransportOrder: [.quic, .tcp],
+                    racesLocalCandidates: false,
+                    racesRemoteCandidates: false
+                )
+            )
+        )
+        let coordinator = LoomConnectionCoordinator(
+            node: node,
+            connector: { target, _ in
+                await recorder.record(target.expectedIdentityKeyID)
+                return try makeCoordinatorTestSession(transportKind: target.transportKind)
+            }
+        )
+        let pin = try #require(LoomPeerIdentityPin(identityKeyID: "stored-key"))
+
+        _ = try await coordinator.connect(
+            hello: makeCoordinatorTestHello(),
+            overlayPeer: makeCoordinatorTestPeer(
+                name: "Overlay Host",
+                endpointHost: "overlay.internal",
+                tcpPort: 4600,
+                quicPort: 5600,
+                identityKeyID: "advertised-key"
+            ),
+            pinnedPeerIdentity: pin
+        )
+
+        // QUIC fails in the test session factory, so both targets are tried.
+        #expect(await recorder.keys() == ["stored-key", "stored-key"])
+    }
+
+    @Test("Identity pins refuse empty key IDs and compare proven identities")
+    func identityPinValidation() throws {
+        #expect(LoomPeerIdentityPin(identityKeyID: "") == nil)
+        #expect(LoomPeerIdentityPin(identityKeyID: "   ") == nil)
+        #expect(LoomPeerIdentityPin(identityKeyID: " key") == nil)
+        #expect(LoomPeerIdentityPin(identityKeyID: "key", identityPublicKey: Data()) == nil)
+
+        let keyOnly = try #require(LoomPeerIdentityPin(identityKeyID: "key"))
+        #expect(keyOnly.matches(identityKeyID: "key", identityPublicKey: nil))
+        #expect(keyOnly.matches(identityKeyID: "key", identityPublicKey: Data([9])))
+        #expect(!keyOnly.matches(identityKeyID: "other", identityPublicKey: nil))
+        #expect(!keyOnly.matches(identityKeyID: nil, identityPublicKey: nil))
+
+        let withPublicKey = try #require(LoomPeerIdentityPin(identityKeyID: "key", identityPublicKey: Data([1])))
+        #expect(withPublicKey.matches(identityKeyID: "key", identityPublicKey: Data([1])))
+        #expect(!withPublicKey.matches(identityKeyID: "key", identityPublicKey: Data([2])))
+        #expect(!withPublicKey.matches(identityKeyID: "key", identityPublicKey: nil))
+    }
+
     @Test("Peer advertisements round-trip direct transport hints through TXT records")
     func advertisementRoundTripsDirectTransports() {
         let advertisement = LoomPeerAdvertisement(
@@ -377,7 +484,8 @@ private func makeCoordinatorTestPeer(
     name: String,
     endpointHost: String,
     tcpPort: UInt16,
-    quicPort: UInt16?
+    quicPort: UInt16?,
+    identityKeyID: String? = nil
 ) -> LoomPeer {
     LoomPeer(
         id: UUID(),
@@ -385,6 +493,7 @@ private func makeCoordinatorTestPeer(
         deviceType: .mac,
         endpoint: .hostPort(host: .init(endpointHost), port: .init(rawValue: tcpPort)!),
         advertisement: LoomPeerAdvertisement(
+            identityKeyID: identityKeyID,
             deviceType: .mac,
             directTransports: {
                 var transports = [
@@ -427,6 +536,18 @@ private func makeCoordinatorTestSession(
         connection: loomConnection,
         role: .initiator
     )
+}
+
+private actor ExpectedIdentityRecorder {
+    private var recorded: [String?] = []
+
+    func record(_ keyID: String?) {
+        recorded.append(keyID)
+    }
+
+    func keys() -> [String?] {
+        recorded
+    }
 }
 
 private actor ConnectionAttemptRecorder {

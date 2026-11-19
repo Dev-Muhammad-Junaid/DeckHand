@@ -2,11 +2,11 @@
 //  SessionHandler.swift
 //  DeckHandMac
 //
-//  Domain: session. Heartbeats, the link judgement and the host status
-//  report. Pongs are sent by `HeartbeatResponder` as pings arrive, off the
-//  main actor, before the message reaches this handler; keep-alive ticks
-//  are stamped and dropped there and never get here. Owned by the network
-//  lane (S1, S13).
+//  Domain: session. Heartbeats, the link judgement, the Mac's VPN
+//  addresses (S15) and the host status report. Pongs are sent by
+//  `HeartbeatResponder` as pings arrive, off the main actor, before the
+//  message reaches this handler; keep-alive ticks are stamped and dropped
+//  there and never get here. Owned by the network lane (S1, S13, S15).
 //
 
 import CoreGraphics
@@ -31,11 +31,17 @@ final class SessionHandler: DomainHandler {
             if seq % 5 == 0 {
                 await sendHostStatus(to: connection)
             }
+            // S15: a paired remote learns this Mac's VPN addresses (first
+            // ping, then only when they change; checked every 5th ping).
+            if seq <= 1 || seq % 5 == 0 {
+                let paired = DeviceAuthorizationManager.shared.isPaired(connectionID: connection.id)
+                await RemoteAccessGate.reportHosts(to: connection, isPaired: paired)
+            }
 
         case .tick:
             break // HeartbeatResponder drops ticks before the router
 
-        case .pong, .hostStatus, .link:
+        case .pong, .hostStatus, .link, .remoteHosts:
             break // Mac → remote only
         }
     }

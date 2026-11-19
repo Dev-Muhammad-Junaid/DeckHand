@@ -18,11 +18,29 @@ public final class LoomMultiplexedStream: @unchecked Sendable {
 }
 public protocol LoomSessionProtocol: Sendable {
     func makeIncomingStreamObserver() -> AsyncStream<LoomMultiplexedStream>
+    func makePathObserver() async -> AsyncStream<LoomSessionNetworkPathSnapshot>
     var context: LoomAuthenticatedSessionContext? { get async }
 }
 final class StubSession: LoomSessionProtocol {
     func makeIncomingStreamObserver() -> AsyncStream<LoomMultiplexedStream> { AsyncStream { _ in } }
+    func makePathObserver() async -> AsyncStream<LoomSessionNetworkPathSnapshot> { AsyncStream { _ in } }
     var context: LoomAuthenticatedSessionContext? { get async { nil } }
+}
+public actor LoomAuthenticatedSession: LoomSessionProtocol {
+    public nonisolated func makeIncomingStreamObserver() -> AsyncStream<LoomMultiplexedStream> { AsyncStream { _ in } }
+    public func makePathObserver() -> AsyncStream<LoomSessionNetworkPathSnapshot> { AsyncStream { _ in } }
+    public var context: LoomAuthenticatedSessionContext? { nil }
+    public var backendRemoteEndpoint: LoomNetworkEndpoint? { nil }
+}
+public struct LoomOverlaySeed: Hashable, Sendable {
+    public let host: String
+    public let probePort: UInt16?
+    public init(host: String, probePort: UInt16? = nil) { self.host = host; self.probePort = probePort }
+}
+public struct LoomOverlayDirectoryConfiguration: Sendable {
+    public typealias SeedProvider = @Sendable () async throws -> [LoomOverlaySeed]
+    public init(probePort: UInt16? = nil, refreshInterval: Duration = .seconds(30), probeTimeout: Duration = .seconds(2), probeAttempts: Int, probeRetryDelay: Duration = .zero, seedProvider: @escaping SeedProvider) {}
+    public init(probePort: UInt16? = nil, refreshInterval: Duration = .seconds(30), probeTimeout: Duration = .seconds(2), seedProvider: @escaping SeedProvider) {}
 }
 public actor LoomConnectionHandle {
     public nonisolated let id: UUID = UUID()
@@ -319,6 +337,41 @@ public struct LoomConnectionDismissal: Sendable, Identifiable {
 @MainActor public final class LoomContext {
     public private(set) var connections: [LoomConnectionSnapshot] = []
     public func disconnect(_ connection: LoomConnectionSnapshot) async {}
+    public func connect(_ peer: LoomPeerSnapshot) async throws -> LoomConnectionHandle { LoomConnectionHandle() }
+    public func connect(_ peer: LoomPeerSnapshot, pinnedIdentity: LoomPeerIdentityPin) async throws -> LoomConnectionHandle { LoomConnectionHandle() }
+}
+
+// MARK: Loom remote access (S15)
+public struct LoomPeerIdentityPin: Hashable, Sendable {
+    public let identityKeyID: String
+    public let identityPublicKey: Data?
+    public init?(identityKeyID: String, identityPublicKey: Data? = nil) {
+        guard !identityKeyID.isEmpty else { return nil }
+        self.identityKeyID = identityKeyID
+        self.identityPublicKey = identityPublicKey
+    }
+}
+public struct LoomPeerAdvertisement: Sendable, Hashable {
+    public let deviceID: UUID?
+    public let identityKeyID: String?
+}
+public struct LoomPeerSnapshot: Identifiable, Hashable, Sendable {
+    public let id: LoomPeerID
+    public let name: String
+    public let isNearby: Bool
+    public let advertisement: LoomPeerAdvertisement
+    public var deviceID: UUID { id.deviceID }
+}
+public struct LoomPeer: Sendable {
+    public let id: LoomPeerID
+    public let advertisement: LoomPeerAdvertisement
+    public var deviceID: UUID { id.deviceID }
+}
+@MainActor public final class LoomOverlayDirectory {
+    public private(set) var discoveredPeers: [LoomPeer] = []
+    public init(configuration: LoomOverlayDirectoryConfiguration, localDeviceID: UUID? = nil) {}
+    public func refresh() async {}
+    public func stop() {}
 }
 
 // MARK: Combine stand-in

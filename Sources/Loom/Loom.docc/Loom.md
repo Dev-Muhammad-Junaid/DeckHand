@@ -74,6 +74,7 @@ Authenticated Loom sessions also expose transport-facing metadata that higher-le
 - ``LoomOverlayDirectory``
 - ``LoomOverlayDirectoryConfiguration``
 - ``LoomOverlaySeed``
+- ``LoomPeerIdentityPin``
 - ``LoomRemoteSignalingClient``
 - ``LoomSTUNProbe``
 

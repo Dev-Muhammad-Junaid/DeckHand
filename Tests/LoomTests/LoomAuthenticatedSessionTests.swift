@@ -327,6 +327,65 @@ struct LoomAuthenticatedSessionTests {
     }
 
     @MainActor
+    @Test("An initiator pinned to the responder's key completes the handshake")
+    func pinnedExpectedIdentityAccepted() async throws {
+        let pair = try await makeLoopbackPair()
+        defer { Task { await pair.stop() } }
+        _ = try pair.clientIdentityManager.currentIdentity()
+        let serverIdentity = try pair.serverIdentityManager.currentIdentity()
+        let pin = try #require(LoomPeerIdentityPin(identityKeyID: serverIdentity.keyID))
+
+        async let clientContext = pair.client.start(
+            localHello: pair.clientHello,
+            identityManager: pair.clientIdentityManager,
+            expectedPeerIdentityKeyID: pin.identityKeyID,
+            expectedPeerIdentityPublicKey: serverIdentity.publicKey
+        )
+        async let serverContext = pair.server.start(
+            localHello: pair.serverHello,
+            identityManager: pair.serverIdentityManager
+        )
+        let (client, _) = try await (clientContext, serverContext)
+
+        #expect(client.peerIdentity.identityKeyID == serverIdentity.keyID)
+        #expect(pin.matches(
+            identityKeyID: client.peerIdentity.identityKeyID,
+            identityPublicKey: client.peerIdentity.identityPublicKey
+        ))
+    }
+
+    @MainActor
+    @Test("An initiator pinned to another key fails closed with authenticationFailed")
+    func pinnedExpectedIdentityMismatchFailsClosed() async throws {
+        let pair = try await makeLoopbackPair()
+        defer { Task { await pair.stop() } }
+        _ = try pair.clientIdentityManager.currentIdentity()
+        let serverIdentity = try pair.serverIdentityManager.currentIdentity()
+        let otherKeyID = LoomIdentityManager.keyID(for: Data(serverIdentity.publicKey.reversed()))
+        #expect(otherKeyID != serverIdentity.keyID)
+
+        let clientResult = Task {
+            try await pair.client.start(
+                localHello: pair.clientHello,
+                identityManager: pair.clientIdentityManager,
+                expectedPeerIdentityKeyID: otherKeyID,
+                handshakeTimeout: .seconds(3)
+            )
+        }
+        let serverResult = Task {
+            try await pair.server.start(
+                localHello: pair.serverHello,
+                identityManager: pair.serverIdentityManager,
+                handshakeTimeout: .seconds(3)
+            )
+        }
+
+        await assertAuthenticationFailed(clientResult)
+        _ = try? await serverResult.value
+        #expect(await pair.client.state != .ready)
+    }
+
+    @MainActor
     @Test("Trust approval deadline cancels evaluation and fails closed")
     func trustApprovalDeadlineCancelsEvaluation() async throws {
         let pair = try await makeLoopbackPair()

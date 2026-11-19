@@ -136,6 +136,12 @@ final class ControlSessionModel {
     @ObservationIgnored var pingSeq: UInt64 = 0
     @ObservationIgnored var networkTasks: [Task<Void, Never>] = []
     @ObservationIgnored var lifecycleObservers: [NSObjectProtocol] = []
+    /// S15: ping/pong round trips and the "away" mirror policy (VPN or a
+    /// long round trip lowers the mirror request).
+    @ObservationIgnored var roundTrips = RoundTripEstimator()
+    var awayQuality = AwayQualityPolicy()
+    /// The codec last actually sent in `mirror.start` (after the away policy).
+    @ObservationIgnored var awaySentMirrorCodec: MirrorCodec?
 
     // ── Host capabilities ───────────────────────────────────────────
     /// What the Mac can actually execute right now, as reported by the
@@ -248,8 +254,9 @@ final class ControlSessionModel {
             // Feature flags and receipts only concern the sender actor; no
             // UI state changes, so they skip the UI handling below.
             switch message {
-            case .session(.pong):
+            case let .session(.pong(seq)):
                 liveness.noteHeartbeat()
+                notePong(seq: seq)
                 continue
             case let .deck(.receipt(requestID, outcome)):
                 await sender?.receivedReceipt(requestID: requestID, outcome: outcome)
@@ -284,6 +291,9 @@ final class ControlSessionModel {
         switch message {
         case let .session(.link(kind)):
             applyHostLink(kind)
+
+        case let .session(.remoteHosts(hosts)):
+            applyRemoteHosts(hosts)
 
         case let .session(.hostStatus(hostStatus)):
             withAnimation(.easeInOut(duration: 0.2)) {
