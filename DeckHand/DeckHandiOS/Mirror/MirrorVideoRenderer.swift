@@ -22,8 +22,8 @@ import VideoToolbox
 final class MirrorVideoRenderer {
     let layer = AVSampleBufferDisplayLayer()
     /// The layer couldn't decode a frame.
-    var onDecodeFailure: (() -> Void)?
-    private var observer: NSObjectProtocol?
+    var onDecodeFailure: (@MainActor () -> Void)?
+    nonisolated(unsafe) private var observer: NSObjectProtocol?
 
     /// Whether this device can decode HEVC in hardware.
     static var hevcDecodeAvailable: Bool {

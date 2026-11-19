@@ -44,7 +44,7 @@ final class MirrorSubscriber {
         }
     }
     /// Asks the encoder for a key frame (set by the service).
-    var onNeedsKeyFrame: (() -> Void)?
+    var onNeedsKeyFrame: (@MainActor () -> Void)?
 
     private var stream: LoomMultiplexedStream?
     private var opening: Task<LoomMultiplexedStream?, Never>?
