@@ -439,3 +439,10 @@ final class UNUserNotificationCenter: @unchecked Sendable {
     func removePendingNotificationRequests(withIdentifiers: [String]) {}
     func removeDeliveredNotifications(withIdentifiers: [String]) {}
 }
+
+// MARK: Deck 2 (DeckHandMac/Deck/MenuCommandPresser.swift reads AX, so it is stubbed)
+enum MenuCommandPresser {
+    enum Result: Equatable, Sendable { case pressed, appNotRunning, notFound(level: Int), disabled, gaveUp, pressFailed }
+    @MainActor static func press(bundleID: String, path: [String], launcher: AppLauncher) async -> Result { .pressed }
+    static func outcome(_ result: Result, path: [String]) -> ActionOutcome { .completed }
+}

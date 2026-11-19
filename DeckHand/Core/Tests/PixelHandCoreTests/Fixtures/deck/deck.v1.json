@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "pages": [
+    {
+      "id": "main",
+      "title": "Main",
+      "keys": [
+        { "id": "k1", "label": "Mission Control", "symbol": "rectangle.3.group", "action": { "system": { "action": "missionControl" } } },
+        { "id": "k2", "label": "Play", "action": { "media": { "key": "playpause" } } }
+      ]
+    },
+    {
+      "id": "xcode",
+      "title": "Xcode",
+      "appBundleID": "com.apple.dt.Xcode",
+      "keys": [
+        { "id": "k3", "label": "Build", "symbol": "hammer", "action": { "appShortcut": { "bundleID": "com.apple.dt.Xcode", "keys": ["cmd", "b"] } } }
+      ]
+    },
+    { "id": "extra", "title": "Extra", "keys": [] }
+  ]
+}

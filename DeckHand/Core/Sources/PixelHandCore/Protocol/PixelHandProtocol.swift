@@ -45,7 +45,7 @@ public enum PixelHandProtocol {
     /// - 11: the Mac's sound while mirroring (S17): `mirror.audio(enabled:)`,
     ///   `mirror.audioError`, the `audioFormat` / `audioPacket` frames on
     ///   `PixelHandStream.audio`, audio fields in the mirror stats.
-    public static let version = 11
+    public static let version = 12
 
     /// Bonjour TXT key carrying `version`. Short, because TXT keys should
     /// stay under 9 bytes.

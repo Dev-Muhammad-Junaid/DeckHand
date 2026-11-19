@@ -54,7 +54,8 @@ public struct DeckFollower: Sendable, Equatable {
     /// the shown page changed.
     @discardableResult
     public mutating func update(document: DeckDocument, now: Date) -> Bool {
-        guard let pending, now.timeIntervalSince(pending.since) >= Self.debounce else { return false }
+        // A millisecond of slack, so a call at `nextDeadline` itself applies.
+        guard let pending, now.timeIntervalSince(pending.since) >= Self.debounce - 0.001 else { return false }
         self.pending = nil
         guard document.followFrontApp, document.pinnedPageID == nil else { return false }
         let before = shownPageID

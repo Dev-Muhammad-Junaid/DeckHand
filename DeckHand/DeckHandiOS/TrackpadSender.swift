@@ -363,7 +363,10 @@ actor TrackpadSender {
     /// waits.
     func sendConfirmed(_ action: Action) async -> CommandDelivery {
         guard hostSendsReceipts else {
-            await send(action.message)
+            // Deck 2 actions (menu commands, Mac Shortcuts, sequences) only
+            // run tracked, so a host without receipts can't run them.
+            guard let message = action.message else { return .failed }
+            await send(message)
             return .sent
         }
         let requestID = UUID().uuidString

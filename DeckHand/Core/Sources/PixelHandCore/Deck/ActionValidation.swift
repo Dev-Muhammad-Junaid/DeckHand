@@ -26,6 +26,9 @@ public enum ActionLimits {
     public static let maxDelayMilliseconds = 10_000
     /// Longest total pause in a sequence.
     public static let maxTotalDelayMilliseconds = 30_000
+    /// The Mac's pause between two action steps of a sequence, so an app
+    /// sees one step's events before the next one's.
+    public static let sequenceStepGapMilliseconds = 40
     /// Longest dialog-button ID (`ContextObserver` builds short ones).
     public static let maxContextIDBytes = 1_024
     /// How long the Mac waits for a Deck 2 run before answering

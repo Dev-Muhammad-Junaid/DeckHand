@@ -20,6 +20,9 @@ import Testing
         .system(action: .showDesktop),
         .media(key: .previous),
         .contextAction(id: "rev|1|Cancel"),
+        .menuCommand(bundleID: "com.apple.Safari", path: ["File", "Export as PDF…"]),
+        .macShortcut(name: "Morning"),
+        .sequence(steps: [.run(action: .shortcut(keys: ["cmd", "c"])), .delay(milliseconds: 200)]),
     ]
 
     @Test("Each action maps to the untracked message that does the same")
@@ -30,6 +33,21 @@ import Testing
         #expect(Action.system(action: .appExpose).message == .system(.run(action: .appExpose)))
         #expect(Action.media(key: .playPause).message == .input(.media(key: .playPause)))
         #expect(Action.contextAction(id: "x").message == .apps(.triggerContextAction(id: "x")))
+    }
+
+    @Test("Deck 2 actions have no untracked message")
+    func deck2ActionsRunOnlyTracked() {
+        #expect(Action.menuCommand(bundleID: "b", path: ["File"]).message == nil)
+        #expect(Action.macShortcut(name: "x").message == nil)
+        #expect(Action.sequence(steps: []).message == nil)
+    }
+
+    @Test("A Shortcuts run needs no Accessibility; a sequence needs it when a step does")
+    func accessibilityNeeds() {
+        #expect(!Action.macShortcut(name: "x").needsAccessibility)
+        #expect(Action.menuCommand(bundleID: "b", path: ["File"]).needsAccessibility)
+        #expect(!Action.sequence(steps: [.run(action: .macShortcut(name: "x")), .delay(milliseconds: 5)]).needsAccessibility)
+        #expect(Action.sequence(steps: [.run(action: .macShortcut(name: "x")), .run(action: .media(key: .next))]).needsAccessibility)
     }
 
     @Test("No action maps to a run, so runs can't nest")
@@ -61,74 +79,5 @@ import Testing
         #expect(MediaKey.playPause.rawValue == "playpause")
         #expect(MediaKey.next.rawValue == "next")
         #expect(MediaKey.previous.rawValue == "prev")
-    }
-}
-
-@Suite struct DeckDocumentTests {
-
-    private func key(_ id: String, _ action: Action, label: String = "Key") -> DeckKey {
-        DeckKey(id: id, label: label, symbol: "star", action: action)
-    }
-
-    private var sample: DeckDocument {
-        DeckDocument(pages: [
-            DeckPage(id: "main", title: "Main", keys: [
-                key("k1", .system(action: .missionControl)),
-                key("k2", .media(key: .playPause)),
-            ]),
-            DeckPage(id: "xcode", title: "Xcode", appBundleID: "com.apple.dt.Xcode", keys: [
-                key("k3", .appShortcut(bundleID: "com.apple.dt.Xcode", keys: ["cmd", "b"])),
-            ]),
-        ])
-    }
-
-    @Test("A deck round-trips through JSON")
-    func roundTrip() throws {
-        let data = try ControlMessageCoding.encoder.encode(sample)
-        #expect(try ControlMessageCoding.decoder.decode(DeckDocument.self, from: data) == sample)
-        #expect(sample.version == DeckDocument.currentVersion)
-    }
-
-    @Test("The frontmost app's page wins, else the first general page")
-    func pageForFrontmostApp() {
-        #expect(sample.page(forFrontmostApp: "com.apple.dt.Xcode")?.id == "xcode")
-        #expect(sample.page(forFrontmostApp: "com.apple.Safari")?.id == "main")
-        #expect(sample.page(forFrontmostApp: nil)?.id == "main")
-        #expect(DeckDocument(pages: []).page(forFrontmostApp: nil) == nil)
-    }
-
-    @Test("A valid deck has no issues")
-    func validDeck() {
-        #expect(DeckValidation.issues(in: sample).isEmpty)
-    }
-
-    @Test("Validation finds every kind of problem")
-    func invalidDecks() {
-        let tooMany = (0...DeckValidation.maxKeysPerPage).map { key("many\($0)", .media(key: .next)) }
-        let deck = DeckDocument(version: 99, pages: [
-            DeckPage(id: "a", title: "A", keys: [
-                key("dup", .shortcut(keys: [])),
-                key("dup", .contextAction(id: "rev|0|OK"), label: "  "),
-                key("long", .shortcut(keys: Array(repeating: "a", count: ProtocolLimits.maxChordKeys + 1)),
-                    label: String(repeating: "L", count: DeckValidation.maxLabelLength + 1)),
-            ]),
-            DeckPage(id: "a", title: "Again", keys: tooMany),
-        ])
-        let issues = DeckValidation.issues(in: deck)
-        #expect(issues.contains(.unsupportedVersion(99)))
-        #expect(issues.contains(.duplicatePageID("a")))
-        #expect(issues.contains(.duplicateKeyID("dup")))
-        #expect(issues.contains(.emptyChord(keyID: "dup")))
-        #expect(issues.contains(.emptyLabel(keyID: "dup")))
-        #expect(issues.contains(.contextActionNotStorable(keyID: "dup")))
-        #expect(issues.contains(.tooManyChordKeys(keyID: "long")))
-        #expect(issues.contains(.labelTooLong(keyID: "long")))
-        #expect(issues.contains(.tooManyKeys(pageID: "a", count: DeckValidation.maxKeysPerPage + 1)))
-    }
-
-    @Test("Too many pages is an issue")
-    func tooManyPages() {
-        let pages = (0...DeckValidation.maxPages).map { DeckPage(id: "p\($0)", title: "P", keys: []) }
-        #expect(DeckValidation.issues(in: DeckDocument(pages: pages)) == [.tooManyPages(DeckValidation.maxPages + 1)])
     }
 }
