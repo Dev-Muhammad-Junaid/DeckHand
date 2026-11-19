@@ -66,11 +66,21 @@ import Testing
 
     // MARK: Other actions and overrides
 
-    @Test func otherActionsAreNotPlanned() {
-        for macro in [SystemMacro.locateCursor, .missionControl, .appExpose] {
-            #expect(SystemActionPlan.mechanisms(for: macro, macOSMajor: 27).isEmpty)
-            #expect(SystemActionPlan.mechanisms(for: macro, macOSMajor: 27, override: "dockNotification").isEmpty)
-            #expect(SystemActionPlan.overrideKey(for: macro) == nil)
+    @Test("Locate is not planned: it is drawn by the Mac app itself")
+    func locateIsNotPlanned() {
+        #expect(SystemActionPlan.mechanisms(for: .locateCursor, macOSMajor: 27).isEmpty)
+        #expect(SystemActionPlan.mechanisms(for: .locateCursor, macOSMajor: 27, override: "dockNotification").isEmpty)
+        #expect(SystemActionPlan.overrideKey(for: .locateCursor) == nil)
+    }
+
+    @Test("Mission Control and App Exposé go through the user's hot key first, never System Events (S7)")
+    func missionControlAndAppExposeUseHotKeys() {
+        for major in [14, 26, 27] {
+            let missionControl = SystemActionPlan.mechanisms(for: .missionControl, macOSMajor: major)
+            #expect(missionControl == [.symbolicHotKey, .openApp], "macOS \(major)")
+            let appExpose = SystemActionPlan.mechanisms(for: .appExpose, macOSMajor: major)
+            #expect(appExpose == [.symbolicHotKey], "macOS \(major)")
+            #expect(!missionControl.contains(.systemEventsKey) && !appExpose.contains(.systemEventsKey))
         }
     }
 
@@ -89,6 +99,8 @@ import Testing
     @Test func overrideKeys() {
         #expect(SystemActionPlan.overrideKey(for: .showDesktop) == "PixelHandShowDesktopMechanism")
         #expect(SystemActionPlan.overrideKey(for: .launchpad) == "PixelHandLaunchpadMechanism")
+        #expect(SystemActionPlan.overrideKey(for: .missionControl) == "PixelHandMissionControlMechanism")
+        #expect(SystemActionPlan.overrideKey(for: .appExpose) == "PixelHandAppExposeMechanism")
     }
 
     // MARK: Symbolic hot keys
@@ -97,7 +109,9 @@ import Testing
         #expect(SymbolicHotKey(.showDesktop) == .showDesktop)
         #expect(SymbolicHotKey.showDesktop.rawValue == 36)
         #expect(SymbolicHotKey(.launchpad)?.rawValue == 160)
-        #expect(SymbolicHotKey(.missionControl) == nil)
+        #expect(SymbolicHotKey(.missionControl)?.rawValue == 32)
+        #expect(SymbolicHotKey(.appExpose)?.rawValue == 33)
+        #expect(SymbolicHotKey(.locateCursor) == nil)
     }
 
     @Test func boundHotKeyUsesTheUsersChord() {

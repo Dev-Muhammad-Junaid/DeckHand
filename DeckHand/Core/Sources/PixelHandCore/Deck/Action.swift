@@ -72,4 +72,7 @@ public enum RefusalReason: String, Codable, Sendable, Equatable, Hashable {
     case accessibilityMissing
     /// The dialog button belongs to a snapshot that has been replaced.
     case staleContext
+    /// The Mac is locked, or another user is on its screen
+    /// (`LockPolicy.decide`).
+    case macLocked
 }

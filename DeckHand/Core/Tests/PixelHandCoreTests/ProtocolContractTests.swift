@@ -45,6 +45,46 @@ import Testing
         ("system.run", .system(.run(action: .showDesktop))),
         ("system.switchSpace", .system(.switchSpace(direction: .next, displayID: nil))),
         ("system.switchSpace.display", .system(.switchSpace(direction: .missionControl, displayID: 1))),
+        ("system.displayState", .system(.displayState(layout: DisplayLayout(
+            displays: [
+                DisplaySpaces(
+                    displayID: 2,
+                    name: "HP E273",
+                    isMain: true,
+                    bounds: DisplayBounds(x: 0, y: 0, width: 1920, height: 1080),
+                    spaces: [.desktop],
+                    currentSpaceIndex: 0
+                ),
+                DisplaySpaces(
+                    displayID: 1,
+                    name: "Built-in Retina Display",
+                    isMain: false,
+                    bounds: DisplayBounds(x: -1728, y: 0, width: 1728, height: 1117),
+                    spaces: [.desktop, .desktop, SpaceInfo(kind: .fullScreen, appName: "Safari")],
+                    currentSpaceIndex: 1
+                ),
+            ],
+            cursorDisplayID: 1,
+            spacesKnown: true,
+            separateSpaces: true
+        )))),
+        ("system.displayState.noSpaces", .system(.displayState(layout: DisplayLayout(
+            displays: [
+                DisplaySpaces(
+                    displayID: 1,
+                    name: "Built-in Retina Display",
+                    isMain: true,
+                    bounds: DisplayBounds(x: 0, y: 0, width: 1512, height: 982),
+                    spaces: nil,
+                    currentSpaceIndex: nil
+                ),
+            ],
+            cursorDisplayID: nil,
+            spacesKnown: false,
+            separateSpaces: true
+        )))),
+        ("system.lockState", .system(.lockState(state: .screenLocked))),
+        ("system.lockState.offConsole", .system(.lockState(state: .offConsole))),
         // apps
         ("apps.launchApp", .apps(.launchApp(bundleID: "com.apple.Safari"))),
         ("apps.appShortcut", .apps(.appShortcut(bundleID: "com.todesktop.230313mzl4w4u92", keys: ["cmd", "k"]))),
@@ -90,6 +130,7 @@ import Testing
         ("deck.run.media", .deck(.run(requestID: "cmd-6", action: .media(key: .next)))),
         ("deck.receipt", .deck(.receipt(requestID: "cmd-1", outcome: .delivered))),
         ("deck.receipt.refused", .deck(.receipt(requestID: "cmd-2", outcome: .refused(reason: .staleContext)))),
+        ("deck.receipt.refused.macLocked", .deck(.receipt(requestID: "cmd-7", outcome: .refused(reason: .macLocked)))),
         ("deck.receipt.failed", .deck(.receipt(requestID: "cmd-3", outcome: .failed(reason: "App not running")))),
         ("deck.receipt.completed", .deck(.receipt(requestID: "cmd-4", outcome: .completed))),
         // mirror
@@ -156,6 +197,8 @@ import Testing
             switch m {
             case .run: "system.run"
             case .switchSpace: "system.switchSpace"
+            case .displayState: "system.displayState"
+            case .lockState: "system.lockState"
             }
         case let .apps(m):
             switch m {
@@ -219,8 +262,8 @@ import Testing
         switch message {}
     }
 
-    /// Cases in protocol version 2. Bump with every added or removed case.
-    static let expectedCaseCount = 37
+    /// Cases in protocol version 4. Bump with every added or removed case.
+    static let expectedCaseCount = 39
 
     // MARK: - Fixture plumbing
 

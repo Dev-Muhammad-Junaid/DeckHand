@@ -16,9 +16,22 @@
 //                                 control, bit3 "NO command" (unset means
 //                                 command is included)
 //
-//  We recurse the whole menu bar, skip separators / disabled items / items
-//  with no shortcut, and translate each into an `AppShortcutBinding` the iPad
-//  can store alongside curated and user-authored bindings.
+//  We recurse the menu bar, skip separators / items with no shortcut, and
+//  translate each into an `AppShortcutBinding` the iPad can store alongside
+//  curated and user-authored bindings.
+//
+//  Hardened against slow and huge apps (S9):
+//
+//  - every element gets a short `AXUIElementSetMessagingTimeout`
+//    (`MenuReadLimits.messagingTimeout`), so a busy app costs a quarter of
+//    a second per call instead of the system's ~6 s;
+//  - each element's five attributes are read in one round trip
+//    (`AXUIElementCopyMultipleAttributeValues`);
+//  - the walk is bounded by Core's `MenuReadBudget` (depth, nodes, items,
+//    children per menu, wall time, consecutive time-outs); what was read
+//    before a limit is still returned;
+//  - it runs on its own serial queue, never on the main actor or the Swift
+//    concurrency pool, whose threads mustn't block on another process.
 //
 
 import AppKit
@@ -41,20 +54,7 @@ enum MenuShortcutDiscovery {
             return []
         }
 
-        // Walking off the main thread avoids briefly stalling our menu bar
-        // UI on large apps (Chrome's menu bar has ~200 nodes). AX calls are
-        // thread-safe for reads.
-        let rawList: [RawMenuItem] = await Task.detached(priority: .userInitiated) {
-            let axApp = AXUIElementCreateApplication(pid)
-            var menuBarRef: CFTypeRef?
-            guard AXUIElementCopyAttributeValue(axApp, kAXMenuBarAttribute as CFString, &menuBarRef) == .success,
-                  let ref = menuBarRef else {
-                return []
-            }
-            var items: [RawMenuItem] = []
-            walkMenuElement(ref as! AXUIElement, path: [], into: &items)
-            return items
-        }.value
+        let rawList = await readMenuBar(pid: pid, limits: .standard)
 
         var bindings: [AppShortcutBinding] = []
         var seenIDs = Set<String>()
@@ -70,7 +70,7 @@ enum MenuShortcutDiscovery {
 
     // MARK: - Raw traversal
 
-    private struct RawMenuItem {
+    private struct RawMenuItem: Sendable {
         let path: [String]
         let title: String
         let cmdChar: String?
@@ -155,26 +155,76 @@ enum MenuShortcutDiscovery {
         }
     }
 
+    /// Menu reads queue here, one at a time, off the main actor and the
+    /// cooperative pool.
+    private static let menuReadQueue = DispatchQueue(label: "com.widgetsflow.pixelhand.menu-read", qos: .userInitiated)
+
+    private static func readMenuBar(pid: pid_t, limits: MenuReadLimits) async -> [RawMenuItem] {
+        await withCheckedContinuation { continuation in
+            menuReadQueue.async {
+                let start = Date()
+                var budget = MenuReadBudget(limits: limits, start: start)
+                var items: [RawMenuItem] = []
+                let app = AXUIElementCreateApplication(pid)
+                AXUIElementSetMessagingTimeout(app, limits.messagingTimeout)
+                var menuBarRef: CFTypeRef?
+                let error = AXUIElementCopyAttributeValue(app, kAXMenuBarAttribute as CFString, &menuBarRef)
+                budget.noteRead(timedOut: error == .cannotComplete)
+                if error == .success, let ref = menuBarRef, CFGetTypeID(ref) == AXUIElementGetTypeID() {
+                    walkMenuElement(ref as! AXUIElement, path: [], depth: 0, budget: &budget, into: &items)
+                }
+                let elapsed = Date().timeIntervalSince(start) * 1000
+                if let reason = budget.stopReason {
+                    DeckHandLog.context.info("Menu read for pid \(pid, privacy: .public) stopped early (\(reason.rawValue, privacy: .public)) after \(budget.nodesVisited, privacy: .public) elements, \(items.count, privacy: .public) shortcuts, \(elapsed, format: .fixed(precision: 0), privacy: .public) ms")
+                } else if budget.truncatedMenus > 0 || elapsed > 1000 {
+                    DeckHandLog.context.info("Menu read for pid \(pid, privacy: .public): \(budget.nodesVisited, privacy: .public) elements, \(items.count, privacy: .public) shortcuts, \(budget.truncatedMenus, privacy: .public) long menus cut, \(elapsed, format: .fixed(precision: 0), privacy: .public) ms")
+                }
+                continuation.resume(returning: items)
+            }
+        }
+    }
+
+    /// The attributes read for every element, in one round trip.
+    private static let walkAttributes: [CFString] = [
+        kAXTitleAttribute as CFString,
+        kAXChildrenAttribute as CFString,
+        kAXMenuItemCmdCharAttribute as CFString,
+        kAXMenuItemCmdVirtualKeyAttribute as CFString,
+        kAXMenuItemCmdModifiersAttribute as CFString,
+    ]
+
     private static func walkMenuElement(
         _ element: AXUIElement,
         path: [String],
+        depth: Int,
+        budget: inout MenuReadBudget,
         into out: inout [RawMenuItem]
     ) {
-        // Enumerate children; most nodes expose either submenu items via
-        // `AXChildren` or a sub-menu container that itself has children.
+        guard budget.mayDescend(toDepth: depth) else { return }
         var childrenRef: CFTypeRef?
-        AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenRef)
-        guard let children = childrenRef as? [AXUIElement] else { return }
+        let error = AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenRef)
+        budget.noteRead(timedOut: error == .cannotComplete)
+        guard error == .success, let children = childrenRef as? [AXUIElement] else { return }
 
-        for child in children {
-            let title = stringAttr(child, kAXTitleAttribute) ?? ""
+        let count = budget.childrenToRead(of: children.count)
+        for child in children.prefix(count) {
+            guard budget.visitNode() else { return }
+            AXUIElementSetMessagingTimeout(child, budget.limits.messagingTimeout)
 
-            // Leaf: this is a menu item with a shortcut.
-            let cmdChar = stringAttr(child, kAXMenuItemCmdCharAttribute as String)
-            let virtualKey = intAttr(child, kAXMenuItemCmdVirtualKeyAttribute as String)
-            let modifiers = intAttr(child, kAXMenuItemCmdModifiersAttribute as String) ?? 0
+            var valuesRef: CFArray?
+            let readError = AXUIElementCopyMultipleAttributeValues(child, walkAttributes as CFArray, AXCopyMultipleAttributeOptions(rawValue: 0), &valuesRef)
+            budget.noteRead(timedOut: readError == .cannotComplete)
+            guard !budget.isExhausted else { return }
+            guard readError == .success, let values = valuesRef as? [AnyObject], values.count == walkAttributes.count else { continue }
 
-            if (cmdChar != nil && !cmdChar!.isEmpty) || virtualKey != nil {
+            let title = attributeValue(values[0]) as? String ?? ""
+            let grandchildren = attributeValue(values[1]) as? [AXUIElement]
+            let cmdChar = attributeValue(values[2]) as? String
+            let virtualKey = attributeValue(values[3]) as? Int
+            let modifiers = attributeValue(values[4]) as? Int ?? 0
+
+            if (cmdChar.map { !$0.isEmpty } ?? false) || virtualKey != nil {
+                guard budget.addItem() else { return }
                 out.append(RawMenuItem(
                     path: path,
                     title: title,
@@ -185,6 +235,7 @@ enum MenuShortcutDiscovery {
             }
 
             // Recurse — a menu item can still have children (a submenu).
+            guard let grandchildren, !grandchildren.isEmpty else { continue }
             let childPath: [String]
             if !title.isEmpty && path.count < 2 {
                 // Only keep the first two levels of path context to avoid
@@ -193,23 +244,19 @@ enum MenuShortcutDiscovery {
             } else {
                 childPath = path
             }
-            walkMenuElement(child, path: childPath, into: &out)
+            walkMenuElement(child, path: childPath, depth: depth + 1, budget: &budget, into: &out)
+            if budget.isExhausted { return }
         }
     }
 
-    private static func stringAttr(_ element: AXUIElement, _ name: String) -> String? {
-        var ref: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, name as CFString, &ref) == .success else {
+    /// A value from `AXUIElementCopyMultipleAttributeValues`, or `nil` when
+    /// that attribute came back as an error (an `AXValue` of type
+    /// `.axError`: the attribute doesn't exist or timed out).
+    private static func attributeValue(_ value: AnyObject) -> AnyObject? {
+        if CFGetTypeID(value) == AXValueGetTypeID(), AXValueGetType(value as! AXValue) == .axError {
             return nil
         }
-        return ref as? String
-    }
-
-    private static func intAttr(_ element: AXUIElement, _ name: String) -> Int? {
-        var ref: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, name as CFString, &ref) == .success,
-              let n = ref as? Int else { return nil }
-        return n
+        return value
     }
 }
 

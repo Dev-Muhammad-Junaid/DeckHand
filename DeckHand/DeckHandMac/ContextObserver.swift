@@ -95,7 +95,20 @@ final class ContextObserver {
 
     func addConnection(_ handle: LoomConnectionHandle, id: UUID) {
         connections[id] = handle
-        Task { try? await send(latestSnapshot, to: handle) }
+        let visible = outgoing(latestSnapshot)
+        Task { try? await send(visible, to: handle) }
+    }
+
+    /// The Mac locked or unlocked. While locked, remotes see no dialog or
+    /// field (`LockPolicy.withholdsContext`): their dialog chips clear at
+    /// the lock and come back at the unlock.
+    func contextVisibilityChanged() {
+        broadcast(outgoing(latestSnapshot))
+    }
+
+    /// What remotes may see of `snapshot` now.
+    private func outgoing(_ snapshot: UIContextSnapshot) -> UIContextSnapshot {
+        LockPolicy.withholdsContext(MacLockMonitor.shared.state) ? .none : snapshot
     }
 
     func removeConnection(id: UUID) {
@@ -340,6 +353,10 @@ final class ContextObserver {
         }
         #endif
 
+        broadcast(outgoing(snapshot))
+    }
+
+    private func broadcast(_ snapshot: UIContextSnapshot) {
         let msg = ControlMessage.apps(.uiContextUpdate(snapshot: snapshot))
         let data: Data
         do {
