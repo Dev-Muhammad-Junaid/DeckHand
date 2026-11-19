@@ -18,7 +18,7 @@ app="$(cd "$here/../.." && pwd)"
 work="$here/Work"
 rm -rf "$work"
 mkdir -p "$work"
-cp "$here/Stubs.swift" "$work/"
+cp "$here/Stubs.swift" "$here/StoreKitStubs.swift" "$work/"
 
 files=(
   "$app/DeckHandMac/ControlReceiver.swift"
@@ -37,11 +37,12 @@ files=(
   "$app/DeckHandiOS/TrackpadSender.swift"
   "$app/DeckHandiOS/Clipboard/RemoteClipboard.swift"
   "$app/DeckHandiOS/Mirror/MirrorStreamReceiver.swift"
+  "$app/DeckHandiOS/Store/SubscriptionStore.swift"
   "$app/Shared/LoomConnectionHandle+ControlMessage.swift"
   "$@"
 )
 for file in "${files[@]}"; do
-  sed -E '/^import (AppKit|Combine|LoomKit|Loom|CoreGraphics|IOKit|os|QuartzCore|SwiftUI|UIKit|UserNotifications)$/d' "$file" > "$work/$(basename "$file")"
+  sed -E '/^import (AppKit|Combine|LoomKit|Loom|CoreGraphics|IOKit|os|QuartzCore|StoreKit|SwiftUI|UIKit|UserNotifications)$/d' "$file" > "$work/$(basename "$file")"
 done
 
 cd "$here"
