@@ -4,8 +4,9 @@
 //
 //  Framing for bulk binary data on its own Loom stream, kept apart from the
 //  JSON control stream so a large frame never queues ahead of input or a
-//  heartbeat. Designed for the binary mirror stream (S5: HEVC); nothing uses
-//  it yet, and the mirror still sends JPEG `MirrorMessage.frame`s.
+//  heartbeat. The mirror stream carries JPEG frames today (HEVC with S5),
+//  plus the Mac's cursor position and shape, which the remote draws over
+//  the video itself (S3).
 //
 //  Layout, big-endian, 28 bytes, then `payloadLength` bytes of payload:
 //
@@ -18,9 +19,19 @@
 //      16     8    presentation time, microseconds on the sender's clock
 //      24     4    payload length
 //
-//  Negotiation stays on the control stream: the host announces
-//  `ProtocolFeature.binaryMirrorStream` in `HostStatus`, and the mirror lane
-//  adds the start/keyframe-request messages to `MirrorMessage`.
+//  Negotiation stays on the control stream: the remote sends
+//  `mirror.start`, the host opens `PixelHandStream.mirror` towards it
+//  (once per connection, reused across restarts) and announces
+//  `ProtocolFeature.binaryMirrorStream` in `HostStatus`. One Loom payload
+//  carries one whole frame; `BinaryFrameReader` also copes with payloads
+//  that were split or joined on the way.
+//
+//  Payload by kind:
+//
+//      jpeg            a JPEG image of the captured display
+//      hevc*           reserved for S5
+//      cursor          `MirrorCursorState.encoded()` (18 bytes)
+//      cursorShape     `MirrorCursorShape.encoded()` (20 bytes + PNG)
 //
 
 import Foundation
@@ -28,7 +39,8 @@ import Foundation
 /// Names of the Loom streams the apps open. The control stream is LoomKit's
 /// default message stream.
 public enum PixelHandStream {
-    /// Mirror video, framed with `BinaryFrameHeader`.
+    /// Mirror video and cursor, framed with `BinaryFrameHeader`. Opened by
+    /// the Mac towards a remote that sent `mirror.start`.
     public static let mirror = "pixelhand.mirror"
 }
 
@@ -48,6 +60,12 @@ public struct BinaryFrameHeader: Equatable, Sendable {
         case hevcKeyFrame = 3
         /// An HEVC frame that depends on earlier ones.
         case hevcDeltaFrame = 4
+        /// Where the Mac's pointer is, and which shape it has (S3). Small
+        /// and frequent; never dropped in favour of a video frame.
+        case cursor = 5
+        /// A pointer image the remote caches by id (S3). Sent the first
+        /// time a shape appears on a stream.
+        case cursorShape = 6
     }
 
     public struct Flags: OptionSet, Sendable, Equatable {
@@ -154,5 +172,56 @@ public struct BinaryFrameHeader: Equatable, Sendable {
             value = value << 8 | UInt64(byte)
         }
         return value
+    }
+}
+
+/// Turns the bytes of a binary stream back into whole frames.
+///
+/// Loom keeps payload boundaries, so normally every `append` holds exactly
+/// one frame. The reader doesn't rely on that: it buffers a partial frame
+/// until the rest arrives and returns every complete frame in order. After
+/// a framing error (bad magic, oversize length) the stream can't be
+/// resynchronised, so the reader stays failed and the caller drops the
+/// stream.
+public struct BinaryFrameReader: Sendable {
+    public struct Frame: Equatable, Sendable {
+        public let header: BinaryFrameHeader
+        public let payload: Data
+    }
+
+    /// Most bytes held waiting for the rest of a frame: one maximum
+    /// payload plus its header.
+    public static let maxBufferedBytes = BinaryFrameHeader.byteCount + Int(BinaryFrameHeader.maxPayloadLength)
+
+    private var buffer = Data()
+    public private(set) var failure: BinaryFrameHeader.DecodeError?
+
+    public init() {}
+
+    /// Bytes received but not yet part of a returned frame.
+    public var bufferedByteCount: Int { buffer.count }
+
+    /// Adds `bytes` and returns every frame completed by them, oldest first.
+    public mutating func append(_ bytes: Data) throws -> [Frame] {
+        if let failure { throw failure }
+        buffer.append(bytes)
+        var frames: [Frame] = []
+        while buffer.count >= BinaryFrameHeader.byteCount {
+            let header: BinaryFrameHeader
+            do {
+                header = try BinaryFrameHeader.decode(buffer)
+            } catch let error as BinaryFrameHeader.DecodeError {
+                failure = error
+                buffer = Data()
+                throw error
+            }
+            let total = BinaryFrameHeader.byteCount + Int(header.payloadLength)
+            guard buffer.count >= total else { break }
+            let start = buffer.startIndex + BinaryFrameHeader.byteCount
+            let end = buffer.startIndex + total
+            frames.append(Frame(header: header, payload: Data(buffer[start..<end])))
+            buffer = Data(buffer[end...])
+        }
+        return frames
     }
 }

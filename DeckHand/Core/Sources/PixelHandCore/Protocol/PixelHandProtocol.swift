@@ -32,7 +32,9 @@ public enum PixelHandProtocol {
     /// - 3: `session.tick` (Wi-Fi keep-alive) and `session.link(kind:)`.
     /// - 4: `system.displayState` (displays, Spaces, pointer display) and
     ///   `system.lockState`; `RefusalReason.macLocked`.
-    public static let version = 4
+    /// - 5: mirror frames and the cursor move to the binary mirror stream
+    ///   (`mirror.frame` removed); `diagnostics` carries mirror stats.
+    public static let version = 5
 
     /// Bonjour TXT key carrying `version`. Short, because TXT keys should
     /// stay under 9 bytes.

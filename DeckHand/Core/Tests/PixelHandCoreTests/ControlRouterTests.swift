@@ -47,7 +47,8 @@ private final class RouteLog {
             mirror: Recorder<MirrorMessage>(.mirror, log: log),
             capture: Recorder<CaptureMessage>(.capture, log: log),
             pairing: Recorder<PairingMessage>(.pairing, log: log),
-            session: Recorder<SessionMessage>(.session, log: log)
+            session: Recorder<SessionMessage>(.session, log: log),
+            diagnostics: Recorder<DiagnosticsMessage>(.diagnostics, log: log)
         )
     }
 

@@ -34,6 +34,7 @@ public final class ControlRouter<Connection> {
     public let capture: any DomainHandler<CaptureMessage, Connection>
     public let pairing: any DomainHandler<PairingMessage, Connection>
     public let session: any DomainHandler<SessionMessage, Connection>
+    public let diagnostics: any DomainHandler<DiagnosticsMessage, Connection>
 
     public init(
         input: any DomainHandler<InputMessage, Connection>,
@@ -43,7 +44,8 @@ public final class ControlRouter<Connection> {
         mirror: any DomainHandler<MirrorMessage, Connection>,
         capture: any DomainHandler<CaptureMessage, Connection>,
         pairing: any DomainHandler<PairingMessage, Connection>,
-        session: any DomainHandler<SessionMessage, Connection>
+        session: any DomainHandler<SessionMessage, Connection>,
+        diagnostics: any DomainHandler<DiagnosticsMessage, Connection>
     ) {
         self.input = input
         self.system = system
@@ -53,6 +55,7 @@ public final class ControlRouter<Connection> {
         self.capture = capture
         self.pairing = pairing
         self.session = session
+        self.diagnostics = diagnostics
     }
 
     /// Hands `message` to its domain's handler and waits for it to return.
@@ -67,9 +70,10 @@ public final class ControlRouter<Connection> {
         case let .capture(m): await capture.handle(m, from: connection)
         case let .pairing(m): await pairing.handle(m, from: connection)
         case let .session(m): await session.handle(m, from: connection)
+        case let .diagnostics(m): await diagnostics.handle(m, from: connection)
         // Reserved domains: no messages exist yet. When one gets its first
         // case, add its handler above.
-        case .sharing, .diagnostics: break
+        case .sharing: break
         }
     }
 }

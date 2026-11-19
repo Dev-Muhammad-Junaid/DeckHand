@@ -24,12 +24,16 @@ protocol version and exactly one domain key.
 | `pairing` | `PairingMessage.swift` | approval handshake; S4 pairing | Pairing |
 | `session` | `SessionMessage.swift` | ping/pong, keep-alive `tick`, `link`, `hostStatus` | Network |
 | `sharing` | `SharingMessage.swift` | reserved: clipboard (S10), files | iOS interaction (S10) |
-| `diagnostics` | `DiagnosticsMessage.swift` | reserved: stats (S6) | Mirror (S6) |
+| `diagnostics` | `DiagnosticsMessage.swift` | mirror stats both ways (S6) | Mirror |
 
-- Bulk binary data (S5 mirror video) never goes in the envelope. It rides
-  its own Loom stream, `PixelHandStream.mirror`, framed by
-  `BinaryFrameHeader` (`Protocol/BinaryFrame.swift`). The host announces it
-  with `ProtocolFeature.binaryMirrorStream` in `HostStatus`.
+- Bulk binary data never goes in the envelope. Mirror video and the
+  Mac's cursor ride their own Loom stream, `PixelHandStream.mirror`, which
+  the Mac opens towards a remote after `mirror.start`, framed by
+  `BinaryFrameHeader` (`Protocol/BinaryFrame.swift`; cursor payloads in
+  `Mirror/MirrorCursor.swift`). The host announces it with
+  `ProtocolFeature.binaryMirrorStream` in `HostStatus`. Adding a frame
+  kind or changing a payload layout is a protocol change like any other:
+  bump the version and add a history line.
 
 ## Changing the protocol
 
@@ -70,3 +74,4 @@ one case, one key, one decode line.
 | 2 | Envelope with `v` and one domain key; messages split into ten domains. `macroButton(id:)` → `system.run(action: SystemMacro)`; `mediaCommand(action: String)` → `input.media(key: MediaKey)`; `authorizationStatus(status: String)` → `pairing.authorizationStatus(state: AuthState)`; `hostCapabilities` + `hostFeatures` → `session.hostStatus`; `tracked`/`commandReceipt` → `deck.run(requestID, Action)` / `deck.receipt(requestID, ActionOutcome)`; mirror errors get `mirror.error` instead of `screenshotError("mirror")`; `startMirror`/`stopMirror`/`mirrorFrame`/`displayListUpdate` → `mirror.start`/`stop`/`frame`/`displayList`. Every field is required (no back-compat defaults). `ph-proto` advertised in Bonjour TXT. |
 | 3 | `session.tick` (remote → Mac, every 0.25 s while in front on a link that dozes; no answer, stamped and dropped by `HeartbeatResponder`) and `session.link(kind: LinkKind)` (Mac → remote, the Mac's link judgement, for example `wired` over a USB cable). Network lane, S1 and S13. |
 | 4 | `system.displayState(layout: DisplayLayout)`: displays, their Spaces (current index, full-screen apps) and the pointer's display, sent on connect and on every change; `system.lockState(state: MacLockState)`, sent on connect and on every change; `RefusalReason.macLocked` for runs the locked-Mac gate refuses. Mac → remote only; nothing a remote sends changed. |
+| 5 | Mirror frames leave the control stream: `mirror.frame` removed; JPEG frames, the cursor position (`cursor`) and pointer images (`cursorShape`) travel on `PixelHandStream.mirror` in `BinaryFrameHeader` frames, and the Mac captures without the pointer (S3). `diagnostics` domain activated: `mirrorStats` (Mac → remote) and `mirrorClientStats` (remote → Mac) (S6). `binaryMirrorStream` announced in `hostStatus`. New `mirror.moveCursor(displayID:)` brings the pointer to a display. |

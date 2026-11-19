@@ -9,9 +9,10 @@
 //  frame slides off in the direction of travel while the live stream
 //  comes in from the other side.
 //
-//  The view is intentionally dumb: frame decode, sequencing, and the
-//  start/stop protocol all live in `ControlView`, which owns the single
-//  host-message loop. This just shows whatever `image` it's handed, and
+//  The view is intentionally dumb: frame decode, the cursor and the
+//  start/stop protocol live in `ControlSessionModel+Mirror` and the binary
+//  stream reader. This shows whatever `image` it's handed with the layers
+//  `MirrorOverlay` passes in (pointer, display picker, badge, stats), and
 //  reports the stream width its current size warrants.
 //
 
@@ -33,6 +34,13 @@ struct MirrorThumbnailView: View {
     var initialLayout: MirrorLayout?
     /// Fired whenever a drag or pinch settles, so the layout can be persisted.
     var onLayoutChanged: (MirrorLayout) -> Void = { _ in }
+    /// Drawn exactly over the live picture (the Mac's pointer, S3). Moves
+    /// with the picture during a Space slide.
+    var cursorLayer: AnyView = AnyView(EmptyView())
+    /// Top-left corner chrome (the display picker).
+    var topLeadingAccessory: AnyView = AnyView(EmptyView())
+    /// Bottom-edge chrome (the cursor badge, the stats line).
+    var bottomAccessory: AnyView = AnyView(EmptyView())
 
     /// Persisted drag offset (committed at drag end) + live in-drag delta.
     @State private var committedOffset: CGSize = .zero
@@ -193,6 +201,8 @@ struct MirrorThumbnailView: View {
             RoundedRectangle(cornerRadius: Layout.cornerRadius, style: .continuous)
                 .strokeBorder(.white.opacity(0.22), lineWidth: 0.5)
         )
+        .overlay(alignment: .topLeading) { topLeadingAccessory }
+        .overlay(alignment: .bottom) { bottomAccessory }
         .overlay(alignment: .topTrailing) {
             Button(action: onClose) {
                 Image(systemName: "xmark.circle.fill")
@@ -248,7 +258,7 @@ struct MirrorThumbnailView: View {
         }
         .animation(.snappy(duration: 0.2), value: committedWidth)
         .accessibilityLabel("Live mirror of the Mac screen")
-        .accessibilityHint("Drag to move. Pinch to resize. Tap to shrink or restore. Chevrons switch desktops.")
+        .accessibilityHint("Drag to move. Pinch to resize. Tap to shrink or restore. Chevrons switch desktops. The menu at the top left picks a display.")
     }
 
     // MARK: - Frame + Space transition
@@ -279,6 +289,7 @@ struct MirrorThumbnailView: View {
             Image(uiImage: image)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
+                .overlay { cursorLayer }
         } else {
             ZStack {
                 Rectangle().fill(.black.opacity(0.85))

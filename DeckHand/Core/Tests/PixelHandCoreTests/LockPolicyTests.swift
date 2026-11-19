@@ -162,6 +162,12 @@ import Testing
         let start = ControlMessage.mirror(.start(fps: 20, maxWidth: 640, displayID: nil))
         #expect(LockPolicy.decide(start, state: .screenLocked) == .allow)
         #expect(LockPolicy.decide(start, state: .offConsole) == .refuse(reply: .none))
+        let move = ControlMessage.mirror(.moveCursor(displayID: 1))
+        #expect(LockPolicy.decide(move, state: .screenLocked) == .allow)
+        #expect(LockPolicy.decide(move, state: .offConsole) == .refuse(reply: .none))
+        let stats = ControlMessage.diagnostics(.mirrorClientStats(stats: MirrorClientStats(receivedFPS: 20, displayedFPS: 20, droppedFrames: 0, decodeMilliseconds: 4, kilobitsPerSecond: 1_000)))
+        #expect(LockPolicy.decide(stats, state: .screenLocked) == .allow)
+        #expect(LockPolicy.decide(stats, state: .offConsole) == .allow)
     }
 
     @Test("Capture: the display may be shot at the lock screen, windows never")

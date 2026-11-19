@@ -186,7 +186,10 @@ public enum LockPolicy {
                 // screen. Off console, a capture of this session's display
                 // would show its desktop behind the login window.
                 return offConsole ? .refuse(reply: .none) : .allow
-            case .stop, .frame, .displayList, .error:
+            case .moveCursor:
+                // Moves the pointer, like Locate.
+                return offConsole ? .refuse(reply: .none) : .allow
+            case .stop, .displayList, .error:
                 return .allow
             }
 
@@ -203,8 +206,12 @@ public enum LockPolicy {
                 return .allow
             }
 
-        case .sharing, .diagnostics:
-            // Reserved domains with no cases yet. Whoever activates one
+        case .diagnostics:
+            // Mirror stats: logged only, nothing runs.
+            return .allow
+
+        case .sharing:
+            // Reserved domain with no cases yet. Whoever activates it
             // decides its rule here; until then nothing decodes.
             return .refuse(reply: .none)
         }
