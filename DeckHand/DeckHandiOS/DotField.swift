@@ -164,7 +164,7 @@ private struct RestingDots: View {
                     cornerSize: CGSize(width: dotSize * 0.3, height: dotSize * 0.3)
                 )
             }
-            context.fill(dots, with: .color(DeckHandTheme.Brand.dotOff))
+            context.fill(dots, with: .color(PixelHandTheme.Brand.dotOff))
         }
     }
 }

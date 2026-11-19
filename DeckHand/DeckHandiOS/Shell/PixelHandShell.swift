@@ -190,7 +190,7 @@ struct PixelHandShell: View {
     private func surfaceView(_ surface: ControlSurface, sender: TrackpadSender, metrics: LayoutMetrics) -> some View {
         switch surface {
         case .pointer:
-            TrackpadView(sender: sender, colorScheme: colorScheme, clipboard: session.clipboard)
+            PointerSurface(sender: sender, clipboard: session.clipboard, margin: metrics.margin)
         case .screen:
             ScreenSurface(session: session, macName: peerName)
                 .padding(.horizontal, metrics.margin)
