@@ -12,8 +12,9 @@
 //  account owner can write to that database). That proof is what powers:
 //
 //   • iPad: "My Mac" badge + priority sort in the peer picker.
-//   • Mac:  auto-allow (no Allow/Deny prompt) for the user's own devices,
-//           controllable via the menu-bar toggle and a per-device blocklist.
+//   • Mac:  nothing automatic. Same iCloud is not trust: a device skips
+//           the Allow prompt only once it is paired (S4, keyed on its Loom
+//           identity key; see PairedDeviceStore).
 //
 //  None of this changes transport performance — frames travel the same
 //  network paths either way. It changes trust and convenience only.
