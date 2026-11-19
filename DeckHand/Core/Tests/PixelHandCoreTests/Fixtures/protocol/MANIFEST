@@ -1,5 +1,5 @@
 # Golden fixture manifest. Written by ProtocolContractTests when
 # recording; see Core/PROTOCOL.md. Changing any fixture changes the
 # digest, and the version must match PixelHandProtocol.version.
-version 8
-digest 4a7419e5fe9b592a
+version 9
+digest 24e4ee25d126db0b

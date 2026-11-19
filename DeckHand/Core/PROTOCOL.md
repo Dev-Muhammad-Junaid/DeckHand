@@ -22,7 +22,7 @@ protocol version and exactly one domain key.
 | `mirror` | `MirrorMessage.swift` | mirror start/stop/frames, display list | Mirror |
 | `capture` | `CaptureMessage.swift` | screenshots, window list | Mirror |
 | `pairing` | `PairingMessage.swift` | approval handshake; S4 pairing | Pairing |
-| `session` | `SessionMessage.swift` | ping/pong, keep-alive `tick`, `link`, `hostStatus` | Network |
+| `session` | `SessionMessage.swift` | ping/pong, keep-alive `tick`, `link`, `remoteHosts`, `hostStatus` | Network |
 | `sharing` | `SharingMessage.swift` | clipboard text sync (S10); files later | iOS interaction (S10) |
 | `diagnostics` | `DiagnosticsMessage.swift` | mirror stats both ways (S6) | Mirror |
 
@@ -78,3 +78,4 @@ one case, one key, one decode line.
 | 6 | HEVC mirror (S5): `mirror.start` gains a required `codec: MirrorCodec` (`jpeg` or `hevc`); new `mirror.requestKeyFrame` (remote → Mac). On the binary stream the `hevcParameterSets` / `hevcKeyFrame` / `hevcDeltaFrame` kinds now carry video (payloads in `Mirror/MirrorVideo.swift`). |
 | 7 | iOS interaction lane. `input.typeText(text:)` (Unicode text, ≤ 4 KB a message, cleaned of control characters by `RemoteInputValidation`); `input.mouseDown(button:)` / `input.mouseUp(button:)` for click-drag (a held button is refreshed by repeating `mouseDown`; the Mac releases it on disconnect or after 5 s unrefreshed). `sharing` domain activated: `clipboardSync(enabled:)` and `setClipboard(text:paste:)` (remote → Mac), `macClipboard(text:)` (Mac → remote), text only, ≤ 64 KB. Lock gate: `mouseUp` always allowed, typed text and drags follow `input`, `setClipboard` refused while locked. S11 gestures use the existing `system.run` / `system.switchSpace`. |
 | 8 | Persistent pairing (S4): `pairing.submitCode(code:)` (remote → Mac, accepted while the request is pending: the pre-approval gate hands it to the pairing logic), `pairing.codeResult(result: PairingCodeResult)` (`accepted`, `wrongCode(attemptsLeft:)`, `lockedOut(retryAfter:)`, `expired`, `noActiveCode`), `pairing.pairedStatus(paired:)` (Mac → remote, with every grant and on change) and `pairing.forget` (remote → Mac). Trust is keyed on the Loom identity key, never on message content. |
+| 9 | Remote access over a VPN (S15): `session.remoteHosts(hosts: [String])`, Mac → paired remote only, the Mac's own addresses on tunnel interfaces and Tailscale's ranges (at most 4), for reaching it when Bonjour can't. The remote re-validates each host (`RemoteHost.parse`) and keeps them only for a paired Mac. `session.link` reports `tunnel` for a Tailscale peer address too. Nothing a remote sends changed. |
