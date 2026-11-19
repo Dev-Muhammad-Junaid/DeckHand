@@ -167,14 +167,14 @@ struct DotWave: View {
     var body: some View {
         Group {
             if reduceMotion {
-                frame(phase: 0.5)
+                waveFrame(phase: 0.5)
             } else if ProcessInfo.processInfo.isLowPowerModeEnabled {
                 TimelineView(.periodic(from: .now, by: 1.0 / 15)) { context in
-                    frame(phase: phase(at: context.date))
+                    waveFrame(phase: phase(at: context.date))
                 }
             } else {
                 TimelineView(.animation) { context in
-                    frame(phase: phase(at: context.date))
+                    waveFrame(phase: phase(at: context.date))
                 }
             }
         }
@@ -188,7 +188,7 @@ struct DotWave: View {
         return t.truncatingRemainder(dividingBy: PixelHandMotion.wavePeriod) / PixelHandMotion.wavePeriod
     }
 
-    private func frame(phase: Double) -> some View {
+    private func waveFrame(phase: Double) -> some View {
         let pitch = self.pitch
         return Canvas { context, _ in
             let side = pitch * 0.78
