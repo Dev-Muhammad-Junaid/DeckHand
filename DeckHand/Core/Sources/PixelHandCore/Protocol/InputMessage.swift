@@ -2,8 +2,8 @@
 //  InputMessage.swift
 //  PixelHandCore
 //
-//  Domain: input. Pointer, scroll, clicks, key chords and media keys.
-//  Remote → Mac. Owned by the iOS interaction lane (remote side) and the
+//  Domain: input. Pointer, scroll, clicks, drags, key chords, typed text
+//  and media keys. Remote → Mac. Owned by the iOS interaction lane (remote side) and the
 //  Mac system control lane (`InputHandler`).
 //
 
@@ -18,9 +18,24 @@ public enum InputMessage: Codable, Sendable, Equatable {
     case mouseScroll(dx: Float, dy: Float, phase: ScrollPhase)
     case mouseClick(button: MouseButton)
     case mouseDoubleClick(button: MouseButton)
+    /// Presses `button` and holds it: the pointer moves that follow are
+    /// drags until `mouseUp`. A remote that keeps the button down repeats
+    /// this every `DragPolicy.keepDownInterval` as a keep-alive; the Mac
+    /// releases a button nobody refreshed for `DragPolicy.hostReleaseAfter`,
+    /// and every held button when the remote disconnects.
+    case mouseDown(button: MouseButton)
+    /// Releases a button pressed with `mouseDown`. Releasing a button that
+    /// isn't held does nothing.
+    case mouseUp(button: MouseButton)
     /// A key chord such as `["cmd", "shift", "p"]`, posted to whatever app
     /// is frontmost.
     case keyboardShortcut(keys: [String])
+    /// Text typed into whatever app is frontmost, as the characters
+    /// themselves (any language, emoji included). `\n` presses Return and
+    /// `\t` presses Tab. A remote sends long text in pieces of at most
+    /// `TextChunker.defaultChunkBytes`; the Mac drops a message over
+    /// `TypingPolicy.maxMessageBytes`.
+    case typeText(text: String)
     /// A hardware media key.
     case media(key: MediaKey)
 }

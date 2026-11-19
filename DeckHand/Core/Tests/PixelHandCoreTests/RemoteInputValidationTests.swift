@@ -179,4 +179,39 @@ import Testing
         guard case let .input(.mouseScroll(_, dy, _)) = message else { Issue.record("\(message)"); return }
         #expect(RemoteInputValidation.wheelUnits(forScrollDelta: dy) == Int32(-RemoteInputValidation.maxScrollDelta * 3))
     }
+
+    // MARK: - Typing, drags and the clipboard (iOS interaction lane)
+
+    @Test("Typed text is cleaned of control characters; empty or oversize text is dropped")
+    func typedText() {
+        #expect(RemoteInputValidation.sanitize(.input(.typeText(text: "héllo 👋🏽\r\n"))) == .input(.typeText(text: "héllo 👋🏽\n")))
+        #expect(RemoteInputValidation.sanitize(.input(.typeText(text: "a\u{1B}[2Jb"))) == .input(.typeText(text: "a[2Jb")))
+        #expect(RemoteInputValidation.sanitize(.input(.typeText(text: ""))) == nil)
+        #expect(RemoteInputValidation.sanitize(.input(.typeText(text: "\u{0}\u{7}"))) == nil)
+        let atLimit = String(repeating: "a", count: TypingPolicy.maxMessageBytes)
+        #expect(RemoteInputValidation.sanitize(.input(.typeText(text: atLimit))) == .input(.typeText(text: atLimit)))
+        #expect(RemoteInputValidation.sanitize(.input(.typeText(text: atLimit + "a"))) == nil)
+    }
+
+    @Test("Button presses and releases pass through")
+    func buttons() {
+        for button in MouseButton.allCases {
+            #expect(RemoteInputValidation.sanitize(.input(.mouseDown(button: button))) == .input(.mouseDown(button: button)))
+            #expect(RemoteInputValidation.sanitize(.input(.mouseUp(button: button))) == .input(.mouseUp(button: button)))
+        }
+    }
+
+    @Test("Clipboard text up to the cap is accepted; empty or oversize is dropped")
+    func clipboardText() {
+        #expect(RemoteInputValidation.sanitize(.sharing(.setClipboard(text: "hi", paste: true))) == .sharing(.setClipboard(text: "hi", paste: true)))
+        #expect(RemoteInputValidation.sanitize(.sharing(.setClipboard(text: "", paste: false))) == nil)
+        let over = String(repeating: "a", count: ClipboardPolicy.maxTextBytes + 1)
+        #expect(RemoteInputValidation.sanitize(.sharing(.setClipboard(text: over, paste: false))) == nil)
+        #expect(RemoteInputValidation.sanitize(.sharing(.clipboardSync(enabled: true))) == .sharing(.clipboardSync(enabled: true)))
+    }
+
+    @Test("A remote can't send the Mac's clipboard message")
+    func macClipboardFromRemoteIsDropped() {
+        #expect(RemoteInputValidation.sanitize(.sharing(.macClipboard(text: "x"))) == nil)
+    }
 }

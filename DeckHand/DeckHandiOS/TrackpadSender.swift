@@ -68,6 +68,11 @@ actor TrackpadSender {
     private var mouseSendCount: UInt64 = 0
     private var lastSendErrorLogAt: Double = 0
 
+    // ── Drag (iOS interaction lane) ─────────────────────────────────
+    /// Repeats `mouseDown` while a button is held, so the Mac knows the
+    /// remote is still there (it releases an unrefreshed button).
+    private var dragKeepAlive: [MouseButton: Task<Void, Never>] = [:]
+
     // ── Delivery receipts ───────────────────────────────────────────
     /// Set when the host's `hostStatus` lists `ProtocolFeature.commandReceipts`.
     /// A host that doesn't is sent plain messages, never a `deck.run`.
@@ -195,6 +200,74 @@ actor TrackpadSender {
         await send(.input(.keyboardShortcut(keys: keys)))
     }
 
+    // MARK: - Typing and drags (iOS interaction lane)
+
+    /// Types `text` on the Mac, in pieces the Mac accepts
+    /// (`TextChunker`), in order.
+    func typeText(_ text: String) async {
+        for chunk in TextChunker.chunks(text) {
+            await send(.input(.typeText(text: chunk)))
+        }
+    }
+
+    /// Presses a special key (arrows, Return, Escape, …), with modifiers.
+    func sendKey(_ key: RemoteKey, modifiers: [KeyModifier] = []) async {
+        await send(.input(.keyboardShortcut(keys: key.chord(with: modifiers))))
+    }
+
+    /// Replays an edit of the typing field: Backspaces, then text.
+    func sendTypingEdit(_ edit: TypingEdit) async {
+        for _ in 0..<min(edit.deletes, 500) {
+            await send(.input(.keyboardShortcut(keys: [RemoteKey.delete.wireName])))
+        }
+        if !edit.insert.isEmpty {
+            await typeText(edit.insert)
+        }
+    }
+
+    /// Presses `button` and holds it until `sendMouseUp`, refreshing it
+    /// every `DragPolicy.keepDownInterval`.
+    func sendMouseDown(_ button: MouseButton) async {
+        await flushMouseDelta()
+        await send(.input(.mouseDown(button: button)))
+        dragKeepAlive[button]?.cancel()
+        dragKeepAlive[button] = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(DragPolicy.keepDownInterval))
+                guard !Task.isCancelled, let self else { return }
+                await self.refreshMouseDown(button)
+            }
+        }
+    }
+
+    private func refreshMouseDown(_ button: MouseButton) async {
+        guard dragKeepAlive[button] != nil else { return }
+        await send(.input(.mouseDown(button: button)))
+    }
+
+    /// Releases a held button, after the moves before it.
+    func sendMouseUp(_ button: MouseButton) async {
+        dragKeepAlive.removeValue(forKey: button)?.cancel()
+        await flushMouseDelta()
+        await send(.input(.mouseUp(button: button)))
+    }
+
+    /// A trackpad gesture's command (S11).
+    func sendGesture(_ command: GestureCommand) async {
+        await send(command.message)
+    }
+
+    // MARK: - Clipboard (S10)
+
+    func setClipboardSync(enabled: Bool) async {
+        await send(.sharing(.clipboardSync(enabled: enabled)))
+    }
+
+    /// Puts `text` on the Mac's clipboard, pressing ⌘V there with `paste`.
+    func setMacClipboard(_ text: String, paste: Bool) async {
+        await send(.sharing(.setClipboard(text: text, paste: paste)))
+    }
+
     /// Runs a Mac-wide action (Mission Control, Show Desktop, …).
     func sendSystemAction(_ action: SystemMacro) async {
         await send(.system(.run(action: action)))
@@ -276,19 +349,6 @@ actor TrackpadSender {
 
     func switchSpace(_ direction: SpaceDirection, displayID: UInt32?) async {
         await send(.system(.switchSpace(direction: direction, displayID: displayID)))
-    }
-
-    /// Maps 3-finger swipe directions to the same keyboard shortcuts
-    /// that macOS uses for trackpad gestures.
-    func sendThreeFingerSwipe(_ direction: TrackpadGestureKind.ThreeFingerDirection) async {
-        switch direction {
-        case .left:
-            await send(.system(.switchSpace(direction: .previous, displayID: nil)))
-        case .right:
-            await send(.system(.switchSpace(direction: .next, displayID: nil)))
-        case .up:    await sendSystemAction(.missionControl)
-        case .down:  await sendSystemAction(.appExpose)
-        }
     }
 
     // MARK: - Delivery receipts

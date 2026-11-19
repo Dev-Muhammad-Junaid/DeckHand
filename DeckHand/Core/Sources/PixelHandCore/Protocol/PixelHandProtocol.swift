@@ -36,7 +36,9 @@ public enum PixelHandProtocol {
     ///   (`mirror.frame` removed); `diagnostics` carries mirror stats.
     /// - 6: HEVC mirror (S5): `mirror.start` gains `codec`, new
     ///   `mirror.requestKeyFrame`; the `hevc*` binary frame kinds are used.
-    public static let version = 6
+    /// - 7: `input.typeText`, `input.mouseDown` / `mouseUp` (click-drag);
+    ///   `sharing` domain for clipboard text.
+    public static let version = 7
 
     /// Bonjour TXT key carrying `version`. Short, because TXT keys should
     /// stay under 9 bytes.

@@ -136,6 +136,14 @@ final class ControlSessionModel {
     /// and cursor badge on it.
     var displayLayout: DisplayLayout?
 
+    // MARK: iOS interaction
+    // Clipboard sync (S10). Logic: ControlSessionModel+Input.swift.
+
+    /// What came from the Mac's clipboard and the last Paste to Mac.
+    let clipboard = RemoteClipboard()
+    /// Read for Share Clipboard when the Mac's text arrives.
+    @ObservationIgnored weak var interactionSettings: DeckHandSettings?
+
     init(connection: LoomConnectionHandle, onAuthStatusChanged: @escaping (String) -> Void) {
         self.connection = connection
         self.onAuthStatusChanged = onAuthStatusChanged
@@ -194,6 +202,10 @@ final class ControlSessionModel {
             mirror.cancel()
             mirrorStats.cancel()
         }
+
+        // Clipboard sync on/off to the Mac (ControlSessionModel+Input.swift).
+        let interaction = Task { [weak self] in await self?.runInteraction(sender: s, settings: settings) }
+        defer { interaction.cancel() }
 
         // Single consolidated message loop — no competing consumers
         await listenForHostMessages(liveness: liveness)
@@ -360,6 +372,9 @@ final class ControlSessionModel {
 
         case let .diagnostics(.mirrorStats(stats)):
             mirrorHostStats = stats
+
+        case let .sharing(m):
+            handleSharingMessage(m)
 
         case let .deck(.appMenuShortcutsResponse(bundleID, shortcuts)):
             let added = ShortcutStore.shared.importBindings(shortcuts, for: bundleID)

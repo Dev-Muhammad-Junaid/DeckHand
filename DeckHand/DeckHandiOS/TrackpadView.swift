@@ -10,6 +10,8 @@ import UIKit
 struct TrackpadView: View {
     let sender: TrackpadSender
     let colorScheme: ColorScheme
+    /// Clipboard sync state (S10), shown in the keyboard panel.
+    var clipboard: RemoteClipboard?
 
     // Sensitivity lives in settings so the inline slider and the settings
     // page stay in step, and the choice survives relaunch.
@@ -19,6 +21,11 @@ struct TrackpadView: View {
     /// Finger positions for the dot field. Only `DotField` reads it, so
     /// touches don't re-render the rest of this view.
     @State private var dots = DotFieldModel()
+    /// Gesture → Mac view, with toggle-back (S11). A click, key or text
+    /// forgets what a gesture opened.
+    @State private var gestureMap = GestureMap()
+    /// The keyboard panel (typing, special keys, Paste to Mac).
+    @State private var showKeyboard = false
 
     private var bg: Color { DeckHandTheme.canvasBackground(colorScheme) }
     private var surfaceShadowColor: Color {
@@ -56,21 +63,37 @@ struct TrackpadView: View {
                         onScrollEnded: {
                             Task { await sender.endScroll() }
                         },
-                        onThreeFingerSwipe: { direction in
-                            Task { await sender.sendThreeFingerSwipe(direction) }
+                        onSystemGesture: { gesture in
+                            // Toggle-back: the opposite gesture closes what
+                            // this one opened; the same one again waits.
+                            guard let command = gestureMap.resolve(gesture) else { return }
+                            Task { await sender.sendGesture(command) }
                         },
                         onTap: { pos in
+                            gestureMap.forget()
                             Task { await sender.sendClick(.left) }
                             dots.pulse(at: pos)
                         },
                         onDoubleTap: { pos in
+                            gestureMap.forget()
                             Task { await sender.sendDoubleClick(.left) }
                             dots.pulse(at: pos)
                         },
                         onLongPress: { pos in
+                            gestureMap.forget()
                             Task { await sender.sendClick(.right) }
                             // Filled ring: a right-click reads differently from a tap.
                             dots.pulse(at: pos, filled: true)
+                        },
+                        onDragButton: { isDown in
+                            gestureMap.forget()
+                            Task {
+                                if isDown {
+                                    await sender.sendMouseDown(.left)
+                                } else {
+                                    await sender.sendMouseUp(.left)
+                                }
+                            }
                         },
                         onGestureChanged: { gesture in
                             withAnimation(.easeInOut(duration: 0.15)) {
@@ -83,7 +106,9 @@ struct TrackpadView: View {
                     ),
                     sensitivity: settings.pointerSensitivity,
                     scrollMode: scrollMode,
-                    naturalScrolling: settings.naturalScrolling
+                    naturalScrolling: settings.naturalScrolling,
+                    systemGestures: settings.trackpadGestures,
+                    pencilHover: settings.pencilHoverPointer
                 )
                 .clipShape(RoundedRectangle(cornerRadius: DeckHandTheme.Radius.hero, style: .continuous))
 
@@ -101,7 +126,7 @@ struct TrackpadView: View {
                             Text(scrollMode ? "Scroll Mode" : "Trackpad")
                                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                                 .foregroundStyle(Color.secondary.opacity(0.7))
-                            Text("Tap • Left  |  Hold • Right  |  2F • Scroll  |  3F • Spaces")
+                            Text("Tap • Click  |  Hold • Right  |  Hold, move • Drag  |  2F • Scroll  |  3F • Spaces, Mission Control")
                                 .font(.system(size: 9, weight: .medium))
                                 .foregroundStyle(Color.secondary.opacity(0.45))
                         }
@@ -115,6 +140,19 @@ struct TrackpadView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.horizontal, 20)
             .padding(.top, 16)
+
+            // ── Keyboard panel: typing, special keys, Paste to Mac ────
+            if showKeyboard {
+                RemoteKeyboardPanel(
+                    sender: sender,
+                    clipboard: clipboard,
+                    colorScheme: colorScheme,
+                    onActivity: { gestureMap.forget() }
+                )
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
 
             // ── Sensitivity slider ────────────────────────────────────
             // Index-driven over a small set of labeled anchors (WID-405):
@@ -161,12 +199,13 @@ struct TrackpadView: View {
             .padding(.top, 8)
 
             // ── Gesture button bar ────────────────────────────────────
-            GestureButtonBar(sender: sender, scrollMode: $scrollMode, colorScheme: colorScheme)
+            GestureButtonBar(sender: sender, scrollMode: $scrollMode, showKeyboard: $showKeyboard, colorScheme: colorScheme)
                 .padding(.horizontal, 20)
                 .padding(.top, 10)
                 .padding(.bottom, 16)
         }
         .background(bg)
+        .animation(.spring(response: 0.28, dampingFraction: 0.85), value: showKeyboard)
     }
 }
 
@@ -199,12 +238,18 @@ private struct GestureIndicator: View {
         switch gesture {
         case .cursor: "hand.point.up.left"
         case .scroll: "arrow.up.and.down"
-        case .threeFingerSwipe(let dir):
-            switch dir {
-            case .left:  "arrow.left"
-            case .right: "arrow.right"
-            case .up:    "arrow.up"
-            case .down:  "arrow.down"
+        case .dragArmed: "hand.raised"
+        case .dragging: "hand.draw"
+        case .dragLocked: "lock"
+        case .pencilHover: "applepencil"
+        case .system(let g):
+            switch g {
+            case .swipe(.left):  "arrow.left"
+            case .swipe(.right): "arrow.right"
+            case .swipe(.up):    "arrow.up"
+            case .swipe(.down):  "arrow.down"
+            case .pinch:         "arrow.down.right.and.arrow.up.left"
+            case .spread:        "arrow.up.left.and.arrow.down.right"
             }
         }
     }
@@ -213,20 +258,27 @@ private struct GestureIndicator: View {
         switch gesture {
         case .cursor: "Cursor"
         case .scroll: "Scrolling"
-        case .threeFingerSwipe(let dir):
-            switch dir {
-            case .left, .right: "Spaces"
-            case .up:           "Mission Control"
-            case .down:         "App Exposé"
+        case .dragArmed: "Move to drag"
+        case .dragging: "Dragging"
+        case .dragLocked: "Drag locked · tap to drop"
+        case .pencilHover: "Pencil"
+        case .system(let g):
+            switch g {
+            case .swipe(.left), .swipe(.right): "Spaces"
+            case .swipe(.up):   "Mission Control"
+            case .swipe(.down): "App Exposé"
+            case .pinch:        "Apps"
+            case .spread:       "Desktop"
             }
         }
     }
 
     private var iconColor: Color {
         switch gesture {
-        case .cursor: DeckHandTheme.Brand.glow
+        case .cursor, .pencilHover: DeckHandTheme.Brand.glow
         case .scroll: DeckHandTheme.Brand.mint
-        case .threeFingerSwipe: DeckHandTheme.Brand.sky
+        case .dragArmed, .dragging, .dragLocked: DeckHandTheme.accent
+        case .system: DeckHandTheme.Brand.sky
         }
     }
 }
@@ -236,12 +288,24 @@ private struct GestureIndicator: View {
 struct GestureButtonBar: View {
     let sender: TrackpadSender
     @Binding var scrollMode: Bool
+    @Binding var showKeyboard: Bool
     let colorScheme: ColorScheme
 
     var body: some View {
         HStack(spacing: 0) {
             // Scroll mode toggle — highlighted when active
             ScrollToggleButton(isActive: $scrollMode, colorScheme: colorScheme)
+
+            // Keyboard panel toggle: type on the Mac.
+            GestureButton(
+                label: showKeyboard ? "Hide Keys" : "Keyboard",
+                icon: showKeyboard ? "keyboard.chevron.compact.down" : "keyboard",
+                color: DeckHandTheme.accent,
+                haptic: .selection,
+                colorScheme: colorScheme
+            ) {
+                showKeyboard.toggle()
+            }
 
             GestureButton(label: "Left Click",   icon: "cursorarrow.click",              color: DeckHandTheme.accent, haptic: .medium, colorScheme: colorScheme) {
                 Task { await sender.sendClick(.left) }

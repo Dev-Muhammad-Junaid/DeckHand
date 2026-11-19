@@ -29,6 +29,8 @@ struct TextFieldAction: Identifiable {
                 .init(id: "undo",      symbol: "arrow.uturn.backward", label: "Undo",   keys: ["cmd", "z"],          isPrimary: false),
                 .init(id: "redo",      symbol: "arrow.uturn.forward",  label: "Redo",   keys: ["cmd", "shift", "z"], isPrimary: false),
                 .init(id: "selectAll", symbol: "selection.pin.in.out", label: "All",    keys: ["cmd", "a"],          isPrimary: false),
+                .init(id: "left",      symbol: "arrow.left",           label: "Left",   keys: ["left"],              isPrimary: false),
+                .init(id: "right",     symbol: "arrow.right",          label: "Right",  keys: ["right"],             isPrimary: false),
                 .init(id: "delete",    symbol: "delete.left",          label: "Delete", keys: ["delete"],            isPrimary: false),
                 .init(id: "return",    symbol: "return",               label: "Return", keys: ["return"],            isPrimary: true),
             ]

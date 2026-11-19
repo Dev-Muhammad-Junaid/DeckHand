@@ -110,6 +110,25 @@ func CGGetActiveDisplayList(_ max: UInt32, _ ids: UnsafeMutablePointer<CGDirectD
     func cursorPosition() -> CGPoint { .zero }
     func moveCursor(to point: CGPoint) {}
     func displayIDUnderCursor() -> CGDirectDisplayID { 0 }
+    // iOS interaction lane
+    private(set) var heldButtons: Set<MouseButton> = []
+    func mouseDown(button: MouseButton) {}
+    func mouseUp(button: MouseButton) {}
+    func typeKey(_ stroke: LayoutKeyStroke) {}
+    func typeNamedKey(_ name: String) {}
+    func typeUnicode(_ text: String) {}
+}
+// iOS interaction lane (Carbon / AppKit inside; their callers are checked)
+@MainActor final class KeyboardLayoutMap {
+    static let shared = KeyboardLayoutMap()
+    func stroke(for character: Character) -> LayoutKeyStroke? { nil }
+    func refreshIfNeeded() {}
+}
+@MainActor final class MacClipboardSync {
+    static let shared = MacClipboardSync()
+    func setSync(_ enabled: Bool, for handle: LoomConnectionHandle, id: UUID) {}
+    func setClipboard(_ text: String, paste: Bool, from id: UUID) {}
+    func removeConnection(id: UUID) {}
 }
 @MainActor final class AppLauncher {
     static let shared = AppLauncher()
@@ -225,4 +244,8 @@ final class UIImage: @unchecked Sendable {
     init?(data: Data) {}
     func preparingForDisplay() -> UIImage? { self }
 }
-enum TrackpadGestureKind { enum ThreeFingerDirection { case left, right, up, down } }
+// iOS interaction lane
+final class UIPasteboard: @unchecked Sendable {
+    static let general = UIPasteboard()
+    var string: String?
+}

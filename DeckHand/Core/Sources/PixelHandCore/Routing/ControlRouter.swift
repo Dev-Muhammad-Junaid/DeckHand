@@ -34,6 +34,7 @@ public final class ControlRouter<Connection> {
     public let capture: any DomainHandler<CaptureMessage, Connection>
     public let pairing: any DomainHandler<PairingMessage, Connection>
     public let session: any DomainHandler<SessionMessage, Connection>
+    public let sharing: any DomainHandler<SharingMessage, Connection>
     public let diagnostics: any DomainHandler<DiagnosticsMessage, Connection>
 
     public init(
@@ -45,6 +46,7 @@ public final class ControlRouter<Connection> {
         capture: any DomainHandler<CaptureMessage, Connection>,
         pairing: any DomainHandler<PairingMessage, Connection>,
         session: any DomainHandler<SessionMessage, Connection>,
+        sharing: any DomainHandler<SharingMessage, Connection>,
         diagnostics: any DomainHandler<DiagnosticsMessage, Connection>
     ) {
         self.input = input
@@ -55,6 +57,7 @@ public final class ControlRouter<Connection> {
         self.capture = capture
         self.pairing = pairing
         self.session = session
+        self.sharing = sharing
         self.diagnostics = diagnostics
     }
 
@@ -70,10 +73,8 @@ public final class ControlRouter<Connection> {
         case let .capture(m): await capture.handle(m, from: connection)
         case let .pairing(m): await pairing.handle(m, from: connection)
         case let .session(m): await session.handle(m, from: connection)
+        case let .sharing(m): await sharing.handle(m, from: connection)
         case let .diagnostics(m): await diagnostics.handle(m, from: connection)
-        // Reserved domains: no messages exist yet. When one gets its first
-        // case, add its handler above.
-        case .sharing: break
         }
     }
 }

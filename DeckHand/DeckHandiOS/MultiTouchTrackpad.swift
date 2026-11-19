@@ -3,8 +3,16 @@
 //  DeckHandiOS
 //
 //  UIViewRepresentable that wraps a custom UIView for raw multi-touch
-//  tracking.  SwiftUI's DragGesture only tracks one finger — this gives
-//  us 1/2/3 finger awareness for cursor, scroll, and Spaces gestures.
+//  tracking. SwiftUI's DragGesture only tracks one finger; this gives
+//  1/2/3/4-finger awareness for the pointer, scrolling, drags and the Mac's
+//  system gestures, plus Apple Pencil hover.
+//
+//  The decisions live in PixelHandCore, tested on Linux:
+//  - `DragStateMachine`: press-hold-move drags, the two-finger drag lock,
+//    and the long-press right click (now on lift, after the hold).
+//  - `GestureStroke` / `GestureClassifier`: three- and four-finger swipes
+//    and pinches, decided when the first finger lifts (S11).
+//  - `HoverPointerTracker`: Pencil hover moves the pointer (S12).
 //
 
 import QuartzCore
@@ -14,18 +22,18 @@ import UIKit
 // MARK: - Gesture event types reported to the parent view
 
 enum TrackpadGestureKind: Equatable {
-    case cursor           // 1-finger drag
-    case scroll           // 2-finger drag
-    case threeFingerSwipe(ThreeFingerDirection)
-
-    enum ThreeFingerDirection: String {
-        case left, right, up, down
-    }
+    case cursor           // 1-finger move
+    case scroll           // 2-finger move
+    case dragArmed        // held still: moving now drags
+    case dragging         // the Mac's button is down
+    case dragLocked       // two-finger drag lock
+    case system(MultiFingerGesture) // 3+ fingers, decided at lift
+    case pencilHover      // Apple Pencil hovering
 }
 
 /// Callbacks from the multi-touch surface to the SwiftUI host.
 struct TrackpadCallbacks {
-    /// Continuous delta during 1-finger drag.
+    /// Pointer movement: a finger, a drag, or Pencil hover.
     var onCursorDelta: (Float, Float) -> Void = { _, _ in }
     /// Continuous delta during 2-finger drag (scroll).
     var onScrollDelta: (Float, Float) -> Void = { _, _ in }
@@ -34,14 +42,16 @@ struct TrackpadCallbacks {
     /// rubber-banding + momentum animations to play out instead of just
     /// stopping abruptly.
     var onScrollEnded: () -> Void = { }
-    /// Fired once when a 3-finger directional swipe is recognized.
-    var onThreeFingerSwipe: (TrackpadGestureKind.ThreeFingerDirection) -> Void = { _ in }
+    /// A three- or four-finger swipe or pinch, once per stroke, at lift.
+    var onSystemGesture: (MultiFingerGesture) -> Void = { _ in }
     /// 1-finger tap (fast touch < 0.3s with < 6pt movement).
     var onTap: (CGPoint) -> Void = { _ in }
     /// 1-finger double-tap (two taps within 0.35s).
     var onDoubleTap: (CGPoint) -> Void = { _ in }
-    /// 1-finger long press (> 0.4s stationary).
+    /// 1-finger long press lifted without moving: a right click.
     var onLongPress: (CGPoint) -> Void = { _ in }
+    /// The left button went down (`true`) or up (`false`) for a drag.
+    var onDragButton: (Bool) -> Void = { _ in }
     /// Reports the active gesture kind for the UI indicator (nil = idle).
     var onGestureChanged: (TrackpadGestureKind?) -> Void = { _ in }
     /// Every finger on the surface, in the view's coordinates, whenever one
@@ -56,6 +66,10 @@ struct MultiTouchTrackpad: UIViewRepresentable {
     let sensitivity: Float
     let scrollMode: Bool
     var naturalScrolling: Bool = false
+    /// Three- and four-finger gestures run Mac views (S11).
+    var systemGestures: Bool = true
+    /// Apple Pencil hover moves the pointer (S12).
+    var pencilHover: Bool = true
 
     func makeUIView(context: Context) -> TouchTrackingView {
         let view = TouchTrackingView()
@@ -69,11 +83,18 @@ struct MultiTouchTrackpad: UIViewRepresentable {
         apply(to: uiView)
     }
 
+    static func dismantleUIView(_ uiView: TouchTrackingView, coordinator: ()) {
+        // The trackpad left the screen: never leave the Mac's button down.
+        uiView.releaseEverything()
+    }
+
     private func apply(to view: TouchTrackingView) {
         view.callbacks = callbacks
         view.sensitivity = sensitivity
         view.scrollMode = scrollMode
         view.naturalScrolling = naturalScrolling
+        view.systemGestures = systemGestures
+        view.pencilHover = pencilHover
     }
 }
 
@@ -85,6 +106,10 @@ final class TouchTrackingView: UIView {
     var scrollMode: Bool = false
     /// Flips scroll deltas so the content tracks the fingers.
     var naturalScrolling: Bool = false
+    var systemGestures: Bool = true
+    var pencilHover: Bool = true {
+        didSet { hoverRecognizer.isEnabled = pencilHover }
+    }
 
     private var scrollSign: Float { naturalScrolling ? -1 : 1 }
 
@@ -92,74 +117,93 @@ final class TouchTrackingView: UIView {
     private var activeTouches: [UITouch] = []
     private var lastCentroid: CGPoint?
 
-    // ── Tap / long-press detection ────────────────────────────────
+    // ── Tap detection ─────────────────────────────────────────────
     private var touchDownTime: Double = 0
     private var touchDownLocation: CGPoint = .zero
-    private var longPressTimer: Task<Void, Never>?
     private var lastSingleTapTime: Double = 0
     private var hasMoved = false
-    private var longPressFired = false  // prevents tap after long-press right-click
 
-    // ── 3-finger swipe detection ──────────────────────────────────
-    private var threeFingerOrigin: CGPoint?
-    private var threeFingerFired = false
+    // ── Drag (Core `DragStateMachine`) ────────────────────────────
+    private var drag = DragStateMachine()
+    /// Ticks the machine while a press waits to arm or a lock waits to
+    /// time out.
+    private var dragTicker: Task<Void, Never>?
+
+    // ── System gestures (Core `GestureStroke`) ────────────────────
+    private var stroke = GestureStroke()
+    /// Once a stroke armed (three fingers), the rest of the touch sends
+    /// no pointer motion, click or scroll.
+    private var strokeOwnsTouch = false
 
     /// `true` while a scroll gesture (1-finger scrollMode or 2-finger drag)
     /// is in flight. Drives `onScrollEnded` so the host can ship a phased
     /// `.end` event when the driving fingers lift.
     private var scrollActive = false
 
+    // ── Pencil hover (S12) ────────────────────────────────────────
+    private lazy var hoverRecognizer = UIHoverGestureRecognizer(target: self, action: #selector(handleHover(_:)))
+    private var hover = HoverPointerTracker()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        hoverRecognizer.cancelsTouchesInView = false
+        addGestureRecognizer(hoverRecognizer)
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        hoverRecognizer.cancelsTouchesInView = false
+        addGestureRecognizer(hoverRecognizer)
+    }
+
+    override func willMove(toWindow newWindow: UIWindow?) {
+        super.willMove(toWindow: newWindow)
+        if newWindow == nil { releaseEverything() }
+    }
+
+    /// Releases a held button and forgets every touch.
+    func releaseEverything() {
+        handle(drag.reset())
+        dragTicker?.cancel()
+        dragTicker = nil
+        stroke.cancel()
+        hover.ended()
+    }
 
     // MARK: - Touches
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesBegan(touches, with: event)
-        for touch in touches {
-            if !activeTouches.contains(touch) {
-                activeTouches.append(touch)
-            }
+        let wasEmpty = activeTouches.isEmpty
+        for touch in touches where !activeTouches.contains(touch) {
+            activeTouches.append(touch)
         }
-
+        let now = CACurrentMediaTime()
         let count = activeTouches.count
         lastCentroid = centroid(of: activeTouches)
+        hover.ended()
 
-        if count == 1 {
-            // Start tap/long-press detection
-            let loc = activeTouches[0].location(in: self)
-            touchDownTime = CACurrentMediaTime()
-            touchDownLocation = loc
+        if wasEmpty {
+            touchDownTime = now
+            touchDownLocation = activeTouches[0].location(in: self)
             hasMoved = false
-            longPressFired = false
+            strokeOwnsTouch = false
+            stroke.reset()
+        }
+        if count > 1 { hasMoved = true }
 
+        handle(drag.touchBegan(fingerCount: count, at: now))
+        startDragTickerIfNeeded()
 
-            // Schedule long press (right-click). Re-validate touch state after
-            // the sleep so a second finger landing within the 400 ms window
-            // (or the user dragging past the dead zone) doesn't race against
-            // the timer and synthesize a phantom right-click.
-            longPressTimer?.cancel()
-            longPressTimer = Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 400_000_000)
-                guard !Task.isCancelled,
-                      self.activeTouches.count == 1,
-                      !self.hasMoved
-                else { return }
-                self.longPressFired = true
-                GestureHaptic.heavy.trigger()
-                self.callbacks.onLongPress(loc)
+        if systemGestures, !drag.routesMovementToPointer, count >= GestureClassifier.minimumFingers {
+            stroke.fingers(fingerPoints())
+            if stroke.isArmed, !strokeOwnsTouch {
+                strokeOwnsTouch = true
+                endScrollIfActive()
             }
-        } else {
-            // Multi-finger → cancel tap/long-press
-            longPressTimer?.cancel()
-            hasMoved = true
         }
 
-        if count == 3 {
-            threeFingerOrigin = centroid(of: activeTouches)
-            threeFingerFired = false
-        }
-
-        // Report gesture kind
-        callbacks.onGestureChanged(gestureKind(for: count))
+        callbacks.onGestureChanged(currentKind(fingerCount: count))
         reportTouches()
     }
 
@@ -168,24 +212,37 @@ final class TouchTrackingView: UIView {
 
         let count = activeTouches.count
         let currentCentroid = centroid(of: activeTouches)
+        let now = CACurrentMediaTime()
 
         guard let last = lastCentroid else {
             lastCentroid = currentCentroid
             return
         }
-
         let dx = Float(currentCentroid.x - last.x)
         let dy = Float(currentCentroid.y - last.y)
         lastCentroid = currentCentroid
 
-        // Check if moved beyond dead zone (for tap detection)
-        if count == 1 {
-            let dist = hypot(currentCentroid.x - touchDownLocation.x,
+        // Distance from where the touch landed: tap detection and the
+        // drag machine's slop.
+        let distance = hypot(currentCentroid.x - touchDownLocation.x,
                              currentCentroid.y - touchDownLocation.y)
-            if dist > 6 {
-                hasMoved = true
-                longPressTimer?.cancel()
-            }
+        if count == 1, distance > DragPolicy.slop {
+            hasMoved = true
+        }
+        handle(drag.touchMoved(distance: Double(distance), at: now))
+
+        // The Mac's button is down: every move drags, whatever the fingers.
+        if drag.routesMovementToPointer {
+            callbacks.onCursorDelta(dx * sensitivity, dy * sensitivity)
+            reportTouches()
+            return
+        }
+
+        // A system gesture owns the touch until every finger lifts.
+        if strokeOwnsTouch {
+            stroke.fingers(fingerPoints())
+            reportTouches()
+            return
         }
 
         switch count {
@@ -208,27 +265,6 @@ final class TouchTrackingView: UIView {
             callbacks.onScrollDelta(dx * 0.5 * scrollSign, dy * 0.5 * scrollSign)
             callbacks.onGestureChanged(.scroll)
 
-        case 3:
-            // Detect swipe direction once past threshold
-            if !threeFingerFired, let origin = threeFingerOrigin {
-                let totalDx = currentCentroid.x - origin.x
-                let totalDy = currentCentroid.y - origin.y
-                let threshold: CGFloat = 60
-
-                if abs(totalDx) > threshold || abs(totalDy) > threshold {
-                    let direction: TrackpadGestureKind.ThreeFingerDirection
-                    if abs(totalDx) > abs(totalDy) {
-                        direction = totalDx > 0 ? .right : .left
-                    } else {
-                        direction = totalDy > 0 ? .down : .up
-                    }
-                    threeFingerFired = true
-                    GestureHaptic.medium.trigger()
-                    callbacks.onThreeFingerSwipe(direction)
-                    callbacks.onGestureChanged(.threeFingerSwipe(direction))
-                }
-            }
-
         default:
             break
         }
@@ -239,25 +275,31 @@ final class TouchTrackingView: UIView {
         super.touchesEnded(touches, with: event)
 
         let wasCount = activeTouches.count
+        let now = CACurrentMediaTime()
+        // A system gesture is decided as its first finger lifts.
+        if strokeOwnsTouch, !stroke.isFinished {
+            stroke.fingers(fingerPoints())
+            if let gesture = stroke.lift() {
+                GestureHaptic.medium.trigger()
+                callbacks.onSystemGesture(gesture)
+                callbacks.onGestureChanged(.system(gesture))
+            }
+        }
         activeTouches.removeAll { touches.contains($0) }
+
+        let machineOwnedTouch = drag.ownsTouch
+        let outputs = drag.touchEnded(remaining: activeTouches.count, at: now)
+        handle(outputs)
 
         // All fingers lifted — evaluate final gesture
         if activeTouches.isEmpty {
-            longPressTimer?.cancel()
+            endScrollIfActive()
 
-            // If a scroll gesture was in flight, surface the `.end` phase to
-            // the host before resetting state. AppKit's scroll views need
-            // this transition to drive their rubber-banding back to rest.
-            if scrollActive {
-                scrollActive = false
-                callbacks.onScrollEnded()
-            }
-
-            // 1-finger tap detection — only if long press didn't already fire
-            if wasCount == 1 && !hasMoved && !longPressFired {
-                let duration = CACurrentMediaTime() - touchDownTime
-                if duration < 0.3 {
-                    let now = CACurrentMediaTime()
+            // 1-finger tap — not when the drag machine owned the touch (a
+            // tap that ends a drag lock, an armed press) or a stroke did.
+            if wasCount == 1, !hasMoved, !machineOwnedTouch, outputs.isEmpty, !strokeOwnsTouch {
+                let duration = now - touchDownTime
+                if duration < DragPolicy.tapMaxDuration {
                     if lastSingleTapTime > 0 && (now - lastSingleTapTime) < 0.35 {
                         // Double-tap
                         lastSingleTapTime = 0
@@ -272,16 +314,17 @@ final class TouchTrackingView: UIView {
                 }
             }
 
-            // Reset state
             lastCentroid = nil
-            threeFingerOrigin = nil
-            threeFingerFired = false
-            longPressFired = false
-            callbacks.onGestureChanged(nil)
+            strokeOwnsTouch = false
+            if !drag.isButtonDown {
+                callbacks.onGestureChanged(nil)
+            }
         } else {
             // Some fingers still down — update centroid
             lastCentroid = centroid(of: activeTouches)
-            callbacks.onGestureChanged(gestureKind(for: activeTouches.count))
+            if !strokeOwnsTouch {
+                callbacks.onGestureChanged(currentKind(fingerCount: activeTouches.count))
+            }
         }
         reportTouches()
     }
@@ -289,24 +332,116 @@ final class TouchTrackingView: UIView {
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesCancelled(touches, with: event)
         activeTouches.removeAll { touches.contains($0) }
+        // The system took the touch (four-finger multitasking, a call):
+        // a stroke sends nothing and a held button is released.
+        stroke.cancel()
+        handle(drag.touchesCancelled())
         if activeTouches.isEmpty {
-            longPressTimer?.cancel()
-            if scrollActive {
-                scrollActive = false
-                callbacks.onScrollEnded()
-            }
+            endScrollIfActive()
             lastCentroid = nil
-            threeFingerOrigin = nil
-            threeFingerFired = false
+            strokeOwnsTouch = false
             callbacks.onGestureChanged(nil)
         }
         reportTouches()
     }
 
+    // MARK: - Drag machine plumbing
+
+    private func handle(_ outputs: [DragStateMachine.Output]) {
+        for output in outputs {
+            switch output {
+            case .armed:
+                GestureHaptic.heavy.trigger()
+                callbacks.onGestureChanged(.dragArmed)
+            case .buttonDown:
+                GestureHaptic.light.trigger()
+                callbacks.onDragButton(true)
+                callbacks.onGestureChanged(.dragging)
+            case .buttonUp:
+                callbacks.onDragButton(false)
+                callbacks.onGestureChanged(activeTouches.isEmpty ? nil : currentKind(fingerCount: activeTouches.count))
+            case .rightClick:
+                callbacks.onLongPress(touchDownLocation)
+            case .lockEngaged:
+                GestureHaptic.medium.trigger()
+                callbacks.onGestureChanged(.dragLocked)
+            }
+        }
+        startDragTickerIfNeeded()
+    }
+
+    /// Runs while the machine has something time-based pending: a press
+    /// that may arm, or a lock that may time out.
+    private func startDragTickerIfNeeded() {
+        let needsTicks: Bool
+        switch drag.phase {
+        case .pressing, .locked: needsTicks = true
+        default: needsTicks = false
+        }
+        guard needsTicks, dragTicker == nil else { return }
+        dragTicker = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(50))
+                guard let self, !Task.isCancelled else { return }
+                let outputs = self.drag.tick(at: CACurrentMediaTime())
+                switch self.drag.phase {
+                case .pressing, .locked:
+                    if !outputs.isEmpty { self.handle(outputs) }
+                default:
+                    self.dragTicker = nil
+                    self.handle(outputs)
+                    return
+                }
+            }
+        }
+    }
+
+    // MARK: - Pencil hover (S12)
+
+    @objc private func handleHover(_ recognizer: UIHoverGestureRecognizer) {
+        // Only a hovering Apple Pencil: a pointer (trackpad or mouse) has
+        // no height above the screen and already moves the iPad's pointer.
+        guard pencilHover, activeTouches.isEmpty, recognizer.zOffset > 0 else {
+            if hover.isHovering {
+                hover.ended()
+                callbacks.onGestureChanged(nil)
+            }
+            return
+        }
+        switch recognizer.state {
+        case .began, .changed:
+            let point = recognizer.location(in: self)
+            if !hover.isHovering { callbacks.onGestureChanged(.pencilHover) }
+            if let delta = hover.moved(to: TouchPoint(x: point.x, y: point.y), sensitivity: Double(sensitivity)) {
+                callbacks.onCursorDelta(Float(delta.dx), Float(delta.dy))
+            }
+        default:
+            hover.ended()
+            callbacks.onGestureChanged(nil)
+        }
+    }
+
     // MARK: - Helpers
+
+    private func endScrollIfActive() {
+        if scrollActive {
+            scrollActive = false
+            callbacks.onScrollEnded()
+        }
+    }
 
     private func reportTouches() {
         callbacks.onTouchesChanged(activeTouches.map { $0.location(in: self) })
+    }
+
+    /// The fingers on the glass, keyed per touch, for `GestureStroke`.
+    private func fingerPoints() -> [Int: TouchPoint] {
+        var points: [Int: TouchPoint] = [:]
+        for touch in activeTouches {
+            let p = touch.location(in: self)
+            points[ObjectIdentifier(touch).hashValue] = TouchPoint(x: p.x, y: p.y)
+        }
+        return points
     }
 
     private func centroid(of touches: [UITouch]) -> CGPoint {
@@ -322,12 +457,17 @@ final class TouchTrackingView: UIView {
         return CGPoint(x: sumX / n, y: sumY / n)
     }
 
-    private func gestureKind(for fingerCount: Int) -> TrackpadGestureKind? {
+    private func currentKind(fingerCount: Int) -> TrackpadGestureKind? {
+        switch drag.phase {
+        case .armed: return .dragArmed
+        case .dragging, .lockedTouch: return .dragging
+        case .lockedHolding, .locked: return .dragLocked
+        case .idle, .pressing, .passive: break
+        }
         switch fingerCount {
         case 1:  return scrollMode ? .scroll : .cursor
         case 2:  return .scroll
-        case 3:  return nil  // Reported on swipe detection
-        default: return nil
+        default: return nil  // Reported when the system gesture is decided
         }
     }
 }

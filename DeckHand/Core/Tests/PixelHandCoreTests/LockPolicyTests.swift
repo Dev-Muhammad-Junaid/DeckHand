@@ -109,6 +109,8 @@ import Testing
         .input(.mouseDelta(dx: 1, dy: 1)),
         .input(.mouseClick(button: .left)),
         .input(.keyboardShortcut(keys: ["return"])),
+        .input(.typeText(text: "hunter2")),
+        .input(.mouseDown(button: .left)),
     ]
 
     @Test("Unlocked: everything goes")
@@ -155,6 +157,22 @@ import Testing
         }
         #expect(LockPolicy.decide(.system(.run(action: .locateCursor)), state: .offConsole) == .refuse(reply: .none))
         #expect(LockPolicy.decide(.mirror(.start(fps: 20, maxWidth: 640, displayID: nil, codec: .jpeg)), state: .offConsole) == .refuse(reply: .none))
+    }
+
+    @Test("A held button can always be released, whatever the state")
+    func mouseUpAlwaysPasses() {
+        for state in MacLockState.allCases {
+            #expect(LockPolicy.decide(.input(.mouseUp(button: .left)), state: state) == .allow)
+        }
+    }
+
+    @Test("Clipboard: nothing is set while locked; turning sync on is only a subscription")
+    func clipboardWhileLocked() {
+        for state in [MacLockState.screenLocked, .offConsole] {
+            #expect(LockPolicy.decide(.sharing(.setClipboard(text: "x", paste: true)), state: state) == .refuse(reply: .none))
+            #expect(LockPolicy.decide(.sharing(.setClipboard(text: "x", paste: false)), state: state) == .refuse(reply: .none))
+            #expect(LockPolicy.decide(.sharing(.clipboardSync(enabled: true)), state: state) == .allow)
+        }
     }
 
     @Test("Mirror: the lock screen may be shown, another session's desktop may not")

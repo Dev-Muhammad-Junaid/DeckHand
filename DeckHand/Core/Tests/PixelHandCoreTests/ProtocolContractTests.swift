@@ -41,6 +41,9 @@ import Testing
         ("input.mouseDoubleClick", .input(.mouseDoubleClick(button: .right))),
         ("input.keyboardShortcut", .input(.keyboardShortcut(keys: ["cmd", "shift", "p"]))),
         ("input.media", .input(.media(key: .playPause))),
+        ("input.mouseDown", .input(.mouseDown(button: .left))),
+        ("input.mouseUp", .input(.mouseUp(button: .left))),
+        ("input.typeText", .input(.typeText(text: "Héllo, 世界 👋🏽\n"))),
         // system
         ("system.run", .system(.run(action: .showDesktop))),
         ("system.switchSpace", .system(.switchSpace(direction: .next, displayID: nil))),
@@ -185,6 +188,10 @@ import Testing
             screenRecording: true,
             features: [.binaryMirrorStream, .commandReceipts]
         )))),
+        // sharing
+        ("sharing.clipboardSync", .sharing(.clipboardSync(enabled: true))),
+        ("sharing.setClipboard", .sharing(.setClipboard(text: "Copied on the iPad", paste: true))),
+        ("sharing.macClipboard", .sharing(.macClipboard(text: "Copied on the Mac"))),
         // diagnostics
         ("diagnostics.mirrorStats", .diagnostics(.mirrorStats(stats: MirrorHostStats(
             codec: .jpeg,
@@ -217,6 +224,9 @@ import Testing
             case .mouseDoubleClick: "input.mouseDoubleClick"
             case .keyboardShortcut: "input.keyboardShortcut"
             case .media: "input.media"
+            case .mouseDown: "input.mouseDown"
+            case .mouseUp: "input.mouseUp"
+            case .typeText: "input.typeText"
             }
         case let .system(m):
             switch m {
@@ -273,7 +283,12 @@ import Testing
             case .tick: "session.tick"
             case .link: "session.link"
             }
-        case let .sharing(m): reservedCaseName(m)
+        case let .sharing(m):
+            switch m {
+            case .clipboardSync: "sharing.clipboardSync"
+            case .setClipboard: "sharing.setClipboard"
+            case .macClipboard: "sharing.macClipboard"
+            }
         case let .diagnostics(m):
             switch m {
             case .mirrorStats: "diagnostics.mirrorStats"
@@ -282,14 +297,8 @@ import Testing
         }
     }
 
-    // The reserved domains have no cases yet. When one gets its first case,
-    // these stop compiling: name the case in a switch like the others.
-    private static func reservedCaseName(_ message: SharingMessage) -> String {
-        switch message {}
-    }
-
-    /// Cases in protocol version 6. Bump with every added or removed case.
-    static let expectedCaseCount = 42
+    /// Cases in protocol version 7. Bump with every added or removed case.
+    static let expectedCaseCount = 48
 
     /// The current version, for the hand-written JSON below.
     static let v = PixelHandProtocol.version
@@ -472,9 +481,9 @@ import Testing
         }
     }
 
-    @Test("Reserved domains decode nothing yet")
-    func reservedDomainsAreRefused() {
-        #expect(throws: ProtocolError.unknownDomain) {
+    @Test("An unknown sharing case is refused")
+    func unknownSharingCaseIsRefused() {
+        #expect(throws: (any Error).self) {
             try ControlMessageCoding.decode(Data(#"{"sharing":{"clipboard":{}},"v":\#(Self.v)}"#.utf8))
         }
     }
