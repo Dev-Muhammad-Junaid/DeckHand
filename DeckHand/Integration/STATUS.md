@@ -554,4 +554,90 @@ Mac should check:
    purchase, trial, restore and the free-tier one-Mac rule.
 4. Then the detailed tables in each `LANE-*.md`.
 
-Status: READY FOR MAC BUILD (build 7)
+## Mac build results (build 7, 2026-11-20)
+
+Built on the owner's Mac (Xcode 27.2, macOS 27) by the new Mac build loop
+session at `b5274b4` + `4abcab8`. Results are for `b2caaf5`.
+
+### Build
+- Mac app: **green** after fixes. iOS app (device and simulator): **green**
+  after fixes.
+- Signed `Apple Development`, team `DD5AWPLT2V`, bundle
+  `com.widgetsflow.pixelhand.mac` / `com.widgetsflow.pixelhand`.
+
+### Fixes pushed (one commit each)
+1. `14b4780` Import Loom where the apps use its types. LoomKit doesn't
+   re-export Loom, so `LoomMultiplexedStream`,
+   `LoomSessionNetworkPathSnapshot`, `LoomOverlaySeed` and
+   `LoomOverlayDirectoryConfiguration` weren't in scope. Mac:
+   `MirrorAudioSubscriber`, `MirrorSubscriber`, `HostLinkMonitor`,
+   `LinkObservation+Loom`. iOS: `LinkObservation+Loom`, `RemoteHostsStore`,
+   `MirrorAudioReceiver`, `MirrorStreamReceiver`.
+2. `509bad5` `LockState.swift`: `import notify` (`notify_register_dispatch`,
+   `notify_get_state`, `NOTIFY_STATUS_OK`).
+3. `7e07efe` `MenuShortcutDiscovery.walkAttributes` is `[String]` instead
+   of `[CFString]` (Swift 6 global-state error; still bridged to `CFArray`).
+4. `6284081` `SubscriptionStore`: `import SwiftUI` for `PurchaseAction`
+   (StoreKit's SwiftUI overlay). Then `StoreKit.Transaction` and
+   `PixelHandCore.SubscriptionRenewalState` are named by module, because
+   SwiftUI made both ambiguous.
+5. `b2caaf5` Loom test: "An initiator pinned to the responder's key
+   completes the handshake" never passed a trust provider to the receiver.
+   A receiver without one asks for approval and denies, so the test failed
+   with `.authenticationFailed` on trust, not on the pin. Both pin tests now
+   pass `pair.serverTrustProvider` (the other 19 handshake tests already
+   do). The pin code itself was right: key ID and public key matched.
+
+### Tests
+- `swift test --package-path DeckHand/Core`: **497 / 497 pass** (87 suites).
+- `swift test --scratch-path .build-local`, nothing skipped: **375 tests**
+  in the main run (365 before + 10 new), plus the smaller runs (13, 10, 5, 9,
+  6, 40, 15), all passing **except one flaky test** (see bugs).
+- `DeckHandTests`: **8 / 8 pass** (3 suites). The rest moved to Core with the
+  foundation split.
+
+### Install
+- Mac: build 7 replaced `/Applications/Pixel Hand.app` (same bundle ID and
+  team, so permissions should carry over) and was launched with `open`. It
+  advertises `_pixelhand._tcp` and listens. The previous build was kept
+  outside the repo on the Mac.
+- iPad Air 11" (M3): installed and launched with `xcrun devicectl`. It
+  starts and advertises `_pixelhand._tcp`.
+
+### Checks done here
+- Mac host launches, advertises on Bonjour, and opens the control and
+  overlay-probe (38450) listeners.
+- iPad Pro 11" (M5) simulator: the app launches to "Looking for your Mac"
+  but **can't start Loom** (bug 1), so no simulator end-to-end pass was
+  possible. The Settings gear didn't respond to two taps in that state. It's
+  unconfirmed whether that comes from the failed start.
+
+### Open bugs for the cloud fix sessions
+1. **iOS app opens Loom's overlay probe listener (port 38450).** Setting
+   `overlayDirectory: RemoteHostsStore.overlayConfiguration` makes LoomKit
+   set `overlayProbePort` on the iOS node, so the client also *listens* on
+   38450. In the Simulator it shares the Mac's network stack with the Mac
+   host, which already holds 38450, so `LoomContext start failed: … NWError
+   48 Address already in use` and discovery never runs. Real devices aren't
+   affected by the clash, but the iPad doesn't need to answer probes either.
+   The fix probably needs a probe-only option in Loom's overlay directory, or
+   no probe listener on the iOS side.
+2. **Flaky Loom test:** "Restarting authenticated advertising closes every
+   previous listener generation" (`LoomNodeAdvertisementTests.swift:199`)
+   fails in full parallel runs (2 of 2) but passes alone (3 of 3). Neither
+   the test nor `LoomNode` changed since the last green run. The likely cause
+   is another test's listener taking the freed ephemeral port before the
+   "can't connect" check.
+
+### Hands-on checks for the owner (build 7)
+Grant permissions again if asked: Accessibility, Screen Recording,
+Automation, Notifications, Local Network; on iPad, Local Network and Photos.
+Then, in order: connect and Allow; pair with the code and reconnect without
+the prompt; trackpad, typing and drag; Mission Control / Show Desktop /
+Launchpad (macOS 27); mirror with HEVC, the pointer, picker, dots, one
+window and audio; lock the Mac and type the password; clipboard; Wired over
+USB-C; Tailscale away from home; the `.storekit` purchase, trial, restore
+and the free-tier one-Mac rule (needs a run from Xcode with the scheme's
+StoreKit config). Then the tables in each `LANE-*.md`.
+
+Status: BUILT (build 7) — 2 bugs
