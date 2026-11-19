@@ -19,12 +19,12 @@ protocol version and exactly one domain key.
 | `system` | `SystemMessage.swift` | Mission Control, Spaces, Show Desktop, Launchpad, Locate; Mac → remote: display/Spaces snapshot, lock state | Mac system control |
 | `apps` | `AppsMessage.swift` | app list, running and frontmost app, dialog context | Mac system control (context side) |
 | `deck` | `DeckMessage.swift` | menu-shortcut import, `run` / `receipt` | deck (later), iOS interaction for now |
-| `mirror` | `MirrorMessage.swift` | mirror start/stop, display list, single-window mirror (S14) | Mirror |
+| `mirror` | `MirrorMessage.swift` | mirror start/stop, display list, single-window mirror (S14), the Mac's sound on/off (S17) | Mirror |
 | `capture` | `CaptureMessage.swift` | screenshots, window list | Mirror |
 | `pairing` | `PairingMessage.swift` | approval handshake; S4 pairing | Pairing |
 | `session` | `SessionMessage.swift` | ping/pong, keep-alive `tick`, `link`, `remoteHosts`, `hostStatus` | Network |
 | `sharing` | `SharingMessage.swift` | clipboard text sync (S10); files later | iOS interaction (S10) |
-| `diagnostics` | `DiagnosticsMessage.swift` | mirror stats both ways (S6) | Mirror |
+| `diagnostics` | `DiagnosticsMessage.swift` | mirror stats both ways (S6), with audio fields (S17) | Mirror |
 
 - Bulk binary data never goes in the envelope. Mirror video and the
   Mac's cursor ride their own Loom stream, `PixelHandStream.mirror`, which
@@ -34,6 +34,11 @@ protocol version and exactly one domain key.
   `ProtocolFeature.binaryMirrorStream` in `HostStatus`. Adding a frame
   kind or changing a payload layout is a protocol change like any other:
   bump the version and add a history line.
+- The Mac's sound (S17) rides a second stream, `PixelHandStream.audio`,
+  which the Mac opens after `mirror.audio(enabled: true)`. Same header;
+  `audioFormat` then `audioPacket` frames (payloads in
+  `Audio/MirrorAudio.swift`), so a 20 ms packet never waits behind a
+  video key frame.
 
 ## Changing the protocol
 
@@ -80,3 +85,4 @@ one case, one key, one decode line.
 | 8 | Persistent pairing (S4): `pairing.submitCode(code:)` (remote → Mac, accepted while the request is pending: the pre-approval gate hands it to the pairing logic), `pairing.codeResult(result: PairingCodeResult)` (`accepted`, `wrongCode(attemptsLeft:)`, `lockedOut(retryAfter:)`, `expired`, `noActiveCode`), `pairing.pairedStatus(paired:)` (Mac → remote, with every grant and on change) and `pairing.forget` (remote → Mac). Trust is keyed on the Loom identity key, never on message content. |
 | 9 | Single-window mirror (S14): `mirror.start` gains `windowID` (optional `CGWindowID`; `nil` mirrors a display); `mirror.displayList` gains `window: MirroredWindow?` (what the stream shows; sent again when the window is resized); `mirror.error` gains `fallbackDisplayID` (optional; set when a mirrored window closed, was minimised, left the screen or the Mac locked, and the mirror carries on with that display instead of stopping). The cursor's fractions and `isOnMirroredDisplay` then refer to the window. Lock gate: a window mirror is refused while locked. |
 | 10 | Remote access over a VPN (S15): `session.remoteHosts(hosts: [String])`, Mac → paired remote only, the Mac's own addresses on tunnel interfaces and Tailscale's ranges (at most 4), for reaching it when Bonjour can't. The remote re-validates each host (`RemoteHost.parse`) and keeps them only for a paired Mac. `session.link` reports `tunnel` for a Tailscale peer address too. Nothing a remote sends changed. |
+| 11 | The Mac's sound while mirroring (S17): `mirror.audio(enabled:)` (remote → Mac; off by default) and `mirror.audioError(message:)` (Mac → remote; the mirror carries on). Audio travels on its own Loom stream, `PixelHandStream.audio` (`pixelhand.audio`), in `BinaryFrameHeader` frames of the new kinds `audioFormat` (7) and `audioPacket` (8) (payloads in `Audio/MirrorAudio.swift`: AAC-LC, or 16-bit PCM when the Mac has no AAC encoder). `MirrorHostStats` and `MirrorClientStats` gain an optional `audio` (packets sent/dropped and data rate; packets received/lost/late, underruns, buffer depth, target and jitter). Lock gate: `audio(enabled: true)` follows `mirror.start` (refused off console). |

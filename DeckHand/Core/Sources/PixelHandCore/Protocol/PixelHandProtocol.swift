@@ -42,7 +42,10 @@ public enum PixelHandProtocol {
     ///   `pairedStatus` and `forget`.
     /// - 9: single-window mirror (S14): `mirror.start` gains `windowID`.
     /// - 10: remote access over a VPN (S15): `session.remoteHosts`.
-    public static let version = 10
+    /// - 11: the Mac's sound while mirroring (S17): `mirror.audio(enabled:)`,
+    ///   `mirror.audioError`, the `audioFormat` / `audioPacket` frames on
+    ///   `PixelHandStream.audio`, audio fields in the mirror stats.
+    public static let version = 11
 
     /// Bonjour TXT key carrying `version`. Short, because TXT keys should
     /// stay under 9 bytes.

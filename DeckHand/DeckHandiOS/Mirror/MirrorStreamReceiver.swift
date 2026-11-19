@@ -161,6 +161,9 @@ struct MirrorStreamReceiver: Sendable {
                         afterDrop: frame.header.flags.contains(.afterDrop),
                         sample: sample
                     ))
+
+                case .audioFormat, .audioPacket:
+                    break // S17: only on PixelHandStream.audio (MirrorAudioReceiver)
                 }
             }
         }

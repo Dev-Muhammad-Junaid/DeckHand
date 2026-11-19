@@ -30,6 +30,8 @@ files=(
   "$app/DeckHandMac/Input/DragGuard.swift"
   "$app/DeckHandMac/Input/TypingQueue.swift"
   "$app/DeckHandMac/Mirror/MirrorSubscriber.swift"
+  "$app/DeckHandMac/Audio/MirrorAudioService.swift"
+  "$app/DeckHandMac/Audio/MirrorAudioSubscriber.swift"
   "$app/DeckHandMac/DeviceAuthorizationManager.swift"
   "$app/DeckHandMac/DeckHandHandshakeTrustProvider.swift"
   "$app/DeckHandMac/Pairing/PairedDeviceStore.swift"
@@ -41,6 +43,7 @@ files=(
   "$app/DeckHandiOS/TrackpadSender.swift"
   "$app/DeckHandiOS/Clipboard/RemoteClipboard.swift"
   "$app/DeckHandiOS/Mirror/MirrorStreamReceiver.swift"
+  "$app/DeckHandiOS/Audio/MirrorAudioReceiver.swift"
   "$app/Shared/LoomConnectionHandle+ControlMessage.swift"
   "$@"
 )

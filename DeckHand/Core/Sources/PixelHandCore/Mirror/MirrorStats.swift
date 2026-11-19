@@ -35,8 +35,10 @@ public struct MirrorHostStats: Codable, Sendable, Equatable {
     public var encodeMilliseconds: Double
     /// Payload sent to this remote.
     public var kilobitsPerSecond: Double
+    /// The Mac's sound to this remote (S17); absent while audio is off.
+    public var audio: MirrorAudioHostStats?
 
-    public init(codec: MirrorCodec, width: Int, height: Int, capturedFPS: Double, sentFPS: Double, droppedFrames: Int, encodeMilliseconds: Double, kilobitsPerSecond: Double) {
+    public init(codec: MirrorCodec, width: Int, height: Int, capturedFPS: Double, sentFPS: Double, droppedFrames: Int, encodeMilliseconds: Double, kilobitsPerSecond: Double, audio: MirrorAudioHostStats? = nil) {
         self.codec = codec
         self.width = width
         self.height = height
@@ -45,6 +47,7 @@ public struct MirrorHostStats: Codable, Sendable, Equatable {
         self.droppedFrames = droppedFrames
         self.encodeMilliseconds = encodeMilliseconds
         self.kilobitsPerSecond = kilobitsPerSecond
+        self.audio = audio
     }
 }
 
@@ -61,13 +64,17 @@ public struct MirrorClientStats: Codable, Sendable, Equatable {
     public var decodeMilliseconds: Double
     /// Payload received.
     public var kilobitsPerSecond: Double
+    /// The Mac's sound on this remote (S17): packets lost and late,
+    /// buffer depth. Absent while audio is off.
+    public var audio: MirrorAudioClientStats?
 
-    public init(receivedFPS: Double, displayedFPS: Double, droppedFrames: Int, decodeMilliseconds: Double, kilobitsPerSecond: Double) {
+    public init(receivedFPS: Double, displayedFPS: Double, droppedFrames: Int, decodeMilliseconds: Double, kilobitsPerSecond: Double, audio: MirrorAudioClientStats? = nil) {
         self.receivedFPS = receivedFPS
         self.displayedFPS = displayedFPS
         self.droppedFrames = droppedFrames
         self.decodeMilliseconds = decodeMilliseconds
         self.kilobitsPerSecond = kilobitsPerSecond
+        self.audio = audio
     }
 
     /// The Mac's check for numbers a remote sent: non-finite becomes 0,
@@ -82,7 +89,8 @@ public struct MirrorClientStats: Codable, Sendable, Equatable {
             displayedFPS: safe(displayedFPS, limit: 1_000),
             droppedFrames: min(max(droppedFrames, 0), 1_000_000),
             decodeMilliseconds: safe(decodeMilliseconds, limit: 60_000),
-            kilobitsPerSecond: safe(kilobitsPerSecond, limit: 10_000_000)
+            kilobitsPerSecond: safe(kilobitsPerSecond, limit: 10_000_000),
+            audio: audio?.sanitized()
         )
     }
 }
@@ -186,7 +194,31 @@ public enum MirrorStatsLine {
             if client.droppedFrames > 0 { remote += ", \(client.droppedFrames) skipped" }
             parts.append(remote)
         }
+        if let audio = audioText(host: host?.audio, client: client?.audio) {
+            parts.append(audio)
+        }
         return parts.isEmpty ? "Waiting for stats…" : parts.joined(separator: " · ")
+    }
+
+    /// S17: `Audio AAC 128 kb/s, 64/60 ms, 2 lost, 1 late, 1 gap`
+    /// (buffered/target delay; gaps are underruns). `nil` while audio is off.
+    static func audioText(host: MirrorAudioHostStats?, client: MirrorAudioClientStats?) -> String? {
+        guard host != nil || client != nil else { return nil }
+        var text = "Audio"
+        if let host {
+            text += " \(host.codec.label) \(rate(host.kilobitsPerSecond))"
+        }
+        var details: [String] = []
+        if let client {
+            details.append("\(Int(client.bufferMilliseconds.rounded()))/\(Int(client.targetMilliseconds.rounded())) ms")
+        }
+        let lost = (client?.packetsLost ?? 0)
+        let dropped = host?.packetsDropped ?? 0
+        if max(lost, dropped) > 0 { details.append("\(max(lost, dropped)) lost") }
+        if let client, client.packetsLate > 0 { details.append("\(client.packetsLate) late") }
+        if let client, client.underruns > 0 { details.append("\(client.underruns) gap\(client.underruns == 1 ? "" : "s")") }
+        if !details.isEmpty { text += (host == nil ? " " : ", ") + details.joined(separator: ", ") }
+        return text
     }
 
     /// One decimal below 10, whole numbers above.

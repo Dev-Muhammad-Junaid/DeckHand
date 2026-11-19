@@ -1,0 +1,1 @@
+{"diagnostics":{"mirrorClientStats":{"stats":{"audio":{"bufferMilliseconds":64.5,"jitterMilliseconds":4.5,"packetsLate":2,"packetsLost":1,"packetsReceived":46,"targetMilliseconds":60,"underruns":1},"decodeMilliseconds":2.5,"displayedFPS":29.5,"droppedFrames":0,"kilobitsPerSecond":4200,"receivedFPS":30}}},"v":11}

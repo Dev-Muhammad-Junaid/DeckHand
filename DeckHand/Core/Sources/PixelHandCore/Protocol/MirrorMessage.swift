@@ -40,6 +40,12 @@ public enum MirrorMessage: Codable, Sendable, Equatable {
     /// sets, soon. The Mac spaces forced key frames out
     /// (`MirrorKeyFramePolicy`). Ignored for a JPEG mirror.
     case requestKeyFrame
+    /// S17: play the Mac's sound on this remote while it mirrors (or stop).
+    /// On: the Mac captures system audio (not Pixel Hand's own) and opens
+    /// `PixelHandStream.audio` towards this remote; off, `stop`, or a
+    /// disconnect closes it. Off by default; refused, like `start`, while
+    /// another user has the Mac's screen.
+    case audio(enabled: Bool)
 
     // MARK: Mac → remote
 
@@ -58,4 +64,8 @@ public enum MirrorMessage: Codable, Sendable, Equatable {
     /// now shows that display. The remote shows `message` as a notice and
     /// keeps the mirror open; a `displayList` follows.
     case error(message: String, fallbackDisplayID: UInt32? = nil)
+    /// S17: the Mac's sound couldn't start or stopped (no audio capture,
+    /// no encoder). The mirror itself carries on; the remote says so near
+    /// the audio setting and stops its player.
+    case audioError(message: String)
 }

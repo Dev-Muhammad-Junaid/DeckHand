@@ -62,6 +62,10 @@ struct MirrorOverlay: View {
         .onChange(of: settings.mirrorPrefersHEVC) {
             session.renegotiateMirror(settings: settings)
         }
+        // S17: the Mac's sound on or off takes effect at once.
+        .onChange(of: settings.mirrorPlaysMacAudio) {
+            session.syncMirrorAudio()
+        }
     }
 }
 

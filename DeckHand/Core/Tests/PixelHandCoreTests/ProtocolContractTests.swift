@@ -161,6 +161,9 @@ import Testing
         ))),
         ("mirror.error", .mirror(.error(message: "Screen Recording is off", fallbackDisplayID: nil))),
         ("mirror.error.windowFallback", .mirror(.error(message: "The Notes window closed. Showing its display instead.", fallbackDisplayID: 1))),
+        ("mirror.audio", .mirror(.audio(enabled: true))),
+        ("mirror.audio.off", .mirror(.audio(enabled: false))),
+        ("mirror.audioError", .mirror(.audioError(message: "The Mac's sound couldn't be captured."))),
         // capture
         ("capture.requestScreenshot", .capture(.requestScreenshot(requestID: "req-1", mode: .fullScreen, quality: .standard))),
         ("capture.requestScreenshot.region", .capture(.requestScreenshot(
@@ -224,12 +227,39 @@ import Testing
             encodeMilliseconds: 6.25,
             kilobitsPerSecond: 1250.5
         )))),
+        ("diagnostics.mirrorStats.audio", .diagnostics(.mirrorStats(stats: MirrorHostStats(
+            codec: .hevc,
+            width: 1440,
+            height: 900,
+            capturedFPS: 30,
+            sentFPS: 30,
+            droppedFrames: 0,
+            encodeMilliseconds: 3.5,
+            kilobitsPerSecond: 4200,
+            audio: MirrorAudioHostStats(codec: .aacLC, packetsSent: 47, packetsDropped: 1, kilobitsPerSecond: 131.5)
+        )))),
         ("diagnostics.mirrorClientStats", .diagnostics(.mirrorClientStats(stats: MirrorClientStats(
             receivedFPS: 19.5,
             displayedFPS: 19,
             droppedFrames: 1,
             decodeMilliseconds: 4.5,
             kilobitsPerSecond: 1250.5
+        )))),
+        ("diagnostics.mirrorClientStats.audio", .diagnostics(.mirrorClientStats(stats: MirrorClientStats(
+            receivedFPS: 30,
+            displayedFPS: 29.5,
+            droppedFrames: 0,
+            decodeMilliseconds: 2.5,
+            kilobitsPerSecond: 4200,
+            audio: MirrorAudioClientStats(
+                packetsReceived: 46,
+                packetsLost: 1,
+                packetsLate: 2,
+                underruns: 1,
+                bufferMilliseconds: 64.5,
+                targetMilliseconds: 60,
+                jitterMilliseconds: 4.5
+            )
         )))),
     ]
 
@@ -282,6 +312,8 @@ import Testing
             case .requestKeyFrame: "mirror.requestKeyFrame"
             case .displayList: "mirror.displayList"
             case .error: "mirror.error"
+            case .audio: "mirror.audio"
+            case .audioError: "mirror.audioError"
             }
         case let .capture(m):
             switch m {
@@ -323,8 +355,8 @@ import Testing
         }
     }
 
-    /// Cases in protocol version 8. Bump with every added or removed case.
-    static let expectedCaseCount = 53
+    /// Cases in protocol version 11. Bump with every added or removed case.
+    static let expectedCaseCount = 55
 
     /// The current version, for the hand-written JSON below.
     static let v = PixelHandProtocol.version

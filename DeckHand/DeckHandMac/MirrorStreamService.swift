@@ -273,6 +273,9 @@ final class MirrorStreamService: NSObject {
     /// subscriber that already left) but doesn't wait for it: the caller is
     /// a connection's cleanup, which must not hang on ScreenCaptureKit.
     func stop(subscriberID: UUID) async {
+        // S17: the Mac's sound stops with the mirror (stop, disconnect,
+        // off console).
+        MirrorAudioService.shared.stop(subscriberID: subscriberID)
         lifecycle.enqueue { [weak self] in
             guard let self,
                   let subscriber = self.subscribers.removeValue(forKey: subscriberID) else { return }
@@ -828,6 +831,7 @@ final class MirrorStreamService: NSObject {
             stats.encodeMilliseconds = capture.encodeMilliseconds
             stats.droppedFrames += capture.droppedFrames
             subscriber.counter.reset()
+            stats.audio = MirrorAudioService.shared.takeStats(subscriberID: subscriber.id, elapsed: seconds)
             lastHostStats[subscriber.id] = stats
             let handle = subscriber.handle
             Task { try? await handle.send(.diagnostics(.mirrorStats(stats: stats))) }

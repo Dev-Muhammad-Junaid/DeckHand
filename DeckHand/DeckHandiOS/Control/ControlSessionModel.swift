@@ -102,6 +102,9 @@ final class ControlSessionModel {
     /// mirror went back to its display), and the task that clears it.
     var mirrorNotice: String?
     @ObservationIgnored var mirrorNoticeTask: Task<Void, Never>?
+    /// S17: plays the Mac's sound (own stream, MirrorAudioReceiver). Logic
+    /// in ControlSessionModel+Audio.swift.
+    @ObservationIgnored let mirrorAudio = MirrorAudioPlayer()
 
     // MARK: Pairing
     // Approval status, the resync poll, pairing codes and "Forget" (S4).
@@ -360,6 +363,9 @@ final class ControlSessionModel {
 
         case let .mirror(.displayList(displays, selectedDisplayID, window)):
             handleMirrorDisplayList(displays, selected: selectedDisplayID, window: window)
+
+        case let .mirror(.audioError(message)):
+            handleMirrorAudioError(message)
 
         case let .diagnostics(.mirrorStats(stats)):
             mirrorHostStats = stats
