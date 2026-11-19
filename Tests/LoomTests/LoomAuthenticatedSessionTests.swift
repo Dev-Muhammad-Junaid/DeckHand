@@ -343,7 +343,8 @@ struct LoomAuthenticatedSessionTests {
         )
         async let serverContext = pair.server.start(
             localHello: pair.serverHello,
-            identityManager: pair.serverIdentityManager
+            identityManager: pair.serverIdentityManager,
+            trustProvider: pair.serverTrustProvider
         )
         let (client, _) = try await (clientContext, serverContext)
 
@@ -376,6 +377,7 @@ struct LoomAuthenticatedSessionTests {
             try await pair.server.start(
                 localHello: pair.serverHello,
                 identityManager: pair.serverIdentityManager,
+                trustProvider: pair.serverTrustProvider,
                 handshakeTimeout: .seconds(3)
             )
         }
