@@ -8,10 +8,16 @@
 //
 //  Send policy, per remote:
 //
-//   • Video: newest-frame-wins. While this remote's previous frame is still
-//     on the wire the next one is dropped (and counted), so a slow link
-//     lowers that remote's frame rate instead of queueing stale frames or
-//     holding up the others.
+//   • JPEG video: newest-frame-wins. While this remote's previous frame is
+//     still on the wire the next one is dropped (and counted), so a slow
+//     link lowers that remote's frame rate instead of queueing stale
+//     frames or holding up the others.
+//   • HEVC video (S5): frames depend on each other, so they go out in
+//     order through one send loop. Deltas are dropped while more than two
+//     sends are un-acked; after a drop everything waits for the next key
+//     frame, which is asked for once the link has room
+//     (`MirrorVideoBackpressure`). A key frame goes with its parameter sets
+//     in one Loom payload.
 //   • Cursor: never dropped behind video. One cursor send is in flight at a
 //     time; a newer position replaces a waiting one.
 //   • Pointer images go once per stream, just before the first position
@@ -30,6 +36,15 @@ final class MirrorSubscriber {
     var cursorThrottle = MirrorCursorThrottle()
     /// This remote's half of the stats window (sent, dropped, bytes).
     var counter = MirrorStatsCounter()
+    /// What this remote asked for in `mirror.start`. Set by the service.
+    var codec: MirrorCodec = .jpeg {
+        didSet {
+            guard codec != oldValue else { return }
+            resetVideo()
+        }
+    }
+    /// Asks the encoder for a key frame (set by the service).
+    var onNeedsKeyFrame: (() -> Void)?
 
     private var stream: LoomMultiplexedStream?
     private var opening: Task<LoomMultiplexedStream?, Never>?
@@ -44,6 +59,12 @@ final class MirrorSubscriber {
     /// The next video frame carries `formatChanged` (new stream, new size).
     private var formatChangedPending = true
     private var loggedSendFailure = false
+
+    // HEVC: one ordered send loop and its backpressure.
+    private var backpressure = MirrorVideoBackpressure()
+    private var videoQueue: [Data] = []
+    private var videoSending = false
+    private var droppedSinceSend = false
 
     init(id: UUID, handle: LoomConnectionHandle) {
         self.id = id
@@ -77,6 +98,7 @@ final class MirrorSubscriber {
             cursorThrottle.reset()
             formatChangedPending = true
             loggedSendFailure = false
+            resetVideo()
         }
         return opened != nil
     }
@@ -90,6 +112,7 @@ final class MirrorSubscriber {
         self.stream = nil
         pendingCursor = nil
         pendingShapes = Data()
+        videoQueue.removeAll()
         try? await stream.close()
     }
 
@@ -131,6 +154,72 @@ final class MirrorSubscriber {
             self?.frameInFlight = false
         }
         return true
+    }
+
+    /// Sends one HEVC frame, or drops it under backpressure. A key frame
+    /// goes with its parameter sets.
+    func sendHEVC(_ frame: MirrorHEVCEncodedFrame) {
+        guard stream != nil else { return }
+        switch backpressure.decide(isKeyFrame: frame.isKeyFrame) {
+        case let .drop(requestKeyFrame):
+            counter.noteDropped()
+            droppedSinceSend = true
+            if requestKeyFrame { onNeedsKeyFrame?() }
+        case .send:
+            var flags: BinaryFrameHeader.Flags = []
+            if droppedSinceSend { flags.insert(.afterDrop) }
+            if frame.isKeyFrame, formatChangedPending {
+                flags.insert(.formatChanged)
+                formatChangedPending = false
+            }
+            droppedSinceSend = false
+            var bytes = Data()
+            if frame.isKeyFrame, let sets = frame.parameterSets {
+                bytes += BinaryFrameHeader.frame(
+                    kind: .hevcParameterSets,
+                    seq: nextSeq(),
+                    presentationTimeMicros: frame.presentationTimeMicros,
+                    payload: sets
+                )
+            }
+            bytes += BinaryFrameHeader.frame(
+                kind: frame.isKeyFrame ? .hevcKeyFrame : .hevcDeltaFrame,
+                flags: flags,
+                seq: nextSeq(),
+                presentationTimeMicros: frame.presentationTimeMicros,
+                payload: frame.payload
+            )
+            counter.noteFrameOut(bytes: bytes.count)
+            videoQueue.append(bytes)
+            pumpVideo()
+        }
+    }
+
+    private func pumpVideo() {
+        guard !videoSending, let stream, !videoQueue.isEmpty else { return }
+        videoSending = true
+        let bytes = videoQueue.removeFirst()
+        Task { @MainActor [weak self] in
+            do {
+                try await stream.send(bytes)
+            } catch {
+                self?.sendFailed(error)
+            }
+            guard let self else { return }
+            self.videoSending = false
+            if self.backpressure.noteAcked() {
+                self.onNeedsKeyFrame?()
+            }
+            self.pumpVideo()
+        }
+    }
+
+    /// A new stream or another codec: start at a key frame.
+    private func resetVideo() {
+        backpressure.reset()
+        videoQueue.removeAll()
+        droppedSinceSend = false
+        formatChangedPending = true
     }
 
     // MARK: Cursor

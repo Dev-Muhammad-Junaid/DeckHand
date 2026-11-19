@@ -6,10 +6,14 @@
 //
 //  Pipeline:
 //
-//    SCStream (GPU-downscaled BGRA, capped fps, no pointer)
-//        → sample-handler queue: CVPixelBuffer → CGImage → JPEG (ImageIO)
-//        → MainActor: one `BinaryFrameHeader` frame per remote, on that
-//          remote's `PixelHandStream.mirror` stream (`MirrorSubscriber`)
+//    SCStream (GPU-downscaled, capped fps, no pointer; BGRA, or NV12
+//    `420v` while an HEVC remote watches)
+//        → sample-handler queue, per codec the remotes asked for:
+//            JPEG: CVPixelBuffer → CGImage → JPEG (ImageIO)
+//            HEVC (S5): CVPixelBuffer → VTCompressionSession
+//              (`Mirror/MirrorHEVCEncoder.swift`)
+//        → MainActor: `BinaryFrameHeader` frames to each remote of that
+//          codec, on its `PixelHandStream.mirror` stream (`MirrorSubscriber`)
 //
 //    60 Hz on the MainActor while streaming:
 //        pointer position and shape (`MirrorCursorSampler`) → each remote,
@@ -22,7 +26,11 @@
 //
 //  Performance / memory invariants:
 //
-//   • LATEST-FRAME-WINS. While a frame is being encoded, new frames are
+//   • HEVC frames depend on each other: they go out in order, and a remote
+//     that falls behind drops deltas until the next key frame
+//     (`MirrorVideoBackpressure`), which the encoder makes on request
+//     (`MirrorKeyFramePolicy`) and every ~2 s anyway.
+//   • LATEST-FRAME-WINS (JPEG). While a frame is being encoded, new frames are
 //     dropped at the top of the sample handler, and a remote whose previous
 //     frame is still on the wire skips the next one. Nothing is queued, so a
 //     slow link lowers that remote's frame rate instead of growing memory
@@ -43,6 +51,7 @@ import ImageIO
 import LoomKit
 @preconcurrency import ScreenCaptureKit
 import UniformTypeIdentifiers
+import VideoToolbox
 
 /// JPEG quality for mirror frames. File-scope so the off-MainActor encoder
 /// can read it without actor hops. 0.5 is the sweet spot for screen
@@ -80,6 +89,11 @@ final class MirrorStreamService: NSObject {
     private var currentDisplayID: CGDirectDisplayID = 0
     private var currentFPS = 20
     private var currentMaxWidth = 640
+    /// The capture's pixel format: NV12 while an HEVC remote watches (the
+    /// encoder's native input), BGRA otherwise.
+    private var currentPixelFormat: OSType = kCVPixelFormatType_32BGRA
+    /// No HEVC encoder could be made on this Mac; every remote gets JPEG.
+    private var hevcUnavailable = false
     /// Size of the frames the capture produces, for the stats.
     private var frameWidth = 0
     private var frameHeight = 0
@@ -134,7 +148,8 @@ final class MirrorStreamService: NSObject {
         handle: LoomConnectionHandle,
         fps: Int,
         maxWidth: Int,
-        displayID: UInt32?
+        displayID: UInt32?,
+        codec: MirrorCodec
     ) async {
         await lifecycle.run { [weak self] in
             await self?.performStart(
@@ -142,9 +157,16 @@ final class MirrorStreamService: NSObject {
                 handle: handle,
                 fps: fps,
                 maxWidth: maxWidth,
-                displayID: displayID
+                displayID: displayID,
+                codec: codec
             )
         }
+    }
+
+    /// A remote's HEVC picture broke (`mirror.requestKeyFrame`).
+    func requestKeyFrame(subscriberID: UUID) {
+        guard subscribers[subscriberID]?.codec == .hevc else { return }
+        output?.requestKeyFrame()
     }
 
     private func performStart(
@@ -152,9 +174,14 @@ final class MirrorStreamService: NSObject {
         handle: LoomConnectionHandle,
         fps: Int,
         maxWidth: Int,
-        displayID: UInt32?
+        displayID: UInt32?,
+        codec: MirrorCodec
     ) async {
         let subscriber = subscribers[subscriberID] ?? MirrorSubscriber(id: subscriberID, handle: handle)
+        // This Mac has no HEVC encoder: JPEG it is (the remote shows what
+        // arrives, and the stats say JPEG).
+        subscriber.codec = hevcUnavailable ? .jpeg : codec
+        subscriber.onNeedsKeyFrame = { [weak self] in self?.output?.requestKeyFrame() }
         guard await subscriber.open() else {
             subscribers.removeValue(forKey: subscriberID)
             try? await handle.send(.mirror(.error(message: "Live mirror unavailable: couldn't open the mirror stream.")))
@@ -169,7 +196,7 @@ final class MirrorStreamService: NSObject {
         let needsNewStream = stream == nil
             || (requestedID != nil && requestedID != currentDisplayID)
         let needsReconfigure = !needsNewStream
-            && (clampedFPS != currentFPS || clampedWidth != currentMaxWidth)
+            && (clampedFPS != currentFPS || clampedWidth != currentMaxWidth || pixelFormat != currentPixelFormat)
         currentFPS = clampedFPS
         currentMaxWidth = clampedWidth
 
@@ -195,6 +222,7 @@ final class MirrorStreamService: NSObject {
         } else if needsReconfigure {
             await reconfigureStream()
         }
+        updateOutputModes()
 
         await sendDisplayList(to: handle)
     }
@@ -214,19 +242,31 @@ final class MirrorStreamService: NSObject {
             await subscriber.close()
             if self.subscribers.isEmpty {
                 await self.teardownStream()
+            } else {
+                self.updateOutputModes()
             }
         }
     }
 
     // MARK: - Stream control
 
+    /// The pixel format the remotes watching now call for.
+    private var pixelFormat: OSType {
+        subscribers.values.contains { $0.codec == .hevc }
+            ? kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+            : kCVPixelFormatType_32BGRA
+    }
+
     private func configuration(for display: SCDisplay, fps: Int, maxWidth: Int) -> SCStreamConfiguration {
         let aspect = CGFloat(display.height) / CGFloat(display.width)
         let config = SCStreamConfiguration()
-        config.width = maxWidth
-        config.height = Int((CGFloat(maxWidth) * aspect).rounded())
+        // Even sizes: HEVC needs them, JPEG doesn't mind.
+        config.width = MirrorVideoBitrate.evenDimension(maxWidth)
+        config.height = MirrorVideoBitrate.evenDimension(Int((CGFloat(maxWidth) * aspect).rounded()))
         config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(fps))
-        config.pixelFormat = kCVPixelFormatType_32BGRA
+        let format = pixelFormat
+        config.pixelFormat = format
+        currentPixelFormat = format
         // Small queue: stale frames are worthless for a live mirror.
         config.queueDepth = 3
         // S3: the remote draws the pointer itself from the cursor updates,
@@ -249,7 +289,7 @@ final class MirrorStreamService: NSObject {
         frameHeight = config.height
         let filter = SCContentFilter(display: display, excludingWindows: [])
 
-        let output = MirrorFrameOutput { [weak self] source, frame in
+        let output = MirrorFrameOutput(fps: fps) { [weak self] source, frame in
             // Called on `sampleQueue` after encode. Hop to the MainActor to
             // hand the frame to each subscriber that's ready, then free the
             // encoder. The flag cleared is the one on the output that made
@@ -259,6 +299,20 @@ final class MirrorStreamService: NSObject {
                 self?.broadcast(frame, from: source)
                 source.finishFrame()
             }
+        } onHEVCFrame: { source, frame in
+            // VideoToolbox's thread. `DispatchQueue.main` keeps encode
+            // order, which HEVC needs (Tasks don't promise it).
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    MirrorStreamService.shared.broadcastHEVC(frame, from: source)
+                }
+            }
+        } onHEVCUnavailable: {
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    MirrorStreamService.shared.handleHEVCUnavailable()
+                }
+            }
         }
 
         let stream = SCStream(filter: filter, configuration: config, delegate: output)
@@ -267,6 +321,7 @@ final class MirrorStreamService: NSObject {
 
         self.stream = stream
         self.output = output
+        updateOutputModes()
         startCursorLoop()
     }
 
@@ -280,6 +335,7 @@ final class MirrorStreamService: NSObject {
             try await stream.updateConfiguration(config)
             frameWidth = config.width
             frameHeight = config.height
+            output?.setFrameRate(currentFPS)
             for subscriber in subscribers.values { subscriber.markFormatChanged() }
             DeckHandLog.app.info("Mirror stream reconfigured (\(self.currentFPS, privacy: .public) fps, \(self.currentMaxWidth, privacy: .public)px)")
         } catch {
@@ -362,12 +418,43 @@ final class MirrorStreamService: NSObject {
     private func broadcast(_ frame: MirrorEncodedFrame, from source: MirrorFrameOutput) {
         // Drop frames from a stream that has since been replaced or stopped.
         guard source === output else { return }
-        captureCounter.noteFrameIn()
+        let hasHEVC = subscribers.values.contains { $0.codec == .hevc }
+        if !hasHEVC { captureCounter.noteFrameIn() } // else counted by broadcastHEVC
         captureCounter.noteWork(seconds: frame.encodeSeconds)
         captureCounter.noteDropped(frame.droppedBefore)
-        for subscriber in subscribers.values {
+        for subscriber in subscribers.values where subscriber.codec == .jpeg {
             subscriber.sendFrame(jpeg: frame.jpeg, presentationTimeMicros: frame.presentationTimeMicros)
         }
+    }
+
+    /// Hands an HEVC frame to every HEVC remote, in encode order.
+    fileprivate func broadcastHEVC(_ frame: MirrorHEVCEncodedFrame, from source: MirrorFrameOutput) {
+        guard source === output else { return }
+        captureCounter.noteFrameIn()
+        captureCounter.noteWork(seconds: frame.encodeSeconds)
+        captureCounter.noteDropped(source.takeHEVCSkippedCount())
+        for subscriber in subscribers.values where subscriber.codec == .hevc {
+            subscriber.sendHEVC(frame)
+        }
+    }
+
+    /// No HEVC encoder on this Mac: switch every HEVC remote to JPEG.
+    fileprivate func handleHEVCUnavailable() {
+        guard !hevcUnavailable else { return }
+        hevcUnavailable = true
+        for subscriber in subscribers.values where subscriber.codec == .hevc {
+            subscriber.codec = .jpeg
+        }
+        updateOutputModes()
+        lifecycle.enqueue { [weak self] in
+            await self?.reconfigureStream() // back to BGRA
+        }
+    }
+
+    /// Tells the frame output which encoders the remotes need.
+    private func updateOutputModes() {
+        let codecs = Set(subscribers.values.map(\.codec))
+        output?.setModes(jpeg: codecs.contains(.jpeg), hevc: codecs.contains(.hevc))
     }
 
     // MARK: - Cursor and stats loop
@@ -422,7 +509,7 @@ final class MirrorStreamService: NSObject {
         let capture = captureCounter.hostStats(codec: .jpeg, width: frameWidth, height: frameHeight, elapsed: seconds)
         captureCounter.reset()
         for subscriber in subscribers.values {
-            var stats = subscriber.counter.hostStats(codec: .jpeg, width: frameWidth, height: frameHeight, elapsed: seconds)
+            var stats = subscriber.counter.hostStats(codec: subscriber.codec, width: frameWidth, height: frameHeight, elapsed: seconds)
             stats.capturedFPS = capture.capturedFPS
             stats.encodeMilliseconds = capture.encodeMilliseconds
             stats.droppedFrames += capture.droppedFrames
@@ -448,9 +535,9 @@ private struct MirrorEncodedFrame: Sendable {
 
 /// Receives frames on the sample-handler queue, encodes, and forwards.
 /// `@unchecked Sendable` because all mutable state is confined to the
-/// sample-handler queue except `busy` and `skipped`, which are
+/// sample-handler queue except `busy`, `skipped` and the modes, which are
 /// lock-protected (`busy` is cleared from the MainActor once the frame is
-/// handed to the senders).
+/// handed to the senders). The HEVC encoder has its own lock.
 private final class MirrorFrameOutput: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
     /// Called with this output and the encoded frame, on the sample queue.
     private let onFrame: (MirrorFrameOutput, MirrorEncodedFrame) -> Void
@@ -458,13 +545,78 @@ private final class MirrorFrameOutput: NSObject, SCStreamOutput, SCStreamDelegat
     private let lock = NSLock()
     private var busy = false
     private var skipped = 0
+    private var wantsJPEG = true
+    private var wantsHEVC = false
+    /// Made on the first HEVC frame, released with this output.
+    private var hevc: MirrorHEVCEncoder?
+    private let hevcLock = NSLock()
+    private var fps: Int
+    private let onHEVCFrame: @Sendable (MirrorFrameOutput, MirrorHEVCEncodedFrame) -> Void
+    private let onHEVCUnavailable: @Sendable () -> Void
 
     /// Reused CIContext — creating one per frame would re-allocate GPU
     /// resources 20× per second.
     private let ciContext = CIContext(options: [.cacheIntermediates: false])
 
-    init(onFrame: @escaping (MirrorFrameOutput, MirrorEncodedFrame) -> Void) {
+    init(
+        fps: Int,
+        onFrame: @escaping (MirrorFrameOutput, MirrorEncodedFrame) -> Void,
+        onHEVCFrame: @escaping @Sendable (MirrorFrameOutput, MirrorHEVCEncodedFrame) -> Void,
+        onHEVCUnavailable: @escaping @Sendable () -> Void
+    ) {
+        self.fps = fps
         self.onFrame = onFrame
+        self.onHEVCFrame = onHEVCFrame
+        self.onHEVCUnavailable = onHEVCUnavailable
+    }
+
+    deinit {
+        hevc?.invalidate()
+    }
+
+    /// Which encoders run for each captured frame.
+    func setModes(jpeg: Bool, hevc: Bool) {
+        lock.lock()
+        wantsJPEG = jpeg
+        wantsHEVC = hevc
+        lock.unlock()
+    }
+
+    func setFrameRate(_ fps: Int) {
+        hevcLock.lock()
+        self.fps = fps
+        let encoder = hevc
+        hevcLock.unlock()
+        encoder?.setFrameRate(fps)
+    }
+
+    func requestKeyFrame() {
+        hevcLock.lock()
+        let encoder = hevc
+        hevcLock.unlock()
+        encoder?.requestKeyFrame()
+    }
+
+    func takeHEVCSkippedCount() -> Int {
+        hevcLock.lock()
+        let encoder = hevc
+        hevcLock.unlock()
+        return encoder?.takeSkippedCount() ?? 0
+    }
+
+    private func hevcEncoder() -> MirrorHEVCEncoder {
+        hevcLock.lock()
+        defer { hevcLock.unlock() }
+        if let hevc { return hevc }
+        let encoder = MirrorHEVCEncoder { [weak self] frame in
+            guard let self else { return }
+            self.onHEVCFrame(self, frame)
+        } onUnavailable: { [onHEVCUnavailable] in
+            onHEVCUnavailable()
+        }
+        encoder.setFrameRate(fps)
+        hevc = encoder
+        return encoder
     }
 
     /// Clears the in-flight flag once the frame has been shipped.
@@ -475,8 +627,22 @@ private final class MirrorFrameOutput: NSObject, SCStreamOutput, SCStreamDelegat
     }
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
-        guard type == .screen else { return }
+        guard type == .screen, Self.isComplete(sampleBuffer) else { return }
 
+        lock.lock()
+        let jpeg = wantsJPEG
+        let hevc = wantsHEVC
+        lock.unlock()
+
+        if hevc, let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) {
+            hevcEncoder().encode(pixelBuffer, presentationTime: CMSampleBufferGetPresentationTimeStamp(sampleBuffer))
+        }
+        if jpeg {
+            encodeJPEG(sampleBuffer)
+        }
+    }
+
+    private func encodeJPEG(_ sampleBuffer: CMSampleBuffer) {
         // Latest-frame-wins: drop everything while a frame is in flight.
         lock.lock()
         if busy {
@@ -513,17 +679,20 @@ private final class MirrorFrameOutput: NSObject, SCStreamOutput, SCStreamDelegat
         }
     }
 
-    /// CVPixelBuffer → CGImage → JPEG. Skips incomplete frames (SCK emits
-    /// status markers for idle/blank ticks that carry no pixels).
-    private static func encode(_ sampleBuffer: CMSampleBuffer, context: CIContext) -> Data? {
-        // Only encode frames marked complete.
+    /// SCK emits status markers for idle/blank ticks that carry no pixels;
+    /// only frames marked complete are encoded.
+    private static func isComplete(_ sampleBuffer: CMSampleBuffer) -> Bool {
         if let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]],
            let statusRaw = attachments.first?[.status] as? Int,
            let status = SCFrameStatus(rawValue: statusRaw),
            status != .complete {
-            return nil
+            return false
         }
+        return true
+    }
 
+    /// CVPixelBuffer (BGRA or NV12) → CGImage → JPEG.
+    private static func encode(_ sampleBuffer: CMSampleBuffer, context: CIContext) -> Data? {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return nil }
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
         guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else { return nil }
