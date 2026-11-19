@@ -11,6 +11,7 @@
 //    display;
 //  - the "Cursor is on <display>" badge, with Bring here / Show;
 //  - the stream stats line (S6), when turned on in Settings;
+//  - the HEVC display layer in place of the JPEG image (S5);
 //  - the desktop dots under the mirror, and ‹ › dimmed or hidden at the
 //    ends of the mirrored display's Spaces (from `system.displayState`).
 //
@@ -48,8 +49,16 @@ struct MirrorOverlay: View {
             bottomAccessory: AnyView(MirrorBottomChrome(session: session)),
             belowAccessory: AnyView(MirrorSpaceDots(strip: strip)),
             previousChevron: strip.previous,
-            nextChevron: strip.next
+            nextChevron: strip.next,
+            videoLayer: session.mirrorShowsVideo
+                ? AnyView(MirrorVideoLayerView(renderer: session.mirrorVideoRenderer))
+                : nil,
+            videoSize: session.mirrorVideoSize
         )
+        // S5: HEVC on or off takes effect at once.
+        .onChange(of: settings.mirrorPrefersHEVC) {
+            session.renegotiateMirror(settings: settings)
+        }
     }
 }
 

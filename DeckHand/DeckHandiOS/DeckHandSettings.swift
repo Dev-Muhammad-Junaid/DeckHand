@@ -35,6 +35,7 @@ final class DeckHandSettings: ObservableObject {
         // MARK: Mirror (lane)
         static let mirrorFollowsCursor = "settings.mirrorFollowsCursor"
         static let showMirrorStats = "settings.showMirrorStats"
+        static let mirrorPrefersHEVC = "settings.mirrorPrefersHEVC"
         static let screenshotQuality = "settings.screenshotQuality"
         static let defaultCapture = "settings.defaultCapture"
         static let autoSaveToPhotos = "settings.autoSaveToPhotos"
@@ -109,6 +110,12 @@ final class DeckHandSettings: ObservableObject {
         didSet { defaults.set(showMirrorStats, forKey: Key.showMirrorStats) }
     }
 
+    /// Streams the mirror as HEVC video when this device can decode it
+    /// (S5); off, or after HEVC failed in a session, JPEG images.
+    @Published var mirrorPrefersHEVC: Bool {
+        didSet { defaults.set(mirrorPrefersHEVC, forKey: Key.mirrorPrefersHEVC) }
+    }
+
     // ── Screenshots ─────────────────────────────────────────────────
     @Published var screenshotQuality: CaptureQuality {
         didSet { defaults.set(screenshotQuality.rawValue, forKey: Key.screenshotQuality) }
@@ -163,6 +170,7 @@ final class DeckHandSettings: ObservableObject {
             .flatMap { try? JSONDecoder().decode(MirrorLayout.self, from: $0) }
         mirrorFollowsCursor = defaults.bool(forKey: Key.mirrorFollowsCursor)
         showMirrorStats = defaults.bool(forKey: Key.showMirrorStats)
+        mirrorPrefersHEVC = defaults.object(forKey: Key.mirrorPrefersHEVC) as? Bool ?? true
 
         screenshotQuality = (defaults.string(forKey: Key.screenshotQuality)
             .flatMap(CaptureQuality.init(rawValue:))) ?? .standard

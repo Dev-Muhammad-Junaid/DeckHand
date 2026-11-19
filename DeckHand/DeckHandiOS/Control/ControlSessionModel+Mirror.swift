@@ -12,7 +12,9 @@
 //    (the badge falls back to the Mac's display snapshot when the cursor
 //    stream hasn't said yet);
 //  - the desktop dots and ‹ › states (`mirrorSpaceStrip`);
-//  - the stats window sent back to the Mac once a second (S6).
+//  - the stats window sent back to the Mac once a second (S6);
+//  - HEVC video (S5): which codec to ask for, feeding the display layer,
+//    and the watchdog (key frame requests, fallback to JPEG).
 //
 
 import LoomKit
@@ -33,13 +35,22 @@ extension ControlSessionModel: MirrorStreamSink {
         await MirrorStreamReceiver(stats: mirrorStatsBox).run(connection: connection, sink: self)
     }
 
-    /// Once a second while the mirror runs: close the stats window, show it
-    /// on the HUD and send it to the Mac for its log line.
+    /// Four times a second, the HEVC watchdog's clock; once a second while
+    /// the mirror runs, close the stats window, show it on the HUD and send
+    /// it to the Mac for its log line.
     func runMirrorStatsLoop() async {
+        mirrorVideoRenderer.onDecodeFailure = { [weak self] in
+            guard let self, self.mirrorShowsVideo || self.isMirrorActive else { return }
+            self.handleWatchdog(self.mirrorWatchdog.decodeFailed(now: CACurrentMediaTime()))
+        }
         var windowStart = ContinuousClock.now
         while !Task.isCancelled {
-            try? await Task.sleep(for: .seconds(MirrorStatsPolicy.reportInterval))
+            try? await Task.sleep(for: .milliseconds(250))
+            if isMirrorActive {
+                handleWatchdog(mirrorWatchdog.tick(now: CACurrentMediaTime()))
+            }
             let elapsed = ContinuousClock.now - windowStart
+            guard elapsed >= .seconds(MirrorStatsPolicy.reportInterval) else { continue }
             windowStart = .now
             let seconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
             let stats = mirrorStatsBox.takeStats(elapsed: seconds)
@@ -53,7 +64,46 @@ extension ControlSessionModel: MirrorStreamSink {
 
     func mirrorDidDecode(_ image: UIImage, header: BinaryFrameHeader) {
         guard isMirrorActive else { return }
+        if mirrorShowsVideo {
+            // The Mac switched this remote to JPEG (fallback, or no encoder).
+            mirrorShowsVideo = false
+            mirrorVideoRenderer.flush()
+        }
         mirrorImage = image
+    }
+
+    func mirrorDidReceiveVideo(_ event: MirrorVideoEvent) {
+        guard isMirrorActive else { return }
+        let now = CACurrentMediaTime()
+        switch event {
+        case let .parameterSets(valid, dimensions):
+            guard valid else {
+                handleWatchdog(mirrorWatchdog.decodeFailed(now: now))
+                return
+            }
+            _ = mirrorWatchdog.frameArrived(.parameterSets, now: now)
+            if let dimensions, mirrorVideoSize != dimensions {
+                mirrorVideoSize = dimensions
+            }
+
+        case let .frame(kind, afterDrop, sample):
+            let verdict = mirrorWatchdog.frameArrived(kind, afterDrop: afterDrop, now: now)
+            handleWatchdog(verdict.action)
+            guard verdict.decode else {
+                mirrorStatsBox.update { $0.noteDropped() }
+                return
+            }
+            guard let sample, mirrorVideoRenderer.enqueue(sample) else {
+                handleWatchdog(mirrorWatchdog.decodeFailed(now: now))
+                return
+            }
+            mirrorWatchdog.frameDisplayed(now: now)
+            mirrorStatsBox.update { $0.noteFrameOut() }
+            if !mirrorShowsVideo {
+                mirrorShowsVideo = true
+                mirrorImage = nil
+            }
+        }
     }
 
     func mirrorCursorDidChange(_ state: MirrorCursorState) {
@@ -118,7 +168,9 @@ extension ControlSessionModel: MirrorStreamSink {
             let fps = settings.mirrorFrameRate.rawValue
             let width = settings.mirrorStreamWidth(naturalWidth: mirrorNaturalWidth)
             let displayID = selectedMirrorDisplayID
-            Task { await sender.startMirror(fps: fps, maxWidth: width, displayID: displayID) }
+            let codec = mirrorRequestedCodec(settings)
+            mirrorLastRequestedCodec = codec
+            Task { await sender.startMirror(fps: fps, maxWidth: width, displayID: displayID, codec: codec) }
         } else {
             clearMirrorState()
             Task { await sender.stopMirror() }
@@ -185,7 +237,39 @@ extension ControlSessionModel: MirrorStreamSink {
         guard let sender, isMirrorActive, let settings = mirrorSettings else { return }
         let fps = settings.mirrorFrameRate.rawValue
         let width = settings.mirrorStreamWidth(naturalWidth: mirrorNaturalWidth)
-        Task { await sender.startMirror(fps: fps, maxWidth: width, displayID: displayID) }
+        let codec = mirrorRequestedCodec(settings)
+        if codec != mirrorLastRequestedCodec {
+            // Another codec: HEVC starts over at the Mac's next key frame.
+            // (No-op after a fallback, which lasts for the session.)
+            mirrorWatchdog.reset(now: CACurrentMediaTime())
+        }
+        mirrorLastRequestedCodec = codec
+        Task { await sender.startMirror(fps: fps, maxWidth: width, displayID: displayID, codec: codec) }
+    }
+
+    /// The codec to ask the Mac for (S5).
+    func mirrorRequestedCodec(_ settings: DeckHandSettings) -> MirrorCodec {
+        MirrorCodecChoice.requested(
+            prefersHEVC: settings.mirrorPrefersHEVC,
+            hevcDecodeAvailable: MirrorVideoRenderer.hevcDecodeAvailable,
+            fellBack: mirrorHEVCFellBack
+        )
+    }
+
+    /// Carries out what the HEVC watchdog decided.
+    func handleWatchdog(_ action: MirrorVideoWatchdog.Action) {
+        switch action {
+        case .none:
+            break
+        case .requestKeyFrame:
+            DeckHandLog.connection.info("Mirror: HEVC picture broken, asking the Mac for a key frame")
+            let connection = connection
+            Task { try? await connection.send(.mirror(.requestKeyFrame)) }
+        case .fallBackToJPEG:
+            DeckHandLog.connection.error("Mirror: HEVC isn't recovering, falling back to JPEG for this session")
+            mirrorHEVCFellBack = true
+            restartMirror(displayID: selectedMirrorDisplayID)
+        }
     }
 
     private func followCursorIfNeeded(_ state: MirrorCursorState) {
@@ -203,6 +287,10 @@ extension ControlSessionModel: MirrorStreamSink {
 
     private func clearMirrorState() {
         mirrorImage = nil
+        mirrorShowsVideo = false
+        mirrorVideoSize = nil
+        mirrorVideoRenderer.flush()
+        mirrorWatchdog = MirrorVideoWatchdog(now: CACurrentMediaTime())
         mirrorCursor = nil
         mirrorCursorDisplayID = nil
         mirrorCursorSprite = nil

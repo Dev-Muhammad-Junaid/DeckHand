@@ -11,7 +11,8 @@
 //
 //  The view is intentionally dumb: frame decode, the cursor and the
 //  start/stop protocol live in `ControlSessionModel+Mirror` and the binary
-//  stream reader. This shows whatever `image` it's handed with the layers
+//  stream reader. This shows whatever `image` (JPEG) or `videoLayer` (HEVC,
+//  S5) it's handed with the layers
 //  `MirrorOverlay` passes in (pointer, display picker, badge, stats), and
 //  reports the stream width its current size warrants.
 //
@@ -48,6 +49,10 @@ struct MirrorThumbnailView: View {
     /// display's Spaces, hidden when it has only one (`MirrorSpaceStrip`).
     var previousChevron: MirrorChevronState = .enabled
     var nextChevron: MirrorChevronState = .enabled
+    /// HEVC video (S5): when set, drawn instead of `image` (the display
+    /// layer), at `videoSize`'s aspect.
+    var videoLayer: AnyView?
+    var videoSize: CGSize?
 
     /// Persisted drag offset (committed at drag end) + live in-drag delta.
     @State private var committedOffset: CGSize = .zero
@@ -90,6 +95,10 @@ struct MirrorThumbnailView: View {
     /// Aspect (height / width) of the streamed frame. Falls back to 16:10
     /// until the first frame lands, matching the placeholder.
     private var frameAspect: CGFloat {
+        if videoLayer != nil {
+            guard let videoSize, videoSize.width > 0 else { return 10.0 / 16.0 }
+            return videoSize.height / videoSize.width
+        }
         guard let image, image.size.width > 0 else { return 10.0 / 16.0 }
         return image.size.height / image.size.width
     }
@@ -193,6 +202,7 @@ struct MirrorThumbnailView: View {
     var body: some View {
         ZStack {
             frameStack
+                .contentShape(Rectangle())
                 .onTapGesture { toggleSize() }
 
             HStack {
@@ -296,7 +306,12 @@ struct MirrorThumbnailView: View {
 
     @ViewBuilder
     private var liveFrame: some View {
-        if let image {
+        if let videoLayer {
+            videoLayer
+                .aspectRatio(1 / frameAspect, contentMode: .fit)
+                .allowsHitTesting(false)
+                .overlay { cursorLayer }
+        } else if let image {
             Image(uiImage: image)
                 .resizable()
                 .aspectRatio(contentMode: .fit)

@@ -143,7 +143,19 @@ func CGGetActiveDisplayList(_ max: UInt32, _ ids: UnsafeMutablePointer<CGDirectD
     func requestKeyFrame(subscriberID: UUID) {}
     var lastHostStats: [UUID: MirrorHostStats] = [:]
 }
-// Mirror/MirrorHEVCEncoder.swift (VideoToolbox) can't build here.
+// iOS Mirror/MirrorHEVCSampleBuilder.swift (CoreMedia) can't build here.
+final class CMSampleBuffer {}
+enum MirrorVideoEvent: @unchecked Sendable {
+    case parameterSets(valid: Bool, dimensions: CGSize?)
+    case frame(kind: MirrorVideoWatchdog.FrameKind, afterDrop: Bool, sample: CMSampleBuffer?)
+}
+final class MirrorHEVCSampleBuilder {
+    var dimensions: CGSize? { nil }
+    func setParameterSets(_ payload: Data) -> Bool { false }
+    func sampleBuffer(payload: Data, isKeyFrame: Bool, presentationTimeMicros: UInt64) -> CMSampleBuffer? { nil }
+}
+
+// Mac Mirror/MirrorHEVCEncoder.swift (VideoToolbox) can't build here.
 struct MirrorHEVCEncodedFrame: Sendable {
     let isKeyFrame: Bool
     let parameterSets: Data?

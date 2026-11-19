@@ -11,10 +11,17 @@
 //  its own task. Every stream is drained to the end even while the mirror
 //  is hidden, so Loom's receive buffer never fills.
 //
-//  Video is newest-frame-wins: the reader drops each JPEG in a one-slot
-//  mailbox and a single decoder takes the newest one, off the main actor.
-//  A slow decode shows fewer frames, never older ones. Cursor updates skip
-//  the mailbox and go straight to the main actor; they are tiny.
+//  JPEG video is newest-frame-wins: the reader drops each JPEG in a
+//  one-slot mailbox and a single decoder takes the newest one, off the
+//  main actor. A slow decode shows fewer frames, never older ones.
+//
+//  HEVC video (S5) can't skip frames: every delta needs the ones before
+//  it. The reader builds a sample buffer per frame
+//  (`MirrorHEVCSampleBuilder`) and hands each, in order, to the main
+//  actor, where the watchdog decides whether it goes to the display layer.
+//
+//  Cursor updates skip the mailbox and go straight to the main actor; they
+//  are tiny.
 //
 
 import Foundation
@@ -27,6 +34,7 @@ protocol MirrorStreamSink: AnyObject, Sendable {
     func mirrorDidDecode(_ image: UIImage, header: BinaryFrameHeader)
     func mirrorCursorDidChange(_ state: MirrorCursorState)
     func mirrorDidReceiveCursorShape(_ shape: MirrorCursorShape, image: UIImage)
+    func mirrorDidReceiveVideo(_ event: MirrorVideoEvent)
 }
 
 /// The remote's half of the stats window, shared by the reader, the decoder
@@ -106,6 +114,7 @@ struct MirrorStreamReceiver: Sendable {
     ) async {
         var reader = BinaryFrameReader()
         var loggedFailure = false
+        let hevc = MirrorHEVCSampleBuilder()
         for await bytes in stream.incomingBytes {
             let frames: [BinaryFrameReader.Frame]
             do {
@@ -135,9 +144,23 @@ struct MirrorStreamReceiver: Sendable {
                           let image = UIImage(data: shape.png) else { continue }
                     await sink.mirrorDidReceiveCursorShape(shape, image: image)
 
-                case .hevcParameterSets, .hevcKeyFrame, .hevcDeltaFrame:
-                    // S5: not sent by this build's Mac.
-                    continue
+                case .hevcParameterSets:
+                    let valid = hevc.setParameterSets(frame.payload)
+                    await sink.mirrorDidReceiveVideo(.parameterSets(valid: valid, dimensions: hevc.dimensions))
+
+                case .hevcKeyFrame, .hevcDeltaFrame:
+                    let isKeyFrame = frame.header.kind == .hevcKeyFrame
+                    stats.update { $0.noteFrameIn(bytes: frame.payload.count) }
+                    let sample = hevc.sampleBuffer(
+                        payload: frame.payload,
+                        isKeyFrame: isKeyFrame,
+                        presentationTimeMicros: frame.header.presentationTimeMicros
+                    )
+                    await sink.mirrorDidReceiveVideo(.frame(
+                        kind: isKeyFrame ? .keyFrame : .deltaFrame,
+                        afterDrop: frame.header.flags.contains(.afterDrop),
+                        sample: sample
+                    ))
                 }
             }
         }

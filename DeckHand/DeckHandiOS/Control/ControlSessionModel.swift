@@ -83,6 +83,17 @@ final class ControlSessionModel {
     /// The settings the mirror was started with (frame rate, sharpness,
     /// Follow cursor). Set by `run(settings:)`.
     @ObservationIgnored weak var mirrorSettings: DeckHandSettings?
+    /// HEVC video (S5): the layer frames are decoded into, whether it (not
+    /// `mirrorImage`) is showing, and the picture size from the parameter
+    /// sets.
+    @ObservationIgnored let mirrorVideoRenderer = MirrorVideoRenderer()
+    var mirrorShowsVideo = false
+    var mirrorVideoSize: CGSize?
+    /// Decides what to decode and when to ask for a key frame or JPEG.
+    @ObservationIgnored var mirrorWatchdog = MirrorVideoWatchdog(now: 0)
+    /// HEVC gave up in this session; the mirror asks for JPEG from now on.
+    @ObservationIgnored var mirrorHEVCFellBack = false
+    @ObservationIgnored var mirrorLastRequestedCodec: MirrorCodec?
 
     /// `true` once any `authorizationStatus` has arrived from the host.
     /// Gates the resync poll below — we stop asking once we've heard
