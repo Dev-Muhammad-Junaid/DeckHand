@@ -100,6 +100,7 @@ func CGPreflightScreenCaptureAccess() -> Bool { true }
 }
 @MainActor final class ContextObserver {
     static let shared = ContextObserver()
+    func contextVisibilityChanged() {}
     func addConnection(_ handle: LoomConnectionHandle, id: UUID) {}
     func removeConnection(id: UUID) {}
     func hasAction(id: String) -> Bool { true }
@@ -107,11 +108,13 @@ func CGPreflightScreenCaptureAccess() -> Bool { true }
 }
 @MainActor final class ActiveAppMonitor {
     static let shared = ActiveAppMonitor()
+    func contextVisibilityChanged() {}
     func addConnection(_ handle: LoomConnectionHandle, id: UUID) {}
     func removeConnection(id: UUID) {}
 }
 @MainActor final class RunningAppMonitor {
     static let shared = RunningAppMonitor()
+    func contextVisibilityChanged() {}
     func addConnection(_ handle: LoomConnectionHandle, id: UUID) {}
     func removeConnection(id: UUID) {}
 }
@@ -142,6 +145,31 @@ enum MenuShortcutDiscovery {
 @MainActor final class SystemActionTrigger {
     static let shared = SystemActionTrigger()
     @discardableResult func run(_ macro: SystemMacro) async -> Bool { true }
+}
+// Mac system control lane
+@MainActor final class SymbolicHotKeys {
+    static let shared = SymbolicHotKeys()
+    @discardableResult func perform(_ action: HotKeyAction) async -> Bool { true }
+}
+@MainActor final class SpacesMonitor {
+    static let shared = SpacesMonitor()
+    func addConnection(_ handle: LoomConnectionHandle, id: UUID) {}
+    func removeConnection(id: UUID) {}
+    func noteCursorActivity() {}
+    func scheduleBroadcast() {}
+    func send(to handle: LoomConnectionHandle) {}
+    func currentLayout() -> DisplayLayout { DisplayLayout(displays: [], cursorDisplayID: nil, spacesKnown: false, separateSpaces: true) }
+}
+@MainActor final class MacLockMonitor {
+    static let shared = MacLockMonitor()
+    private(set) var state: MacLockState = .unlocked
+    var connectionHandles: [UUID: LoomConnectionHandle] { [:] }
+    func addConnection(_ handle: LoomConnectionHandle, id: UUID) {}
+    func removeConnection(id: UUID) {}
+}
+@MainActor final class DisplayWake {
+    static let shared = DisplayWake()
+    func note(_ trigger: DisplayWakeTrigger, lock: MacLockState) {}
 }
 final class NSWorkspace: @unchecked Sendable {
     static let shared = NSWorkspace()

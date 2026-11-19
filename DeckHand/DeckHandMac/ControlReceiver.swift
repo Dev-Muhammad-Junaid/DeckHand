@@ -162,6 +162,9 @@ final class ControlReceiver {
             default:
                 DeckHandLog.connection.debug("📥 dispatching \(String(describing: message), privacy: .public)")
             }
+            // Locked-Mac gate (S8, Mac system control lane): refuses what a
+            // locked Mac mustn't do and answers the remote; see LockGate.
+            guard await LockGate.shared.admit(message, from: connectionHandle) else { continue }
             await handlers.router.route(message, from: connectionHandle)
         }
         let id = connectionHandle.id

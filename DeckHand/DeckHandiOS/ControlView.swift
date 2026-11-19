@@ -70,6 +70,9 @@ struct ControlView: View {
                                 text: "The Mac is missing Accessibility permission — mouse, keyboard, and shortcuts won't work. Fix it in the Mac's menu bar panel."
                             )
                         }
+                        if let lockText = session.macLockState.bannerText(macName: peerName) {
+                            HostCapabilityBanner(text: lockText)
+                        }
                         if session.hostScreenRecordingGranted == false {
                             HostCapabilityBanner(
                                 text: "The Mac is missing Screen Recording permission — screenshots and the live mirror won't work."
