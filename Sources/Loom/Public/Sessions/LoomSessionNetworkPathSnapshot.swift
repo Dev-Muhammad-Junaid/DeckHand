@@ -20,7 +20,16 @@ public enum LoomSessionNetworkPathStatus: String, Sendable, Codable {
 /// Snapshot of the transport path currently used by an authenticated Loom session.
 public struct LoomSessionNetworkPathSnapshot: Sendable, Equatable {
     public let status: LoomSessionNetworkPathStatus
+    /// Names of the path's interfaces, sorted alphabetically.
     public let interfaceNames: [String]
+    /// The path's interfaces in the transport's order of preference, with
+    /// their category and index when the backend reports them.
+    ///
+    /// For an established connection the first entry is the interface
+    /// carrying it; see ``primaryInterface``. Snapshots created from names
+    /// only list each interface with the ``LoomNetworkInterfaceType/other``
+    /// category, in the order given.
+    public let interfaces: [LoomNetworkInterface]
     public let isExpensive: Bool
     public let isConstrained: Bool
     public let supportsIPv4: Bool
@@ -45,6 +54,12 @@ public struct LoomSessionNetworkPathSnapshot: Sendable, Equatable {
     }
 #endif
 
+    /// The interface the transport prefers on this path: for an established
+    /// connection, the one carrying it. `nil` when no interface is reported.
+    public var primaryInterface: LoomNetworkInterface? {
+        interfaces.first
+    }
+
     /// Backend-independent representation of this path snapshot.
     public var backendPath: LoomNetworkPath {
         let backendStatus: LoomNetworkPathStatus = switch status {
@@ -57,9 +72,7 @@ public struct LoomSessionNetworkPathSnapshot: Sendable, Equatable {
         }
         return LoomNetworkPath(
             status: backendStatus,
-            interfaces: interfaceNames.map {
-                LoomNetworkInterface(name: $0, type: .other)
-            },
+            interfaces: interfaces,
             isExpensive: isExpensive,
             isConstrained: isConstrained,
             supportsIPv4: supportsIPv4,
@@ -75,6 +88,10 @@ public struct LoomSessionNetworkPathSnapshot: Sendable, Equatable {
     }
 
     /// Creates a path snapshot without exposing a platform networking type.
+    ///
+    /// - Parameter interfaces: The path's interfaces in order of preference.
+    ///   When `nil`, ``interfaces`` lists `interfaceNames` in the given order
+    ///   with the ``LoomNetworkInterfaceType/other`` category.
     public init(
         status: LoomSessionNetworkPathStatus,
         interfaceNames: [String],
@@ -88,10 +105,14 @@ public struct LoomSessionNetworkPathSnapshot: Sendable, Equatable {
         usesLoopback: Bool,
         usesOther: Bool,
         backendLocalEndpoint: LoomNetworkEndpoint?,
-        backendRemoteEndpoint: LoomNetworkEndpoint?
+        backendRemoteEndpoint: LoomNetworkEndpoint?,
+        interfaces: [LoomNetworkInterface]? = nil
     ) {
         self.status = status
         self.interfaceNames = interfaceNames
+        self.interfaces = interfaces ?? interfaceNames.map {
+            LoomNetworkInterface(name: $0, type: .other)
+        }
         self.isExpensive = isExpensive
         self.isConstrained = isConstrained
         self.supportsIPv4 = supportsIPv4
@@ -107,6 +128,10 @@ public struct LoomSessionNetworkPathSnapshot: Sendable, Equatable {
 
 #if canImport(Network)
     /// Creates a path snapshot using the released Network.framework endpoint API.
+    ///
+    /// - Parameter interfaces: The path's interfaces in order of preference.
+    ///   When `nil`, ``interfaces`` lists `interfaceNames` in the given order
+    ///   with the ``LoomNetworkInterfaceType/other`` category.
     public init(
         status: LoomSessionNetworkPathStatus,
         interfaceNames: [String],
@@ -120,7 +145,8 @@ public struct LoomSessionNetworkPathSnapshot: Sendable, Equatable {
         usesLoopback: Bool,
         usesOther: Bool,
         localEndpoint: NWEndpoint?,
-        remoteEndpoint: NWEndpoint?
+        remoteEndpoint: NWEndpoint?,
+        interfaces: [LoomNetworkInterface]? = nil
     ) {
         self.init(
             status: status,
@@ -135,7 +161,8 @@ public struct LoomSessionNetworkPathSnapshot: Sendable, Equatable {
             usesLoopback: usesLoopback,
             usesOther: usesOther,
             backendLocalEndpoint: localEndpoint.flatMap(LoomNetworkEndpoint.init),
-            backendRemoteEndpoint: remoteEndpoint.flatMap(LoomNetworkEndpoint.init)
+            backendRemoteEndpoint: remoteEndpoint.flatMap(LoomNetworkEndpoint.init),
+            interfaces: interfaces
         )
     }
 #endif
@@ -164,7 +191,8 @@ extension LoomSessionNetworkPathSnapshot {
             usesLoopback: backendPath.usesLoopback,
             usesOther: backendPath.usesOther,
             backendLocalEndpoint: backendPath.localEndpoint,
-            backendRemoteEndpoint: backendPath.remoteEndpoint
+            backendRemoteEndpoint: backendPath.remoteEndpoint,
+            interfaces: backendPath.interfaces
         )
     }
 
@@ -194,7 +222,8 @@ extension LoomSessionNetworkPathSnapshot {
             usesLoopback: path.usesInterfaceType(.loopback),
             usesOther: path.usesInterfaceType(.other),
             localEndpoint: path.localEndpoint,
-            remoteEndpoint: path.remoteEndpoint
+            remoteEndpoint: path.remoteEndpoint,
+            interfaces: path.availableInterfaces.map(LoomNetworkInterface.init)
         )
     }
 #endif

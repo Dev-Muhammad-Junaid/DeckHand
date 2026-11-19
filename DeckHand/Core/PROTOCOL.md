@@ -22,7 +22,7 @@ protocol version and exactly one domain key.
 | `mirror` | `MirrorMessage.swift` | mirror start/stop/frames, display list | Mirror |
 | `capture` | `CaptureMessage.swift` | screenshots, window list | Mirror |
 | `pairing` | `PairingMessage.swift` | approval handshake; S4 pairing | Pairing |
-| `session` | `SessionMessage.swift` | ping/pong, `hostStatus` | Network |
+| `session` | `SessionMessage.swift` | ping/pong, keep-alive `tick`, `link`, `hostStatus` | Network |
 | `sharing` | `SharingMessage.swift` | reserved: clipboard (S10), files | iOS interaction (S10) |
 | `diagnostics` | `DiagnosticsMessage.swift` | reserved: stats (S6) | Mirror (S6) |
 
@@ -68,3 +68,4 @@ one case, one key, one decode line.
 | --- | --- |
 | 1 | The flat `ControlMessage` of builds up to the foundation work: no envelope, no version, never advertised. |
 | 2 | Envelope with `v` and one domain key; messages split into ten domains. `macroButton(id:)` → `system.run(action: SystemMacro)`; `mediaCommand(action: String)` → `input.media(key: MediaKey)`; `authorizationStatus(status: String)` → `pairing.authorizationStatus(state: AuthState)`; `hostCapabilities` + `hostFeatures` → `session.hostStatus`; `tracked`/`commandReceipt` → `deck.run(requestID, Action)` / `deck.receipt(requestID, ActionOutcome)`; mirror errors get `mirror.error` instead of `screenshotError("mirror")`; `startMirror`/`stopMirror`/`mirrorFrame`/`displayListUpdate` → `mirror.start`/`stop`/`frame`/`displayList`. Every field is required (no back-compat defaults). `ph-proto` advertised in Bonjour TXT. |
+| 3 | `session.tick` (remote → Mac, every 0.25 s while in front on a link that dozes; no answer, stamped and dropped by `HeartbeatResponder`) and `session.link(kind: LinkKind)` (Mac → remote, the Mac's link judgement, for example `wired` over a USB cable). Network lane, S1 and S13. |

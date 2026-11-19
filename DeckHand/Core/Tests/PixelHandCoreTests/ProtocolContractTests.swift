@@ -129,6 +129,9 @@ import Testing
         // session
         ("session.ping", .session(.ping(seq: 7))),
         ("session.pong", .session(.pong(seq: 7))),
+        ("session.tick", .session(.tick)),
+        ("session.link", .session(.link(kind: .wired))),
+        ("session.link.wifi", .session(.link(kind: .wifi))),
         ("session.hostStatus", .session(.hostStatus(status: HostStatus(
             accessibility: true,
             screenRecording: false,
@@ -198,6 +201,8 @@ import Testing
             case .ping: "session.ping"
             case .pong: "session.pong"
             case .hostStatus: "session.hostStatus"
+            case .tick: "session.tick"
+            case .link: "session.link"
             }
         case let .sharing(m): reservedCaseName(m)
         case let .diagnostics(m): reservedCaseName(m)
@@ -215,7 +220,7 @@ import Testing
     }
 
     /// Cases in protocol version 2. Bump with every added or removed case.
-    static let expectedCaseCount = 35
+    static let expectedCaseCount = 37
 
     // MARK: - Fixture plumbing
 
@@ -343,7 +348,7 @@ import Testing
 
     @Test("Host status skips feature names this build doesn't know")
     func hostStatusSkipsUnknownFeatures() throws {
-        let json = #"{"session":{"hostStatus":{"status":{"accessibility":true,"features":["commandReceipts","teleport"],"screenRecording":true}}},"v":2}"#
+        let json = #"{"session":{"hostStatus":{"status":{"accessibility":true,"features":["commandReceipts","teleport"],"screenRecording":true}}},"v":\#(PixelHandProtocol.version)}"#
         let decoded = try ControlMessageCoding.decode(Data(json.utf8))
         guard case let .session(.hostStatus(status)) = decoded else {
             Issue.record("decoded \(decoded)")
@@ -382,13 +387,13 @@ import Testing
     @Test("Unknown, missing and multiple domains are refused")
     func badDomainsAreRefused() {
         #expect(throws: ProtocolError.unknownDomain) {
-            try ControlMessageCoding.decode(Data(#"{"selfDestruct":{"now":{}},"v":2}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"selfDestruct":{"now":{}},"v":\#(PixelHandProtocol.version)}"#.utf8))
         }
         #expect(throws: ProtocolError.unknownDomain) {
-            try ControlMessageCoding.decode(Data(#"{"v":2}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"v":\#(PixelHandProtocol.version)}"#.utf8))
         }
         #expect(throws: ProtocolError.multipleDomains(["input", "session"])) {
-            try ControlMessageCoding.decode(Data(#"{"input":{"mouseClick":{"button":"left"}},"session":{"ping":{"seq":1}},"v":2}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"input":{"mouseClick":{"button":"left"}},"session":{"ping":{"seq":1}},"v":\#(PixelHandProtocol.version)}"#.utf8))
         }
         #expect(throws: (any Error).self) {
             try ControlMessageCoding.decode(Data("{}".utf8))
@@ -398,32 +403,32 @@ import Testing
     @Test("Reserved domains decode nothing yet")
     func reservedDomainsAreRefused() {
         #expect(throws: ProtocolError.unknownDomain) {
-            try ControlMessageCoding.decode(Data(#"{"sharing":{"clipboard":{}},"v":2}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"sharing":{"clipboard":{}},"v":\#(PixelHandProtocol.version)}"#.utf8))
         }
         #expect(throws: ProtocolError.unknownDomain) {
-            try ControlMessageCoding.decode(Data(#"{"diagnostics":{"stats":{}},"v":2}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"diagnostics":{"stats":{}},"v":\#(PixelHandProtocol.version)}"#.utf8))
         }
     }
 
     @Test("Unknown cases and missing fields are refused")
     func unknownCasesAreRefused() {
         #expect(throws: (any Error).self) {
-            try ControlMessageCoding.decode(Data(#"{"input":{"selfDestruct":{}},"v":2}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"input":{"selfDestruct":{}},"v":\#(PixelHandProtocol.version)}"#.utf8))
         }
         #expect(throws: (any Error).self) {
-            try ControlMessageCoding.decode(Data(#"{"input":{"mouseDelta":{"dx":1}},"v":2}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"input":{"mouseDelta":{"dx":1}},"v":\#(PixelHandProtocol.version)}"#.utf8))
         }
         #expect(throws: (any Error).self) {
-            try ControlMessageCoding.decode(Data(#"{"input":{"mouseDelta":{"dx":1,"dy":2},"mouseClick":{"button":"left"}},"v":2}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"input":{"mouseDelta":{"dx":1,"dy":2},"mouseClick":{"button":"left"}},"v":\#(PixelHandProtocol.version)}"#.utf8))
         }
         #expect(throws: (any Error).self) {
-            try ControlMessageCoding.decode(Data(#"{"system":{"run":{"action":"selfDestruct"}},"v":2}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"system":{"run":{"action":"selfDestruct"}},"v":\#(PixelHandProtocol.version)}"#.utf8))
         }
     }
 
     @Test("A run can't wrap a message, so runs can't nest")
     func runsCantNest() {
-        let nested = #"{"deck":{"run":{"action":{"deck":{"run":{"action":{"shortcut":{"keys":["a"]}},"requestID":"b"}}},"requestID":"a"}},"v":2}"#
+        let nested = #"{"deck":{"run":{"action":{"deck":{"run":{"action":{"shortcut":{"keys":["a"]}},"requestID":"b"}}},"requestID":"a"}},"v":\#(PixelHandProtocol.version)}"#
         #expect(throws: (any Error).self) { try ControlMessageCoding.decode(Data(nested.utf8)) }
     }
 

@@ -22,7 +22,12 @@
 //    the peer;
 //  - whichever side gives up logs why, with the numbers.
 //
-//  On the wire: `session.ping(seq)` and `session.pong(seq)`.
+//  On the wire: `session.ping(seq)`, `session.pong(seq)`, and the remote's
+//  keep-alive `session.tick` (S1, `KeepAlivePolicy`), which the Mac counts
+//  as a sign of life and drops before its main-actor loop.
+//
+//  Background: the remote stops pinging and ticking when it leaves the
+//  front, and `restart(at:)`s its clock when it comes back.
 //
 
 import Foundation
@@ -70,6 +75,14 @@ public struct LivenessMonitor: Sendable, Equatable {
     public mutating func noteHeartbeat(at now: Date = Date()) {
         noteInbound(at: now)
         lastHeartbeatAt = now
+    }
+
+    /// Starts counting silence again from `now`, as if the peer had just
+    /// spoken and no check had run yet. The remote calls it when it comes
+    /// back to the front, so time spent suspended isn't blamed on the Mac.
+    public mutating func restart(at now: Date = Date()) {
+        lastInboundAt = now
+        lastCheckAt = nil
     }
 
     /// Run periodically by the side doing the checking.
@@ -152,6 +165,11 @@ public final class LivenessClock: @unchecked Sendable {
         monitor.noteHeartbeat(at: now)
     }
 
+    public func restart(at now: Date = Date()) {
+        lock.lock(); defer { lock.unlock() }
+        monitor.restart(at: now)
+    }
+
     public func check(at now: Date = Date()) -> LivenessMonitor.Verdict {
         lock.lock(); defer { lock.unlock() }
         return monitor.check(at: now)
@@ -170,19 +188,36 @@ public enum HeartbeatResponder {
     /// here, so input and other traffic pass through untouched.
     public static let maxPingBytes = 96
 
+    /// A heartbeat-sized message the relay handles itself.
+    public enum Heartbeat: Sendable, Equatable {
+        case ping(seq: UInt64)
+        case tick
+    }
+
+    /// `data` as a ping or a keep-alive tick, or `nil` for anything else.
+    public static func heartbeat(in data: Data) -> Heartbeat? {
+        guard data.count <= maxPingBytes,
+              let message = try? ControlMessageCoding.decode(data)
+        else { return nil }
+        switch message {
+        case let .session(.ping(seq)): return .ping(seq: seq)
+        case .session(.tick): return .tick
+        default: return nil
+        }
+    }
+
     /// The ping's sequence number, if `data` is a ping.
     public static func pingSequence(in data: Data) -> UInt64? {
-        guard data.count <= maxPingBytes,
-              let message = try? ControlMessageCoding.decode(data),
-              case let .session(.ping(seq)) = message
-        else { return nil }
+        guard case let .ping(seq) = heartbeat(in: data) else { return nil }
         return seq
     }
 
     /// Reads `source` off the main actor and republishes it, in order, as
     /// the returned stream. Every message is stamped on `clock`; pings are
     /// also answered at once through `reply` and still passed on, so the
-    /// loop can do its periodic work on them.
+    /// loop can do its periodic work on them. Keep-alive ticks are stamped
+    /// and dropped here: at four a second they would only wake the main
+    /// actor for nothing.
     public static func relay(
         _ source: AsyncStream<Data>,
         clock: LivenessClock,
@@ -191,11 +226,15 @@ public enum HeartbeatResponder {
         let (stream, continuation) = AsyncStream.makeStream(of: Data.self)
         let pump = Task.detached(priority: .userInitiated) {
             for await data in source {
-                if let seq = pingSequence(in: data) {
+                switch heartbeat(in: data) {
+                case let .ping(seq):
                     clock.noteHeartbeat()
                     // Its own task: a slow send must not hold up input.
                     Task.detached(priority: .userInitiated) { await reply(seq) }
-                } else {
+                case .tick:
+                    clock.noteInbound()
+                    continue
+                case nil:
                     clock.noteInbound()
                 }
                 continuation.yield(data)

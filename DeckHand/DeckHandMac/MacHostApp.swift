@@ -52,6 +52,9 @@ final class MacDaemon: ObservableObject {
                     // this provider lets verified identities through so the
                     // app-level Allow / Deny still runs.
                     trustProvider: DeckHandHandshakeTrustProvider(),
+                    // S1: no AWDL. Peer-to-peer Wi-Fi takes the radio off
+                    // channel every half second (p90 ~50 ms instead of ~4 ms).
+                    enablePeerToPeer: false,
                     // `ph-proto` in the Bonjour TXT record, so remotes can
                     // say "Please update" before dialling (PeerCompatibility).
                     advertisementMetadata: PixelHandProtocol.advertisementMetadata,

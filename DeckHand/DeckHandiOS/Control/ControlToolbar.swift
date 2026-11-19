@@ -44,6 +44,7 @@ struct ControlToolbar: ToolbarContent {
                     Text(ApprovalStatusCopy.headerSubtitle(status: authStatus, activeAppName: activeAppName))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+                    RemoteLinkBadge() // Network lane (S13): "Wired" over a USB cable
                 }
                 // Surface the live connection id so the session can be
                 // matched against the Mac and a silent session swap is
