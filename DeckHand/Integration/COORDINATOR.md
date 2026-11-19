@@ -1,6 +1,6 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Mac loop needed:** run `/loop 1h Follow the "Build loop" section in DeckHand/Integration/MAC-BUILD.md on claude/pixelhand-integration` in a Mac session. (Build 3 waited about 14 h with no Mac build; build 4 is now queued and replaces it.)
+> **Mac loop needed:** run `/loop 1h Follow the "Build loop" section in DeckHand/Integration/MAC-BUILD.md on claude/pixelhand-integration` in a Mac session. (Build 3 waited about 14 h with no Mac build. Builds 4 and 5 have been queued since; build 5 replaces both.)
 
 The owner approved the full program (see `DECISIONS.md`). A scheduled cloud
 task starts a fresh coordinator session every 2 hours; it has no memory, so
@@ -14,24 +14,24 @@ weekly usage limit is close).
 | --- | --- | --- | --- |
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac) | session_01H5HwATvLJkqCFPruLyBsX8 | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
-| Lane: Mirror 2 (desktop dots, S5 HEVC; S14 if time) | session_01H5HwARaG2DQsSAmTij3Pjo | claude/pixelhand-lane-mirror-2 | `LANE-mirror-2.md` ends `Lane: READY TO MERGE` |
-| Lane: iOS interaction (typing, drag, S11, S12, S10) | session_01H5HwAUQUjPJwVFTCm2GHwq | claude/pixelhand-lane-ios-interaction | `LANE-ios-interaction.md` ends `Lane: READY TO MERGE` |
-| Lane: Pairing (S4) | session_01H5HwATY2su8kZcgNm19S2Q | claude/pixelhand-lane-pairing | `LANE-pairing.md` ends `Lane: READY TO MERGE` |
+| Lane: Mirror window (S14) | session_01H5HwASxWkoe8622yo4Anmk | claude/pixelhand-lane-mirror-window | `LANE-mirror-window.md` ends `Lane: READY TO MERGE` |
+| Lane: Network VPN (S15) | session_01H5HwAV9xeAp8DZb7gWseyK | claude/pixelhand-lane-network-vpn | `LANE-network-vpn.md` ends `Lane: READY TO MERGE` |
+| Lane: Store (StoreKit 2 + free tier; merge last) | session_01H5HwAVs7ec2swJGq7DGiQh | claude/pixelhand-lane-store | `LANE-store.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
-Merged: Network, Mac system control, Mirror. Running: Mirror 2, iOS
-interaction, Pairing (see Active sessions).
+Merged: Network, Mac system control, Mirror, Mirror 2 (dots + S5),
+iOS interaction, Pairing. Running: Mirror window (S14), Network VPN (S15),
+Store (see Active sessions). Store merges last; if it finishes first, it
+waits and re-merges integration before its merge.
 
-1. Lane: mirror-window (S14), unless Mirror 2 finishes it.
-2. Lane: Store (StoreKit 2 subscription + free tier). Merges last.
-3. Lane: Network S15 VPN remote (after Pairing merges).
-4. Lane: S17 audio.
-5. Roadmap + redesign (after all Sill lanes merged and a green Mac build):
-   design-strategy recommendation (merge `claude/pixelhand-design-strategy`
-   docs first), Deck 2, App Intents/widgets/Control Center, multi-Mac,
-   sharing, AI (on-device first), iPhone Fold two-pane, PiP live screen.
-   S16 virtual display stays deferred.
+1. Lane: S17 audio (Mac system audio → iPad), when a slot frees.
+2. Roadmap + redesign (after all Sill lanes are merged and a Mac build is
+   green): merge the `claude/pixelhand-design-strategy` docs first, take its
+   recommended option; then design system + new layout, Deck 2, App
+   Intents/widgets/Control Center, multi-Mac, sharing between paired devices,
+   AI (on-device first), iPhone Fold two-pane, PiP live screen (backlog on
+   `claude/pixelhand-product-spec`). S16 virtual display stays deferred.
 
 Lanes start only after Foundation is merged. Each lane: own branch from
 `claude/pixelhand-integration`, follows `LANES.md` file ownership,
@@ -56,3 +56,10 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   queued (`2464a70`); it replaces build 3, which was never built. Started
   Mirror 2, iOS interaction and Pairing. Swift 6.2 is installed at
   `/opt/swift-dl` in this container.
+- 2026-11-19 ~13:30 UTC: tick 3. Merged Mirror 2 (`5347488`, protocol 6),
+  iOS interaction (`affbde8`, renumbered to 7) and Pairing (`6341278`,
+  renumbered to 8). Added `NSCameraUsageDescription` (iOS, for QR), and
+  `ControlReceiver` now withholds typed text, clipboard text and pairing codes
+  from the log. Core 368 tests and the Linux type check are green. Build 5
+  queued (`cfa4b0f`), replacing 4. No Mac results yet. Started Mirror window,
+  Network VPN and Store.
