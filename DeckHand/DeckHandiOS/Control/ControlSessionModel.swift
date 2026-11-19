@@ -95,13 +95,24 @@ final class ControlSessionModel {
     @ObservationIgnored var mirrorHEVCFellBack = false
     @ObservationIgnored var mirrorLastRequestedCodec: MirrorCodec?
 
-    /// `true` once any `authorizationStatus` has arrived from the host.
-    /// Gates the resync poll below — we stop asking once we've heard
-    /// anything, because from then on pushes are flowing.
-    @ObservationIgnored private var hasReceivedAuthStatus = false
+    // MARK: Pairing
+    // Approval status, the resync poll, pairing codes and "Forget" (S4).
+    // Logic in ControlSessionModel+Pairing.swift (pairing lane).
+
+    /// `true` once a decisive `authorizationStatus` has arrived from the
+    /// host. Stops the resync poll.
+    @ObservationIgnored var hasReceivedAuthStatus = false
     /// Last status received — keeps a "denied" verdict from being stomped
     /// by a liveness timeout.
     @ObservationIgnored var lastAuthStatus = "pending"
+    /// The Mac as its handshake proved it; `nil` until read (or if Loom
+    /// couldn't verify it).
+    @ObservationIgnored var pairingMac: TrustCandidate?
+    /// Whether the Mac said this device is paired during this session, so
+    /// a later "not paired" reads as the Mac forgetting it.
+    @ObservationIgnored var pairedThisSession = false
+    @ObservationIgnored var pairingTasks: [Task<Void, Never>] = []
+    @ObservationIgnored var pairingSessionToken: UUID?
 
     // MARK: Network
     // Heartbeat, keep-alive tick, background pause and the link judgement.
@@ -166,27 +177,10 @@ final class ControlSessionModel {
         // Then request fresh list from Mac
         Task { await s.requestAppList() }
 
-        // ── Authorization resync poll ───────────────────────────
-        // The host pushes `authorizationStatus`, and the handle's
-        // message stream buffers, so the normal path never loses it.
-        // But the push itself is a network send that can fail — and a
-        // lost `granted` would strand this view on the approval
-        // overlay while the Mac thinks the session is live. Poll
-        // until a DECISIVE status (granted/denied) arrives — NOT the
-        // initial "pending" the host emits before the user decides.
-        // Queries sent while we're still pending sit buffered host-side
-        // (the host only consumes this connection's inbox after it
-        // authorizes) and are all answered "granted" the moment approval
-        // lands, healing any dropped push. Bounded at 20 attempts
-        // (~60 s, past the host's 45 s pending expiry) so the loop
-        // always terminates even if the view outlives a dead connection.
-        Task { [weak self] in
-            for _ in 0..<20 {
-                guard let self, !self.hasReceivedAuthStatus else { break }
-                await s.requestAuthorizationStatus()
-                try? await Task.sleep(for: .seconds(3))
-            }
-        }
+        // ── Pairing: approval resync poll, Mac identity, QR invite ──
+        // See ControlSessionModel+Pairing.swift.
+        startPairing(sender: s)
+        defer { stopPairing() }
 
         // ── Network: heartbeat, keep-alive tick, link ──────────
         // See ControlSessionModel+Network.swift. Structured with this
@@ -290,34 +284,13 @@ final class ControlSessionModel {
             }
 
         case let .pairing(.authorizationStatus(state)):
-            // The UI keeps string states because it adds local ones
-            // ("timed_out", "host_disconnected"); see ApprovalStatusCopy.
-            let status = state.rawValue
-            // Always-on so the pending→granted/denied transition is
-            // visible in Console.app for release/TestFlight, not just
-            // Xcode-attached DEBUG. `decisive` mirrors the resync-poll
-            // gate below.
-            DeckHandLog.connection.info("🔑 iPad authorizationStatus = \(status, privacy: .public) (decisive=\(status != "pending"))")
-            // Only a DECISIVE verdict disarms the resync poll. The
-            // host pushes "pending" the instant the connection lands
-            // (before the user has decided); treating that as "heard
-            // back" used to stop the poll immediately, so if the later
-            // "granted" push was dropped on the wire the iPad sat on
-            // the approval overlay forever. The poll is precisely the
-            // recovery path for a lost push — keep it alive until the
-            // host actually grants or denies.
-            let isFirstGrant = status == "granted" && lastAuthStatus != "granted"
-            if status != "pending" {
-                hasReceivedAuthStatus = true
-            }
-            lastAuthStatus = status
-            onAuthStatusChanged(status)
-            // The host's pre-approval gate drops everything sent
-            // before Allow, including the app-list request made when
-            // this view appeared. Ask again once access is granted.
-            if isFirstGrant, let sender {
-                Task { await sender.requestAppList() }
-            }
+            handleAuthorizationStatus(state)
+
+        case let .pairing(.codeResult(result)):
+            handleCodeResult(result)
+
+        case let .pairing(.pairedStatus(paired)):
+            handlePairedStatus(paired)
 
         case let .apps(.activeAppUpdate(name, bundleID)):
             withAnimation(.easeInOut(duration: 0.2)) {

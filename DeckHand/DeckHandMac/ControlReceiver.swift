@@ -159,6 +159,10 @@ final class ControlReceiver {
                 if inputMessageCount % 120 == 1 {
                     DeckHandLog.input.info("📥 input stream alive (\(self.inputMessageCount) input messages received)")
                 }
+            case .input(.typeText), .sharing, .pairing(.submitCode):
+                // Typed text (a password at the lock screen), clipboard text
+                // and pairing codes never reach the log; only the domain does.
+                DeckHandLog.connection.debug("📥 dispatching a \(message.domain.rawValue, privacy: .public) message (content withheld)")
             default:
                 DeckHandLog.connection.debug("📥 dispatching \(String(describing: message), privacy: .public)")
             }

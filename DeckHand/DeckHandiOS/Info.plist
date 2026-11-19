@@ -49,6 +49,8 @@
     <array>
         <string>_pixelhand._tcp</string>
     </array>
+    <key>NSCameraUsageDescription</key>
+    <string>Pixel Hand uses the camera only to scan the pairing code your Mac shows.</string>
     <key>NSLocalNetworkUsageDescription</key>
     <string>Pixel Hand uses the local network to discover and connect to nearby Macs.</string>
     <key>NSPhotoLibraryUsageDescription</key>

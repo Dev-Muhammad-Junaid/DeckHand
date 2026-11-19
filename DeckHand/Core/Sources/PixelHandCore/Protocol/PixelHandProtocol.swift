@@ -38,7 +38,9 @@ public enum PixelHandProtocol {
     ///   `mirror.requestKeyFrame`; the `hevc*` binary frame kinds are used.
     /// - 7: `input.typeText`, `input.mouseDown` / `mouseUp` (click-drag);
     ///   `sharing` domain for clipboard text.
-    public static let version = 7
+    /// - 8: persistent pairing (S4): `pairing.submitCode`, `codeResult`,
+    ///   `pairedStatus` and `forget`.
+    public static let version = 8
 
     /// Bonjour TXT key carrying `version`. Short, because TXT keys should
     /// stay under 9 bytes.

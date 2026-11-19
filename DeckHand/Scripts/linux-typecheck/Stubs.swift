@@ -18,9 +18,11 @@ public final class LoomMultiplexedStream: @unchecked Sendable {
 }
 public protocol LoomSessionProtocol: Sendable {
     func makeIncomingStreamObserver() -> AsyncStream<LoomMultiplexedStream>
+    var context: LoomAuthenticatedSessionContext? { get async }
 }
 final class StubSession: LoomSessionProtocol {
     func makeIncomingStreamObserver() -> AsyncStream<LoomMultiplexedStream> { AsyncStream { _ in } }
+    var context: LoomAuthenticatedSessionContext? { get async { nil } }
 }
 public actor LoomConnectionHandle {
     public nonisolated let id: UUID = UUID()
@@ -83,6 +85,7 @@ enum DeckHandLog {
     static let input = Logger()
     static let connection = Logger()
     static let app = Logger()
+    static let trust = Logger()
 }
 
 // MARK: Mac services
@@ -248,4 +251,131 @@ final class UIImage: @unchecked Sendable {
 final class UIPasteboard: @unchecked Sendable {
     static let general = UIPasteboard()
     var string: String?
+}
+
+enum TrackpadGestureKind { enum ThreeFingerDirection { case left, right, up, down } }
+
+// MARK: Loom identity and trust (pairing lane)
+public enum DeviceType: String, Codable, Sendable { case mac, iPad, iPhone, vision, unknown }
+public struct LoomPeerIdentity: Sendable, Equatable {
+    public let deviceID: UUID
+    public let name: String
+    public let deviceType: DeviceType
+    public let iCloudUserID: String?
+    public let identityKeyID: String?
+    public let identityPublicKey: Data?
+    public let isIdentityAuthenticated: Bool
+    public let advertisementMetadata: [String: String]
+    public let endpoint: String
+}
+public struct LoomAuthenticatedSessionContext: Sendable, Equatable {
+    public let peerIdentity: LoomPeerIdentity
+}
+public enum LoomTrustDecision: Sendable, Equatable { case trusted, requiresApproval, denied, unavailable(String) }
+public struct LoomTrustEvaluation: Sendable, Equatable {
+    public let decision: LoomTrustDecision
+    public let shouldShowAutoTrustNotice: Bool
+    public init(decision: LoomTrustDecision, shouldShowAutoTrustNotice: Bool) {
+        self.decision = decision
+        self.shouldShowAutoTrustNotice = shouldShowAutoTrustNotice
+    }
+}
+public protocol LoomTrustProvider: AnyObject, Sendable {
+    @MainActor func evaluateTrust(for peer: LoomPeerIdentity) async -> LoomTrustDecision
+    @MainActor func evaluateTrustOutcome(for peer: LoomPeerIdentity) async -> LoomTrustEvaluation
+    @MainActor func grantTrust(to peer: LoomPeerIdentity) async throws
+    @MainActor func revokeTrust(for deviceID: UUID) async throws
+}
+public struct LoomAccountIdentity: Sendable { public let keyID: String; public let publicKey: Data }
+@MainActor public final class LoomIdentityManager {
+    public static let shared = LoomIdentityManager()
+    public func currentIdentity() throws -> LoomAccountIdentity { LoomAccountIdentity(keyID: "", publicKey: Data()) }
+    public nonisolated static func keyID(for publicKey: Data) -> String { "" }
+}
+public enum LoomSharedDeviceID {
+    public static func getOrCreate(suiteName: String? = nil, key: String = "") -> UUID { UUID() }
+}
+public struct LoomPeerID: Codable, Hashable, Sendable {
+    public let deviceID: UUID
+    public init(deviceID: UUID, appID: String? = nil) { self.deviceID = deviceID }
+    public var uuidString: String { deviceID.uuidString }
+}
+public enum LoomTransportKind: String, Sendable { case tcp, udp, quic }
+public struct LoomConnectionSnapshot: Sendable, Identifiable {
+    public enum State: Sendable { case connecting, connected, stale, disconnecting, disconnected, failed, reconnecting }
+    public let id: UUID
+    public let peerID: LoomPeerID
+    public let peerName: String
+    public let state: State
+    public let transportKind: LoomTransportKind
+    public let connectedAt: Date
+    public let lastError: String?
+}
+public struct LoomConnectionDismissal: Sendable, Identifiable {
+    public let id: UUID
+    public let peerID: LoomPeerID
+    public let peerName: String
+}
+@MainActor public final class LoomContext {
+    public private(set) var connections: [LoomConnectionSnapshot] = []
+    public func disconnect(_ connection: LoomConnectionSnapshot) async {}
+}
+
+// MARK: Combine stand-in
+protocol ObservableObject: AnyObject {}
+@propertyWrapper struct Published<Value> {
+    var wrappedValue: Value
+    init(wrappedValue: Value) { self.wrappedValue = wrappedValue }
+}
+
+// MARK: UserNotifications stand-in
+struct UNNotificationActionOptions: OptionSet, Sendable {
+    let rawValue: Int
+    static let foreground = UNNotificationActionOptions(rawValue: 1)
+    static let destructive = UNNotificationActionOptions(rawValue: 2)
+}
+struct UNNotificationCategoryOptions: OptionSet, Sendable { let rawValue: Int }
+struct UNAuthorizationOptions: OptionSet, Sendable {
+    let rawValue: Int
+    static let alert = UNAuthorizationOptions(rawValue: 1)
+    static let sound = UNAuthorizationOptions(rawValue: 2)
+}
+enum UNAuthorizationStatus: Sendable { case notDetermined, denied, authorized, provisional, ephemeral }
+final class UNNotificationSettings: @unchecked Sendable { var authorizationStatus: UNAuthorizationStatus { .authorized } }
+final class UNNotificationAction: @unchecked Sendable {
+    init(identifier: String, title: String, options: UNNotificationActionOptions) {}
+}
+final class UNNotificationCategory: Hashable, @unchecked Sendable {
+    init(identifier: String, actions: [UNNotificationAction], intentIdentifiers: [String], options: UNNotificationCategoryOptions) {}
+    static func == (a: UNNotificationCategory, b: UNNotificationCategory) -> Bool { a === b }
+    func hash(into hasher: inout Hasher) {}
+}
+class UNNotificationContent: @unchecked Sendable { var userInfo: [AnyHashable: Any] = [:] }
+final class UNMutableNotificationContent: UNNotificationContent, @unchecked Sendable {
+    var title = ""
+    var body = ""
+    var sound: UNNotificationSound?
+    var categoryIdentifier = ""
+}
+final class UNNotificationSound: @unchecked Sendable { static let `default` = UNNotificationSound() }
+final class UNNotificationTrigger: @unchecked Sendable {}
+final class UNNotificationRequest: @unchecked Sendable {
+    let content: UNNotificationContent
+    init(identifier: String, content: UNNotificationContent, trigger: UNNotificationTrigger?) { self.content = content }
+}
+final class UNNotification: @unchecked Sendable { var request: UNNotificationRequest { fatalError() } }
+final class UNNotificationResponse: @unchecked Sendable {
+    var actionIdentifier: String { "" }
+    var notification: UNNotification { fatalError() }
+}
+protocol UNUserNotificationCenterDelegate: AnyObject {}
+final class UNUserNotificationCenter: @unchecked Sendable {
+    static func current() -> UNUserNotificationCenter { UNUserNotificationCenter() }
+    weak var delegate: UNUserNotificationCenterDelegate?
+    func setNotificationCategories(_ categories: Set<UNNotificationCategory>) {}
+    func getNotificationSettings(completionHandler: @escaping @Sendable (UNNotificationSettings) -> Void) {}
+    func requestAuthorization(options: UNAuthorizationOptions, completionHandler: @escaping @Sendable (Bool, Error?) -> Void) {}
+    func add(_ request: UNNotificationRequest, withCompletionHandler: (@Sendable (Error?) -> Void)? = nil) {}
+    func removePendingNotificationRequests(withIdentifiers: [String]) {}
+    func removeDeliveredNotifications(withIdentifiers: [String]) {}
 }

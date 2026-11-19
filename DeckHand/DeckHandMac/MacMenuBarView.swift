@@ -175,6 +175,12 @@ struct MacMenuBarView: View {
 
             Divider()
 
+            // ── Pairing (S4) ──────────────────────────────────────────
+            // Pair a Device… (code + QR) and the paired list with Forget.
+            PairingMenuSection()
+
+            Divider()
+
             // ── Permissions ───────────────────────────────────────────
             // Live status per TCC permission — re-checked every 2 s while
             // the panel is open, so toggles flipped in System Settings
@@ -399,7 +405,7 @@ private struct ConnectionRow: View {
                         .font(.system(size: 14))
                 }
                 .buttonStyle(.plain)
-                .help("Remove Authorization & Disconnect")
+                .help("Disconnect and end this session's access. A paired device stays paired; use Forget below.")
             } else {
                 // The icon's mint pixel: this device is live right now.
                 LivePixel(size: 7)
@@ -445,7 +451,8 @@ private struct PendingConnectionRow: View {
                 Spacer(minLength: 0)
             }
 
-            // One decision, no modes: Allow (this session) or Deny. Labelled
+            // Allow (this session) or Deny, or Pair: show a code the device
+            // can enter to connect without asking from now on. Labelled
             // buttons rather than colored circles, so the choice doesn't
             // rest on telling green from red. Their own row, so a long
             // device name never has to share the panel's 270 pt with them.
@@ -456,6 +463,12 @@ private struct PendingConnectionRow: View {
                 }
                 .buttonStyle(.bordered)
                 .help("Deny")
+
+                Button("Pair…") {
+                    authManager.showPairingCode()
+                }
+                .buttonStyle(.bordered)
+                .help("Show a pairing code to enter on the device. Paired devices connect without asking.")
 
                 Button("Allow") {
                     authManager.authorize(connection: connection)

@@ -100,6 +100,11 @@ public enum RemoteInputValidation {
             guard isAcceptable(requestID), sanitize(action.message) == action.message else { return nil }
             return message
 
+        case let .pairing(.submitCode(code)):
+            // Pairing lane (S4): a code is a few digits; the Mac reads it
+            // with PairingCodeWindow, which counts anything invalid as a guess.
+            return code.utf8.count <= PairingCode.maxInputLength ? message : nil
+
         default:
             return message
         }

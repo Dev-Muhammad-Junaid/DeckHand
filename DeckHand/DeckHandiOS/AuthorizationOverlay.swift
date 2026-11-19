@@ -11,6 +11,10 @@ struct AuthorizationOverlay: View {
     let onDisconnect: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
+    /// Pairing (S4): the code sheet, and the live session's pairing state
+    /// (the Mac's answer to a code sent from a scanned QR invite).
+    @State private var isEnteringCode = false
+    private let pairing = PairedMacsStore.shared
 
     /// True when the only sensible action is to dismiss the overlay (the
     /// connection is already gone). Drives both the button label and its
@@ -26,6 +30,9 @@ struct AuthorizationOverlay: View {
 
             VStack(spacing: 22) {
                 statusContent
+                if status == "pending" {
+                    pairingPrompt
+                }
                 disconnectButton
                     .padding(.top, 8)
                     // Approved shows for a moment before the card leaves;
@@ -37,6 +44,42 @@ struct AuthorizationOverlay: View {
             .frame(maxWidth: .infinity)
             .background(cardBackground)
             .padding(.horizontal, 28)
+        }
+        .sheet(isPresented: $isEnteringCode) {
+            PairingCodeEntryView(macName: peerName)
+        }
+    }
+
+    // MARK: - Pairing (S4)
+
+    /// While waiting: pair with the Mac's code instead, so next time there
+    /// is no prompt. Shows the Mac's answer to a code sent from a QR code
+    /// scanned in the picker.
+    @ViewBuilder
+    private var pairingPrompt: some View {
+        VStack(spacing: 10) {
+            if pairing.isAwaitingCodeResult {
+                ProgressView("Pairing…")
+                    .font(DeckHandTheme.TypeStyle.bodyRounded)
+            } else if let notice = pairing.notice {
+                Text(notice)
+                    .font(DeckHandTheme.TypeStyle.bodyRounded)
+                    .foregroundStyle(DeckHandTheme.danger)
+                    .multilineTextAlignment(.center)
+            } else if let result = pairing.lastCodeResult,
+                      let line = ApprovalStatusCopy.codeResult(result, peerName: peerName) {
+                Text(line)
+                    .font(DeckHandTheme.TypeStyle.bodyRounded)
+                    .foregroundStyle(DeckHandTheme.danger)
+                    .multilineTextAlignment(.center)
+            }
+            Button {
+                isEnteringCode = true
+            } label: {
+                Label("Enter Pairing Code", systemImage: "number")
+            }
+            .buttonStyle(.bordered)
+            .disabled(pairing.liveMac == nil || pairing.isAwaitingCodeResult)
         }
     }
 

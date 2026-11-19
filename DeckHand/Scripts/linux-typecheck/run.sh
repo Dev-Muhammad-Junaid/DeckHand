@@ -29,6 +29,11 @@ files=(
   "$app/DeckHandMac/Input/DragGuard.swift"
   "$app/DeckHandMac/Input/TypingQueue.swift"
   "$app/DeckHandMac/Mirror/MirrorSubscriber.swift"
+  "$app/DeckHandMac/DeviceAuthorizationManager.swift"
+  "$app/DeckHandMac/DeckHandHandshakeTrustProvider.swift"
+  "$app/DeckHandMac/Pairing/PairedDeviceStore.swift"
+  "$app/Shared/Pairing+Loom.swift"
+  "$app/DeckHandiOS/Pairing/PairedMacsStore.swift"
   "$app/DeckHandiOS/TrackpadSender.swift"
   "$app/DeckHandiOS/Clipboard/RemoteClipboard.swift"
   "$app/DeckHandiOS/Mirror/MirrorStreamReceiver.swift"
@@ -36,7 +41,7 @@ files=(
   "$@"
 )
 for file in "${files[@]}"; do
-  sed -E '/^import (AppKit|LoomKit|Loom|CoreGraphics|IOKit|os|QuartzCore|SwiftUI|UIKit)$/d' "$file" > "$work/$(basename "$file")"
+  sed -E '/^import (AppKit|Combine|LoomKit|Loom|CoreGraphics|IOKit|os|QuartzCore|SwiftUI|UIKit|UserNotifications)$/d' "$file" > "$work/$(basename "$file")"
 done
 
 cd "$here"
