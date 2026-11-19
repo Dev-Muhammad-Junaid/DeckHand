@@ -187,6 +187,10 @@ public enum LockPolicy {
 
         case let .mirror(m):
             switch m {
+            case let .start(_, _, _, _, windowID?) where windowID != 0:
+                // S14: a window capture draws the window whatever covers
+                // it, the lock screen included (as a window screenshot).
+                return .refuse(reply: .none)
             case .start:
                 // At the lock screen the display shows only the lock
                 // screen. Off console, a capture of this session's display

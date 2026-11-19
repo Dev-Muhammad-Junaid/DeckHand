@@ -26,10 +26,13 @@ public struct MirrorDisplayChrome: Equatable, Sendable {
         displays: [DisplayInfo],
         mirroredDisplayID: UInt32?,
         cursorDisplayID: UInt32?,
-        followsCursor: Bool
+        followsCursor: Bool,
+        mirroringWindow: Bool = false
     ) -> MirrorDisplayChrome {
         var elsewhere: DisplayInfo?
-        if !followsCursor,
+        // S14: a window mirror says whether the pointer is over the
+        // window (the cursor layer), not which display it is on.
+        if !followsCursor, !mirroringWindow,
            let cursorDisplayID, cursorDisplayID != 0,
            let mirroredDisplayID, cursorDisplayID != mirroredDisplayID {
             elsewhere = displays.first { $0.displayID == cursorDisplayID }
