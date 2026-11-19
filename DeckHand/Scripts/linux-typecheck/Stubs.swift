@@ -386,7 +386,13 @@ protocol ObservableObject: AnyObject {}
 @propertyWrapper struct Published<Value> {
     var wrappedValue: Value
     init(wrappedValue: Value) { self.wrappedValue = wrappedValue }
+    var projectedValue: PublishedPublisher<Value> { PublishedPublisher() }
 }
+struct PublishedPublisher<Value> {
+    func dropFirst() -> PublishedPublisher<Value> { self }
+    func sink(receiveValue: @escaping (Value) -> Void) -> AnyCancellable { AnyCancellable() }
+}
+final class AnyCancellable {}
 
 // MARK: UserNotifications stand-in
 struct UNNotificationActionOptions: OptionSet, Sendable {

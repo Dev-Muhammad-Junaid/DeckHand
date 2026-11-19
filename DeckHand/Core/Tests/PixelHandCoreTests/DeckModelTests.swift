@@ -589,3 +589,53 @@ private var sampleDeck: DeckDocument {
         #expect(line.setting(x: 1, y: 2, on: true).setting(x: 2, y: 2, on: true).hasThickStroke)
     }
 }
+
+// MARK: - Store load plan
+
+@Suite struct DeckLoadPlanTests {
+    @Test("A current stored deck loads as it is and isn't rewritten")
+    func storedCurrent() throws {
+        let data = try DeckMigration.encode(sampleDeck)
+        let plan = DeckLoadPlan.make(storedFile: data, legacy: { Issue.record("legacy read"); return .init() })
+        #expect(plan.document == sampleDeck)
+        #expect(plan.source == .stored)
+        #expect(!plan.needsSave)
+        #expect(plan.backupSuffix == nil)
+    }
+
+    @Test("A schema 1 deck is migrated and saved")
+    func storedOld() throws {
+        let plan = DeckLoadPlan.make(storedFile: try DeckFixtures.data("deck.v1.json"), legacy: { .init() })
+        #expect(plan.source == .storedMigrated)
+        #expect(plan.needsSave)
+        #expect(plan.document.pages.first?.kind == .home)
+    }
+
+    @Test("A damaged or newer file is kept aside and the deck rebuilt from the chips")
+    func storedUnusable() throws {
+        let legacy = try DeckFixtures.legacy()
+        let damaged = DeckLoadPlan.make(storedFile: Data("{garbage".utf8), legacy: { legacy })
+        #expect(damaged.source == .replaced(.unreadable))
+        #expect(damaged.backupSuffix == "damaged")
+        #expect(damaged.document == DeckMigration.fromLegacy(legacy))
+        #expect(damaged.needsSave)
+
+        let newer = DeckLoadPlan.make(storedFile: Data(#"{"schemaVersion":7}"#.utf8), legacy: { .init() })
+        #expect(newer.source == .replaced(.newerVersion(7)))
+        #expect(newer.backupSuffix == "schema7")
+        #expect(newer.document == .empty)
+    }
+
+    @Test("First launch: the chips' data, or an empty Home page")
+    func firstLaunch() throws {
+        let legacy = try DeckFixtures.legacy()
+        let migrated = DeckLoadPlan.make(storedFile: nil, legacy: { legacy })
+        #expect(migrated.source == .legacyChips)
+        #expect(migrated.needsSave)
+        #expect(migrated.document.pages.count == 4)
+
+        let fresh = DeckLoadPlan.make(storedFile: nil, legacy: { .init() })
+        #expect(fresh.source == .fresh)
+        #expect(fresh.document == .empty)
+    }
+}

@@ -42,6 +42,8 @@ files=(
   "$app/DeckHandiOS/Network/RemoteConnect.swift"
   "$app/DeckHandiOS/Network/RemoteHostTester.swift"
   "$app/DeckHandiOS/TrackpadSender.swift"
+  "$app/DeckHandiOS/Deck/DeckStore.swift"
+  "$app/DeckHandiOS/ShortcutStore.swift"
   "$app/DeckHandiOS/Clipboard/RemoteClipboard.swift"
   "$app/DeckHandiOS/Mirror/MirrorStreamReceiver.swift"
   "$app/DeckHandiOS/Audio/MirrorAudioReceiver.swift"
