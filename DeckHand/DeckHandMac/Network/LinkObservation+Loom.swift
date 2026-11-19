@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Loom
 import LoomKit
 
 extension LinkObservation {
