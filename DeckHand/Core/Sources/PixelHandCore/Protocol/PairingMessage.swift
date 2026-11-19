@@ -2,10 +2,14 @@
 //  PairingMessage.swift
 //  PixelHandCore
 //
-//  Domain: pairing and trust. Today, the Allow / Deny handshake. Persistent
-//  pairing (S4: code, QR, "Forget device") adds its messages here. Owned by
+//  Domain: pairing and trust. The Allow / Deny handshake, and persistent
+//  pairing (S4): a code typed or scanned on the remote, the Mac's answer,
+//  whether the remote is on the Mac's paired list, and "Forget". Owned by
 //  the pairing lane (`DeviceAuthorizationManager`, `PairingHandler`, the
 //  remote's approval UI).
+//
+//  Trust itself is keyed on the Loom identity key the remote proved in the
+//  handshake (`TrustList`), never on anything carried in these messages.
 //
 
 import Foundation
@@ -18,6 +22,23 @@ public enum PairingMessage: Codable, Sendable, Equatable {
     /// `PreApprovalGate` keeps a few of these while the request is pending
     /// and they are answered right after approval.
     case requestAuthorizationStatus
+    /// Remote → Mac: a pairing code the user typed or scanned. Accepted
+    /// while the request is pending (the gate hands it to the Mac's pairing
+    /// logic instead of dropping it) and once allowed. The Mac answers with
+    /// `codeResult`.
+    case submitCode(code: String)
+    /// Mac → remote: the answer to `submitCode`. On `.accepted` the Mac has
+    /// added this device to its paired list and also sends
+    /// `authorizationStatus(.granted)` and `pairedStatus(paired: true)`.
+    case codeResult(result: PairingCodeResult)
+    /// Mac → remote: whether this device is on the Mac's paired list. Sent
+    /// with every grant and whenever it changes. `false` after a grant that
+    /// was `true` means the Mac forgot this device; the Mac then ends the
+    /// session.
+    case pairedStatus(paired: Bool)
+    /// Remote → Mac: the user chose "Forget" for this Mac. The Mac removes
+    /// this device from its paired list and ends the session.
+    case forget
 }
 
 /// The Mac's decision about a remote.
@@ -25,4 +46,19 @@ public enum AuthState: String, Codable, Sendable, CaseIterable {
     case pending
     case granted
     case denied
+}
+
+/// The Mac's answer to a pairing code (`PairingCodeWindow.verify`).
+public enum PairingCodeResult: Codable, Sendable, Equatable {
+    /// Right code: this device is paired.
+    case accepted
+    /// Wrong code; `attemptsLeft` more before the code is burned.
+    case wrongCode(attemptsLeft: Int)
+    /// Too many wrong codes. The Mac shows no code for `retryAfter` seconds.
+    case lockedOut(retryAfter: Int)
+    /// The code's five minutes ran out. Show a new one on the Mac.
+    case expired
+    /// The Mac isn't showing a code (none issued, already used, or
+    /// cancelled).
+    case noActiveCode
 }

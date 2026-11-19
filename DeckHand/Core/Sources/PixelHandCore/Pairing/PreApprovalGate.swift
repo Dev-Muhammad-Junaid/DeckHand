@@ -12,8 +12,10 @@
 //
 //  Now the gate reads the connection from the moment it arrives. Until
 //  `open()`, it drops everything except a few `requestAuthorizationStatus`
-//  queries (the remote's resync path, answered right after approval). After
-//  `open()`, everything passes through in order.
+//  queries (the remote's resync path, answered right after approval) and a
+//  few `submitCode` messages (S4), which go straight to the Mac's pairing
+//  logic instead of the message loop. After `open()`, everything passes
+//  through in order.
 //
 
 import Foundation
@@ -24,10 +26,26 @@ public struct PreApprovalFilter: Sendable {
     /// Status queries kept while pending. The remote polls about once a
     /// second; one answer after approval is enough, a few cover loss.
     public static let maxHeldStatusQueries = 4
+    /// Pairing codes taken from one pending connection. The Mac's
+    /// `PairingCodeWindow` limits wrong answers across all devices; this
+    /// only stops one connection from flooding it.
+    public static let maxPairingCodesWhilePending = 8
 
     public private(set) var isOpen = false
     public private(set) var droppedCount = 0
     private var heldStatusQueries = 0
+    private var pairingCodesTaken = 0
+
+    /// What happens to one message.
+    public enum Disposition: Equatable, Sendable {
+        /// Pass it to the message loop.
+        case pass
+        /// Drop it.
+        case drop
+        /// A pairing code sent while pending: hand it to the pairing logic,
+        /// not the message loop.
+        case pairingCode(String)
+    }
 
     public init() {}
 
@@ -35,15 +53,25 @@ public struct PreApprovalFilter: Sendable {
         isOpen = true
     }
 
-    /// Whether `data` should reach the message loop.
+    /// Whether `data` should reach the message loop. A pairing code sent
+    /// while pending doesn't (see `take(_:)`).
     public mutating func admit(_ data: Data) -> Bool {
-        if isOpen { return true }
+        take(data) == .pass
+    }
+
+    /// Decides one message.
+    public mutating func take(_ data: Data) -> Disposition {
+        if isOpen { return .pass }
         if heldStatusQueries < Self.maxHeldStatusQueries, Self.isStatusQuery(data) {
             heldStatusQueries += 1
-            return true
+            return .pass
+        }
+        if pairingCodesTaken < Self.maxPairingCodesWhilePending, let code = Self.pairingCode(in: data) {
+            pairingCodesTaken += 1
+            return .pairingCode(code)
         }
         droppedCount += 1
-        return false
+        return .drop
     }
 
     public static func isStatusQuery(_ data: Data) -> Bool {
@@ -53,6 +81,18 @@ public struct PreApprovalFilter: Sendable {
         }
         if case .pairing(.requestAuthorizationStatus) = message { return true }
         return false
+    }
+
+    /// The code in a `pairing.submitCode` message, or `nil` for anything
+    /// else (including a code longer than `PairingCode.maxInputLength`).
+    public static func pairingCode(in data: Data) -> String? {
+        guard data.count <= 256,
+              let message = try? ControlMessageCoding.decode(data),
+              case let .pairing(.submitCode(code)) = message,
+              code.utf8.count <= PairingCode.maxInputLength else {
+            return nil
+        }
+        return code
     }
 }
 
@@ -64,7 +104,11 @@ public final class PreApprovalGate: @unchecked Sendable {
     public let messages: AsyncStream<Data>
     private let state: State
 
-    public init(source: AsyncStream<Data>) {
+    /// - Parameters:
+    ///   - source: The connection's inbound messages.
+    ///   - onPairingCode: Called (off the main actor, in arrival order) with
+    ///     each pairing code the remote sends while pending.
+    public init(source: AsyncStream<Data>, onPairingCode: (@Sendable (String) -> Void)? = nil) {
         let (messages, continuation) = AsyncStream.makeStream(of: Data.self)
         let state = State()
         self.messages = messages
@@ -73,8 +117,13 @@ public final class PreApprovalGate: @unchecked Sendable {
         // running after the gate itself is released at approval time.
         let pump = Task {
             for await data in source {
-                if state.admit(data) {
+                switch state.take(data) {
+                case .pass:
                     continuation.yield(data)
+                case let .pairingCode(code):
+                    onPairingCode?(code)
+                case .drop:
+                    break
                 }
             }
             continuation.finish()
@@ -99,10 +148,10 @@ public final class PreApprovalGate: @unchecked Sendable {
         private let lock = NSLock()
         private var filter = PreApprovalFilter()
 
-        func admit(_ data: Data) -> Bool {
+        func take(_ data: Data) -> PreApprovalFilter.Disposition {
             lock.lock()
             defer { lock.unlock() }
-            return filter.admit(data)
+            return filter.take(data)
         }
 
         func open() {
