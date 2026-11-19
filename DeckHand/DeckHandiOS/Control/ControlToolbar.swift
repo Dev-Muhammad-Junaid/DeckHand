@@ -24,6 +24,8 @@ struct ControlToolbar: ToolbarContent {
     let onOCR: () -> Void
     let onPrimaryCapture: () -> Void
     let onSettings: () -> Void
+    /// Switches to the Pixel Hand shell.
+    var onNewLayout: (() -> Void)?
     let onDisconnect: () -> Void
 
     var body: some ToolbarContent {
@@ -93,6 +95,14 @@ struct ControlToolbar: ToolbarContent {
                 Image(systemName: "gearshape")
             }
             .accessibilityLabel("Settings")
+        }
+        if let onNewLayout {
+            ToolbarItem(placement: .topBarLeading) {
+                Button(action: onNewLayout) {
+                    Image(systemName: "square.grid.2x2")
+                }
+                .accessibilityLabel("Use the new layout")
+            }
         }
         ToolbarItem(placement: .topBarTrailing) {
             Button(action: onDisconnect) {

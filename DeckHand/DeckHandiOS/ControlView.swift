@@ -2,10 +2,12 @@
 //  ControlView.swift
 //  DeckHandiOS
 //
-//  The control screen for one connected Mac: tabs, the floating mirror,
-//  the toolbar and the capture sheets. Connection state and the message
-//  loop live in `ControlSessionModel` (Control/), captures in
-//  `CaptureCoordinator`.
+//  The control screen for one connected Mac. Owns the session, the sheets
+//  and the session's lifetime, and shows either the Pixel Hand shell
+//  (`Shell/PixelHandShell.swift`, the default) or the classic layout (tabs,
+//  floating mirror, navigation toolbar), switched from each one's menu.
+//  Connection state and the message loop live in `ControlSessionModel`
+//  (Control/), captures in `CaptureCoordinator`.
 //
 
 import LoomKit
@@ -24,6 +26,9 @@ struct ControlView: View {
     @State private var selectedTab: Tab = .trackpad
     @State private var isSettingsPresented = false
     @State private var session: ControlSessionModel
+    /// The redesign's shell is the default; the classic layout stays one
+    /// tap away while the other lanes restyle their surfaces.
+    @AppStorage("pixelhand.usesPixelHandShell") private var usesPixelHandShell = true
 
     init(
         connection: LoomConnectionHandle,
@@ -56,6 +61,39 @@ struct ControlView: View {
     }
 
     var body: some View {
+        Group {
+            if usesPixelHandShell {
+                PixelHandShell(
+                    session: session,
+                    peerName: peerName,
+                    authStatus: authStatus,
+                    onSettings: { isSettingsPresented = true },
+                    onClassicLayout: { usesPixelHandShell = false },
+                    onDisconnect: onDisconnect
+                )
+            } else {
+                classicLayout
+            }
+        }
+        .sheet(isPresented: $isSettingsPresented) {
+            SettingsView()
+        }
+        // Mirror settings only take effect on the next stream, so a change
+        // made while the mirror is up has to restart it.
+        .onChange(of: settings.mirrorSharpness) { session.renegotiateMirror(settings: settings) }
+        .onChange(of: settings.mirrorFrameRate) { session.renegotiateMirror(settings: settings) }
+        .onChange(of: settings.inputSendRate) { _, rate in
+            Task { await session.sender?.setSendRate(hz: rate.rawValue) }
+        }
+        .modifier(ControlCaptureSheets(capture: session.capture, runningBundleIDs: session.runningBundleIDs))
+        .task {
+            await session.run(settings: settings)
+        }
+    }
+
+    // MARK: - Classic layout
+
+    private var classicLayout: some View {
         NavigationStack {
             ZStack {
                 DeckHandTheme.canvasBackground(colorScheme).ignoresSafeArea()
@@ -149,23 +187,10 @@ struct ControlView: View {
                     onOCR: { session.capture.beginCapture(intent: .ocr, mode: .fullScreen, quality: settings.screenshotQuality) },
                     onPrimaryCapture: { session.capture.beginDefaultCapture(settings: settings) },
                     onSettings: { isSettingsPresented = true },
+                    onNewLayout: { usesPixelHandShell = true },
                     onDisconnect: onDisconnect
                 )
             }
-        }
-        .sheet(isPresented: $isSettingsPresented) {
-            SettingsView()
-        }
-        // Mirror settings only take effect on the next stream, so a change
-        // made while the mirror is up has to restart it.
-        .onChange(of: settings.mirrorSharpness) { session.renegotiateMirror(settings: settings) }
-        .onChange(of: settings.mirrorFrameRate) { session.renegotiateMirror(settings: settings) }
-        .onChange(of: settings.inputSendRate) { _, rate in
-            Task { await session.sender?.setSendRate(hz: rate.rawValue) }
-        }
-        .modifier(ControlCaptureSheets(capture: session.capture, runningBundleIDs: session.runningBundleIDs))
-        .task {
-            await session.run(settings: settings)
         }
     }
 

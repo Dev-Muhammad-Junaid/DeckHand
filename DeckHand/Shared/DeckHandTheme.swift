@@ -71,113 +71,29 @@ extension Color {
     }
 }
 
-// MARK: - Pixel Hand design tokens
+// MARK: - Legacy tokens (forwarding shim)
 
-/// Every brand color comes from a part of the app icon: a cobalt tile, a
-/// navy screen, and a pointing hand drawn in lit dots. The roles are fixed so
-/// a color always means the same thing:
-///
-/// - **Cobalt** (`accent`) is the one action color: buttons, selection, tint.
-/// - **Glow** (cyan) is live activity with the Mac: searching, connecting,
-///   touches on the trackpad, the cursor locator.
-/// - **Mint** (`success`) is connected and approved.
-/// - **Pixel violet** is the hand's fill and appears only inside dot art.
-///
-/// The master artwork is `website/brand/concept-b2-ipad.svg`; the website's
-/// `styles.css` uses the same values.
+/// **Deprecated: use `PixelHandTheme`.** Kept as a forwarding shim (UX-001)
+/// so existing views compile and pick up the new tokens until each lane
+/// restyles its views; removed in UX-014. Every value here now comes from
+/// `PixelHandTheme`, so the whole app already wears the new palette: the
+/// navy-biased dark canvas, raised cards, hairlines and Dynamic Type roles.
 enum DeckHandTheme {
 
     // MARK: Accent and status
 
-    /// The action color. Matches `AccentColor` in both asset catalogs; use
-    /// this where a view needs the brand cobalt explicitly (fills behind white
-    /// text, selection rings). Light: 6.0:1 against white. Dark: lifted to
-    /// about 4.4:1 both as text on the dark canvas and behind white text,
-    /// the most one color can manage both ways.
-    static let accent = Color(light: "3A4CF2", dark: "5466FF")
+    static var accent: Color { PixelHandTheme.accent }
+    static var mint: Color { PixelHandTheme.success }
+    static var success: Color { PixelHandTheme.success }
+    static var warning: Color { PixelHandTheme.warning }
+    static var danger: Color { PixelHandTheme.danger }
 
-    /// The icon's mint pixel in dark mode, a deep teal in light mode so it
-    /// still reads on white.
-    static let mint = Color(light: "0B7A6C", dark: "3DE0B0")
+    // MARK: Brand surface
 
-    /// Connected / live / approved status — use everywhere instead of `Color.green`.
-    static let success = mint
-    /// Cautionary / pending status — use instead of bare `Color.orange`
-    /// (host-disconnected overlay, missing permissions, requests waiting on
-    /// the Mac).
-    static let warning = Color(light: "A35F00", dark: "FFB547")
-    /// Negative / blocked status — use instead of bare `Color.red`
-    /// (denied overlay, disconnect and remove buttons, destructive accents).
-    static let danger = Color(light: "D92D3F", dark: "FF4D5E")
+    typealias Brand = PixelHandTheme.Brand
 
-    // MARK: Brand surface (sampled from the app icon)
-
-    /// Fixed colors from the icon itself. These don't adapt to appearance:
-    /// they're used on surfaces that are always dark (first run, the picker,
-    /// the trackpad) and in the mark's artwork.
-    enum Brand {
-        /// The icon's tile: the action color at full strength.
-        static let cobalt = Color(hex: "3A4CF2")
-        /// Cobalt lifted for hover, dark backgrounds and gradient tops.
-        static let cobaltHigh = Color(hex: "5466FF")
-        /// The pale top of the icon's tile gradient.
-        static let sky = Color(hex: "86B4FF")
-
-        /// Base canvas — the icon's screen glass, navy rather than neutral black.
-        static let screen = Color(hex: "060A2A")
-        /// The lit center of the screen glass.
-        static let screenHigh = Color(hex: "1C2C80")
-        /// Cards and tiles sitting on `screen`.
-        static let screenRaised = Color(hex: "0E1540")
-
-        /// A lit dot.
-        static let phosphor = Color(hex: "EFFFFC")
-        /// The cyan bloom around lit dots. Live activity with the Mac.
-        static let glow = Color(hex: "3DE0E0")
-        /// The tap rays above the fingertip.
-        static let ray = Color(hex: "9FF6FF")
-        /// The hand's fill. Dot art only, never a control.
-        static let pixelViolet = Color(hex: "8E70FF")
-        /// The mint pixel in the top-right of the screen.
-        static let mint = Color(hex: "3DE0B0")
-        /// An unlit dot.
-        static let dotOff = Color(hex: "2B3C99").opacity(0.5)
-
-        /// Hairline stroke on cards sitting on `screen`.
-        static let tileStroke = Color.white.opacity(0.09)
-
-        /// The icon's tile, for symbols and accents on dark brand surfaces.
-        static var tileGradient: LinearGradient {
-            LinearGradient(
-                colors: [sky, cobaltHigh],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        }
-
-        /// Primary buttons on dark brand surfaces. Both stops keep white
-        /// text above 4.4:1.
-        static var actionGradient: LinearGradient {
-            LinearGradient(
-                colors: [cobaltHigh, cobalt],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        }
-
-        /// Cards and tiles on the brand background.
-        static var screenGradient: LinearGradient {
-            LinearGradient(
-                colors: [screenRaised, screen],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        }
-    }
-
-    /// Full-bleed brand background: the icon's navy screen with its two light
-    /// sources — a cobalt bloom just above center and the mint pixel's cast
-    /// in the top-right corner.
+    /// Full-bleed brand background: the icon's navy screen with a cobalt
+    /// bloom just above centre and the mint pixel's cast top-trailing.
     static func brandBackground() -> some View {
         ZStack {
             Brand.screen
@@ -196,145 +112,69 @@ enum DeckHandTheme {
         }
     }
 
+    /// Old radius names mapped onto the concentric scale by role.
     enum Radius {
-        static let sm: CGFloat = 12
-        static let md: CGFloat = 14
-        static let lg: CGFloat = 18
-        static let xl: CGFloat = 20
-        static let xxl: CGFloat = 24
-        static let hero: CGFloat = 28
+        static let sm: CGFloat = PixelHandTheme.Radius.kbd + 4
+        static let md: CGFloat = PixelHandTheme.Radius.chip
+        static let lg: CGFloat = PixelHandTheme.Radius.key
+        static let xl: CGFloat = PixelHandTheme.Radius.key
+        static let xxl: CGFloat = PixelHandTheme.Radius.card
+        static let hero: CGFloat = PixelHandTheme.Radius.pane
     }
 
-    // MARK: Surfaces (iOS shell + shared semantics)
+    // MARK: Surfaces
 
     static func canvasBackground(_ scheme: ColorScheme) -> Color {
-        switch scheme {
-        case .dark:
-            return Color(hex: "0A0A0F")
-        case .light:
-            #if os(iOS)
-            return Color(UIColor.systemGroupedBackground)
-            #elseif os(macOS)
-            return Color(nsColor: .windowBackgroundColor)
-            #else
-            return Color(white: 0.95)
-            #endif
-        @unknown default:
-            return Color(hex: "0A0A0F")
-        }
+        PixelHandTheme.color(PaletteTokens.canvas, for: scheme)
     }
 
     static func cardFill(_ scheme: ColorScheme, pressed: Bool = false) -> Color {
-        switch scheme {
-        case .dark:
-            return .white.opacity(pressed ? 0.12 : 0.07)
-        case .light:
-            #if os(iOS)
-            return Color(UIColor.systemBackground).opacity(pressed ? 0.9 : 1.0)
-            #elseif os(macOS)
-            return Color(nsColor: .controlBackgroundColor)
-            #else
-            return Color(white: 1)
-            #endif
-        @unknown default:
-            return .white.opacity(0.07)
-        }
+        PixelHandTheme.color(pressed ? PaletteTokens.fill2 : PaletteTokens.raised, for: scheme)
     }
 
     static func cardBorder(_ scheme: ColorScheme) -> Color {
-        switch scheme {
-        case .dark: return .white.opacity(0.1)
-        case .light: return Color.primary.opacity(0.08)
-        @unknown default: return .white.opacity(0.1)
-        }
+        PixelHandTheme.color(PaletteTokens.hairline, for: scheme)
     }
 
     static func navDivider(_ scheme: ColorScheme) -> Color {
-        switch scheme {
-        case .dark: return .white.opacity(0.07)
-        case .light: return Color.primary.opacity(0.08)
-        @unknown default: return .white.opacity(0.07)
-        }
+        PixelHandTheme.color(PaletteTokens.hairline, for: scheme)
     }
 
     static func tabContainerFill(_ scheme: ColorScheme) -> Color {
-        switch scheme {
-        case .dark: return .white.opacity(0.06)
-        case .light:
-            #if os(iOS)
-            return Color(UIColor.systemFill)
-            #elseif os(macOS)
-            return Color(nsColor: .controlBackgroundColor).opacity(0.65)
-            #else
-            return Color(white: 0.9)
-            #endif
-        @unknown default:
-            return .white.opacity(0.06)
-        }
+        PixelHandTheme.color(PaletteTokens.fill, for: scheme)
     }
 
     static func tabContainerBorder(_ scheme: ColorScheme) -> Color {
-        switch scheme {
-        case .dark: return .white.opacity(0.09)
-        case .light: return Color.primary.opacity(0.06)
-        @unknown default: return .white.opacity(0.09)
-        }
+        PixelHandTheme.color(PaletteTokens.hairline, for: scheme)
     }
 
-    /// Search field on the Apps grid — same fill as the control tab strip container.
     static func searchFieldFill(_ scheme: ColorScheme) -> Color {
         tabContainerFill(scheme)
     }
 
     static func tabPillSelectedFill(_ scheme: ColorScheme) -> Color {
-        switch scheme {
-        case .dark: return .white.opacity(0.14)
-        case .light:
-            #if os(iOS)
-            return Color(UIColor.systemBackground)
-            #elseif os(macOS)
-            return Color(nsColor: .controlBackgroundColor)
-            #else
-            return Color(white: 1)
-            #endif
-        @unknown default:
-            return .white.opacity(0.14)
-        }
+        PixelHandTheme.color(PaletteTokens.raised, for: scheme)
     }
 
-    /// The trackpad is the icon's screen in both appearances: a dark slab
-    /// that reads as a device, lit a little toward the top like the icon's
-    /// glass. Content on it is drawn with a forced dark color scheme.
+    /// The trackpad is the icon's screen in both appearances.
     static var trackpadSurface: RadialGradient {
-        RadialGradient(
-            colors: [Color(hex: "111A55"), Brand.screen],
-            center: UnitPoint(x: 0.5, y: 0.15),
-            startRadius: 0,
-            endRadius: 720
-        )
+        PixelHandTheme.Brand.screenSurface
     }
 
     static func subtleWellFill(_ scheme: ColorScheme) -> Color {
-        Color.primary.opacity(0.07)
+        PixelHandTheme.color(PaletteTokens.fill, for: scheme)
     }
 
     // MARK: Authorization overlay
 
-    /// Backdrop scrim behind the auth dialog. Card chrome and button chrome
-    /// come from native materials / button styles — only the scrim opacity
-    /// is opinionated.
     static func authScrim(_ scheme: ColorScheme) -> Color {
-        switch scheme {
-        case .dark: return .black.opacity(0.45)
-        case .light: return .black.opacity(0.22)
-        @unknown default: return .black.opacity(0.45)
-        }
+        PixelHandTheme.color(PaletteTokens.scrim, for: scheme)
     }
 
     // MARK: Error banner
 
     static func errorBannerFill(_ scheme: ColorScheme) -> Color {
-        danger.opacity(scheme == .dark ? 0.38 : 0.14)
+        PixelHandTheme.color(PaletteTokens.dangerTint, for: scheme)
     }
 
     static func errorBannerLabel(_ scheme: ColorScheme) -> Color {
@@ -347,34 +187,26 @@ enum DeckHandTheme {
         [Brand.cobaltHigh, Brand.cobalt]
     }
 
-    /// Shadow color for floating dialog cards (auth overlay, modal sheets).
     static func dialogCardShadow(_ scheme: ColorScheme) -> Color {
         .black.opacity(scheme == .dark ? 0.35 : 0.12)
     }
 
-    // MARK: Floating Action Buttons (Apps page keyboard / numeric toggles)
+    // MARK: Floating Action Buttons (removed with the FABs in UX-005)
 
-    /// Design tokens for the circular floating-action toggle buttons that
-    /// surface the keyboard / numeric edit rows on the Apps page. Geometry,
-    /// shadow, and animation come from the native `Button` styles
-    /// (`.glass` / `.glassProminent` on iOS 26+, `.bordered` /
-    /// `.borderedProminent` on iOS 17). Only the active tint is opinionated.
     enum FAB {
-        /// Keyboard FAB uses the accent.
-        static let keyboardTint: Color = DeckHandTheme.accent
-        /// Numeric FAB uses a deep teal so the two toggles read distinctly
-        /// against the same surface. Dark enough to keep a white glyph legible.
-        static let numericTint:  Color = Color(hex: "0B7A6C")
+        static var keyboardTint: Color { PixelHandTheme.accent }
+        static var numericTint: Color { PixelHandTheme.success }
     }
 
-    // MARK: Typography (rounded matches picker / control chrome)
+    // MARK: Typography
 
+    /// Old fixed sizes, now text styles with the same default size so they
+    /// follow Dynamic Type. SF Rounded is dropped (`02-Design-System.md` §3).
     enum TypeStyle {
-        static let titleRounded = Font.system(size: 20, weight: .semibold, design: .rounded)
-        static let bodyRounded = Font.system(size: 15, weight: .regular, design: .rounded)
-        static let captionRounded = Font.system(size: 13, weight: .regular, design: .rounded)
-        static let buttonRounded = Font.system(size: 15, weight: .semibold, design: .rounded)
-        /// Progress / empty-state titles (peer search, initializing, apps loading).
-        static let loadingTitle = Font.system(size: 15, weight: .medium, design: .rounded)
+        static var titleRounded: Font { .title3.weight(.semibold) }
+        static var bodyRounded: Font { .subheadline }
+        static var captionRounded: Font { .footnote }
+        static var buttonRounded: Font { .subheadline.weight(.semibold) }
+        static var loadingTitle: Font { .subheadline.weight(.medium) }
     }
 }
