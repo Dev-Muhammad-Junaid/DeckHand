@@ -80,6 +80,11 @@ final class RemoteHostsStore {
     /// default overlay probe port; a Mac that answers shows up in the
     /// picker as a non-nearby peer. Dialling it goes through `RemoteConnect`
     /// (paired only, key pinned).
+    ///
+    /// Dial-only: the iPad never answers probes, so it must not open its own
+    /// probe listener on 38450. In the Simulator it shares the Mac's network
+    /// stack, where the Mac host already holds that port, and the clash made
+    /// `LoomContext.start` fail with "Address already in use" (build 7).
     static let overlayConfiguration = LoomOverlayDirectoryConfiguration(
         refreshInterval: .seconds(30),
         probeTimeout: .seconds(2),
@@ -88,7 +93,7 @@ final class RemoteHostsStore {
         seedProvider: {
             await MainActor.run { RemoteHostsStore.shared.currentSeeds() }
         }
-    )
+    ).dialOnly()
 
     // MARK: - Storage
 

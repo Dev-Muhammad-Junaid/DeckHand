@@ -15,6 +15,10 @@ private var thisDeviceKind: String {
 }
 
 struct PeerPickerView: View {
+    /// Set when Loom couldn't start: discovery isn't running, so the picker
+    /// says so (with Retry) instead of "Looking for your Mac" forever.
+    var startError: String? = nil
+    var onRetryStart: () -> Void = {}
     let onConnected: (LoomConnectionHandle, String) -> Void
 
     @Environment(\.loomContext) private var loomContext
@@ -48,7 +52,9 @@ struct PeerPickerView: View {
                     ScrollView {
                         VStack(spacing: 0) {
                             header
-                            if peers.isEmpty {
+                            if let startError, peers.isEmpty {
+                                startFailedState(startError)
+                            } else if peers.isEmpty {
                                 searchingState
                             } else {
                                 peerList
@@ -131,7 +137,7 @@ struct PeerPickerView: View {
                 Text("Pixel Hand")
                     .font(.system(size: 34, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
-                Text(peers.isEmpty ? "Looking for your Mac" : "Choose a Mac to control")
+                Text(headerSubtitle)
                     .font(.system(size: 16, weight: .regular, design: .rounded))
                     .foregroundStyle(.white.opacity(0.55))
                     .contentTransition(.opacity)
@@ -139,6 +145,11 @@ struct PeerPickerView: View {
         }
         .padding(.top, 32)
         .padding(.bottom, 40)
+    }
+
+    private var headerSubtitle: String {
+        if !peers.isEmpty { return "Choose a Mac to control" }
+        return startError == nil ? "Looking for your Mac" : "Can't look for Macs"
     }
 
     // MARK: - Peers
@@ -183,6 +194,29 @@ struct PeerPickerView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 48)
         }
+        .padding(.top, 12)
+    }
+
+    /// Loom failed to start, so nothing is being searched. Say what went
+    /// wrong and offer Retry; Settings stays reachable above.
+    private func startFailedState(_ message: String) -> some View {
+        VStack(spacing: 14) {
+            Text("Pixel Hand couldn't start its network connection.")
+                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .foregroundStyle(.white.opacity(0.8))
+            Text(message)
+                .font(.system(size: 13, weight: .regular, design: .rounded))
+                .foregroundStyle(DeckHandTheme.danger)
+            Button("Try Again", action: onRetryStart)
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 22)
+                .padding(.vertical, 10)
+                .background(Capsule().fill(Color.white.opacity(0.12)))
+                .buttonStyle(PressableButtonStyle())
+        }
+        .multilineTextAlignment(.center)
+        .padding(.horizontal, 40)
         .padding(.top, 12)
     }
 

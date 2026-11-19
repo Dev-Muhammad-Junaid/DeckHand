@@ -49,7 +49,11 @@ files=(
   "$@"
 )
 for file in "${files[@]}"; do
-  sed -E '/^import (AppKit|Combine|LoomKit|Loom|CoreGraphics|IOKit|os|QuartzCore|StoreKit|SwiftUI|UIKit|UserNotifications)$/d' "$file" > "$work/$(basename "$file")"
+  # StoreKit is stubbed inside this module, so `StoreKit.Transaction` (the
+  # app names it by module where SwiftUI makes it ambiguous) loses its prefix.
+  sed -E -e '/^import (AppKit|Combine|LoomKit|Loom|CoreGraphics|IOKit|os|QuartzCore|StoreKit|SwiftUI|UIKit|UserNotifications)$/d' \
+    -e 's/\bStoreKit\.(Transaction|Product|VerificationResult|AppStore)\b/\1/g' \
+    "$file" > "$work/$(basename "$file")"
 done
 
 cd "$here"

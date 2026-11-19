@@ -18,6 +18,11 @@ struct ContentRootView: View {
     /// than a person could click (the user's own iCloud Macs) skips the
     /// check rather than adding a pause.
     @State private var pendingSince = Date()
+    /// Why `LoomContext.start()` failed, if it did. Without it the picker
+    /// said "Looking for your Mac" forever although discovery never ran.
+    @State private var loomStartError: String?
+    /// Bumped by Retry to run the start task again.
+    @State private var loomStartAttempt = 0
 
     /// How long the check stays up before the card leaves.
     private static let approvalHold: Duration = .milliseconds(900)
@@ -122,7 +127,10 @@ struct ContentRootView: View {
                     }
                 }
             } else {
-                PeerPickerView { handle, peerName in
+                PeerPickerView(
+                    startError: loomStartError,
+                    onRetryStart: { loomStartAttempt += 1 }
+                ) { handle, peerName in
                     withAnimation(.easeInOut(duration: 0.28)) {
                         activeConnection = (handle, peerName)
                     }
@@ -131,13 +139,17 @@ struct ContentRootView: View {
             }
         }
         .animation(.easeInOut(duration: 0.28), value: activeConnection != nil)
-        .task {
+        .task(id: loomStartAttempt) {
             do {
-                DeckHandLog.app.info("Starting LoomContext")
+                DeckHandLog.app.info("Starting LoomContext (attempt \(loomStartAttempt + 1))")
+                withAnimation(.easeInOut(duration: 0.22)) { loomStartError = nil }
                 try await loomContext.start()
                 DeckHandLog.app.info("LoomContext started")
             } catch {
                 DeckHandLog.app.fault("LoomContext start failed: \(error.localizedDescription, privacy: .public)")
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    loomStartError = error.localizedDescription
+                }
             }
         }
     }

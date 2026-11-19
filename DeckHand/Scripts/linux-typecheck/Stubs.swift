@@ -41,6 +41,8 @@ public struct LoomOverlayDirectoryConfiguration: Sendable {
     public typealias SeedProvider = @Sendable () async throws -> [LoomOverlaySeed]
     public init(probePort: UInt16? = nil, refreshInterval: Duration = .seconds(30), probeTimeout: Duration = .seconds(2), probeAttempts: Int, probeRetryDelay: Duration = .zero, seedProvider: @escaping SeedProvider) {}
     public init(probePort: UInt16? = nil, refreshInterval: Duration = .seconds(30), probeTimeout: Duration = .seconds(2), seedProvider: @escaping SeedProvider) {}
+    public var listensForProbes: Bool = true
+    public func dialOnly() -> LoomOverlayDirectoryConfiguration { self }
 }
 public actor LoomConnectionHandle {
     public nonisolated let id: UUID = UUID()
