@@ -19,16 +19,22 @@ public enum MirrorMessage: Codable, Sendable, Equatable {
     // MARK: Remote → Mac
 
     /// Start streaming frames on `PixelHandStream.mirror`. `fps` caps the
-    /// capture rate, `maxWidth` bounds the frame's width, and `displayID`
-    /// picks a monitor (`nil` or unknown: the main display). Sent again to
-    /// change any of them; the Mac reuses the stream.
-    case start(fps: Int, maxWidth: Int, displayID: UInt32?)
+    /// capture rate, `maxWidth` bounds the frame's width, `displayID`
+    /// picks a monitor (`nil` or unknown: the main display) and `codec`
+    /// picks JPEG images or an HEVC stream (S5; see `Mirror/MirrorVideo.swift`).
+    /// Sent again to change any of them; the Mac reuses the stream.
+    case start(fps: Int, maxWidth: Int, displayID: UInt32?, codec: MirrorCodec)
     /// Stop the stream. Also implied by disconnecting.
     case stop
     /// Move the Mac's pointer to the centre of `displayID` (the mirror's
     /// "Cursor is on …" badge brings the pointer to the mirrored display).
     /// Ignored for a display the Mac doesn't have.
     case moveCursor(displayID: UInt32)
+    /// The HEVC picture broke on the remote (decode error, a delta it can't
+    /// use, no picture for a while): send a key frame, with its parameter
+    /// sets, soon. The Mac spaces forced key frames out
+    /// (`MirrorKeyFramePolicy`). Ignored for a JPEG mirror.
+    case requestKeyFrame
 
     // MARK: Mac → remote
 

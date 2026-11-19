@@ -154,12 +154,12 @@ import Testing
             #expect(LockPolicy.decide(message, state: .offConsole) == .refuse(reply: .none))
         }
         #expect(LockPolicy.decide(.system(.run(action: .locateCursor)), state: .offConsole) == .refuse(reply: .none))
-        #expect(LockPolicy.decide(.mirror(.start(fps: 20, maxWidth: 640, displayID: nil)), state: .offConsole) == .refuse(reply: .none))
+        #expect(LockPolicy.decide(.mirror(.start(fps: 20, maxWidth: 640, displayID: nil, codec: .jpeg)), state: .offConsole) == .refuse(reply: .none))
     }
 
     @Test("Mirror: the lock screen may be shown, another session's desktop may not")
     func mirrorRules() {
-        let start = ControlMessage.mirror(.start(fps: 20, maxWidth: 640, displayID: nil))
+        let start = ControlMessage.mirror(.start(fps: 20, maxWidth: 640, displayID: nil, codec: .jpeg))
         #expect(LockPolicy.decide(start, state: .screenLocked) == .allow)
         #expect(LockPolicy.decide(start, state: .offConsole) == .refuse(reply: .none))
     }
@@ -209,7 +209,7 @@ import Testing
         #expect(DisplayWakePolicy.isPersonAction(.capture(.requestScreenshot(requestID: "r", mode: .fullScreen, quality: .standard))))
         #expect(!DisplayWakePolicy.isPersonAction(.session(.ping(seq: 1))))
         #expect(!DisplayWakePolicy.isPersonAction(.apps(.requestAppList)))
-        #expect(!DisplayWakePolicy.isPersonAction(.mirror(.start(fps: 20, maxWidth: 640, displayID: nil))))
+        #expect(!DisplayWakePolicy.isPersonAction(.mirror(.start(fps: 20, maxWidth: 640, displayID: nil, codec: .jpeg))))
         #expect(!DisplayWakePolicy.isPersonAction(.pairing(.requestAuthorizationStatus)))
     }
 

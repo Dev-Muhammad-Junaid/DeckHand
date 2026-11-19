@@ -123,8 +123,8 @@ import Testing
             (20, 480, 20, 480),
         ]
         for (fps, width, expectedFPS, expectedWidth) in cases {
-            let message = try #require(RemoteInputValidation.sanitize(.mirror(.start(fps: fps, maxWidth: width, displayID: 7))))
-            guard case let .mirror(.start(outFPS, outWidth, displayID)) = message else { Issue.record("\(message)"); return }
+            let message = try #require(RemoteInputValidation.sanitize(.mirror(.start(fps: fps, maxWidth: width, displayID: 7, codec: .jpeg))))
+            guard case let .mirror(.start(outFPS, outWidth, displayID, _)) = message else { Issue.record("\(message)"); return }
             #expect(outFPS == expectedFPS)
             #expect(outWidth == expectedWidth)
             #expect(displayID == 7)

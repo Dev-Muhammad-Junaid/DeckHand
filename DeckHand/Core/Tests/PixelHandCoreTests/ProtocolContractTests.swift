@@ -134,8 +134,10 @@ import Testing
         ("deck.receipt.failed", .deck(.receipt(requestID: "cmd-3", outcome: .failed(reason: "App not running")))),
         ("deck.receipt.completed", .deck(.receipt(requestID: "cmd-4", outcome: .completed))),
         // mirror
-        ("mirror.start", .mirror(.start(fps: 20, maxWidth: 480, displayID: nil))),
-        ("mirror.start.display", .mirror(.start(fps: 20, maxWidth: 480, displayID: 1))),
+        ("mirror.start", .mirror(.start(fps: 20, maxWidth: 480, displayID: nil, codec: .jpeg))),
+        ("mirror.start.display", .mirror(.start(fps: 20, maxWidth: 480, displayID: 1, codec: .jpeg))),
+        ("mirror.start.hevc", .mirror(.start(fps: 30, maxWidth: 1440, displayID: 2, codec: .hevc))),
+        ("mirror.requestKeyFrame", .mirror(.requestKeyFrame)),
         ("mirror.stop", .mirror(.stop)),
         ("mirror.moveCursor", .mirror(.moveCursor(displayID: 2))),
         ("mirror.displayList", .mirror(.displayList(
@@ -246,6 +248,7 @@ import Testing
             case .start: "mirror.start"
             case .stop: "mirror.stop"
             case .moveCursor: "mirror.moveCursor"
+            case .requestKeyFrame: "mirror.requestKeyFrame"
             case .displayList: "mirror.displayList"
             case .error: "mirror.error"
             }
@@ -286,7 +289,7 @@ import Testing
     }
 
     /// Cases in this protocol version. Bump with every added or removed case.
-    static let expectedCaseCount = 41
+    static let expectedCaseCount = 42
 
     /// The current version, for the hand-written JSON below.
     static let v = PixelHandProtocol.version
@@ -409,7 +412,7 @@ import Testing
 
     @Test("Optional fields are omitted when nil, not encoded as null")
     func nilOptionalsAreOmitted() throws {
-        let mirror = try ControlMessageCoding.encode(.mirror(.start(fps: 15, maxWidth: 640, displayID: nil)))
+        let mirror = try ControlMessageCoding.encode(.mirror(.start(fps: 15, maxWidth: 640, displayID: nil, codec: .jpeg)))
         #expect(!String(decoding: mirror, as: UTF8.self).contains("displayID"))
         let app = try ControlMessageCoding.encode(.apps(.activeAppUpdate(name: "X", bundleID: nil)))
         #expect(!String(decoding: app, as: UTF8.self).contains("bundleID"))

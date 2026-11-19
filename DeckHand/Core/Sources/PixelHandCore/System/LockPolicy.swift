@@ -190,7 +190,8 @@ public enum LockPolicy {
                 // Moving the pointer is input: fine at the lock screen,
                 // not when another user has the screen.
                 return offConsole ? .refuse(reply: .none) : .allow
-            case .stop, .displayList, .error:
+            case .stop, .requestKeyFrame, .displayList, .error:
+                // A key frame only affects a mirror the gate already let start.
                 return .allow
             }
 
