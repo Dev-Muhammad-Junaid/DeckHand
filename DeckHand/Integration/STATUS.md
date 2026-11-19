@@ -641,3 +641,33 @@ and the free-tier one-Mac rule (needs a run from Xcode with the scheme's
 StoreKit config). Then the tables in each `LANE-*.md`.
 
 Status: BUILT (build 7) — 2 bugs
+
+## Build 8 queued (2026-11-19, merged by the primary session)
+
+Merged on top of build 7:
+
+- **Build 7 fixes** (`LANE-build7-fixes.md`): the iOS app no longer opens
+  Loom's overlay probe listener (Simulator start failure, bug 1), the
+  picker shows an error state when Loom can't start, and the flaky
+  advertising-restart test is made robust (bug 2). Loom tests need a run here.
+- **Design foundation** (`LANE-design-foundation.md`, first redesign lane):
+  design tokens from the board, the pixel/glyph/dot-matrix components,
+  glass chrome, and the new app shell **on by default**. Read its
+  "Compile risks" list first (iOS 26 glass APIs, `PixelHandTheme`).
+- **Deck 2 model** (`LANE-deck2-model.md`): typed actions, `deck.run`
+  sequences, `DeckStore`, Mac-side execution; protocol 12.
+
+Mac should check:
+
+1. `xcodegen generate`, build both apps, fix compile errors using each
+   lane's list.
+2. `swift test --package-path DeckHand/Core`, `swift test --scratch-path
+   .build-local` (including the fixed advertising test, in a full parallel
+   run), `DeckHandTests`.
+3. The iPad Simulator now starts Loom and finds the Mac host; do a
+   simulator pass of connect / Allow / trackpad / mirror.
+4. Install on Mac and iPad. The owner is testing by hand right now, so
+   install as soon as it builds and list the visible design changes.
+
+Status: READY FOR MAC BUILD (build 8)
+
