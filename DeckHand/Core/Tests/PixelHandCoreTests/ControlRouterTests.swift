@@ -48,6 +48,7 @@ private final class RouteLog {
             capture: Recorder<CaptureMessage>(.capture, log: log),
             pairing: Recorder<PairingMessage>(.pairing, log: log),
             session: Recorder<SessionMessage>(.session, log: log),
+            sharing: Recorder<SharingMessage>(.sharing, log: log),
             diagnostics: Recorder<DiagnosticsMessage>(.diagnostics, log: log)
         )
     }

@@ -15,7 +15,7 @@ protocol version and exactly one domain key.
 
 | Domain | File | What | Lane |
 | --- | --- | --- | --- |
-| `input` | `InputMessage.swift` | pointer, scroll, clicks, chords, media keys | iOS interaction (remote), Mac system control (`InputHandler`) |
+| `input` | `InputMessage.swift` | pointer, scroll, clicks, drags (`mouseDown`/`mouseUp`), chords, typed text, media keys | iOS interaction |
 | `system` | `SystemMessage.swift` | Mission Control, Spaces, Show Desktop, Launchpad, Locate; Mac → remote: display/Spaces snapshot, lock state | Mac system control |
 | `apps` | `AppsMessage.swift` | app list, running and frontmost app, dialog context | Mac system control (context side) |
 | `deck` | `DeckMessage.swift` | menu-shortcut import, `run` / `receipt` | deck (later), iOS interaction for now |
@@ -23,7 +23,7 @@ protocol version and exactly one domain key.
 | `capture` | `CaptureMessage.swift` | screenshots, window list | Mirror |
 | `pairing` | `PairingMessage.swift` | approval handshake; S4 pairing | Pairing |
 | `session` | `SessionMessage.swift` | ping/pong, keep-alive `tick`, `link`, `hostStatus` | Network |
-| `sharing` | `SharingMessage.swift` | reserved: clipboard (S10), files | iOS interaction (S10) |
+| `sharing` | `SharingMessage.swift` | clipboard text sync (S10); files later | iOS interaction (S10) |
 | `diagnostics` | `DiagnosticsMessage.swift` | mirror stats both ways (S6) | Mirror |
 
 - Bulk binary data never goes in the envelope. Mirror video and the
@@ -75,3 +75,4 @@ one case, one key, one decode line.
 | 3 | `session.tick` (remote → Mac, every 0.25 s while in front on a link that dozes; no answer, stamped and dropped by `HeartbeatResponder`) and `session.link(kind: LinkKind)` (Mac → remote, the Mac's link judgement, for example `wired` over a USB cable). Network lane, S1 and S13. |
 | 4 | `system.displayState(layout: DisplayLayout)`: displays, their Spaces (current index, full-screen apps) and the pointer's display, sent on connect and on every change; `system.lockState(state: MacLockState)`, sent on connect and on every change; `RefusalReason.macLocked` for runs the locked-Mac gate refuses. Mac → remote only; nothing a remote sends changed. |
 | 5 | Mirror frames leave the control stream: `mirror.frame` removed; JPEG frames, the cursor position (`cursor`) and pointer images (`cursorShape`) travel on `PixelHandStream.mirror` in `BinaryFrameHeader` frames, and the Mac captures without the pointer (S3). `diagnostics` domain activated: `mirrorStats` (Mac → remote) and `mirrorClientStats` (remote → Mac) (S6). `binaryMirrorStream` announced in `hostStatus`. New `mirror.moveCursor(displayID:)` brings the pointer to a display. |
+| 6 | iOS interaction lane. `input.typeText(text:)` (Unicode text, ≤ 4 KB a message, cleaned of control characters by `RemoteInputValidation`); `input.mouseDown(button:)` / `input.mouseUp(button:)` for click-drag (a held button is refreshed by repeating `mouseDown`; the Mac releases it on disconnect or after 5 s unrefreshed). `sharing` domain activated: `clipboardSync(enabled:)` and `setClipboard(text:paste:)` (remote → Mac), `macClipboard(text:)` (Mac → remote), text only, ≤ 64 KB. Lock gate: `mouseUp` always allowed, typed text and drags follow `input`, `setClipboard` refused while locked. S11 gestures use the existing `system.run` / `system.switchSpace`. |

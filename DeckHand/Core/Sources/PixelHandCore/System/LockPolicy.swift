@@ -140,9 +140,15 @@ public enum LockPolicy {
             // Liveness and approval keep working, or the remote would drop.
             return .allow
 
+        case .input(.mouseUp):
+            // Releasing a held button is always allowed, so a drag that
+            // began before the lock can't leave the button stuck.
+            return .allow
+
         case .input:
             // At the lock screen an approved remote may type the password
-            // and click. Off console nothing it sends belongs here.
+            // and click (typed text and drags included). Off console
+            // nothing it sends belongs here.
             return offConsole ? .refuse(reply: .none) : .allow
 
         case let .system(m):
@@ -210,10 +216,18 @@ public enum LockPolicy {
             // Mirror stats: logged only, nothing runs.
             return .allow
 
-        case .sharing:
-            // Reserved domain with no cases yet. Whoever activates it
-            // decides its rule here; until then nothing decodes.
-            return .refuse(reply: .none)
+        case let .sharing(m):
+            switch m {
+            case .clipboardSync:
+                // Only a subscription; the Mac withholds its clipboard
+                // while locked, so turning it on reads nothing now.
+                return .allow
+            case .setClipboard:
+                // The clipboard is withheld while locked, both ways.
+                return .refuse(reply: .none)
+            case .macClipboard:
+                return .allow // Mac → remote; the handler ignores it
+            }
         }
     }
 

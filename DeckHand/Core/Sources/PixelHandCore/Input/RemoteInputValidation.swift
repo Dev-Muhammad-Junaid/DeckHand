@@ -29,8 +29,11 @@ public enum RemoteInputValidation {
 
     /// Returns `message` with every remote-supplied number made safe, or
     /// `nil` when the message must be dropped (a non-finite float, an empty
-    /// capture region, a string or list past `ProtocolLimits`). Messages
-    /// without numbers or strings pass through unchanged.
+    /// capture region, a string or list past `ProtocolLimits`, typed text
+    /// over `TypingPolicy.maxMessageBytes` or empty once cleaned, clipboard
+    /// text over `ClipboardPolicy.maxTextBytes`). Messages without numbers
+    /// or strings (`mouseDown`, `mouseUp`, `clipboardSync`) pass through
+    /// unchanged.
     public static func sanitize(_ message: ControlMessage) -> ControlMessage? {
         switch message {
         case let .input(.mouseDelta(dx, dy)):
@@ -45,6 +48,22 @@ public enum RemoteInputValidation {
 
         case let .input(.keyboardShortcut(keys)):
             return isAcceptableChord(keys) ? message : nil
+
+        case let .input(.typeText(text)):
+            // Control characters other than Return and Tab never become
+            // key presses; empty or oversize text is dropped.
+            guard text.utf8.count <= TypingPolicy.maxMessageBytes else { return nil }
+            let clean = TypingText.normalized(text)
+            guard !clean.isEmpty else { return nil }
+            return .input(.typeText(text: clean))
+
+        case let .sharing(.setClipboard(text, paste)):
+            guard ClipboardPolicy.isAcceptable(remoteText: text) else { return nil }
+            return .sharing(.setClipboard(text: text, paste: paste))
+
+        case .sharing(.macClipboard):
+            // Mac → remote only; a remote has no business sending it.
+            return nil
 
         case let .apps(.launchApp(bundleID)):
             return isAcceptable(bundleID) ? message : nil
