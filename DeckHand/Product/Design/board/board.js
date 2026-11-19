@@ -626,5 +626,10 @@
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeBox(); });
 
   window.addEventListener('resize', function () { window.requestAnimationFrame(fit); });
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render); else render();
+
+  /* Parts shared with pixel.js, which adds the round-2 screens before render. */
+  window.PH = { S: S, P: P, ic: ic, app: app, mac: mac, lit: lit, pad: pad, macpill: macpill, header: header, chip: chip, strip: strip,
+    appDock: appDock, surfaceDock: surfaceDock, key: key, deck: deck, dmx: dmx, hand: hand, phone: phone, sb: sb, home: home, XCODE_KEYS: XCODE_KEYS, fit: fit };
+  function start() { setTimeout(render, 0); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();

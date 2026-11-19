@@ -10,6 +10,32 @@ Source: `board/` (`index.html`, `board.css` with the real tokens, `board.js`
 with one function per screen). Open `board/index.html` in a browser to view it
 locally.
 
+## Round 2 (19 Nov 2026)
+
+The owner approved the direction and asked for more glyph, pixel and
+dot-matrix work and less sloppiness (`DECISIONS.md`, 2026-11-19). Round 2 adds:
+
+- **Pixel identity** ([06-Pixel-Identity.md](06-Pixel-Identity.md)): 40 glyphs
+  on one 9 × 9 dot grid with one stroke rule; 5 × 7 dot-matrix type for status,
+  counters, stats and codes; the status strip on the mirror, Mac cards and
+  widgets; link badges (Wired, VPN, Wi-Fi), desktop dots, cursor badge,
+  display picker, sound toggle; phosphor focus; dot-grid loading and empty
+  states; pixel dissolve, scanline and power-on transitions with timings; the
+  menu-bar hand states and the icon → launch → control-surface carry-through.
+  Every element mapped to SwiftUI (`Canvas` glyphs, data in PixelHandCore,
+  `TimelineView`, a stitchable dissolve shader).
+- **Polish spec** ([07-Polish-Spec.md](07-Polish-Spec.md)): layout grid per
+  size class, spacing / radius / control-height scales with no exceptions,
+  concentric radii, alignment rules, three Dynamic Type bands, and a
+  per-screen QA checklist at iPhone, iPhone Duo folded and unfolded, and iPad,
+  light and dark.
+- **Board**: new sections Pixel identity, Polish spec (with a "Show layout
+  grid" overlay), Key screens (control surface, deck, Mac switcher, settings,
+  onboarding, paywall, AX3 deck), New features (mirror chrome, display picker,
+  pairing on Mac and iPhone), Duo and iPad. Round 1 stays below for reference.
+- **Plan** ([05-Implementation-Plan.md](05-Implementation-Plan.md)) re-mapped
+  to `LANES.md`, with tickets UX-015…UX-019 for the pixel identity.
+
 ## Recommendation in one paragraph
 
 Build **Option A, Dock & Canvas**. One canvas shows the **Pointer**, **Screen**
@@ -34,6 +60,8 @@ a Mac is talking.
 | 4 | [04-Interaction-Model.md](04-Interaction-Model.md) | Navigation, gestures per surface, Apple Intelligence (suggested decks, Ask, ask about the screen), multi-Mac and sharing, onboarding and permissions, paywall and free tier, empty and error states, accessibility, review risks, copy |
 | 5 | [board/](board/) + the Artifact | High-fidelity mockups at real point sizes, light and dark: iPhone (Pointer, Deck, Screen, Ask, My Macs), iPhone SE, iPhone landscape, iPhone Duo (cover, book, laptop), iPad (landscape, portrait, ½ Split View), PiP (iPhone, iPad), pairing, paywall, free tier, send, deck editor, error state, Mac panel, components |
 | 6 | [05-Implementation-Plan.md](05-Implementation-Plan.md) | Sequenced tickets UX-001…UX-041 mapped to lanes and PH-010's file splits, with acceptance criteria and the visual QA checklist |
+| 7 | [06-Pixel-Identity.md](06-Pixel-Identity.md) | Round 2: glyphs, dot-matrix type, status strip, badges, focus, loading/empty, transitions, icon carry-through, SwiftUI mapping |
+| 8 | [07-Polish-Spec.md](07-Polish-Spec.md) | Round 2: grids, scales, alignment, control sizes, Dynamic Type bands, per-screen QA |
 
 ## Decisions for the owner
 
@@ -58,9 +86,8 @@ a Mac is talking.
   (Apple's custom-player guide).
 - Liquid Glass is for controls and navigation, not content (Apple, "Adopting
   Liquid Glass").
-- `DeckHand/Integration/LANES.md` did not exist at `9c07a63`; the plan uses the
-  lane table in `DeckHand/Product/05-Backlog.md` and must be re-mapped when it
-  lands.
+- The plan follows `DeckHand/Integration/LANES.md` (read at `9ac0ce5`) and
+  proposes a Design lane for the Integration-owned UI files during the redesign.
 - Sill was read for interaction patterns only; nothing was copied.
 
 Board: https://claude.ai/artifact/Aa8KTJubKeqahy3cmSjRTm

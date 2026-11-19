@@ -1,5 +1,10 @@
 # 02 · Pixel Hand design system
 
+> **Round 2 (19 Nov 2026):** the pixel language in `06-Pixel-Identity.md` and
+> the strict scales in `07-Polish-Spec.md` extend this file. Where they differ
+> (spacing scale without 20 between siblings, the concentric radius table,
+> 9 × 9 glyphs instead of 8 × 8, 12 pt deck gutters), round 2 wins.
+
 Derived from the website (`website/public/styles.css`, `ui.css`,
 `website/brand/concept-b2-ipad.svg`) and today's `Shared/DeckHandTheme.swift`.
 It replaces `DeckHandTheme`'s ad-hoc surfaces and fixed fonts with one token
