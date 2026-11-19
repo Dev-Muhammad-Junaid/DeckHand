@@ -1,0 +1,9 @@
+{
+  "com.apple.Safari": [
+    { "id": "custom-1", "bundleID": "com.apple.Safari", "displayName": "Show Tab Overview", "keys": ["cmd", "shift", "\\"], "sfSymbol": "square.grid.2x2", "isCurated": false },
+    { "id": "imported.com.apple.Safari.file>export-as-pdf", "bundleID": "com.apple.Safari", "displayName": "File › Export as PDF", "keys": ["cmd", "option", "p"], "sfSymbol": "keyboard", "isCurated": false, "category": "File" }
+  ],
+  "com.apple.dt.Xcode": [
+    { "id": "custom-2", "bundleID": "com.apple.dt.Xcode", "displayName": "Clean Build Folder", "keys": ["cmd", "shift", "k"], "sfSymbol": "trash", "isCurated": false }
+  ]
+}

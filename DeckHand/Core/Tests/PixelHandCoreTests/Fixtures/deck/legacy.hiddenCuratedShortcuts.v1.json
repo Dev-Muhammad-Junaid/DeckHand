@@ -1,0 +1,4 @@
+{
+  "com.apple.Safari": ["curated.safari.private-window", "curated.safari.downloads"],
+  "com.apple.Terminal": ["curated.terminal.new-tab"]
+}

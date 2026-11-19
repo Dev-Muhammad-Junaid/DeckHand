@@ -98,8 +98,7 @@ public enum RemoteInputValidation {
             return .diagnostics(.mirrorClientStats(stats: stats.sanitized()))
 
         case let .deck(.run(requestID, action)):
-            // The action is checked as the message it stands for.
-            guard isAcceptable(requestID), sanitize(action.message) == action.message else { return nil }
+            guard isAcceptable(requestID), isAcceptable(action) else { return nil }
             return message
 
         case let .pairing(.submitCode(code)):
@@ -109,6 +108,30 @@ public enum RemoteInputValidation {
 
         default:
             return message
+        }
+    }
+
+    /// An action from a remote (`deck.run`). The first six are checked as
+    /// the message they stand for, a step of a sequence too; every Deck 2
+    /// string and number is bounded by `ActionValidation`: bundle IDs,
+    /// menu paths (≤ 6 titles of ≤ 256 bytes, no control characters),
+    /// Shortcuts names (≤ 256 bytes, no control characters, no leading
+    /// `-`), sequences (1…20 steps, no nesting, no dialog presses, pauses
+    /// 0…10 000 ms and ≤ 30 000 ms in all). Anything outside is dropped
+    /// whole: a run is never partly run.
+    public static func isAcceptable(_ action: Action) -> Bool {
+        guard ActionValidation.isValid(action, storable: false) else { return false }
+        switch action {
+        case let .sequence(steps):
+            return steps.allSatisfy { step in
+                guard let inner = step.action else { return true }
+                return isAcceptable(inner)
+            }
+        case .menuCommand, .macShortcut:
+            return true
+        case .shortcut, .appShortcut, .launchApp, .system, .media, .contextAction:
+            guard let domain = action.message else { return false }
+            return sanitize(domain) == domain
         }
     }
 

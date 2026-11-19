@@ -174,8 +174,8 @@ public enum LockPolicy {
         case let .deck(m):
             switch m {
             case let .run(requestID, action):
-                // Judged as the message it stands for, answered with a receipt.
-                return decide(action.message, state: state) == .allow
+                // Judged as the action it runs, answered with a receipt.
+                return allows(action, state: state)
                     ? .allow
                     : .refuse(reply: .receipt(requestID: requestID))
             case .requestAppMenuShortcuts:
@@ -238,6 +238,32 @@ public enum LockPolicy {
             case .macClipboard:
                 return .allow // Mac → remote; the handler ignores it
             }
+        }
+    }
+
+    /// Whether `action` may run in `state`; a `deck.run` is judged as the
+    /// action it runs. The first six actions follow the message they stand
+    /// for. Deck 2:
+    /// - `menuCommand` reads and presses another app's menus (and may
+    ///   activate it): refused while locked, like `appShortcut`;
+    /// - `macShortcut` runs automation as this user: refused while locked;
+    /// - `sequence` runs only when every step may (pauses always may). The
+    ///   Mac checks each step again as it reaches it, so a lock that comes
+    ///   mid-sequence stops the rest.
+    public static func allows(_ action: Action, state: MacLockState) -> Bool {
+        guard state.isLocked else { return true }
+        switch action {
+        case .menuCommand, .macShortcut:
+            return false
+        case let .sequence(steps):
+            return steps.allSatisfy { step in
+                guard let inner = step.action else { return true }
+                if case .sequence = inner { return false }
+                return allows(inner, state: state)
+            }
+        case .shortcut, .appShortcut, .launchApp, .system, .media, .contextAction:
+            guard let message = action.message else { return false }
+            return decide(message, state: state) == .allow
         }
     }
 

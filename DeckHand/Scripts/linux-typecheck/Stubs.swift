@@ -388,7 +388,13 @@ protocol ObservableObject: AnyObject {}
 @propertyWrapper struct Published<Value> {
     var wrappedValue: Value
     init(wrappedValue: Value) { self.wrappedValue = wrappedValue }
+    var projectedValue: PublishedPublisher<Value> { PublishedPublisher() }
 }
+struct PublishedPublisher<Value> {
+    func dropFirst() -> PublishedPublisher<Value> { self }
+    func sink(receiveValue: @escaping (Value) -> Void) -> AnyCancellable { AnyCancellable() }
+}
+final class AnyCancellable {}
 
 // MARK: UserNotifications stand-in
 struct UNNotificationActionOptions: OptionSet, Sendable {
@@ -440,4 +446,11 @@ final class UNUserNotificationCenter: @unchecked Sendable {
     func add(_ request: UNNotificationRequest, withCompletionHandler: (@Sendable (Error?) -> Void)? = nil) {}
     func removePendingNotificationRequests(withIdentifiers: [String]) {}
     func removeDeliveredNotifications(withIdentifiers: [String]) {}
+}
+
+// MARK: Deck 2 (DeckHandMac/Deck/MenuCommandPresser.swift reads AX, so it is stubbed)
+enum MenuCommandPresser {
+    enum Result: Equatable, Sendable { case pressed, appNotRunning, notFound(level: Int), disabled, gaveUp, pressFailed }
+    @MainActor static func press(bundleID: String, path: [String], launcher: AppLauncher) async -> Result { .pressed }
+    static func outcome(_ result: Result, path: [String]) -> ActionOutcome { .completed }
 }
