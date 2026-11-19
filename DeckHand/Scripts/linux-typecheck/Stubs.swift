@@ -337,6 +337,41 @@ public struct LoomConnectionDismissal: Sendable, Identifiable {
 @MainActor public final class LoomContext {
     public private(set) var connections: [LoomConnectionSnapshot] = []
     public func disconnect(_ connection: LoomConnectionSnapshot) async {}
+    public func connect(_ peer: LoomPeerSnapshot) async throws -> LoomConnectionHandle { LoomConnectionHandle() }
+    public func connect(_ peer: LoomPeerSnapshot, pinnedIdentity: LoomPeerIdentityPin) async throws -> LoomConnectionHandle { LoomConnectionHandle() }
+}
+
+// MARK: Loom remote access (S15)
+public struct LoomPeerIdentityPin: Hashable, Sendable {
+    public let identityKeyID: String
+    public let identityPublicKey: Data?
+    public init?(identityKeyID: String, identityPublicKey: Data? = nil) {
+        guard !identityKeyID.isEmpty else { return nil }
+        self.identityKeyID = identityKeyID
+        self.identityPublicKey = identityPublicKey
+    }
+}
+public struct LoomPeerAdvertisement: Sendable, Hashable {
+    public let deviceID: UUID?
+    public let identityKeyID: String?
+}
+public struct LoomPeerSnapshot: Identifiable, Hashable, Sendable {
+    public let id: LoomPeerID
+    public let name: String
+    public let isNearby: Bool
+    public let advertisement: LoomPeerAdvertisement
+    public var deviceID: UUID { id.deviceID }
+}
+public struct LoomPeer: Sendable {
+    public let id: LoomPeerID
+    public let advertisement: LoomPeerAdvertisement
+    public var deviceID: UUID { id.deviceID }
+}
+@MainActor public final class LoomOverlayDirectory {
+    public private(set) var discoveredPeers: [LoomPeer] = []
+    public init(configuration: LoomOverlayDirectoryConfiguration, localDeviceID: UUID? = nil) {}
+    public func refresh() async {}
+    public func stop() {}
 }
 
 // MARK: Combine stand-in

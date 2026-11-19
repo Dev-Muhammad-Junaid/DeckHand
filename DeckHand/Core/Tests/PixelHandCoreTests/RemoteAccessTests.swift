@@ -358,6 +358,33 @@ struct RemoteDialTests {
     }
 }
 
+// MARK: - Testing a saved host
+
+@Suite("RemoteAccessPolicy: testing a saved host")
+struct ProbeVerdictTests {
+    let mac = paired("a").ref
+
+    @Test("The paired Mac answering with its stored key is reachable")
+    func reachable() {
+        #expect(RemoteAccessPolicy.probeVerdict(answers: [(macID, key("a"))], mac: mac) == .reachable)
+    }
+
+    @Test("Another Mac, or the same device ID with another key, is a different Mac")
+    func different() {
+        #expect(RemoteAccessPolicy.probeVerdict(answers: [(otherMacID, key("a"))], mac: mac) == .differentMac)
+        #expect(RemoteAccessPolicy.probeVerdict(answers: [(macID, key("b"))], mac: mac) == .differentMac)
+        #expect(RemoteAccessPolicy.probeVerdict(answers: [(macID, nil)], mac: mac) == .differentMac)
+    }
+
+    @Test("No answer is no answer")
+    func none() {
+        #expect(RemoteAccessPolicy.probeVerdict(answers: [], mac: mac) == .noAnswer)
+        for v: RemoteAccessPolicy.ProbeVerdict in [.reachable, .differentMac, .noAnswer] {
+            #expect(!v.message.isEmpty)
+        }
+    }
+}
+
 // MARK: - Mac admission over a remote path
 
 @Suite("RemoteAccessPolicy: Mac admission over a remote path")

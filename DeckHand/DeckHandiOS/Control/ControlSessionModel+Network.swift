@@ -14,7 +14,11 @@
 //  - Background: ticks and pings stop when the app leaves the front; on
 //    the way back the liveness clock restarts and a ping goes out at once.
 //  - Link: this side's judgement from Loom's path (public API only) merged
-//    with the Mac's `session.link` report, shown as "Wired", "Wi-Fi", …
+//    with the Mac's `session.link` report, shown as "Wired", "Wi-Fi", "VPN"…
+//  - Remote access (S15): the Mac's VPN addresses (`session.remoteHosts`)
+//    are saved for a paired Mac; round trips from ping/pong and the link
+//    drive `AwayQualityPolicy`, which lowers the mirror request over a VPN
+//    or a slow link and re-negotiates a running mirror when that changes.
 //
 //  Every task here is cancelled by `stopNetwork()`, which `run` defers, so
 //  they end with the view's `.task`.
@@ -36,6 +40,10 @@ extension ControlSessionModel {
         keepAlive = KeepAliveGate(isForeground: UIApplication.shared.applicationState != .background)
         link = .unknown
         RemoteLinkStatus.shared.current = .unknown
+        RemoteLinkStatus.shared.isAway = false
+        roundTrips.reset()
+        awayQuality = AwayQualityPolicy()
+        awaySentMirrorCodec = nil
         networkTasks = [
             heartbeatTask(sender: s, liveness: liveness),
             keepAliveTask(),
@@ -51,6 +59,7 @@ extension ControlSessionModel {
         lifecycleObservers.forEach { NotificationCenter.default.removeObserver($0) }
         lifecycleObservers = []
         RemoteLinkStatus.shared.current = nil
+        RemoteLinkStatus.shared.isAway = false
     }
 
     // MARK: - Heartbeat
@@ -61,6 +70,7 @@ extension ControlSessionModel {
                 guard let self else { return }
                 if self.keepAlive.isPinging {
                     self.pingSeq &+= 1
+                    self.roundTrips.pingSent(seq: self.pingSeq, at: ProcessInfo.processInfo.systemUptime)
                     await s.sendPing(seq: self.pingSeq)
                 }
                 try? await Task.sleep(for: .seconds(LivenessPolicy.pingInterval))
@@ -134,10 +144,13 @@ extension ControlSessionModel {
         case .resumed:
             // Time spent suspended is not the Mac's silence.
             livenessClock?.restart()
+            // A round trip that spans a suspension isn't the link's.
+            roundTrips.reset()
             DeckHandLog.connection.info("Back in front: liveness clock restarted, pinging now")
             if let sender {
                 pingSeq &+= 1
                 let seq = pingSeq
+                roundTrips.pingSent(seq: seq, at: ProcessInfo.processInfo.systemUptime)
                 Task { await sender.sendPing(seq: seq) }
             }
         }
@@ -171,5 +184,43 @@ extension ControlSessionModel {
             link = shown
         }
         RemoteLinkStatus.shared.current = shown
+        if awayQuality.setLink(shown) { awayChanged() }
+    }
+
+    // MARK: - Remote access (S15)
+
+    /// The Mac's own VPN addresses. Saved only if this Mac is paired
+    /// (`RemoteHostsStore` re-checks against the pairing list).
+    func applyRemoteHosts(_ hosts: [String]) {
+        guard let mac = pairingMac else { return }
+        RemoteHostsStore.shared.macReported(hosts, mac: mac.ref)
+    }
+
+    /// A pong: one round-trip sample for the away policy.
+    func notePong(seq: UInt64) {
+        guard let smoothed = roundTrips.pongReceived(seq: seq, at: ProcessInfo.processInfo.systemUptime) else { return }
+        if awayQuality.noteRoundTrip(smoothed) { awayChanged() }
+    }
+
+    private func awayChanged() {
+        let rttMs = Int((roundTrips.smoothed ?? 0) * 1_000)
+        DeckHandLog.connection.info("Mirror quality: \(self.awayQuality.isAway ? "away (VPN or slow link)" : "home", privacy: .public); link \(self.awayQuality.link.rawValue, privacy: .public), smoothed RTT \(rttMs, privacy: .public) ms")
+        RemoteLinkStatus.shared.isAway = awayQuality.isAway
+        guard isMirrorActive, let settings = mirrorSettings else { return }
+        renegotiateMirror(settings: settings)
+    }
+
+    /// Sends `mirror.start` through the away policy. The Mirror code calls
+    /// this with what its settings ask for; at home it goes out unchanged.
+    func sendMirrorStart(_ sender: TrackpadSender, fps: Int, maxWidth: Int, displayID: UInt32?, codec: MirrorCodec) async {
+        let hevcAvailable = MirrorVideoRenderer.hevcDecodeAvailable && !mirrorHEVCFellBack
+        let shape = awayQuality.adjust(MirrorRequestShape(fps: fps, maxWidth: maxWidth, codec: codec), hevcAvailable: hevcAvailable)
+        if let sent = awaySentMirrorCodec, sent != shape.codec, codec == mirrorLastRequestedCodec {
+            // The away policy switched codecs: HEVC starts over at the
+            // Mac's next key frame, as after a settings change.
+            mirrorWatchdog.reset(now: CACurrentMediaTime())
+        }
+        awaySentMirrorCodec = shape.codec
+        await sender.startMirror(fps: shape.fps, maxWidth: shape.maxWidth, displayID: displayID, codec: shape.codec)
     }
 }

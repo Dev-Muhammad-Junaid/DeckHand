@@ -93,6 +93,38 @@ public enum RemoteAccessPolicy {
         return provenIdentityKeyID == pinned.identityKeyID && provenDeviceID == pinned.deviceID
     }
 
+    // MARK: - Remote: testing a saved host
+
+    /// What a probe of one saved host found (Settings › Remote Access ›
+    /// Test). The probe answer is an advertisement, not proof: a match only
+    /// says the right Mac answers there; the pinned handshake proves it.
+    public enum ProbeVerdict: Equatable, Sendable {
+        /// The paired Mac answered, advertising its stored key.
+        case reachable
+        /// A Pixel Hand Mac answered, but not this paired Mac (or with
+        /// another key).
+        case differentMac
+        /// Nothing answered.
+        case noAnswer
+
+        public var message: String {
+            switch self {
+            case .reachable: "Reachable. Connect from the device list."
+            case .differentMac: "Another Mac answered at this address."
+            case .noAnswer: "No answer. Check that the VPN is on for both devices and Pixel Hand is open on the Mac."
+            }
+        }
+    }
+
+    public static func probeVerdict(
+        answers: [(deviceID: UUID?, identityKeyID: String?)],
+        mac: PairedDeviceRef
+    ) -> ProbeVerdict {
+        if answers.isEmpty { return .noAnswer }
+        let match = answers.contains { $0.deviceID == mac.deviceID && $0.identityKeyID == mac.identityKeyID }
+        return match ? .reachable : .differentMac
+    }
+
     // MARK: - Mac: admission
 
     /// Whether a connection's path is a remote one: anything that isn't a

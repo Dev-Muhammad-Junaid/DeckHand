@@ -170,7 +170,7 @@ extension ControlSessionModel: MirrorStreamSink {
             let displayID = selectedMirrorDisplayID
             let codec = mirrorRequestedCodec(settings)
             mirrorLastRequestedCodec = codec
-            Task { await sender.startMirror(fps: fps, maxWidth: width, displayID: displayID, codec: codec) }
+            Task { await sendMirrorStart(sender, fps: fps, maxWidth: width, displayID: displayID, codec: codec) } // S15 away quality (network lane)
         } else {
             clearMirrorState()
             Task { await sender.stopMirror() }
@@ -244,7 +244,7 @@ extension ControlSessionModel: MirrorStreamSink {
             mirrorWatchdog.reset(now: CACurrentMediaTime())
         }
         mirrorLastRequestedCodec = codec
-        Task { await sender.startMirror(fps: fps, maxWidth: width, displayID: displayID, codec: codec) }
+        Task { await sendMirrorStart(sender, fps: fps, maxWidth: width, displayID: displayID, codec: codec) } // S15 away quality (network lane)
     }
 
     /// The codec to ask the Mac for (S5).

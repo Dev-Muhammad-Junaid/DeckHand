@@ -30,6 +30,9 @@ struct DeckHandApp: App {
                     // account surface with `.cloudKitOwn` → "My Mac" badge,
                     // priority sort, and host-side auto-allow (DeckHandCloud).
                     cloudKit: DeckHandCloud.cloudKitConfiguration,
+                    // S15: probe the saved VPN hosts of paired Macs, so a
+                    // Mac Bonjour can't see still shows up (RemoteHostsStore).
+                    overlayDirectory: RemoteHostsStore.overlayConfiguration,
                     remoteSignaling: DeckHandCloud.remoteSignalingConfiguration,
                     // S1: no AWDL. Peer-to-peer Wi-Fi takes the radio off
                     // channel every half second (p90 ~50 ms instead of ~4 ms).
