@@ -461,3 +461,93 @@
 
   PH.glyph = glyph; PH.dmText = dmText; PH.G = G;
 })();
+
+/* ---------- Onboarding, every page (round 2b) ---------- */
+(function () {
+  'use strict';
+  var PH = window.PH; if (!PH || !PH.glyph) return;
+  var S = PH.S, glyph = PH.glyph, dmText = PH.dmText, mac = PH.mac, hand = PH.hand, lit = PH.lit, sb = PH.sb, home = PH.home, phone = PH.phone;
+
+  var PAGES = [
+    { t: 'Pixel Hand', b: 'Your iPhone or iPad becomes a trackpad, a live view of your Mac and a set of buttons for the app in front. Over your own network, with nothing in between.', l: [] },
+    { t: 'A real trackpad', b: 'Move, click and scroll with the gestures you already know. The dots light up under your fingers.', l: [['click', 'Two fingers to scroll'], ['mission', 'Three fingers to switch desktops'], ['pointer', 'Tap, then hold to drag']] },
+    { t: 'Watch your Mac', b: 'Keep a live view of the screen next to the trackpad. Pinch it bigger to read, flick it to a corner when you’re done.', l: [['pip', 'Drag it anywhere'], ['region', 'Pinch to resize'], ['screen', 'Gets sharper as it grows']] },
+    { t: 'Capture and read', b: 'Take the whole screen, one window or a region. Mark it up, or lift the text straight out of it.', l: [['capture', 'Full screen, window or region'], ['type', 'Mark up before you share'], ['ocr', 'Copy the text from any capture']] },
+    { t: 'One step on your Mac', b: 'Open Pixel Hand on your Mac. The first time you connect, you pair once with a code from its menu bar.', l: [['laptop', 'Free at pixelhand.app/mac'], ['wifi', 'Same Wi-Fi, or a cable'], ['lock', 'Pair once with a code']] }
+  ];
+
+  function strip(txt, style) { return '<div class="sstrip" style="' + style + '"><i class="sstrip__px"></i>' + dmText(txt, 1.6, { cls: 'dmt--glow' }) + '</div>'; }
+
+  /* One dot-art scene per page, all on the same navy plate as the mark. */
+  function art(i, s) {
+    var k = s / 320;
+    if (i === 0) {
+      return '<div class="onbmark" style="width:' + s + 'px;height:' + s + 'px"><div class="onbmark__tile" style="width:' + Math.round(s * 0.62) + 'px;height:' + Math.round(s * 0.62) + 'px;border-radius:' + Math.round(s * 0.14) + 'px;padding:' + Math.round(s * 0.07) + 'px"><div class="icon__scr" style="border-radius:' + Math.round(s * 0.08) + 'px">' + hand(Math.round(s * 0.27)) + '<i class="icon__mint" style="right:' + Math.round(s * 0.04) + 'px;top:' + Math.round(s * 0.04) + 'px"></i></div></div></div>';
+    }
+    var h = '<div class="onbplate" style="width:' + s + 'px;height:' + s + 'px">';
+    if (i === 1) {
+      var pts = [];
+      for (var n = 0; n <= 10; n++) { var t = n / 10; pts.push([s * (0.2 + 0.55 * t), s * (0.74 - 0.42 * t + 0.25 * t * t), 18 + 44 * t, 0.25 + 0.75 * t]); }
+      h += lit(pts);
+      h += '<i class="onbring" style="left:' + (s * 0.75 - 22) + 'px;top:' + (s * 0.57 - 22) + 'px"></i><i class="onbring" style="left:' + (s * 0.75 + 12) + 'px;top:' + (s * 0.57 - 34) + 'px"></i>';
+      h += strip('2 FINGERS · SCROLL', 'position:absolute;left:16px;bottom:16px;height:22px');
+    } else if (i === 2 || i === 3) {
+      var w = Math.round(s * 0.82), hh = Math.round(w / 1.6), x = (s - w) / 2, y = Math.round(s * 0.2);
+      h += '<div class="onbmac" style="left:' + x + 'px;top:' + y + 'px;width:' + w + 'px;height:' + hh + 'px">' + mac({ cur: [46, 42], dlg: i === 2 });
+      if (i === 2) {
+        h += '<div style="position:absolute;inset:0;background:#000;clip-path:inset(62% 0 0 0)"></div><div style="position:absolute;left:0;right:0;top:calc(62% - 16px);height:16px;background:linear-gradient(transparent,rgba(61,224,224,.45))"></div><div style="position:absolute;left:0;right:0;top:62%;height:1.5px;background:#EFFFFC;box-shadow:0 0 8px #3DE0E0"></div>';
+      } else {
+        h += '<div class="onbsel" style="left:18%;top:26%;width:52%;height:46%"><i style="left:-4px;top:-4px"></i><i style="right:-4px;top:-4px"></i><i style="left:-4px;bottom:-4px"></i><i style="right:-4px;bottom:-4px"></i></div>';
+      }
+      h += '</div>';
+      h += i === 2 ? strip('LIVE · 60 FPS', 'position:absolute;left:' + (x + 8) + 'px;top:' + (y + 8) + 'px;height:22px') : '<div style="position:absolute;left:' + x + 'px;right:' + x + 'px;top:' + (y + hh + 16 * k) + 'px;display:flex;flex-direction:column;gap:' + Math.round(8 * k) + 'px;color:var(--phosphor)">' + dmText('BUILD FAILED', 1.8 * k, { cls: 'dmt--glow' }) + dmText('MAIN.SWIFT:42', 1.8 * k, { cls: 'dmt--glow' }) + '</div>';
+    } else if (i === 4) {
+      var p = Math.round(9 * k);
+      h += '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:' + Math.round(18 * k) + 'px;color:#cfe0ff">' + glyph('wifi', Math.round(4 * k)) +
+        '<div class="row" style="gap:' + Math.round(14 * k) + 'px;align-items:center">' + glyph('laptop', p, { off: 1 }) + '<span class="onb-beam"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span>' + glyph('iphone', p, { off: 1 }) + '</div>' +
+        PH.dmx('4821 0937').replace('class="dmx"', 'class="dmx" style="zoom:' + (0.7 * k).toFixed(2) + '"') + '</div>';
+    }
+    return h + '</div>';
+  }
+
+  function bullets(list, align) {
+    if (!list.length) return '';
+    return '<div class="onbb" style="align-self:' + (align || 'center') + '">' + list.map(function (b) { return '<div class="onbb__r"><span class="rowic">' + glyph(b[0], 2) + '</span><span>' + b[1] + '</span></div>'; }).join('') + '</div>';
+  }
+  function dots(i) { var h = '<div class="pgd" aria-hidden="true">'; for (var n = 0; n < 5; n++) h += '<i class="' + (n === i ? 'on' : '') + '"></i>'; return h + '</div>'; }
+  function top(i) { return '<div class="row onbtop">' + dmText('0' + (i + 1) + '/05', 1.6, { cls: 'dmt--glow', label: 'Step ' + (i + 1) + ' of 5' }) + '<span class="grow"></span>' + (i < 4 ? '<span class="onbskip">Skip</span>' : '') + '</div>'; }
+  function buttons(i, wide) {
+    var last = i === 4;
+    return '<div class="row" style="gap:12px;width:100%;max-width:' + (wide ? 440 : 420) + 'px">' + (i > 0 ? '<div class="btns onbback">Back</div>' : '') + '<div class="btnp" style="flex:1">' + (last ? 'Find my Mac' : i === 0 ? 'Get started' : 'Continue') + '</div></div>';
+  }
+  function text(i, align, maxw, tsize) {
+    var a = align === 'left' ? 'left' : 'center';
+    return '<div style="display:flex;flex-direction:column;gap:12px;text-align:' + a + ';max-width:' + maxw + 'px"><div class="onbt" style="font-size:' + tsize + 'px">' + PAGES[i].t + '</div><div class="onbd">' + PAGES[i].b + '</div></div>';
+  }
+
+  /* iPad portrait 820 x 1180 */
+  S['onbPad' + 0] = null;
+  [0, 1, 2, 3, 4].forEach(function (i) {
+    S['onbPadP' + i] = function () {
+      var inner = '<div class="col brandbg">' + sb('pad', '#fff') + top(i) +
+        '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:40px;padding:0 48px;position:relative">' + art(i, 340) +
+        '<div style="display:flex;flex-direction:column;align-items:center;gap:28px">' + text(i, 'center', 520, 40) + bullets(PAGES[i].l) + '</div></div>' +
+        '<div style="display:flex;flex-direction:column;align-items:center;gap:24px;padding:0 48px 24px">' + dots(i) + buttons(i) + '</div>' + home('pad', '#fff') + '</div>';
+      return phone(820, 1180, 'dark v2', inner, { frame: 'ipad' });
+    };
+    S['onbPadL' + i] = function () {
+      var inner = '<div class="col brandbg">' + sb('pad', '#fff') + top(i) +
+        '<div style="flex:1;display:flex;align-items:center;justify-content:center;gap:72px;padding:0 72px;position:relative">' + art(i, 400) +
+        '<div style="display:flex;flex-direction:column;align-items:flex-start;gap:28px;width:440px">' + text(i, 'left', 440, 40) + bullets(PAGES[i].l, 'flex-start') + '<div style="height:4px"></div>' + dots(i).replace('class="pgd"', 'class="pgd" style="justify-content:flex-start;padding:0"') + buttons(i, true) + '</div></div>' + home('pad', '#fff') + '</div>';
+      return phone(1180, 820, 'dark v2', inner, { frame: 'ipad' });
+    };
+    S['onbPhone' + i] = function () {
+      var inner = '<div class="col brandbg">' + sb('pro', '#fff') + top(i) +
+        '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;padding:0 24px;position:relative">' + art(i, 248) +
+        '<div style="display:flex;flex-direction:column;align-items:center;gap:20px">' + text(i, 'center', 340, 30) + bullets(PAGES[i].l) + '</div></div>' +
+        '<div style="display:flex;flex-direction:column;align-items:center;gap:16px;padding:0 24px 8px">' + dots(i) + buttons(i) + '</div>' + home('pro', '#fff') + '</div>';
+      return phone(402, 874, 'dark v2', inner);
+    };
+  });
+  delete S.onbPad0;
+})();

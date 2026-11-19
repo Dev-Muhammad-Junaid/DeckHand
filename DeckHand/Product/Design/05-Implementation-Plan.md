@@ -139,7 +139,10 @@ every screen it touches, and before/after screenshots at the QA sizes in the PR.
 - Accept: max one modal level from Control; works at 320 pt and AX5.
 
 **UX-010 Onboarding and picker** · Design · M
-- Scope: scrollable onboarding (§5 of the interaction model), device-neutral
+- Scope: onboarding pages 2–5 rebuilt to page 1's level with dot-art scenes,
+  glyph bullets, dot-matrix step counter, Back/Continue and an iPad landscape
+  two-column layout (`06-Pixel-Identity.md` §9; owner feedback 19 Nov);
+  scrollable onboarding (§5 of the interaction model), device-neutral
   copy, coach marks instead of a tour; picker header shrinks so the first Mac
   is visible in landscape; approval card max width 480 pt.
 - Files: `OnboardingView.swift`, `PeerPickerView.swift`, `AuthorizationOverlay.swift`.

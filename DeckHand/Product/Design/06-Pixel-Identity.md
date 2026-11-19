@@ -235,3 +235,44 @@ zooms (hero motion) into the trackpad's dot grid, so the icon, the launch and
 the control surface are one continuous object. Widgets, Control Center
 controls and Live Activities (later) use navy, glyphs and the status strip.
 The Mac panel's header uses the same hand on the cobalt tile.
+
+## 9. Onboarding: every page at the first page's level
+
+**Owner feedback (19 Nov 2026):** on iPad the welcome page looks good, but the
+other pages don't have the same craft or icons. **Why:** in
+`DeckHandiOS/OnboardingView.swift` only page 1 draws real artwork
+(`DeckHandMark(size: 172)`). Pages 2–5 use `OnboardingPage.symbol`, a stock SF
+Symbol (`hand.point.up.left`, `rectangle.on.rectangle`, `camera.viewfinder`,
+`wifi`) at 54 pt light weight in a blurred 136 pt navy square, with green
+SF `checkmark` circles as bullets and fixed 36 pt rounded titles. The result
+reads as a generic iOS template next to a bespoke first page.
+
+**Fix (board section "Onboarding, every page").**
+
+| Part | Now | New |
+| --- | --- | --- |
+| Artwork | Page 1: mark. Pages 2–5: SF Symbol in a blurred square | Page 1: the icon tile with the dot hand (kept). Pages 2–5: an `OnboardingScene` on the same navy plate (radius 36, 15 pt dot grid, cobalt bloom): **Trackpad** a lit finger trail across the grid with two touch rings and a `2 FINGERS · SCROLL` strip; **Mirror** the Mac's screen arriving under a scanline with a `LIVE · 60 FPS` strip; **Capture** a dotted phosphor region selection with the lifted text in dot-matrix; **Your Mac** Mac and iPad glyphs (pitch 10) joined by a beam, Wi-Fi glyph above, the first 8 digits of a pairing code below |
+| Bullets | SF `checkmark` in mint circles | 30 pt navy glyph tiles with the page's own glyphs (scroll → Click, desktops → Mission Control, drag → Pointer; Picture in Picture, Region, Screen; Capture, Type, Read text; Mac, Wi-Fi, Lock) |
+| Title | SF Rounded 36 fixed | Geist Medium `display.large` (40 on iPad, 30 on iPhone at default size, scales with `.largeTitle`) |
+| Progress | Capsule dots | Dot-matrix `02/05` top-leading + 6 pt square page dots, current one phosphor |
+| Buttons | Continue only; swipe to go back | Back (secondary, 120 pt) + Continue (primary, 52 pt); last page "Find my Mac" |
+| iPad landscape | One centred column | Two columns: scene 400 pt left, text column 440 pt right, left-aligned, buttons under the text |
+| Motion | Fade + 10 pt rise | Page 1 power-on (600 ms); scenes animate in place (trail draws, scanline sweeps, selection marches, beam fills; 600–900 ms, once); page change = pixel dissolve on the scene, 8 pt slide + fade on text. Reduce Motion: final frames, cross-fade |
+| Copy | iPad-only ("Your iPad becomes…", "Approve the iPad once") | Device-neutral; page 5 explains pairing with a code (Pairing lane) |
+| Small screens | Not scrollable; clips in landscape | Content in a `ScrollView` with the buttons pinned; iPhone landscape uses the two-column layout at 248 pt scene size |
+
+**SwiftUI.**
+- `OnboardingPage` drops `symbol: String?` for `scene: OnboardingScene`
+  (`.mark`, `.trackpad`, `.mirror`, `.capture`, `.pairing`) and
+  `bullets: [(glyph: PixelBitmap, text: String)]`.
+- `OnboardingSceneView(scene:size:)`: a `PixelSurface` plate; the trackpad
+  trail reuses `DotField`'s lighting maths fed by a scripted path; the mirror
+  uses a still frame (bundled image of the Mac desktop drawn in the app's
+  palette) with the scanline `visualEffect`; capture uses the phosphor focus
+  stroke for the dotted selection and `DotMatrixText`; pairing uses
+  `PixelGlyph` and `DotBeam`. Each scene is a `TimelineView(.animation)` that
+  runs once per appearance, then holds.
+- Layout from `LayoutMetrics`: `wide || (medium && short)` → two columns.
+  Scene size: 400 / 340 / 248 by class.
+- Owner of the file: Integration today (`LANES.md` §2.7), the Design lane in
+  the redesign phase; ticket **UX-010** below includes this.

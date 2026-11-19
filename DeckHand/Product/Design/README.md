@@ -33,6 +33,10 @@ dot-matrix work and less sloppiness (`DECISIONS.md`, 2026-11-19). Round 2 adds:
   grid" overlay), Key screens (control surface, deck, Mac switcher, settings,
   onboarding, paywall, AX3 deck), New features (mirror chrome, display picker,
   pairing on Mac and iPhone), Duo and iPad. Round 1 stays below for reference.
+- **Onboarding, every page**: the owner noted that only the welcome page has
+  real craft on iPad. Pages 2–5 now each get a dot-art scene, glyph bullets,
+  a dot-matrix step counter and an iPad landscape layout (board section
+  "Onboarding, every page", spec in `06-Pixel-Identity.md` §9, ticket UX-010).
 - **Plan** ([05-Implementation-Plan.md](05-Implementation-Plan.md)) re-mapped
   to `LANES.md`, with tickets UX-015…UX-019 for the pixel identity.
 
