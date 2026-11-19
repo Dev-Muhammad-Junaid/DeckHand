@@ -8,7 +8,10 @@
 //  - start, stop and re-negotiate (WID-403);
 //  - frames and the cursor from the binary mirror stream
 //    (`MirrorStreamReceiver`, S3);
-//  - the display picker, Follow cursor and the "Cursor is on …" badge;
+//  - the display picker, Follow cursor and the "Cursor is on …" badge
+//    (the badge falls back to the Mac's display snapshot when the cursor
+//    stream hasn't said yet);
+//  - the desktop dots and ‹ › states (`mirrorSpaceStrip`);
 //  - the stats window sent back to the Mac once a second (S6).
 //
 
@@ -159,9 +162,15 @@ extension ControlSessionModel: MirrorStreamSink {
         MirrorDisplayChrome.make(
             displays: mirrorDisplays,
             mirroredDisplayID: selectedMirrorDisplayID,
-            cursorDisplayID: mirrorCursorDisplayID,
+            cursorDisplayID: MirrorDisplayChrome.cursorDisplayID(stream: mirrorCursorDisplayID, layout: displayLayout),
             followsCursor: mirrorSettings?.mirrorFollowsCursor ?? false
         )
+    }
+
+    /// The desktop dots and ‹ › states for the mirrored display, from the
+    /// Mac's display snapshot (`displayLayout`, Mac system lane).
+    var mirrorSpaceStrip: MirrorSpaceStrip {
+        MirrorSpaceStrip.make(layout: displayLayout, mirroredDisplayID: selectedMirrorDisplayID)
     }
 
     /// The mirrored display's width in points, for scaling the pointer.

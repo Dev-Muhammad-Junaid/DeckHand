@@ -41,6 +41,13 @@ struct MirrorThumbnailView: View {
     var topLeadingAccessory: AnyView = AnyView(EmptyView())
     /// Bottom-edge chrome (the cursor badge, the stats line).
     var bottomAccessory: AnyView = AnyView(EmptyView())
+    /// Drawn just under the mirror, outside its frame (the desktop dots).
+    /// Doesn't take part in layout, so drag and pinch bounds are unchanged.
+    var belowAccessory: AnyView = AnyView(EmptyView())
+    /// How ‹ and › are drawn: dimmed at either end of the mirrored
+    /// display's Spaces, hidden when it has only one (`MirrorSpaceStrip`).
+    var previousChevron: MirrorChevronState = .enabled
+    var nextChevron: MirrorChevronState = .enabled
 
     /// Persisted drag offset (committed at drag end) + live in-drag delta.
     @State private var committedOffset: CGSize = .zero
@@ -189,9 +196,9 @@ struct MirrorThumbnailView: View {
                 .onTapGesture { toggleSize() }
 
             HStack {
-                spaceChevron(direction: .previous, symbol: "chevron.left.circle.fill", label: "Previous desktop")
+                spaceChevron(direction: .previous, state: previousChevron, symbol: "chevron.left.circle.fill", label: "Previous desktop")
                 Spacer(minLength: 0)
-                spaceChevron(direction: .next, symbol: "chevron.right.circle.fill", label: "Next desktop")
+                spaceChevron(direction: .next, state: nextChevron, symbol: "chevron.right.circle.fill", label: "Next desktop")
             }
             .padding(.horizontal, 6)
         }
@@ -203,6 +210,10 @@ struct MirrorThumbnailView: View {
         )
         .overlay(alignment: .topLeading) { topLeadingAccessory }
         .overlay(alignment: .bottom) { bottomAccessory }
+        .overlay(alignment: .bottom) {
+            belowAccessory
+                .alignmentGuide(.bottom) { dimensions in dimensions[.top] - 4 }
+        }
         .overlay(alignment: .topTrailing) {
             Button(action: onClose) {
                 Image(systemName: "xmark.circle.fill")
@@ -336,20 +347,30 @@ struct MirrorThumbnailView: View {
         }
     }
 
+    @ViewBuilder
     private func spaceChevron(
         direction: SpaceDirection,
+        state: MirrorChevronState,
         symbol: String,
         label: String
     ) -> some View {
-        Button {
-            performSpaceSwitch(direction)
-        } label: {
-            Image(systemName: symbol)
-                .font(.system(size: 28))
-                .symbolRenderingMode(.palette)
-                .foregroundStyle(.white, .black.opacity(0.45))
+        if state == .hidden {
+            // Keeps the HStack's shape; nothing to tap or read out.
+            Color.clear.frame(width: 28, height: 28).accessibilityHidden(true)
+        } else {
+            Button {
+                performSpaceSwitch(direction)
+            } label: {
+                Image(systemName: symbol)
+                    .font(.system(size: 28))
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(.white, .black.opacity(0.45))
+            }
+            .buttonStyle(.plain)
+            .disabled(state == .dimmed)
+            .opacity(state == .dimmed ? 0.3 : 1)
+            .animation(.easeInOut(duration: 0.2), value: state)
+            .accessibilityLabel(label)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
     }
 }
