@@ -29,7 +29,7 @@ struct PixelSurface<Content: View>: View {
             .background {
                 ZStack {
                     PixelHandTheme.Brand.screenSurface
-                    if showsGrid { DotGrid() }
+                    if showsGrid { RestingDotGrid() }
                 }
                 .clipShape(shape)
             }
@@ -46,7 +46,7 @@ extension PixelSurface where Content == EmptyView {
 
 /// The resting dot grid: 2.4 pt dots on a 15 pt pitch, centred so the
 /// margins are equal on both axes.
-struct DotGrid: View {
+struct RestingDotGrid: View {
     var pitch: CGFloat = 15
     var dot: CGFloat = 2.4
     var color: Color = PixelHandTheme.Brand.dotOff
