@@ -1,5 +1,7 @@
 # Coordinator state (read and update on every coordinator tick)
 
+> **Mac loop needed:** run `/loop 1h Follow the "Build loop" section in DeckHand/Integration/MAC-BUILD.md on claude/pixelhand-integration` in a Mac session. (Build 3 waited about 14 h with no Mac build; build 4 is now queued and replaces it.)
+
 The owner approved the full program (see `DECISIONS.md`). A scheduled cloud
 task starts a fresh coordinator session every 2 hours; it has no memory, so
 this file is the memory. Update it, commit, and push on every tick that
@@ -12,22 +14,24 @@ weekly usage limit is close).
 | --- | --- | --- | --- |
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac) | session_01H5HwATvLJkqCFPruLyBsX8 | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
-| Lane: Network (S1, S13) | session_01H5HwATY1dvE2kGpF8EJ5Cw | claude/pixelhand-lane-network | `LANE-network.md` ends `Lane: READY TO MERGE` |
-| Lane: Mac system control (S7, S8, S9, Spaces) | session_01H5HwAVpEkSemaj3uPn1AaK | claude/pixelhand-lane-mac-system | `LANE-mac-system.md` ends `Lane: READY TO MERGE` |
-| Lane: Mirror (binary stream, S3, picker, S6; may split S5/S14) | session_01H5HwASAnQxuNTmWj7uVoBs | claude/pixelhand-lane-mirror | `LANE-mirror.md` ends `Lane: READY TO MERGE` |
+| Lane: Mirror 2 (desktop dots, S5 HEVC; S14 if time) | session_01H5HwARaG2DQsSAmTij3Pjo | claude/pixelhand-lane-mirror-2 | `LANE-mirror-2.md` ends `Lane: READY TO MERGE` |
+| Lane: iOS interaction (typing, drag, S11, S12, S10) | session_01H5HwAUQUjPJwVFTCm2GHwq | claude/pixelhand-lane-ios-interaction | `LANE-ios-interaction.md` ends `Lane: READY TO MERGE` |
+| Lane: Pairing (S4) | session_01H5HwATY2su8kZcgNm19S2Q | claude/pixelhand-lane-pairing | `LANE-pairing.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
-Started 2026-11-18: Network, Mac system control, Mirror (see Active sessions).
+Merged: Network, Mac system control, Mirror. Running: Mirror 2, iOS
+interaction, Pairing (see Active sessions).
 
-1. (Mirror follow-ups, if the Mirror lane splits: mirror-hevc S5, mirror-window S14.)
-4. Lane: iOS interaction — text typing, click-drag, S11 gestures, S12 Pencil hover, S10 clipboard sync.
-5. Lane: Pairing — S4 persistent pairing (code/QR, Forget device).
-6. Lane: Store — StoreKit 2 subscription + free tier (DECISIONS.md).
-7. Later Sill: S15 VPN remote, S16 virtual display, S17 audio.
-8. Roadmap + redesign (after all Sill lanes merged and a green Mac build):
-   design-strategy recommendation, Deck 2, App Intents/widgets, multi-Mac,
-   sharing, AI, iPhone Fold two-pane, PiP live screen.
+1. Lane: mirror-window (S14), unless Mirror 2 finishes it.
+2. Lane: Store (StoreKit 2 subscription + free tier). Merges last.
+3. Lane: Network S15 VPN remote (after Pairing merges).
+4. Lane: S17 audio.
+5. Roadmap + redesign (after all Sill lanes merged and a green Mac build):
+   design-strategy recommendation (merge `claude/pixelhand-design-strategy`
+   docs first), Deck 2, App Intents/widgets/Control Center, multi-Mac,
+   sharing, AI (on-device first), iPhone Fold two-pane, PiP live screen.
+   S16 virtual display stays deferred.
 
 Lanes start only after Foundation is merged. Each lane: own branch from
 `claude/pixelhand-integration`, follows `LANES.md` file ownership,
@@ -45,4 +49,10 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   was deleted; coordination moved to a cloud coordinator session.
 - 2026-11-18 23:32 UTC: coordinator tick 1. No lane ready; build 3 awaiting the
   Mac. Started lanes Network, Mac system control, Mirror (3/3 slots).
-
+- 2026-11-19 ~11:50 UTC: tick 2. Merged Network (`9328dfe`, protocol 3), Mac
+  system control (`9149e2a`, renumbered to 4) and Mirror (`10a79e3`,
+  renumbered to 5; lock gate updated for `mirror.moveCursor` and
+  `diagnostics`). Core 222 tests and the Linux type check are green. Build 4
+  queued (`2464a70`); it replaces build 3, which was never built. Started
+  Mirror 2, iOS interaction and Pairing. Swift 6.2 is installed at
+  `/opt/swift-dl` in this container.
