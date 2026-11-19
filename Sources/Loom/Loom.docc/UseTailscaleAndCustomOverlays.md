@@ -65,6 +65,20 @@ let container = try LoomContainer(
 
 If you are using ``Loom`` directly, set `overlayProbePort` on ``LoomNetworkConfiguration`` for the local node and construct ``LoomOverlayDirectory`` yourself for remote peer resolution.
 
+### Dial without answering probes
+
+A node that only connects outward, such as a client that never needs to be discovered over the overlay, doesn't need its own probe listener. Call ``LoomOverlayDirectoryConfiguration/dialOnly()`` (or set ``LoomOverlayDirectoryConfiguration/listensForProbes`` to `false`). The directory still probes remote seeds on ``LoomOverlayDirectoryConfiguration/probePort``, but a LoomKit container leaves `overlayProbePort` unset on its node, so nothing binds that port locally:
+
+```swift
+let overlayDirectory = LoomOverlayDirectoryConfiguration(
+    seedProvider: {
+        [LoomOverlaySeed(host: "studio-mac.tailnet.example")]
+    }
+).dialOnly()
+```
+
+This also avoids an "address already in use" start failure when two nodes share one network stack, for example a client running in a simulator next to a host on the same machine.
+
 ## Pin the identity you already trust
 
 An overlay probe answers with the advertisement of whatever Loom node listens at that host. If a tailnet address is reassigned, or a seed comes from an inventory you don't fully control, that advertisement can name a different identity key than the device you meant to reach. By default a connection plan expects the advertised key, so the handshake would succeed against the wrong device.

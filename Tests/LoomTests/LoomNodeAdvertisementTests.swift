@@ -151,6 +151,10 @@ struct LoomNodeAdvertisementTests {
     @MainActor
     @Test("Restarting authenticated advertising closes every previous listener generation")
     func authenticatedAdvertisingRestartClosesPreviousGeneration() async throws {
+        // Assert on the listener objects, not on whether a freed port refuses
+        // connections: in a parallel run another test can bind the freed
+        // ephemeral port before the check, which made this test flaky.
+        let backend = ListenerRecordingNetworkBackend()
         let node = LoomNode(
             configuration: LoomNetworkConfiguration(
                 enableBonjour: false,
@@ -160,7 +164,9 @@ struct LoomNodeAdvertisementTests {
             identityManager: LoomIdentityManager(
                 service: "loom.tests.advertising.restart.\(UUID().uuidString)",
                 synchronizable: false
-            )
+            ),
+            trustProvider: nil,
+            networkBackend: backend
         )
         defer {
             Task { await node.stopAdvertising() }
@@ -183,7 +189,10 @@ struct LoomNodeAdvertisementTests {
             helloProvider: helloProvider,
             onSession: { _ in }
         )
-        let firstPort = try #require(firstPorts[.tcp])
+        _ = try #require(firstPorts[.tcp])
+        let firstGeneration = backend.listeners
+        #expect(!firstGeneration.isEmpty)
+        #expect(firstGeneration.allSatisfy { !$0.isCancelled })
 
         node.configuration.controlPort = 0
         let replacementPorts = try await node.startAuthenticatedAdvertising(
@@ -192,11 +201,18 @@ struct LoomNodeAdvertisementTests {
             onSession: { _ in }
         )
         let replacementPort = try #require(replacementPorts[.tcp])
-        #expect(replacementPort != firstPort)
-        #expect(!(await canConnectToNodeTestPort(firstPort)))
+        let replacementGeneration = backend.listeners.filter { candidate in
+            !firstGeneration.contains { $0 === candidate }
+        }
+        #expect(!replacementGeneration.isEmpty)
+        #expect(firstGeneration.allSatisfy(\.isCancelled))
+        #expect(replacementGeneration.allSatisfy { !$0.isCancelled })
+        // The live replacement must accept connections; a port that is still
+        // bound can't be taken over by another test.
+        #expect(await canConnectToNodeTestPort(replacementPort))
 
         await node.stopAdvertising()
-        #expect(!(await canConnectToNodeTestPort(replacementPort)))
+        #expect(backend.listeners.allSatisfy(\.isCancelled))
     }
 
     @Test("Bonjour advertiser recovery delay backs off and caps")
@@ -390,5 +406,71 @@ private final class LoomNodeAdvertisementTestContinuationBox<Value: Sendable>: @
         case .failure(let error):
             continuation?.resume(throwing: error)
         }
+    }
+}
+
+/// Network backend that wraps the platform default and records every listener
+/// it hands out, so tests can check which listener objects were cancelled.
+private final class ListenerRecordingNetworkBackend: LoomNetworkBackend, @unchecked Sendable {
+    private let base: any LoomNetworkBackend
+    private let lock = NSLock()
+    private var recorded: [RecordingNetworkListener] = []
+
+    init() {
+        base = LoomNetworkFrameworkBackend()
+    }
+
+    var listeners: [RecordingNetworkListener] {
+        lock.withLock { recorded }
+    }
+
+    func makeConnection(
+        to endpoint: LoomNetworkEndpoint,
+        using transportKind: LoomTransportKind,
+        configuration: LoomNetworkConnectionConfiguration
+    ) throws -> any LoomNetworkConnection {
+        try base.makeConnection(to: endpoint, using: transportKind, configuration: configuration)
+    }
+
+    func makeListener(
+        using transportKind: LoomTransportKind,
+        configuration: LoomNetworkListenerConfiguration
+    ) throws -> any LoomNetworkListener {
+        let listener = RecordingNetworkListener(
+            base: try base.makeListener(using: transportKind, configuration: configuration)
+        )
+        lock.withLock { recorded.append(listener) }
+        return listener
+    }
+}
+
+private final class RecordingNetworkListener: LoomNetworkListener, @unchecked Sendable {
+    private let base: any LoomNetworkListener
+    private let lock = NSLock()
+    private var cancelled = false
+
+    init(base: any LoomNetworkListener) {
+        self.base = base
+    }
+
+    var isCancelled: Bool {
+        lock.withLock { cancelled }
+    }
+
+    var transportKind: LoomTransportKind {
+        base.transportKind
+    }
+
+    func start(port: UInt16) async throws -> UInt16 {
+        try await base.start(port: port)
+    }
+
+    func makeConnectionStream() async -> AsyncStream<any LoomNetworkConnection> {
+        await base.makeConnectionStream()
+    }
+
+    func cancel() async {
+        await base.cancel()
+        lock.withLock { cancelled = true }
     }
 }

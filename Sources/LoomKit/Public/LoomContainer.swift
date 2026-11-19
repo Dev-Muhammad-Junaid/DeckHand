@@ -70,7 +70,7 @@ public final class LoomContainer {
             serviceType: trimmedServiceType,
             controlPort: self.configuration.ports.tcpPort,
             udpPort: self.configuration.ports.udpPort,
-            overlayProbePort: self.configuration.overlayDirectory?.probePort,
+            overlayProbePort: Self.localOverlayProbePort(for: self.configuration.overlayDirectory),
             enablePeerToPeer: configuration.enablePeerToPeer,
             enabledDirectTransports: configuration.enabledDirectTransports,
             directConnectionPolicy: configuration.directConnectionPolicy
@@ -223,13 +223,28 @@ public final class LoomContainer {
         guard overlayDirectory.usesDefaultProbePort else {
             return overlayDirectory
         }
-        return LoomOverlayDirectoryConfiguration(
+        var resolved = LoomOverlayDirectoryConfiguration(
             probePort: ports.overlayProbePort,
             refreshInterval: overlayDirectory.refreshInterval,
             probeTimeout: overlayDirectory.probeTimeout,
             probeAttempts: overlayDirectory.probeAttempts,
             probeRetryDelay: overlayDirectory.probeRetryDelay,
+            retainedPeerExpiration: overlayDirectory.retainedPeerExpiration,
+            directConnectionPolicy: overlayDirectory.directConnectionPolicy,
             seedProvider: overlayDirectory.seedProvider
         )
+        resolved.listensForProbes = overlayDirectory.listensForProbes
+        return resolved
+    }
+
+    /// The port the local node's overlay probe listener binds, or `nil` when the
+    /// container has no overlay directory or the directory is dial-only.
+    static func localOverlayProbePort(
+        for overlayDirectory: LoomOverlayDirectoryConfiguration?
+    ) -> UInt16? {
+        guard let overlayDirectory, overlayDirectory.listensForProbes else {
+            return nil
+        }
+        return overlayDirectory.probePort
     }
 }

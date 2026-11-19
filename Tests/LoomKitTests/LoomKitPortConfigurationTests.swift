@@ -68,4 +68,47 @@ struct LoomKitPortConfigurationTests {
 
         #expect(container.configuration.overlayDirectory?.probePort == 41_005)
     }
+
+    @MainActor
+    @Test("Container keeps the overlay probe listener by default")
+    func containerKeepsProbeListenerByDefault() throws {
+        let container = try LoomContainer(
+            for: LoomContainerConfiguration(
+                serviceName: "Listening Overlay Host",
+                overlayDirectory: LoomOverlayDirectoryConfiguration(
+                    seedProvider: { [] }
+                )
+            )
+        )
+
+        let overlayDirectory = try #require(container.configuration.overlayDirectory)
+        #expect(overlayDirectory.listensForProbes)
+        #expect(LoomContainer.localOverlayProbePort(for: overlayDirectory) == Loom.defaultOverlayProbePort)
+    }
+
+    @MainActor
+    @Test("A dial-only overlay directory opens no local probe listener but keeps probing remote seeds")
+    func dialOnlyOverlayDirectoryOpensNoProbeListener() throws {
+        let ports = LoomKitPortConfiguration(overlayProbePort: 41_006)
+        let container = try LoomContainer(
+            for: LoomContainerConfiguration(
+                serviceName: "Dial-only Overlay Client",
+                overlayDirectory: LoomOverlayDirectoryConfiguration(
+                    probeAttempts: 2,
+                    probeRetryDelay: .milliseconds(400),
+                    retainedPeerExpiration: .seconds(45),
+                    seedProvider: { [] }
+                ).dialOnly(),
+                ports: ports
+            )
+        )
+
+        let overlayDirectory = try #require(container.configuration.overlayDirectory)
+        #expect(!overlayDirectory.listensForProbes)
+        #expect(overlayDirectory.probePort == 41_006)
+        #expect(overlayDirectory.probeAttempts == 2)
+        #expect(overlayDirectory.retainedPeerExpiration == .seconds(45))
+        #expect(LoomContainer.localOverlayProbePort(for: overlayDirectory) == nil)
+        #expect(LoomContainer.localOverlayProbePort(for: nil) == nil)
+    }
 }
