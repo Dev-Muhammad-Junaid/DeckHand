@@ -399,3 +399,55 @@ Allow / trackpad / mirror / chips still work after the protocol reset.
 
 Status: READY FOR MAC BUILD (build 3)
 
+
+## Build 4 queued (2026-11-19)
+
+Build 3 was never built on the Mac. Build 4 replaces it, so build it
+instead: it holds the foundation (everything listed under build 3) plus the
+first three Sill lanes. Protocol is now **version 5**, so both devices must
+run this build.
+
+Merged (each lane's handoff doc has the full check list):
+
+- **Network** (`LANE-network.md`): S1 AWDL off (`enablePeerToPeer: false`)
+  and a 0.25 s keep-alive tick on Wi-Fi with background pause; S13 link
+  judge and **Wired** badge over a USB cable (IOKit CDC-NCM probe). Loom:
+  `LoomSessionNetworkPathSnapshot` gains ordered `interfaces` and
+  `primaryInterface` (+4 Loom tests).
+- **Mac system control** (`LANE-mac-system.md`): S7 the user's real Mission
+  Control / App Exposé / Spaces shortcuts via `dlsym` CGS calls (no more
+  `osascript` or Automation prompt for these); Show Desktop and Launchpad
+  through the same resolver; S8 locked-Mac gate (lock banner on the iPad,
+  refusals while locked) and display wake; S9 bounded AX menu reads;
+  `SpacesMonitor` sends `system.displayState` and refuses Space switches
+  past either end.
+- **Mirror** (`LANE-mirror.md`): frames on their own Loom stream
+  (`pixelhand.mirror`, binary framing), S3 pointer drawn on the iPad
+  (capture without cursor), display picker with Follow Cursor, "Cursor on
+  <display>" badge with Bring Here / Show, S6 stats line (Settings › Live
+  mirror › Show stream stats).
+
+Coordinator merge fixes: protocol renumbered (Network 3, Mac system 4,
+Mirror 5), fixtures re-recorded (41 cases); the lock gate now covers
+`mirror.moveCursor` (Locate's rule) and allows `diagnostics` stats.
+Linux: `swift test --package-path DeckHand/Core` 222 tests pass;
+`Scripts/linux-typecheck/run.sh` clean. **The apps were not compiled
+here.** Each handoff doc lists its compile risks, most likely first.
+
+Mac should check:
+
+1. `cd DeckHand && xcodegen generate` (new `Network/` and `Mirror/` folders), then
+   build both apps; fix compile errors using the handoff docs' §"Compile
+   risks" lists (note what you changed here).
+2. `swift test --package-path DeckHand/Core` (expect 222),
+   `swift test --scratch-path .build-local` (Loom, previous count + 4),
+   `DeckHandTests`.
+3. Build 3's checks: Settings screens on both platforms; connect / Allow /
+   trackpad / chips work after the protocol reset.
+4. The check tables in `LANE-network.md` §3, `LANE-mac-system.md` §4 and
+   `LANE-mirror.md` §7. The highest-value ones: mirror with pointer and
+   picker on two displays; Mission Control / Show Desktop / Launchpad on
+   macOS 27 (record which mechanism works); lock the Mac and type the
+   password from the iPad; Wired badge over USB-C.
+
+Status: READY FOR MAC BUILD (build 4)

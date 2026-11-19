@@ -288,7 +288,7 @@ import Testing
         switch message {}
     }
 
-    /// Cases in this protocol version. Bump with every added or removed case.
+    /// Cases in protocol version 6. Bump with every added or removed case.
     static let expectedCaseCount = 42
 
     /// The current version, for the hand-written JSON below.

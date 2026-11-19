@@ -187,8 +187,7 @@ public enum LockPolicy {
                 // would show its desktop behind the login window.
                 return offConsole ? .refuse(reply: .none) : .allow
             case .moveCursor:
-                // Moving the pointer is input: fine at the lock screen,
-                // not when another user has the screen.
+                // Moves the pointer, like Locate.
                 return offConsole ? .refuse(reply: .none) : .allow
             case .stop, .requestKeyFrame, .displayList, .error:
                 // A key frame only affects a mirror the gate already let start.
@@ -209,7 +208,7 @@ public enum LockPolicy {
             }
 
         case .diagnostics:
-            // Mirror stats only: numbers about the stream, nothing on screen.
+            // Mirror stats: logged only, nothing runs.
             return .allow
 
         case .sharing:

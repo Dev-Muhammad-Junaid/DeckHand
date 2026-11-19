@@ -32,7 +32,6 @@ public enum PixelHandProtocol {
     /// - 3: `session.tick` (Wi-Fi keep-alive) and `session.link(kind:)`.
     /// - 4: `system.displayState` (displays, Spaces, pointer display) and
     ///   `system.lockState`; `RefusalReason.macLocked`.
-    
     /// - 5: mirror frames and the cursor move to the binary mirror stream
     ///   (`mirror.frame` removed); `diagnostics` carries mirror stats.
     /// - 6: HEVC mirror (S5): `mirror.start` gains `codec`, new
