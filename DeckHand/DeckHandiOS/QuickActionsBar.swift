@@ -167,6 +167,7 @@ struct QuickActionsBar: View {
                     }
                 }
             }
+            .requiresPro(.decks) // Store lane
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
@@ -217,6 +218,7 @@ struct QuickActionsBar: View {
         HStack(spacing: 8) {
             shortcutChipsSegment
                 .id("ctx-\(activeBundleID ?? "none")")
+                .requiresPro(.decks) // Store lane
 
             if showNumericKeypad {
                 chipDivider

@@ -65,6 +65,7 @@ struct ControlToolbar: ToolbarContent {
             }
             .tint(isMirrorActive ? DeckHandTheme.mint : nil)
             .accessibilityLabel(isMirrorActive ? "Stop live mirror" : "Start live mirror")
+            .requiresPro(.mirror) // Store lane
         }
         ToolbarItem(placement: .topBarTrailing) {
             CaptureCapsule(
@@ -75,6 +76,7 @@ struct ControlToolbar: ToolbarContent {
                 onOCR: onOCR,
                 onPrimary: onPrimaryCapture
             )
+            .requiresPro(.capture) // Store lane
         }
         // `ToolbarSpacer` is iOS 26 SDK-only — compile-time gate it
         // (Xcode 26 / Swift 6.2) so the toolbar still builds on

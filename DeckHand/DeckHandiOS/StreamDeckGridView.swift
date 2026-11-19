@@ -311,6 +311,7 @@ private struct AppButton: View {
             .animation(.easeInOut(duration: 0.2), value: isActive)
         }
         .buttonStyle(.plain)
+        .requiresPro(.decks) // Store lane
         .simultaneousGesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { _ in isPressed = true }

@@ -68,6 +68,7 @@ struct DeckHandApp: App {
                     StartupFailureView(message: startupError)
                 }
             }
+            .subscriptionStore() // Store lane: StoreKit, \.entitlements, paywalls
             .environmentObject(settings)
             .preferredColorScheme(settings.appearance.colorScheme)
         }

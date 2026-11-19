@@ -161,6 +161,7 @@ struct PeerPickerView: View {
                 ) {
                     connectTo(peer)
                 }
+                .freeMacBadge(deviceID: peer.deviceID) // Store lane
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
                 .animation(
                     reduceMotion
@@ -223,6 +224,7 @@ struct PeerPickerView: View {
 
     private func connectTo(_ peer: LoomPeerSnapshot) {
         guard connecting == nil else { return }
+        guard SubscriptionStore.shared.admitMac(deviceID: peer.deviceID, name: peer.name, retry: { connectTo(peer) }) else { return } // Store lane: one Mac on the free plan
 
         // A Mac on a different Loom protocol would fail the handshake with a
         // generic error. Say which side to update instead of dialling.
