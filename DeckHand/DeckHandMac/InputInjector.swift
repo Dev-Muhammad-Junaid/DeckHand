@@ -35,6 +35,9 @@ final class InputInjector {
     /// Timestamp of the previous `moveCursor` injection, used to detect
     /// dropped frames during active movement (cursor-jitter investigation).
     private var lastMoveCursorAt: Date?
+    /// Buttons a remote holds down (`input.mouseDown`), so pointer moves
+    /// are posted as drags. `DragGuard` decides when they go down and up.
+    private(set) var heldButtons: Set<MouseButton> = []
 
     /// Logs (≤1/sec) that an inbound input event was dropped because
     /// Accessibility isn't granted — the smoking gun for "received but
@@ -110,10 +113,13 @@ final class InputInjector {
 
         let next = CGPoint(x: cgCurrent.x + Double(accelDx),
                            y: cgCurrent.y + Double(accelDy))
+        // While a remote holds a button the move is a drag, or the app
+        // under the pointer sees a hover and drops the drag.
+        let (moveType, moveButton) = dragMoveType()
         let event = CGEvent(mouseEventSource: nil,
-                            mouseType: .mouseMoved,
+                            mouseType: moveType,
                             mouseCursorPosition: next,
-                            mouseButton: .left)
+                            mouseButton: moveButton)
         event?.post(tap: .cghidEventTap)
         noteInjectionActive("mouseDelta")
     }
@@ -211,6 +217,96 @@ final class InputInjector {
         noteInjectionActive("click")
     }
 
+    // MARK: - Drag (button down / up)
+
+    /// Presses `button` and keeps it down; moves become drags until
+    /// `mouseUp`. Called by `DragGuard` only for a new press.
+    func mouseDown(button: MouseButton) {
+        guard isAccessibilityGranted else { noteInjectSkipped("mouseDown"); return }
+        let (downType, _, cgButton) = cgMouseTypes(for: button)
+        heldButtons.insert(button)
+        let event = CGEvent(mouseEventSource: nil, mouseType: downType,
+                            mouseCursorPosition: currentCGCursorPosition(), mouseButton: cgButton)
+        event?.setIntegerValueField(.mouseEventClickState, value: 1)
+        event?.post(tap: .cghidEventTap)
+        noteInjectionActive("mouseDown")
+    }
+
+    /// Releases a button pressed with `mouseDown`. The bookkeeping clears
+    /// first, so later moves are plain moves whatever happens here.
+    func mouseUp(button: MouseButton) {
+        heldButtons.remove(button)
+        guard isAccessibilityGranted else { noteInjectSkipped("mouseUp"); return }
+        let (_, upType, cgButton) = cgMouseTypes(for: button)
+        let event = CGEvent(mouseEventSource: nil, mouseType: upType,
+                            mouseCursorPosition: currentCGCursorPosition(), mouseButton: cgButton)
+        event?.setIntegerValueField(.mouseEventClickState, value: 1)
+        event?.post(tap: .cghidEventTap)
+    }
+
+    /// The event type for a pointer move: a drag of the held button (left
+    /// first), or a plain move.
+    private func dragMoveType() -> (CGEventType, CGMouseButton) {
+        if heldButtons.contains(.left) { return (.leftMouseDragged, .left) }
+        if heldButtons.contains(.right) { return (.rightMouseDragged, .right) }
+        if heldButtons.contains(.middle) { return (.otherMouseDragged, .center) }
+        return (.mouseMoved, .left)
+    }
+
+    // MARK: - Typed text (input.typeText)
+    //
+    // `TypingQueue` plans the text with Core's `TypingPlanner` and calls
+    // these one step at a time, paced, so the frontmost app keeps up.
+
+    /// A dedicated source, so a modifier the person holds on the Mac's
+    /// own keyboard doesn't turn typed letters into shortcuts.
+    private lazy var typingSource = CGEventSource(stateID: .privateState)
+
+    /// Presses and releases one key of the current layout, with Shift or
+    /// Option held when the character needs them.
+    func typeKey(_ stroke: LayoutKeyStroke) {
+        guard isAccessibilityGranted else { noteInjectSkipped("typeText"); return }
+        var flags: CGEventFlags = []
+        if stroke.shift { flags.insert(.maskShift) }
+        if stroke.option { flags.insert(.maskAlternate) }
+        let keyCode = CGKeyCode(stroke.keyCode)
+        for isDown in [true, false] {
+            guard let event = CGEvent(keyboardEventSource: typingSource, virtualKey: keyCode, keyDown: isDown) else { continue }
+            event.flags = flags
+            event.post(tap: .cghidEventTap)
+        }
+        noteInjectionActive("typeText")
+    }
+
+    /// Presses and releases a named key from Core's `KeyTable` (Return, Tab).
+    func typeNamedKey(_ name: String) {
+        guard isAccessibilityGranted else { noteInjectSkipped("typeText"); return }
+        guard let code = KeyTable.keyCode(for: name) else { return }
+        for isDown in [true, false] {
+            guard let event = CGEvent(keyboardEventSource: typingSource, virtualKey: CGKeyCode(code), keyDown: isDown) else { continue }
+            event.flags = []
+            event.post(tap: .cghidEventTap)
+        }
+    }
+
+    /// Types `text` (at most `TypingPlanner.maxUnicodeUnitsPerEvent` UTF-16
+    /// units) as a Unicode string on one key-down/up pair, for characters
+    /// the layout can't type.
+    func typeUnicode(_ text: String) {
+        guard isAccessibilityGranted else { noteInjectSkipped("typeText"); return }
+        let units = Array(text.utf16.prefix(TypingPlanner.maxUnicodeUnitsPerEvent))
+        guard !units.isEmpty else { return }
+        for isDown in [true, false] {
+            guard let event = CGEvent(keyboardEventSource: typingSource, virtualKey: 0, keyDown: isDown) else { continue }
+            event.flags = []
+            units.withUnsafeBufferPointer { buffer in
+                event.keyboardSetUnicodeString(stringLength: buffer.count, unicodeString: buffer.baseAddress)
+            }
+            event.post(tap: .cghidEventTap)
+        }
+        noteInjectionActive("typeText")
+    }
+
     // MARK: - Keyboard shortcuts
 
     /// Sends a keyboard shortcut specified as an array of key name strings.
@@ -264,15 +360,22 @@ final class InputInjector {
     }
 
     /// Maps a `CGEventFlags` set to the virtual key codes we need to press so
-    /// AppKit sees `flagsChanged` events for each modifier.
+    /// AppKit sees `flagsChanged` events for each modifier (Core's
+    /// `KeyModifier` codes, in its press order).
     private func activeModifierKeys(_ flags: CGEventFlags) -> [CGKeyCode] {
-        var keys: [CGKeyCode] = []
-        if flags.contains(.maskCommand)     { keys.append(0x37) } // left cmd
-        if flags.contains(.maskShift)       { keys.append(0x38) } // left shift
-        if flags.contains(.maskAlternate)   { keys.append(0x3A) } // left option
-        if flags.contains(.maskControl)     { keys.append(0x3B) } // left control
-        if flags.contains(.maskSecondaryFn) { keys.append(0x3F) } // fn
-        return keys
+        KeyModifier.pressOrder
+            .filter { flags.contains(Self.flag(for: $0)) }
+            .map { CGKeyCode($0.keyCode) }
+    }
+
+    private static func flag(for modifier: KeyModifier) -> CGEventFlags {
+        switch modifier {
+        case .command: .maskCommand
+        case .shift: .maskShift
+        case .option: .maskAlternate
+        case .control: .maskControl
+        case .function: .maskSecondaryFn
+        }
     }
 
     // MARK: - Media Controls
@@ -402,43 +505,20 @@ final class InputInjector {
         }
     }
 
-    /// Maps string key names → (CGEventFlags, CGKeyCode?)
+    /// Maps string key names → (CGEventFlags, CGKeyCode?) with Core's
+    /// `KeyTable`, which both apps share and Core tests.
     private func parseKeys(_ keys: [String]) -> (CGEventFlags, CGKeyCode?) {
-        var flags: CGEventFlags = []
-        var keyCode: CGKeyCode?
-
-        for key in keys.map({ $0.lowercased() }) {
-            switch key {
-            case "cmd", "command": flags.insert(.maskCommand)
-            case "shift":          flags.insert(.maskShift)
-            case "option", "alt":  flags.insert(.maskAlternate)
-            case "ctrl", "control": flags.insert(.maskControl)
-            case "fn":             flags.insert(.maskSecondaryFn)
-            default:
-                keyCode = keyCodeForName(key)
+        guard let chord = KeyTable.chord(keys) else {
+            // Keep the old leniency for modifiers-only or unknown keys: the
+            // flags still parse, there's just no key to press.
+            var flags: CGEventFlags = []
+            for name in keys {
+                if let modifier = KeyModifier.named(name) { flags.insert(Self.flag(for: modifier)) }
             }
+            return (flags, nil)
         }
-        return (flags, keyCode)
-    }
-
-    private func keyCodeForName(_ name: String) -> CGKeyCode? {
-        // Common key mapping
-        let map: [String: CGKeyCode] = [
-            "a": 0, "s": 1, "d": 2, "f": 3, "h": 4, "g": 5,
-            "z": 6, "x": 7, "c": 8, "v": 9, "b": 11, "q": 12,
-            "w": 13, "e": 14, "r": 15, "y": 16, "t": 17, "1": 18,
-            "2": 19, "3": 20, "4": 21, "6": 22, "5": 23, "=": 24,
-            "9": 25, "7": 26, "-": 27, "8": 28, "0": 29, "]": 30,
-            "o": 31, "u": 32, "[": 33, "i": 34, "p": 35, "l": 37,
-            "j": 38, "'": 39, "k": 40, ";": 41, "\\": 42, ",": 43,
-            "/": 44, "n": 45, "m": 46, ".": 47, "`": 50, " ": 49,
-            "space": 49, "return": 36, "enter": 36, "tab": 48,
-            "delete": 51, "backspace": 51, "escape": 53, "esc": 53,
-            "up": 126, "down": 125, "left": 123, "right": 124,
-            "f1": 122, "f2": 120, "f3": 99, "f4": 118,
-            "f5": 96, "f6": 97, "f7": 98, "f8": 100,
-            "f9": 101, "f10": 109, "f11": 103, "f12": 111,
-        ]
-        return map[name.lowercased()]
+        var flags: CGEventFlags = []
+        for modifier in chord.modifiers { flags.insert(Self.flag(for: modifier)) }
+        return (flags, CGKeyCode(chord.keyCode))
     }
 }

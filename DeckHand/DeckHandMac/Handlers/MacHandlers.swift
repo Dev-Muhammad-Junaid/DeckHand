@@ -21,6 +21,7 @@ final class MacHandlers {
     let capture = CaptureHandler()
     let pairing = PairingHandler()
     let session = SessionHandler()
+    let sharing = SharingHandler()
     let diagnostics = DiagnosticsHandler()
 
     let router: ControlRouter<LoomConnectionHandle>
@@ -35,6 +36,7 @@ final class MacHandlers {
             capture: capture,
             pairing: pairing,
             session: session,
+            sharing: sharing,
             diagnostics: diagnostics
         )
         // A tracked run is dispatched as the message its action stands for,

@@ -117,6 +117,7 @@ enum MacSystemSession {
         MacLockMonitor.shared.removeConnection(id: id)
         SpacesMonitor.shared.removeConnection(id: id)
         LockGate.shared.forget(id)
+        InteractionSession.connectionRemoved(id: id) // iOS interaction lane: drag release, clipboard
     }
 
     static func lockStateChanged(from previous: MacLockState, to next: MacLockState) {

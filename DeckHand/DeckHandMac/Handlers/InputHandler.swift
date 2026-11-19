@@ -2,8 +2,11 @@
 //  InputHandler.swift
 //  DeckHandMac
 //
-//  Domain: input. Pointer, scroll, clicks, key chords and media keys,
-//  posted through `InputInjector`. Owned by the Mac system control lane.
+//  Domain: input. Pointer, scroll, clicks, drags, key chords, typed text
+//  and media keys, posted through `InputInjector`. Owned by the iOS
+//  interaction lane. Typed text and chords go through `TypingQueue` so a
+//  chord never overtakes the text before it; held buttons through
+//  `DragGuard`, which releases them if the remote vanishes.
 //
 
 import AppKit
@@ -27,8 +30,17 @@ final class InputHandler: DomainHandler {
         case let .mouseDoubleClick(button):
             injector.click(button: button, double: true)
 
+        case let .mouseDown(button):
+            DragGuard.shared.mouseDown(button, from: connection.id)
+
+        case let .mouseUp(button):
+            DragGuard.shared.mouseUp(button, from: connection.id)
+
         case let .keyboardShortcut(keys):
-            injector.sendShortcut(keys: keys)
+            TypingQueue.shared.shortcut(keys)
+
+        case let .typeText(text):
+            TypingQueue.shared.type(text)
 
         case let .media(key):
             switch key {
