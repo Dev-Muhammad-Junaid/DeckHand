@@ -87,7 +87,7 @@ struct ControlView: View {
                         Group {
                             switch selectedTab {
                             case .trackpad:
-                                TrackpadView(sender: sender, colorScheme: colorScheme)
+                                TrackpadView(sender: sender, colorScheme: colorScheme, clipboard: session.clipboard)
                             case .streamdeck:
                                 StreamDeckGridView(
                                     sender: sender,

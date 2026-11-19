@@ -221,4 +221,8 @@ final class UIImage: @unchecked Sendable {
     init?(data: Data) {}
     func preparingForDisplay() -> UIImage? { self }
 }
-enum TrackpadGestureKind { enum ThreeFingerDirection { case left, right, up, down } }
+// iOS interaction lane
+final class UIPasteboard: @unchecked Sendable {
+    static let general = UIPasteboard()
+    var string: String?
+}

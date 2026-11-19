@@ -197,3 +197,28 @@ import Testing
         }
     }
 }
+
+@Suite struct TypingEditTests {
+    @Test("Typing at the end is an insert")
+    func append() {
+        #expect(TypingEdit.between("hel", "hello") == TypingEdit(deletes: 0, insert: "lo"))
+        #expect(TypingEdit.between("", "a") == TypingEdit(deletes: 0, insert: "a"))
+    }
+
+    @Test("Backspace is a delete")
+    func backspace() {
+        #expect(TypingEdit.between("hello", "hell") == TypingEdit(deletes: 1, insert: ""))
+        #expect(TypingEdit.between("a👋🏽", "a") == TypingEdit(deletes: 1, insert: ""), "one character")
+    }
+
+    @Test("Autocorrect replaces the end of the word")
+    func autocorrect() {
+        #expect(TypingEdit.between("I saw teh", "I saw the ") == TypingEdit(deletes: 2, insert: "he "))
+    }
+
+    @Test("An input method's commit replaces its romaji")
+    func inputMethodCommit() {
+        #expect(TypingEdit.between("say ", "say 日本") == TypingEdit(deletes: 0, insert: "日本"))
+        #expect(TypingEdit.between("x", "x") .isEmpty)
+    }
+}

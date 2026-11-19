@@ -42,6 +42,11 @@ final class DeckHandSettings: ObservableObject {
         static let hasCompletedOnboarding = "settings.hasCompletedOnboarding"
         /// Owned by `StreamDeckGridView`; the key predates this store.
         static let hiddenApps = "hiddenBundleIDs"
+        // MARK: iOS interaction (lane)
+        static let trackpadGestures = "settings.trackpadGestures"
+        static let pencilHoverPointer = "settings.pencilHoverPointer"
+        static let clipboardSync = "settings.clipboardSync"
+        static let pasteRightAway = "settings.pasteRightAway"
     }
 
     private let defaults: UserDefaults
@@ -70,6 +75,31 @@ final class DeckHandSettings: ObservableObject {
     /// off, which preserves the direction the app has always used.
     @Published var naturalScrolling: Bool {
         didSet { defaults.set(naturalScrolling, forKey: Key.naturalScrolling) }
+    }
+
+    // MARK: iOS interaction (lane)
+    // Choices and copy in Settings/DeckHandSettings+Input.swift.
+
+    /// Three- and four-finger swipes and pinches run Mac views (S11).
+    @Published var trackpadGestures: Bool {
+        didSet { defaults.set(trackpadGestures, forKey: Key.trackpadGestures) }
+    }
+
+    /// Apple Pencil hovering over the trackpad moves the pointer (S12).
+    @Published var pencilHoverPointer: Bool {
+        didSet { defaults.set(pencilHoverPointer, forKey: Key.pencilHoverPointer) }
+    }
+
+    /// The Mac's clipboard text comes to this device (S10). Off until the
+    /// person turns it on.
+    @Published var clipboardSync: Bool {
+        didSet { defaults.set(clipboardSync, forKey: Key.clipboardSync) }
+    }
+
+    /// Paste to Mac also presses ⌘V on the Mac; off puts it on the Mac's
+    /// clipboard only.
+    @Published var pasteRightAway: Bool {
+        didSet { defaults.set(pasteRightAway, forKey: Key.pasteRightAway) }
     }
 
     // ── Live mirror ─────────────────────────────────────────────────
@@ -176,6 +206,12 @@ final class DeckHandSettings: ObservableObject {
         shareCrashReports = DeckHandDiagnostics.isEnabledByUser
 
         hasCompletedOnboarding = defaults.bool(forKey: Key.hasCompletedOnboarding)
+
+        // MARK: iOS interaction (lane)
+        trackpadGestures = defaults.object(forKey: Key.trackpadGestures) as? Bool ?? true
+        pencilHoverPointer = defaults.object(forKey: Key.pencilHoverPointer) as? Bool ?? true
+        clipboardSync = defaults.bool(forKey: Key.clipboardSync)
+        pasteRightAway = defaults.object(forKey: Key.pasteRightAway) as? Bool ?? true
 
         GestureHaptic.strength = hapticStrength
     }

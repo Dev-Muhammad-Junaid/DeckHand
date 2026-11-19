@@ -204,3 +204,37 @@ public enum TypingPlanner {
         return steps
     }
 }
+
+/// What changed in the remote's typing field, as the Mac must replay it:
+/// Backspaces, then text. The remote keeps a local field so the system
+/// keyboard's autocorrect, dictation and input methods (Chinese, Japanese,
+/// Korean) work; each committed change is diffed against the last one and
+/// replayed at the Mac's cursor. Counted in characters, as one Backspace
+/// on the Mac deletes one character.
+public struct TypingEdit: Equatable, Sendable {
+    public var deletes: Int
+    public var insert: String
+
+    public init(deletes: Int, insert: String) {
+        self.deletes = deletes
+        self.insert = insert
+    }
+
+    public var isEmpty: Bool { deletes == 0 && insert.isEmpty }
+
+    /// The edit that turns `old` into `new`, assuming the caret sits at the
+    /// end of both: the shared beginning stays, the rest of `old` is
+    /// deleted and the rest of `new` typed.
+    public static func between(_ old: String, _ new: String) -> TypingEdit {
+        let oldChars = Array(old)
+        let newChars = Array(new)
+        var common = 0
+        while common < oldChars.count, common < newChars.count, oldChars[common] == newChars[common] {
+            common += 1
+        }
+        return TypingEdit(
+            deletes: oldChars.count - common,
+            insert: String(newChars[common...])
+        )
+    }
+}
