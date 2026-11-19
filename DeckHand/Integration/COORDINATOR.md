@@ -4,12 +4,13 @@
 
 ## Needs the owner
 
-- **App Store Connect (for Store/StoreKit):** Paid Applications agreement
-  active; create group "Pixel Hand Pro" with `com.widgetsflow.pixelhand.pro.monthly`
-  ($2.99) and `.yearly` ($19.99), levels, Family Sharing on, 2-week free
-  intro offer, review screenshot; 16-day billing grace period; submit both
-  with the next app version; update the product page and review notes; make
-  a sandbox tester. Steps: `DeckHand/AppStore/Subscription.md` §1.
+- **App Store Connect:** done 2026-11-20 (see
+  `DeckHand/AppStore/AppStoreConnectStatus.md`): app is Free; "Pixel Hand
+  Pro" group with yearly ($19.99) and monthly ($2.99), 2-week trial, Family
+  Sharing, 16-day grace period; URLs set; App Privacy published. Left for
+  later: paywall review screenshot per subscription (needs a build with the
+  paywall), App Review notes' demo video, Paid Applications agreement
+  (with Apple), CloudKit schema deploy before release.
 - **Mac build loop:** see the note above. No Mac has built anything since
   build 2, and the roadmap phase waits for a green Mac build.
 
