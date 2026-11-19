@@ -511,3 +511,47 @@ check table (mirror one Safari window with JPEG and HEVC, resize it, close
 it, lock the Mac while it runs).
 
 Status: READY FOR MAC BUILD (build 6)
+
+## Build 7 queued (2026-11-19): every Sill lane merged
+
+Build 6 hasn't been built yet. Build 7 replaces it, and it is the **complete
+Sill phase**: the foundation plus every lane. Protocol is **version 11**.
+
+New since build 6 (each handoff doc has its check list and compile risks):
+
+- **Network VPN** (`LANE-network-vpn.md`): S15 remote access to a *paired*
+  Mac over Tailscale/VPN, pinned to the stored identity key. Loom gains
+  `LoomPeerIdentityPin` and `LoomContext.connect(_:pinnedIdentity:)` (+6
+  Loom tests, DocC updated). There's a "Remote access" area in Settings ›
+  Connection, and the mirror uses lower quality when away.
+- **Audio** (`LANE-audio.md`): S17 Mac sound while mirroring. It's off by
+  default; the toggle is in Settings › Live mirror. Audio has its own Loom
+  stream and a jitter buffer on the iPad.
+- **Store** (`LANE-store.md`): StoreKit 2 Pixel Hand Pro (monthly/yearly,
+  2-week trial), paywall with disclosures, Restore Purchases, the
+  subscription row in Settings, and the free tier (trackpad, keyboard and
+  media keys with one Mac). `project.yml` now runs the iOS scheme with
+  `PixelHand.storekit`.
+
+Coordinator merge changes: protocol renumbered (VPN 10, Audio 11),
+fixtures re-recorded (55 cases), Store's `project.yml` change applied.
+Linux: Core **497 tests pass**, `linux-typecheck/run.sh` clean (now also
+checks `SubscriptionStore`). **The apps were not compiled here.**
+
+Mac should check:
+
+1. `cd DeckHand && xcodegen generate`, build both apps, and fix compile
+   errors using each `LANE-*.md` "Compile risks" list. This is the first
+   compile of eleven lanes' code, so record every fix here.
+2. `swift test --package-path DeckHand/Core` (expect 497);
+   `swift test --scratch-path .build-local` (Loom: previous + 10);
+   `DeckHandTests`.
+3. A smoke pass in this order: connect and Allow; pair with the code and
+   reconnect without the prompt; trackpad, typing and drag; Mission Control
+   / Show Desktop / Launchpad (macOS 27); mirror with HEVC, the pointer,
+   picker, dots, one window and audio; lock the Mac and type the password;
+   clipboard; Wired over USB-C; Tailscale away from home; the `.storekit`
+   purchase, trial, restore and the free-tier one-Mac rule.
+4. Then the detailed tables in each `LANE-*.md`.
+
+Status: READY FOR MAC BUILD (build 7)

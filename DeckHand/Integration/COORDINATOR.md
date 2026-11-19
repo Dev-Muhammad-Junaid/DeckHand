@@ -1,6 +1,17 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Mac loop needed:** run `/loop 1h Follow the "Build loop" section in DeckHand/Integration/MAC-BUILD.md on claude/pixelhand-integration` in a Mac session. (Build 3 waited about 14 h with no Mac build. Builds 4, 5 and 6 have been queued since; build 6 replaces all of them.)
+> **Mac loop needed:** run `/loop 1h Follow the "Build loop" section in DeckHand/Integration/MAC-BUILD.md on claude/pixelhand-integration` in a Mac session. (Build 3 waited about 14 h with no Mac build. Builds 4–7 have been queued since; build 7, the complete Sill phase, replaces all of them.)
+
+## Needs the owner
+
+- **App Store Connect (for Store/StoreKit):** Paid Applications agreement
+  active; create group "Pixel Hand Pro" with `com.widgetsflow.pixelhand.pro.monthly`
+  ($2.99) and `.yearly` ($19.99), levels, Family Sharing on, 2-week free
+  intro offer, review screenshot; 16-day billing grace period; submit both
+  with the next app version; update the product page and review notes; make
+  a sandbox tester. Steps: `DeckHand/AppStore/Subscription.md` §1.
+- **Mac build loop:** see the note above. No Mac has built anything since
+  build 2, and the roadmap phase waits for a green Mac build.
 
 The owner approved the full program (see `DECISIONS.md`). A scheduled cloud
 task starts a fresh coordinator session every 2 hours; it has no memory, so
@@ -14,23 +25,21 @@ weekly usage limit is close).
 | --- | --- | --- | --- |
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac) | session_01H5HwATvLJkqCFPruLyBsX8 | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
-| Lane: Network VPN (S15) | session_01H5HwAV9xeAp8DZb7gWseyK | claude/pixelhand-lane-network-vpn | `LANE-network-vpn.md` ends `Lane: READY TO MERGE` |
-| Lane: Store (StoreKit 2 + free tier; merge last) | session_01H5HwAVs7ec2swJGq7DGiQh | claude/pixelhand-lane-store | `LANE-store.md` ends `Lane: READY TO MERGE` |
-| Lane: Audio (S17) | session_01H5HwAVjmsSY4Xhpcuuecy2 | claude/pixelhand-lane-audio | `LANE-audio.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
-Merged: Network, Mac system control, Mirror, Mirror 2 (dots + S5),
-iOS interaction, Pairing, Mirror window (S14). Running: Network VPN (S15),
-Store, Audio (S17) — every Sill lane is now started. Store merges last; if it finishes first, it
-waits and re-merges integration before its merge.
+**Sill phase complete:** every lane is merged (Network, Mac system control,
+Mirror, Mirror 2, iOS interaction, Pairing, Mirror window, Network VPN,
+Audio, Store). No lane sessions are running.
 
-1. Roadmap + redesign (after all Sill lanes are merged and a Mac build is
-   green): merge the `claude/pixelhand-design-strategy` docs first, take its
-   recommended option; then design system + new layout, Deck 2, App
-   Intents/widgets/Control Center, multi-Mac, sharing between paired devices,
-   AI (on-device first), iPhone Fold two-pane, PiP live screen (backlog on
-   `claude/pixelhand-product-spec`). S16 virtual display stays deferred.
+Next, the roadmap and redesign phase. It **waits for a green Mac build** of
+build 7 (the brief's gate). After that: merge the
+`claude/pixelhand-design-strategy` docs, take its recommended option, then
+design system + new layout, Deck 2, App Intents/widgets/Control Center,
+multi-Mac, sharing between paired devices, AI (on-device first), iPhone
+Fold two-pane, PiP live screen (backlog on `claude/pixelhand-product-spec`).
+S16 virtual display stays deferred. If build 7 has bugs, route them to one
+fix session first.
 
 Lanes start only after Foundation is merged. Each lane: own branch from
 `claude/pixelhand-integration`, follows `LANES.md` file ownership,
@@ -68,3 +77,8 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   (`a05e0a7`), replacing 5. Network VPN and Store had failed at the limit
   with nothing pushed; told both to resume. Started Audio (S17). No Mac
   results yet.
+- 2026-11-19 ~18:50 UTC: tick 5. Merged Network VPN (protocol 10, clean;
+  Loom changes stay product-agnostic), Audio (renumbered to 11) and Store
+  (`project.yml` StoreKit config applied). Core 497 tests and the type check
+  are green. Build 7 queued: the whole Sill phase. Roadmap waits for a green
+  Mac build; ticks are now every 180 min.
