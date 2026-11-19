@@ -451,3 +451,47 @@ Mac should check:
    password from the iPad; Wired badge over USB-C.
 
 Status: READY FOR MAC BUILD (build 4)
+
+## Build 5 queued (2026-11-19)
+
+Build 4 hasn't been built yet. Build 5 replaces it, so build this one: it
+holds everything in builds 3 and 4 plus three more Sill lanes. Protocol is
+now **version 8**, so both devices must run this build.
+
+Merged since build 4 (each handoff doc has its full check list and
+compile risks):
+
+- **Mirror 2** (`LANE-mirror-2.md`): desktop dots and ‹ › edge rules under
+  the mirror; **S5 HEVC** (VideoToolbox encoder, `AVSampleBufferDisplayLayer`
+  on the iPad, key frame on request, delta-drop backpressure, watchdog and
+  JPEG fallback); `mirror.start` gains `codec`, plus `mirror.requestKeyFrame`.
+- **iOS interaction** (`LANE-ios-interaction.md`): text typing (Keyboard
+  button), click-drag (`mouseDown`/`mouseUp`, auto-release), S11 gestures,
+  S12 Pencil hover pointer, S10 clipboard text sync (`sharing` domain,
+  `UIPasteControl`).
+- **Pairing** (`LANE-pairing.md`): S4 persistent pairing keyed on the Loom
+  identity key, a 6-digit code with a check digit or a QR, lockout, and
+  Forget device on both sides.
+
+Coordinator merge changes: protocol renumbered (Mirror 2 → 6, iOS
+interaction → 7, Pairing → 8), fixtures re-recorded (52 cases);
+`NSCameraUsageDescription` added to the iOS Info.plist (QR); the Mac's
+`ControlReceiver` no longer logs typed text, clipboard text or pairing
+codes. Linux: Core **368 tests pass**, `linux-typecheck/run.sh` clean.
+**The apps were not compiled here.**
+
+Mac should check:
+
+1. `cd DeckHand && xcodegen generate`, build both apps, and fix compile
+   errors using each handoff doc's "Compile risks" list. Record what you
+   changed. This is the first compile of six lanes' code, so expect a few.
+2. `swift test --package-path DeckHand/Core` (expect 368),
+   `swift test --scratch-path .build-local` (Loom), `DeckHandTests`.
+3. Build 4's checks (above) and the build 3 basics.
+4. New: mirror codec shows **HEVC** in the stats line, and the picture stays
+   smooth; type a sentence and a password at the lock screen; drag a window;
+   four-finger swipes; clipboard round trip; pair with the code, quit both
+   apps, and reconnect without the Allow prompt; Forget device on both
+   sides.
+
+Status: READY FOR MAC BUILD (build 5)
