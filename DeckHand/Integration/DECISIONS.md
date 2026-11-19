@@ -3,6 +3,26 @@
 Recorded by the coordinating session ("Deckhand project status review").
 Newest first. If a doc elsewhere disagrees, this file wins.
 
+## 2026-11-19 — Design direction approved, with more pixel identity
+The owner reviewed the design board
+(https://claude.ai/artifact/Aa8KTJubKeqahy3cmSjRTm, branch
+`claude/pixelhand-design-strategy`) and approved the direction: "I really
+liked the direction". For the redesign phase:
+- Lean further into the **glyph, pixel and dot-matrix** language: dot-matrix
+  type and numerals for status and counters, pixel glyphs for actions and
+  app keys, dot grids for empty and loading states, phosphor-style
+  highlights, pixel-dissolve transitions. It should feel like one
+  instrument, not decoration on top of stock iOS.
+- **Less sloppiness:** every screen gets a strict grid, consistent spacing
+  and alignment, no stray default controls or mismatched sizes, no cluttered
+  button walls. Polish (pixel-perfect alignment, consistent radii and
+  insets, Dynamic Type that still looks designed) is acceptance criteria,
+  not nice-to-have. Add a visual QA pass per screen at iPhone, iPhone Fold
+  and iPad sizes, light and dark.
+- Before implementation, the design session extends the board with these
+  pixel/glyph ideas (component sheet + key screens) so the build follows a
+  concrete reference.
+
 ## 2026-11-17 — Full go-ahead: Loom first, then all of Sill, then the roadmap
 The owner approved the whole plan without further check-ins ("You have full
 approval from my end, so you don't have to wait for anything") and asked
