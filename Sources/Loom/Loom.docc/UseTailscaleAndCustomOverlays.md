@@ -65,6 +65,23 @@ let container = try LoomContainer(
 
 If you are using ``Loom`` directly, set `overlayProbePort` on ``LoomNetworkConfiguration`` for the local node and construct ``LoomOverlayDirectory`` yourself for remote peer resolution.
 
+## Pin the identity you already trust
+
+An overlay probe answers with the advertisement of whatever Loom node listens at that host. If a tailnet address is reassigned, or a seed comes from an inventory you don't fully control, that advertisement can name a different identity key than the device you meant to reach. By default a connection plan expects the advertised key, so the handshake would succeed against the wrong device.
+
+When your app stored the peer's identity earlier, for example when the two devices first trusted each other on a local network, pin it. Every target in the plan then expects the stored identity, and the session fails with ``LoomError/authenticationFailed`` unless the peer proves exactly that key:
+
+```swift
+guard let pin = LoomPeerIdentityPin(identityKeyID: storedIdentityKeyID) else { return }
+let session = try await coordinator.connect(
+    hello: hello,
+    overlayPeer: overlayPeer,
+    pinnedPeerIdentity: pin
+)
+```
+
+`LoomKit` exposes the same option as `LoomContext.connect(_:pinnedIdentity:)`. Pins also apply to nearby and signaling targets, and automatic retries keep them. Use ``LoomConnectionPlan/pinned(to:)`` to inspect a pinned plan without connecting.
+
 ## Keep signaling as a fallback, not the primary plan
 
 Overlay-discovered peers can still advertise signaling reachability. That is the useful shape for Tailscale: use the tailnet path when it is reachable, but keep signaling available when the overlay host is stale, asleep, or currently blocked by policy.

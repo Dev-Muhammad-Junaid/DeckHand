@@ -120,6 +120,24 @@ public final class LoomContext {
         try await store.connect(to: peer)
     }
 
+    /// Connects to a unified LoomKit peer snapshot, requiring it to prove a stored identity.
+    ///
+    /// Every candidate path (nearby, overlay and signaling) expects `pinnedIdentity`
+    /// instead of the identity key the peer advertised, so a host reached through an
+    /// overlay name or relayed presence can't substitute another key. A peer that proves
+    /// a different identity fails with ``LoomError/authenticationFailed``. An existing
+    /// connection is reused only if it was dialled with the same pin, and automatic
+    /// retries keep the pin.
+    ///
+    /// Pinned connections are not available through a shared host runtime
+    /// (``LoomContainerConfiguration/appGroup``); the call throws in that configuration.
+    public func connect(
+        _ peer: LoomPeerSnapshot,
+        pinnedIdentity: LoomPeerIdentityPin
+    ) async throws -> LoomConnectionHandle {
+        try await store.connect(to: peer, pinnedPeerIdentity: pinnedIdentity)
+    }
+
     /// Connects through signaling using a known remote session identifier.
     public func connect(remoteSessionID: String) async throws -> LoomConnectionHandle {
         try await store.connect(remoteSessionID: remoteSessionID)

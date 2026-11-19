@@ -37,6 +37,9 @@ private struct ManagedConnection: Sendable {
     let peerSnapshot: LoomPeerSnapshot
     let origin: LoomConnectionOrigin
     let registeredAt: ContinuousClock.Instant
+    /// The identity this connection was dialled with, kept so a retry dials
+    /// with the same pin.
+    var pinnedPeerIdentity: LoomPeerIdentityPin? = nil
 }
 
 private struct RetryState {
@@ -371,8 +374,18 @@ actor LoomStore {
         await refreshCloudPeers()
     }
 
-    func connect(to peerSnapshot: LoomPeerSnapshot) async throws -> LoomConnectionHandle {
+    func connect(
+        to peerSnapshot: LoomPeerSnapshot,
+        pinnedPeerIdentity: LoomPeerIdentityPin? = nil
+    ) async throws -> LoomConnectionHandle {
         if let hostClient {
+            guard pinnedPeerIdentity == nil else {
+                // The shared host runtime dials on this process's behalf and
+                // can't enforce a caller's pin.
+                throw LoomStoreError.invalidConfiguration(
+                    "LoomKit pinned peer identities are not supported through a shared host runtime."
+                )
+            }
             if !isRunning {
                 try await start()
             }
@@ -395,8 +408,11 @@ actor LoomStore {
             // for a dial that never happens. An explicit connect(to:) is a
             // clear statement of user intent — tear the zombie down and
             // dial fresh.
+            // A pinned connect reuses only a session dialled with the same
+            // pin; anything else is replaced by a fresh, pinned dial.
             if let existing = connections.first(where: { $0.value.peerSnapshot.id == peerSnapshot.id }),
-               connectionSnapshots[existing.key]?.state == .connected {
+               connectionSnapshots[existing.key]?.state == .connected,
+               pinnedPeerIdentity == nil || existing.value.pinnedPeerIdentity == pinnedPeerIdentity {
                 LoomLogger.debug(
                     .transport,
                     "LoomKit returning existing connected session for \(peerSnapshot.name)"
@@ -426,7 +442,8 @@ actor LoomStore {
             preferredPeer: resolvedPeer,
             localPeer: localPeer,
             overlayPeer: overlayPeer,
-            signalingSessionID: signalingSessionID
+            signalingSessionID: signalingSessionID,
+            pinnedPeerIdentity: pinnedPeerIdentity
         )
     }
 
@@ -648,6 +665,7 @@ actor LoomStore {
             let delay = policy.delay(forAttempt: attempt - 1)
             let peerSnapshot = managed.peerSnapshot
             let signalingSessionID = managed.signalingSessionID
+            let pinnedPeerIdentity = managed.pinnedPeerIdentity
 
             retryStates[id] = RetryState(
                 attempt: attempt,
@@ -661,7 +679,8 @@ actor LoomStore {
                     await self.executeRetry(
                         originalConnectionID: id,
                         peer: peerSnapshot,
-                        signalingSessionID: signalingSessionID
+                        signalingSessionID: signalingSessionID,
+                        pinnedPeerIdentity: pinnedPeerIdentity
                     )
                 }
             )
@@ -699,7 +718,8 @@ actor LoomStore {
     private func executeRetry(
         originalConnectionID id: UUID,
         peer: LoomPeerSnapshot,
-        signalingSessionID: String?
+        signalingSessionID: String?,
+        pinnedPeerIdentity: LoomPeerIdentityPin?
     ) async {
         guard connectionSnapshots[id] != nil else {
             retryStates.removeValue(forKey: id)
@@ -724,7 +744,8 @@ actor LoomStore {
                 preferredPeer: resolvedPeer,
                 localPeer: localPeer,
                 overlayPeer: overlayPeer,
-                signalingSessionID: effectiveSignaling
+                signalingSessionID: effectiveSignaling,
+                pinnedPeerIdentity: pinnedPeerIdentity
             )
 
             connectionSnapshots.removeValue(forKey: id)
@@ -781,7 +802,8 @@ actor LoomStore {
                         await self.executeRetry(
                             originalConnectionID: id,
                             peer: peer,
-                            signalingSessionID: signalingSessionID
+                            signalingSessionID: signalingSessionID,
+                            pinnedPeerIdentity: pinnedPeerIdentity
                         )
                     }
                 )
@@ -1097,7 +1119,8 @@ actor LoomStore {
         preferredPeer: LoomPeerSnapshot?,
         localPeer: LoomPeer?,
         overlayPeer: LoomPeer?,
-        signalingSessionID: String?
+        signalingSessionID: String?,
+        pinnedPeerIdentity: LoomPeerIdentityPin? = nil
     ) async throws -> LoomConnectionHandle {
         let hello = try await makeHelloRequest()
         var didJoinSignaling = false
@@ -1116,8 +1139,22 @@ actor LoomStore {
             let session = try await connectionCoordinator.connect(
                 hello: hello,
                 localPeer: localPeer,
-                signalingSessionID: signalingSessionID
+                overlayPeer: overlayPeer,
+                signalingSessionID: signalingSessionID,
+                pinnedPeerIdentity: pinnedPeerIdentity
             )
+            if let pinnedPeerIdentity {
+                // The handshake already enforced the pin; check the proven
+                // identity once more before handing the session out.
+                let provenIdentity = await session.context?.peerIdentity
+                guard pinnedPeerIdentity.matches(
+                    identityKeyID: provenIdentity?.identityKeyID,
+                    identityPublicKey: provenIdentity?.identityPublicKey
+                ) else {
+                    await session.cancel()
+                    throw LoomError.authenticationFailed
+                }
+            }
             let peerSnapshot = try await resolveConnectedPeer(
                 preferredPeer: preferredPeer,
                 session: session,
@@ -1126,7 +1163,8 @@ actor LoomStore {
             return await registerConnection(
                 session: session,
                 peerSnapshot: peerSnapshot,
-                signalingSessionID: didJoinSignaling ? signalingSessionID : nil
+                signalingSessionID: didJoinSignaling ? signalingSessionID : nil,
+                pinnedPeerIdentity: pinnedPeerIdentity
             )
         } catch {
             if didJoinSignaling,
@@ -1143,7 +1181,8 @@ actor LoomStore {
         session: any LoomSessionProtocol,
         peerSnapshot: LoomPeerSnapshot,
         signalingSessionID: String?,
-        origin: LoomConnectionOrigin = .outgoing
+        origin: LoomConnectionOrigin = .outgoing,
+        pinnedPeerIdentity: LoomPeerIdentityPin? = nil
     ) async -> LoomConnectionHandle {
         let connectionID = UUID()
         let handle = LoomConnectionHandle(
@@ -1170,7 +1209,8 @@ actor LoomStore {
             signalingSessionID: signalingSessionID,
             peerSnapshot: peerSnapshot,
             origin: origin,
-            registeredAt: .now
+            registeredAt: .now,
+            pinnedPeerIdentity: pinnedPeerIdentity
         )
         connectionSnapshots[connectionID] = LoomConnectionSnapshot(
             id: connectionID,
