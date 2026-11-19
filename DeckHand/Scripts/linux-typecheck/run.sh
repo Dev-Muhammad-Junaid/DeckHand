@@ -26,7 +26,9 @@ files=(
   "$app/DeckHandMac/Network/HostLinkMonitor.swift"
   "$app/DeckHandMac/Network/LinkObservation+Loom.swift"
   "$app/DeckHandMac/LockGate.swift"
+  "$app/DeckHandMac/Mirror/MirrorSubscriber.swift"
   "$app/DeckHandiOS/TrackpadSender.swift"
+  "$app/DeckHandiOS/Mirror/MirrorStreamReceiver.swift"
   "$app/Shared/LoomConnectionHandle+ControlMessage.swift"
   "$@"
 )

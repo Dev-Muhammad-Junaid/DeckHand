@@ -2,7 +2,8 @@
 //  SettingsMirrorSection.swift
 //  DeckHandiOS
 //
-//  Settings › Live mirror: sharpness, frame rate, remembered layout.
+//  Settings › Live mirror: sharpness, frame rate, remembered layout,
+//  follow cursor and the stream stats line.
 //  Split out of SettingsView.swift (PH-010).
 //
 
@@ -33,10 +34,14 @@ struct SettingsMirrorSection: View {
             }
 
             Toggle("Remember size and position", isOn: $settings.rememberMirrorLayout)
+
+            Toggle("Follow cursor between displays", isOn: $settings.mirrorFollowsCursor)
+
+            Toggle("Show stream stats", isOn: $settings.showMirrorStats)
         } header: {
             Text("Live mirror")
         } footer: {
-            Text("Sharpness and frame rate together decide how much of your network the mirror uses. Drop both if the picture stutters before you blame the Mac.")
+            Text("Sharpness and frame rate together decide how much of your network the mirror uses. Drop both if the picture stutters before you blame the Mac. Stream stats show the frame rate, timing and data rate on both ends.")
         }
     }
 }

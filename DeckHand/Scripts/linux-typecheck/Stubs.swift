@@ -9,12 +9,28 @@ typealias Action = PixelHandCore.Action
 typealias CGDirectDisplayID = UInt32
 
 // MARK: Loom
+public final class LoomMultiplexedStream: @unchecked Sendable {
+    public let id: UInt16 = 0
+    public let label: String? = nil
+    public let incomingBytes: AsyncStream<Data> = AsyncStream { _ in }
+    public func send(_ data: Data) async throws {}
+    public func close() async throws {}
+}
+public protocol LoomSessionProtocol: Sendable {
+    func makeIncomingStreamObserver() -> AsyncStream<LoomMultiplexedStream>
+}
+final class StubSession: LoomSessionProtocol {
+    func makeIncomingStreamObserver() -> AsyncStream<LoomMultiplexedStream> { AsyncStream { _ in } }
+}
 public actor LoomConnectionHandle {
     public nonisolated let id: UUID = UUID()
     public nonisolated let messages: AsyncStream<Data> = AsyncStream { _ in }
     public nonisolated let networkPathUpdates: AsyncStream<LoomSessionNetworkPathSnapshot> = AsyncStream { _ in }
+    // Cross-module, the real `let` needs `await`; this mirrors that.
+    public var session: any LoomSessionProtocol { get async { StubSession() } }
     public func send(_ data: Data) async throws {}
     public func disconnect() async {}
+    public func openStream(label: String) async throws -> LoomMultiplexedStream { LoomMultiplexedStream() }
 }
 
 public struct LoomNetworkHost: Sendable, Hashable { public let rawValue: String }
@@ -77,6 +93,8 @@ let NX_KEYTYPE_PLAY: Int32 = 16
 let NX_KEYTYPE_NEXT: Int32 = 17
 let NX_KEYTYPE_PREVIOUS: Int32 = 18
 func CGPreflightScreenCaptureAccess() -> Bool { true }
+struct CGError: Equatable { static let success = CGError() }
+func CGGetActiveDisplayList(_ max: UInt32, _ ids: UnsafeMutablePointer<CGDirectDisplayID>?, _ count: UnsafeMutablePointer<UInt32>) -> CGError { .success }
 
 @MainActor final class InputInjector {
     static let shared = InputInjector()
@@ -122,6 +140,7 @@ func CGPreflightScreenCaptureAccess() -> Bool { true }
     static let shared = MirrorStreamService()
     func start(subscriberID: UUID, handle: LoomConnectionHandle, fps: Int, maxWidth: Int, displayID: UInt32?) async {}
     func stop(subscriberID: UUID) async {}
+    var lastHostStats: [UUID: MirrorHostStats] = [:]
 }
 @MainActor final class ScreenCaptureService {
     static let shared = ScreenCaptureService()
@@ -179,4 +198,8 @@ final class NSWorkspace: @unchecked Sendable {
 
 // MARK: iOS
 func CACurrentMediaTime() -> Double { 0 }
+final class UIImage: @unchecked Sendable {
+    init?(data: Data) {}
+    func preparingForDisplay() -> UIImage? { self }
+}
 enum TrackpadGestureKind { enum ThreeFingerDirection { case left, right, up, down } }

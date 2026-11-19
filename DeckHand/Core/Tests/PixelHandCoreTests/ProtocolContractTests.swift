@@ -137,7 +137,7 @@ import Testing
         ("mirror.start", .mirror(.start(fps: 20, maxWidth: 480, displayID: nil))),
         ("mirror.start.display", .mirror(.start(fps: 20, maxWidth: 480, displayID: 1))),
         ("mirror.stop", .mirror(.stop)),
-        ("mirror.frame", .mirror(.frame(seq: 42, data: Data([0xFF, 0xD8, 0xFF, 0xE0])))),
+        ("mirror.moveCursor", .mirror(.moveCursor(displayID: 2))),
         ("mirror.displayList", .mirror(.displayList(
             displays: [
                 DisplayInfo(displayID: 1, name: "Built-in Retina Display", isMain: true, width: 1728, height: 1117),
@@ -177,6 +177,29 @@ import Testing
             accessibility: true,
             screenRecording: false,
             features: [.commandReceipts]
+        )))),
+        ("session.hostStatus.binaryMirror", .session(.hostStatus(status: HostStatus(
+            accessibility: true,
+            screenRecording: true,
+            features: [.binaryMirrorStream, .commandReceipts]
+        )))),
+        // diagnostics
+        ("diagnostics.mirrorStats", .diagnostics(.mirrorStats(stats: MirrorHostStats(
+            codec: .jpeg,
+            width: 1440,
+            height: 900,
+            capturedFPS: 20,
+            sentFPS: 19.5,
+            droppedFrames: 3,
+            encodeMilliseconds: 6.25,
+            kilobitsPerSecond: 1250.5
+        )))),
+        ("diagnostics.mirrorClientStats", .diagnostics(.mirrorClientStats(stats: MirrorClientStats(
+            receivedFPS: 19.5,
+            displayedFPS: 19,
+            droppedFrames: 1,
+            decodeMilliseconds: 4.5,
+            kilobitsPerSecond: 1250.5
         )))),
     ]
 
@@ -222,7 +245,7 @@ import Testing
             switch m {
             case .start: "mirror.start"
             case .stop: "mirror.stop"
-            case .frame: "mirror.frame"
+            case .moveCursor: "mirror.moveCursor"
             case .displayList: "mirror.displayList"
             case .error: "mirror.error"
             }
@@ -248,7 +271,11 @@ import Testing
             case .link: "session.link"
             }
         case let .sharing(m): reservedCaseName(m)
-        case let .diagnostics(m): reservedCaseName(m)
+        case let .diagnostics(m):
+            switch m {
+            case .mirrorStats: "diagnostics.mirrorStats"
+            case .mirrorClientStats: "diagnostics.mirrorClientStats"
+            }
         }
     }
 
@@ -258,12 +285,11 @@ import Testing
         switch message {}
     }
 
-    private static func reservedCaseName(_ message: DiagnosticsMessage) -> String {
-        switch message {}
-    }
+    /// Cases in this protocol version. Bump with every added or removed case.
+    static let expectedCaseCount = 41
 
-    /// Cases in protocol version 4. Bump with every added or removed case.
-    static let expectedCaseCount = 39
+    /// The current version, for the hand-written JSON below.
+    static let v = PixelHandProtocol.version
 
     // MARK: - Fixture plumbing
 
@@ -391,7 +417,7 @@ import Testing
 
     @Test("Host status skips feature names this build doesn't know")
     func hostStatusSkipsUnknownFeatures() throws {
-        let json = #"{"session":{"hostStatus":{"status":{"accessibility":true,"features":["commandReceipts","teleport"],"screenRecording":true}}},"v":\#(PixelHandProtocol.version)}"#
+        let json = #"{"session":{"hostStatus":{"status":{"accessibility":true,"features":["commandReceipts","teleport"],"screenRecording":true}}},"v":\#(Self.v)}"#
         let decoded = try ControlMessageCoding.decode(Data(json.utf8))
         guard case let .session(.hostStatus(status)) = decoded else {
             Issue.record("decoded \(decoded)")
@@ -430,13 +456,13 @@ import Testing
     @Test("Unknown, missing and multiple domains are refused")
     func badDomainsAreRefused() {
         #expect(throws: ProtocolError.unknownDomain) {
-            try ControlMessageCoding.decode(Data(#"{"selfDestruct":{"now":{}},"v":\#(PixelHandProtocol.version)}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"selfDestruct":{"now":{}},"v":\#(Self.v)}"#.utf8))
         }
         #expect(throws: ProtocolError.unknownDomain) {
-            try ControlMessageCoding.decode(Data(#"{"v":\#(PixelHandProtocol.version)}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"v":\#(Self.v)}"#.utf8))
         }
         #expect(throws: ProtocolError.multipleDomains(["input", "session"])) {
-            try ControlMessageCoding.decode(Data(#"{"input":{"mouseClick":{"button":"left"}},"session":{"ping":{"seq":1}},"v":\#(PixelHandProtocol.version)}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"input":{"mouseClick":{"button":"left"}},"session":{"ping":{"seq":1}},"v":\#(Self.v)}"#.utf8))
         }
         #expect(throws: (any Error).self) {
             try ControlMessageCoding.decode(Data("{}".utf8))
@@ -446,32 +472,29 @@ import Testing
     @Test("Reserved domains decode nothing yet")
     func reservedDomainsAreRefused() {
         #expect(throws: ProtocolError.unknownDomain) {
-            try ControlMessageCoding.decode(Data(#"{"sharing":{"clipboard":{}},"v":\#(PixelHandProtocol.version)}"#.utf8))
-        }
-        #expect(throws: ProtocolError.unknownDomain) {
-            try ControlMessageCoding.decode(Data(#"{"diagnostics":{"stats":{}},"v":\#(PixelHandProtocol.version)}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"sharing":{"clipboard":{}},"v":\#(Self.v)}"#.utf8))
         }
     }
 
     @Test("Unknown cases and missing fields are refused")
     func unknownCasesAreRefused() {
         #expect(throws: (any Error).self) {
-            try ControlMessageCoding.decode(Data(#"{"input":{"selfDestruct":{}},"v":\#(PixelHandProtocol.version)}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"input":{"selfDestruct":{}},"v":\#(Self.v)}"#.utf8))
         }
         #expect(throws: (any Error).self) {
-            try ControlMessageCoding.decode(Data(#"{"input":{"mouseDelta":{"dx":1}},"v":\#(PixelHandProtocol.version)}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"input":{"mouseDelta":{"dx":1}},"v":\#(Self.v)}"#.utf8))
         }
         #expect(throws: (any Error).self) {
-            try ControlMessageCoding.decode(Data(#"{"input":{"mouseDelta":{"dx":1,"dy":2},"mouseClick":{"button":"left"}},"v":\#(PixelHandProtocol.version)}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"input":{"mouseDelta":{"dx":1,"dy":2},"mouseClick":{"button":"left"}},"v":\#(Self.v)}"#.utf8))
         }
         #expect(throws: (any Error).self) {
-            try ControlMessageCoding.decode(Data(#"{"system":{"run":{"action":"selfDestruct"}},"v":\#(PixelHandProtocol.version)}"#.utf8))
+            try ControlMessageCoding.decode(Data(#"{"system":{"run":{"action":"selfDestruct"}},"v":\#(Self.v)}"#.utf8))
         }
     }
 
     @Test("A run can't wrap a message, so runs can't nest")
     func runsCantNest() {
-        let nested = #"{"deck":{"run":{"action":{"deck":{"run":{"action":{"shortcut":{"keys":["a"]}},"requestID":"b"}}},"requestID":"a"}},"v":\#(PixelHandProtocol.version)}"#
+        let nested = #"{"deck":{"run":{"action":{"deck":{"run":{"action":{"shortcut":{"keys":["a"]}},"requestID":"b"}}},"requestID":"a"}},"v":\#(Self.v)}"#
         #expect(throws: (any Error).self) { try ControlMessageCoding.decode(Data(nested.utf8)) }
     }
 

@@ -32,6 +32,9 @@ final class DeckHandSettings: ObservableObject {
         static let mirrorSharpness = "settings.mirrorSharpness"
         static let rememberMirrorLayout = "settings.rememberMirrorLayout"
         static let mirrorLayout = "settings.mirrorLayout"
+        // MARK: Mirror (lane)
+        static let mirrorFollowsCursor = "settings.mirrorFollowsCursor"
+        static let showMirrorStats = "settings.showMirrorStats"
         static let screenshotQuality = "settings.screenshotQuality"
         static let defaultCapture = "settings.defaultCapture"
         static let autoSaveToPhotos = "settings.autoSaveToPhotos"
@@ -95,6 +98,17 @@ final class DeckHandSettings: ObservableObject {
         }
     }
 
+    // MARK: Mirror (lane)
+    /// The mirror switches to whichever display the Mac's pointer is on.
+    @Published var mirrorFollowsCursor: Bool {
+        didSet { defaults.set(mirrorFollowsCursor, forKey: Key.mirrorFollowsCursor) }
+    }
+
+    /// Shows the stream stats line over the mirror (S6).
+    @Published var showMirrorStats: Bool {
+        didSet { defaults.set(showMirrorStats, forKey: Key.showMirrorStats) }
+    }
+
     // ── Screenshots ─────────────────────────────────────────────────
     @Published var screenshotQuality: CaptureQuality {
         didSet { defaults.set(screenshotQuality.rawValue, forKey: Key.screenshotQuality) }
@@ -147,6 +161,8 @@ final class DeckHandSettings: ObservableObject {
         rememberMirrorLayout = defaults.object(forKey: Key.rememberMirrorLayout) as? Bool ?? true
         mirrorLayout = defaults.data(forKey: Key.mirrorLayout)
             .flatMap { try? JSONDecoder().decode(MirrorLayout.self, from: $0) }
+        mirrorFollowsCursor = defaults.bool(forKey: Key.mirrorFollowsCursor)
+        showMirrorStats = defaults.bool(forKey: Key.showMirrorStats)
 
         screenshotQuality = (defaults.string(forKey: Key.screenshotQuality)
             .flatMap(CaptureQuality.init(rawValue:))) ?? .standard

@@ -6,11 +6,11 @@
 //  display list. Both ways. Owned by the mirror lane (`MirrorHandler`,
 //  `MirrorStreamService`, the remote's mirror views).
 //
-//  Frames ride this control stream as JPEG for now (`frame`). The binary
-//  mirror stream (S5) will carry frames on their own Loom stream framed by
-//  `BinaryFrameHeader`; when it lands, `frame` goes and a negotiation
-//  message (and the `ProtocolFeature.binaryMirrorStream` flag) takes its
-//  place.
+//  Frames don't travel here. After `start`, the Mac opens the Loom stream
+//  `PixelHandStream.mirror` towards the remote and sends video and the
+//  cursor on it, framed by `BinaryFrameHeader` (protocol 3 removed the JSON
+//  `frame`). The host announces this with
+//  `ProtocolFeature.binaryMirrorStream`.
 //
 
 import Foundation
@@ -18,18 +18,20 @@ import Foundation
 public enum MirrorMessage: Codable, Sendable, Equatable {
     // MARK: Remote → Mac
 
-    /// Start streaming frames. `fps` caps the capture rate, `maxWidth`
-    /// bounds the longest frame edge, and `displayID` picks a monitor
-    /// (`nil` or unknown: the main display).
+    /// Start streaming frames on `PixelHandStream.mirror`. `fps` caps the
+    /// capture rate, `maxWidth` bounds the frame's width, and `displayID`
+    /// picks a monitor (`nil` or unknown: the main display). Sent again to
+    /// change any of them; the Mac reuses the stream.
     case start(fps: Int, maxWidth: Int, displayID: UInt32?)
     /// Stop the stream. Also implied by disconnecting.
     case stop
+    /// Move the Mac's pointer to the centre of `displayID` (the mirror's
+    /// "Cursor is on …" badge brings the pointer to the mirrored display).
+    /// Ignored for a display the Mac doesn't have.
+    case moveCursor(displayID: UInt32)
 
     // MARK: Mac → remote
 
-    /// One JPEG frame. `seq` increases within a stream; frames are
-    /// independent, so any may be dropped.
-    case frame(seq: UInt64, data: Data)
     /// The displays the Mac can mirror and the one the stream shows. Sent
     /// when a mirror starts and when screens change.
     case displayList(displays: [DisplayInfo], selectedDisplayID: UInt32)
