@@ -29,6 +29,8 @@ files=(
   "$app/DeckHandMac/Input/DragGuard.swift"
   "$app/DeckHandMac/Input/TypingQueue.swift"
   "$app/DeckHandMac/Mirror/MirrorSubscriber.swift"
+  "$app/DeckHandMac/Audio/MirrorAudioService.swift"
+  "$app/DeckHandMac/Audio/MirrorAudioSubscriber.swift"
   "$app/DeckHandMac/DeviceAuthorizationManager.swift"
   "$app/DeckHandMac/DeckHandHandshakeTrustProvider.swift"
   "$app/DeckHandMac/Pairing/PairedDeviceStore.swift"

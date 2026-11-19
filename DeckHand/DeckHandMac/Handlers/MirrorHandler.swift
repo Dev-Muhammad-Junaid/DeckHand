@@ -4,7 +4,8 @@
 //
 //  Domain: mirror and displays. Starts and stops the live mirror for a
 //  connection; frames and the cursor go out on the binary mirror stream
-//  (`MirrorStreamService`, `DeckHandMac/Mirror/`). Owned by the mirror lane (`MirrorStreamService`, S3, S5, S6,
+//  (`MirrorStreamService`, `DeckHandMac/Mirror/`), and the Mac's sound
+//  on its own stream (S17, `DeckHandMac/Audio/`). Owned by the mirror lane (`MirrorStreamService`, S3, S5, S6,
 //  the display picker, S14, S16).
 //
 
@@ -45,7 +46,15 @@ final class MirrorHandler: DomainHandler {
             guard Self.activeDisplayIDs().contains(displayID) else { return }
             InputInjector.shared.moveCursorToCenter(ofDisplay: CGDirectDisplayID(displayID))
 
-        case .displayList, .error:
+        case let .audio(enabled):
+            // S17: the Mac's sound on this remote (own SCStream, own Loom
+            // stream). Stopped with the mirror by MirrorStreamService.stop.
+            let subscriberID = connection.id
+            Task {
+                await MirrorAudioService.shared.setEnabled(enabled, subscriberID: subscriberID, handle: connection)
+            }
+
+        case .displayList, .error, .audioError:
             break // Mac → remote only
         }
     }

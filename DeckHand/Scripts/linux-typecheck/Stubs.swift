@@ -165,6 +165,13 @@ func CGGetActiveDisplayList(_ max: UInt32, _ ids: UnsafeMutablePointer<CGDirectD
     func requestKeyFrame(subscriberID: UUID) {}
     var lastHostStats: [UUID: MirrorHostStats] = [:]
 }
+// Mac Audio/MirrorAudioCapture.swift (ScreenCaptureKit) can't build here (S17).
+final class MirrorAudioCapture: @unchecked Sendable {
+    var onPacket: (@Sendable (MirrorAudioFormat, MirrorAudioPacket, UInt64) -> Void)?
+    var onFailure: (@Sendable (String) -> Void)?
+    func start() async throws {}
+    func stop() async {}
+}
 // iOS Mirror/MirrorHEVCSampleBuilder.swift (CoreMedia) can't build here.
 final class CMSampleBuffer {}
 enum MirrorVideoEvent: @unchecked Sendable {
