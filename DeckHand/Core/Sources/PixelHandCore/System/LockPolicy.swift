@@ -196,10 +196,15 @@ public enum LockPolicy {
                 // screen. Off console, a capture of this session's display
                 // would show its desktop behind the login window.
                 return offConsole ? .refuse(reply: .none) : .allow
+            case let .audio(enabled):
+                // S17: the Mac's sound follows the mirror's rule. At the
+                // lock screen it plays on (as the lock screen mirrors);
+                // off console it is another user's sound.
+                return enabled && offConsole ? .refuse(reply: .none) : .allow
             case .moveCursor:
                 // Moves the pointer, like Locate.
                 return offConsole ? .refuse(reply: .none) : .allow
-            case .stop, .requestKeyFrame, .displayList, .error:
+            case .stop, .requestKeyFrame, .displayList, .error, .audioError:
                 // A key frame only affects a mirror the gate already let start.
                 return .allow
             }

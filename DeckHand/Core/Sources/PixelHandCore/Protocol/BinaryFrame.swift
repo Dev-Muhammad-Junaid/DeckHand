@@ -36,6 +36,13 @@
 //                         (layouts and rules: `Mirror/MirrorVideo.swift`)
 //      cursor          `MirrorCursorState.encoded()` (18 bytes)
 //      cursorShape     `MirrorCursorShape.encoded()` (20 bytes + PNG)
+//      audioFormat     `MirrorAudioFormat.encoded()`, first on every
+//                      audio stream and again when the format changes (S17)
+//      audioPacket     `MirrorAudioPacket.encoded()`: one encoded audio
+//                      packet (layouts and rules: `Audio/MirrorAudio.swift`)
+//
+//  The audio kinds travel on their own stream, `PixelHandStream.audio`,
+//  so a 20 ms audio packet never waits behind a video key frame.
 //
 
 import Foundation
@@ -46,6 +53,11 @@ public enum PixelHandStream {
     /// Mirror video and cursor, framed with `BinaryFrameHeader`. Opened by
     /// the Mac towards a remote that sent `mirror.start`.
     public static let mirror = "pixelhand.mirror"
+    /// The Mac's sound while mirroring (S17), framed with
+    /// `BinaryFrameHeader` (`audioFormat`, `audioPacket`). Opened by the
+    /// Mac towards a remote that sent `mirror.audio(enabled: true)`;
+    /// closed when audio or the mirror stops.
+    public static let audio = "pixelhand.audio"
 }
 
 public struct BinaryFrameHeader: Equatable, Sendable {
@@ -70,6 +82,12 @@ public struct BinaryFrameHeader: Equatable, Sendable {
         /// A pointer image the remote caches by id (S3). Sent the first
         /// time a shape appears on a stream.
         case cursorShape = 6
+        /// How the audio packets that follow are encoded (S17). Only on
+        /// `PixelHandStream.audio`.
+        case audioFormat = 7
+        /// One encoded audio packet, about 20 ms of sound (S17). Only on
+        /// `PixelHandStream.audio`.
+        case audioPacket = 8
     }
 
     public struct Flags: OptionSet, Sendable, Equatable {
