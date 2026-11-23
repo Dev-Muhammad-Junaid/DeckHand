@@ -711,10 +711,9 @@ If build 9 hasn't been built, build this instead. Build 10 holds build 9
 Protocol is still **12**. Linux: Core **586 tests pass**, the type check is
 clean. The apps were not compiled here.
 
-Known overlap to check: the two lanes finished in parallel. On the
-**Pointer** tab with the mirror on, the floating tile may cover the new
-click strip or caption. A follow-up lane fixes this; note here whether it
-happens.
+The floating tile now reserves a 120 pt band at the bottom (click strip,
+caption, desktop dots). It can't be dragged or pinched over the Pointer
+surface's click strip or caption. This is check 10 in `LANE-ux-screen.md`.
 
 Mac should check:
 1. Build both apps and fix compile errors with each handoff's "Compile
