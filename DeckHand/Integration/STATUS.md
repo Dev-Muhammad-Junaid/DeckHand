@@ -753,3 +753,32 @@ Mac should check:
    lock banner still appears.
 
 Status: READY FOR MAC BUILD (build 11)
+
+## Build 12 queued (2026-11-23)
+
+If build 11 hasn't been built, build this one instead. Build 12 is build 11
+plus the **UX capture lane** (`LANE-ux-capture.md`):
+- **UX-009:** the screenshot, annotation, OCR, region-crop and window-picker
+  flows are restyled to the pixel identity. Capture still refuses while the
+  Mac is locked.
+- **Floating tile placement:** this replaces the fixed 120 pt band from
+  build 10. The Pointer surface now reports its pad, click strip, caption
+  and keyboard button (`MirrorTileKeepOut`), and Core `MirrorTilePlacement`
+  clamps the tile clear of all four. That holds when dragging and pinching,
+  when the keyboard panel shrinks the pad, when the strip is hidden, and
+  when the keyboard button sits in the dock.
+
+Protocol is still **12**. Linux: Core **622 tests pass**, and the type
+check is clean. The apps were not compiled here.
+
+Mac should check:
+1. Build both apps. Fix compile errors using each new handoff's "Compile
+   risks" section (UX Pointer, UX Screen, UX shell, UX capture), and record
+   the fixes here.
+2. Run `swift test --package-path DeckHand/Core` (expect 622) and
+   `DeckHandTests`.
+3. Go through the check table in `LANE-ux-capture.md`: the tile in each
+   corner and while dragging on the Pointer tab, then every capture flow in
+   light and dark. After that, the other three handoffs' tables.
+
+Status: READY FOR MAC BUILD (build 12)

@@ -1,6 +1,6 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Mac builds:** build 7 was built on the Mac (2026-11-20, results in `STATUS.md`). Build 11 is queued (build 8 plus UX Pointer, UX Screen and UX shell). Mac builds are now run from the primary session or the owner's Mac session.
+> **Mac builds:** build 7 was built on the Mac (2026-11-20, results in `STATUS.md`). Build 12 is queued (build 8 plus UX Pointer, Screen, shell and capture). Mac builds are now run from the primary session or the owner's Mac session.
 
 ## Needs the owner
 
@@ -24,7 +24,6 @@ weekly usage limit is close).
 | --- | --- | --- | --- |
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac) — **archived since 2026-11-18; start a new Mac session** | session_01H5HwATvLJkqCFPruLyBsX8 (archived) | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
-| Lane: UX capture (UX-009; the tile fix is already merged) | session_01H5HwATPUvvgLzivgTceR8t | claude/pixelhand-lane-ux-capture | `LANE-ux-capture.md` ends `Lane: READY TO MERGE` |
 | Lane: UX arrangements (UX-007) | session_01H5HwATPNioSdZ3GkNKUfmk | claude/pixelhand-lane-ux-arrangements | `LANE-ux-arrangements.md` ends `Lane: READY TO MERGE` |
 | Lane: UX onboarding (UX-010 onboarding + picker, UX-011 paywall) | session_01H5HwASiRB6CXssuGg7CDa1 | claude/pixelhand-lane-ux-onboarding | `LANE-ux-onboarding.md` ends `Lane: READY TO MERGE` |
 
@@ -121,3 +120,7 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   shell (UX-005, UX-008, Settings; Core 603 tests; type check clean; lock
   banner kept). Queued build 11. UX-007 arrangements are next.
   Started UX arrangements (UX-007). Next in line: UX-020 Deck 2 UI, then UX-012 Mac panel, UX-017/018/019, UX-013, UX-014.
+- 2026-11-23 ~19:25 UTC: merged UX capture (UX-009 and a keep-out based
+  tile placement, which replaces Screen's fixed band because it also covers
+  the keyboard button and pad resizes). Core 622 tests; type check clean.
+  Queued build 12.
