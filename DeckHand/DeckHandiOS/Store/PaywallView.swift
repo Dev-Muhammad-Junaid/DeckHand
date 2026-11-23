@@ -44,7 +44,7 @@ struct PaywallView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(alignment: .leading, spacing: PixelHandTheme.Space.xl) {
                     header
                     if case let .anotherMac(request) = reason {
                         anotherMacCard(request)
@@ -59,17 +59,30 @@ struct PaywallView: View {
                         disclosure
                     }
                 }
-                .padding(.horizontal, 22)
-                .padding(.vertical, 20)
+                .padding(.horizontal, PixelHandTheme.Space.xl)
+                .padding(.bottom, PixelHandTheme.Space.xl)
                 .frame(maxWidth: 560)
                 .frame(maxWidth: .infinity)
             }
+            .scrollBounceBehavior(.basedOnSize)
             .background(DeckHandTheme.brandBackground().ignoresSafeArea())
+            .foregroundStyle(.white)
+            .pixelOnNavy()
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
+                // Always visible: the paywall never hides its close button.
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                        .foregroundStyle(.white.opacity(0.8))
+                    Button { dismiss() } label: {
+                        PHGlyph(glyph: PixelGlyphs.close, pitch: 1.6)
+                            .foregroundStyle(.white)
+                            .frame(width: 36, height: 36)
+                            .background(Circle().fill(Color.white.opacity(0.1)))
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Close")
                 }
             }
         }
@@ -90,27 +103,51 @@ struct PaywallView: View {
         }
     }
 
+    /// The PRO mark on a navy plate (LED panel look), the Geist headline and
+    /// what stays free.
     private var header: some View {
-        VStack(spacing: 14) {
-            DeckHandMark(size: 72)
+        VStack(alignment: .leading, spacing: PixelHandTheme.Space.lg) {
+            DotMatrixText("PRO", pitch: 5, label: SubscriptionCopy.productName, showsUnlit: true, glows: true, stepsWithType: false)
+                .foregroundStyle(PixelHandTheme.Brand.phosphor)
+                .padding(.horizontal, PixelHandTheme.Space.xl)
+                .padding(.vertical, PixelHandTheme.Space.lg)
+                .background(
+                    RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous)
+                        .fill(PixelHandTheme.Brand.screenSurface)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous)
+                        .strokeBorder(PixelHandTheme.Brand.tileStroke, lineWidth: 1)
+                )
+                .shadow(color: PixelHandTheme.Brand.cobalt.opacity(0.45), radius: 24)
             Text(SubscriptionCopy.headline(for: focusFeature))
-                .font(.system(size: 26, weight: .semibold, design: .rounded))
+                .font(PixelHandFonts.geist(.medium, size: 30, relativeTo: .largeTitle))
+                .tracking(-0.8)
                 .foregroundStyle(.white)
-                .multilineTextAlignment(.center)
-            Text(SubscriptionCopy.freePlanSummary)
-                .font(.system(size: 14, design: .rounded))
-                .foregroundStyle(.white.opacity(0.55))
-                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            HStack(alignment: .firstTextBaseline, spacing: PixelHandTheme.Space.sm) {
+                StatusPixel(state: .live)
+                Text(SubscriptionCopy.freePlanSummary)
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.72))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
-        .padding(.top, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, PixelHandTheme.Space.sm)
     }
 
     private func anotherMacCard(_ request: MacPaywallRequest) -> some View {
         let canSwitch = request.switchAllowedAt <= Date()
-        return VStack(alignment: .leading, spacing: 10) {
-            Text(SubscriptionCopy.otherMacMessage(freeMacName: request.freeMacName))
-                .font(.system(size: 14, design: .rounded))
-                .foregroundStyle(.white.opacity(0.85))
+        return VStack(alignment: .leading, spacing: PixelHandTheme.Space.md) {
+            HStack(alignment: .top, spacing: PixelHandTheme.Space.md) {
+                GlyphTile(glyph: PixelGlyphs.mac)
+                Text(SubscriptionCopy.otherMacMessage(freeMacName: request.freeMacName))
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.86))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if canSwitch, !switchFailed {
                 Button(SubscriptionCopy.switchMacButton(newMacName: request.macName)) {
                     if store.makeFreeMac(deviceID: request.deviceID, name: request.macName) {
@@ -119,35 +156,36 @@ struct PaywallView: View {
                         switchFailed = true
                     }
                 }
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .tint(DeckHandTheme.Brand.mint)
+                .buttonStyle(.ph(.secondary, size: .small))
             } else {
                 Text(SubscriptionCopy.switchMacWait(until: request.switchAllowedAt.formatted(date: .abbreviated, time: .omitted)))
-                    .font(.system(size: 12, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.66))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
+        .padding(PixelHandTheme.Space.lg)
         .background(card(highlighted: false))
     }
 
     private var featureList: some View {
         VStack(alignment: .leading, spacing: 14) {
             ForEach(Self.listedFeatures, id: \.self) { feature in
-                HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: SubscriptionCopy.symbol(feature))
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(feature == focusFeature ? DeckHandTheme.Brand.mint : .white.opacity(0.75))
-                        .frame(width: 26)
+                HStack(alignment: .top, spacing: PixelHandTheme.Space.md) {
+                    GlyphTile(
+                        glyph: feature.glyph,
+                        pitch: 2.2,
+                        tint: feature == focusFeature ? PixelHandTheme.Brand.phosphor : Color(red: 0.81, green: 0.88, blue: 1)
+                    )
                     VStack(alignment: .leading, spacing: 2) {
                         Text(SubscriptionCopy.title(feature))
-                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.white)
                         Text(SubscriptionCopy.detail(feature))
-                            .font(.system(size: 13, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.55))
+                            .font(.footnote)
+                            .foregroundStyle(.white.opacity(0.66))
                     }
+                    .fixedSize(horizontal: false, vertical: true)
                 }
                 .accessibilityElement(children: .combine)
             }
@@ -162,36 +200,43 @@ struct PaywallView: View {
     }
 
     private var planPicker: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: PixelHandTheme.Space.md) {
             ForEach([SubscriptionPlan.yearly, .monthly], id: \.self) { plan in
                 let price = store.products[plan]?.displayPrice
+                let isSelected = selectedPlan == plan
                 Button {
                     selectedPlan = plan
                 } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: selectedPlan == plan ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 20))
-                            .foregroundStyle(selectedPlan == plan ? DeckHandTheme.Brand.mint : .white.opacity(0.35))
+                    HStack(alignment: .center, spacing: PixelHandTheme.Space.md) {
+                        PlanRadio(isOn: isSelected)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(plan.title)
-                                .font(.system(size: 13, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.6))
+                                .font(.footnote.weight(.medium))
+                                .foregroundStyle(.white.opacity(0.72))
                             // The billed amount is the most prominent price.
                             Text(SubscriptionCopy.billedPrice(plan, displayPrice: price))
-                                .font(.system(size: 19, weight: .semibold, design: .rounded))
+                                .font(.title3.weight(.semibold))
                                 .foregroundStyle(.white)
                             Text(SubscriptionCopy.planCaption(plan, displayPrice: price, trialEligible: store.isTrialEligible, savingsPercent: savingsPercent))
-                                .font(.system(size: 12, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.55))
+                                .font(.caption)
+                                .foregroundStyle(.white.opacity(0.66))
                         }
+                        .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 0)
+                        if plan == .yearly, let savingsPercent {
+                            DotMatrixText("-\(savingsPercent)%", pitch: CGFloat(PixelPitch.badge), label: "Save \(savingsPercent) percent", glows: false)
+                                .foregroundStyle(PixelHandTheme.Brand.mint)
+                                .padding(.horizontal, 7)
+                                .frame(height: PixelHandTheme.ControlHeight.badge)
+                                .background(Capsule().fill(PixelHandTheme.Brand.mint.opacity(0.16)))
+                        }
                     }
-                    .padding(16)
-                    .background(card(highlighted: selectedPlan == plan))
+                    .padding(PixelHandTheme.Space.lg)
+                    .background(card(highlighted: isSelected))
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityAddTraits(selectedPlan == plan ? .isSelected : [])
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }
     }
@@ -204,19 +249,12 @@ struct PaywallView: View {
                 Text(SubscriptionCopy.purchaseButtonTitle(trialEligible: store.isTrialEligible))
                     .opacity(store.isWorking ? 0 : 1)
                 if store.isWorking {
-                    ProgressView().tint(.white)
+                    DotWave(pitch: 3, label: "Working")
                 }
             }
-            .font(.system(size: 17, weight: .semibold, design: .rounded))
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 15)
-            .background(
-                RoundedRectangle(cornerRadius: DeckHandTheme.Radius.md, style: .continuous)
-                    .fill(DeckHandTheme.Brand.cobalt)
-            )
-            .foregroundStyle(.white)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.ph(.primary, fullWidth: true))
+        .shadow(color: PixelHandTheme.Brand.cobalt.opacity(0.45), radius: 16, y: 6)
         .disabled(store.isWorking)
     }
 
@@ -224,18 +262,23 @@ struct PaywallView: View {
     private var statusMessages: some View {
         if store.isPurchasePending {
             Text("Your purchase is waiting for approval. Pro turns on as soon as it's approved.")
-                .font(.system(size: 13, design: .rounded))
-                .foregroundStyle(DeckHandTheme.Brand.mint)
+                .font(.footnote)
+                .foregroundStyle(PixelHandTheme.Brand.mint)
                 .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
         }
         if let error = store.errorMessage {
             Text(error)
-                .font(.system(size: 13, design: .rounded))
-                .foregroundStyle(DeckHandTheme.warning)
+                .font(.footnote)
+                .foregroundStyle(PixelHandTheme.warning)
                 .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
         }
     }
 
+    /// Apple's required text, unchanged, at a size that stays legible at AX5,
+    /// with Restore Purchases, Terms of Use and Privacy Policy. The links
+    /// stack when they don't fit on one line.
     private var disclosure: some View {
         VStack(spacing: 14) {
             Text(SubscriptionCopy.disclosure(
@@ -243,44 +286,58 @@ struct PaywallView: View {
                 yearlyPrice: store.products[.yearly]?.displayPrice,
                 trialEligible: store.isTrialEligible
             ))
-            .font(.system(size: 11, design: .rounded))
-            .foregroundStyle(.white.opacity(0.5))
+            .font(.caption)
+            .foregroundStyle(.white.opacity(0.66))
             .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
 
-            HStack(spacing: 18) {
-                Button("Restore Purchases") {
-                    Task { await store.restore() }
-                }
-                .disabled(store.isWorking)
-                Link("Terms of Use", destination: SubscriptionCopy.termsOfUseURL)
-                Link("Privacy Policy", destination: SubscriptionCopy.privacyPolicyURL)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 18) { disclosureLinks }
+                VStack(spacing: PixelHandTheme.Space.md) { disclosureLinks }
             }
-            .font(.system(size: 12, weight: .medium, design: .rounded))
-            .tint(.white.opacity(0.8))
+            .font(.footnote.weight(.medium))
+            .tint(.white.opacity(0.86))
         }
+        .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private var disclosureLinks: some View {
+        Button("Restore Purchases") {
+            Task { await store.restore() }
+        }
+        .disabled(store.isWorking)
+        Link("Terms of Use", destination: SubscriptionCopy.termsOfUseURL)
+        Link("Privacy Policy", destination: SubscriptionCopy.privacyPolicyURL)
     }
 
     private var alreadyPro: some View {
-        VStack(spacing: 12) {
-            Text("You have Pixel Hand Pro. Everything is unlocked.")
-                .font(.system(size: 15, weight: .medium, design: .rounded))
-                .foregroundStyle(DeckHandTheme.Brand.mint)
-                .multilineTextAlignment(.center)
+        VStack(spacing: PixelHandTheme.Space.md) {
+            HStack(spacing: PixelHandTheme.Space.sm) {
+                ProBadge()
+                Text("You have Pixel Hand Pro. Everything is unlocked.")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(PixelHandTheme.Brand.mint)
+            }
             Button("Done") { finish() }
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
-                .tint(.white)
+                .buttonStyle(.ph(.secondary, size: .regular))
         }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Helpers
 
     private func card(highlighted: Bool) -> some View {
-        RoundedRectangle(cornerRadius: DeckHandTheme.Radius.md, style: .continuous)
-            .fill(Color.white.opacity(highlighted ? 0.1 : 0.05))
+        let shape = RoundedRectangle(cornerRadius: PixelHandTheme.Radius.key, style: .continuous)
+        return shape
+            .fill(highlighted ? PixelHandTheme.Brand.screenRaised : Color.white.opacity(0.05))
             .overlay(
-                RoundedRectangle(cornerRadius: DeckHandTheme.Radius.md, style: .continuous)
-                    .strokeBorder(highlighted ? DeckHandTheme.Brand.mint.opacity(0.7) : Color.white.opacity(0.1), lineWidth: highlighted ? 1.5 : 1)
+                shape.strokeBorder(
+                    highlighted ? PixelHandTheme.Brand.sky : PixelHandTheme.Brand.tileStroke,
+                    lineWidth: highlighted ? PixelHandTheme.Stroke.selection : 1
+                )
             )
+            .shadow(color: highlighted ? PixelHandTheme.Brand.cobalt.opacity(0.4) : .clear, radius: 14)
     }
 
     /// Closes the paywall; a Mac the picker refused is dialled now.
@@ -295,5 +352,32 @@ struct PaywallView: View {
                 retry()
             }
         }
+    }
+}
+
+/// A plan card's radio: a ring, filled with a lit 3 × 3 dot block when on.
+private struct PlanRadio: View {
+    let isOn: Bool
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .strokeBorder(isOn ? PixelHandTheme.Brand.sky : Color.white.opacity(0.35), lineWidth: 2)
+            if isOn {
+                Canvas { context, size in
+                    let pitch: CGFloat = 3.2, dot: CGFloat = 2.5
+                    let o = (size.width - pitch * 3) / 2
+                    for y in 0..<3 {
+                        for x in 0..<3 where x == 1 || y == 1 {
+                            let rect = CGRect(x: o + CGFloat(x) * pitch + (pitch - dot) / 2, y: o + CGFloat(y) * pitch + (pitch - dot) / 2, width: dot, height: dot)
+                            context.fill(Path(roundedRect: rect, cornerRadius: dot * 0.3), with: .color(PixelHandTheme.Brand.phosphor))
+                        }
+                    }
+                }
+                .shadow(color: PixelHandTheme.Brand.glow.opacity(0.8), radius: 2)
+            }
+        }
+        .frame(width: 22, height: 22)
+        .accessibilityHidden(true)
     }
 }

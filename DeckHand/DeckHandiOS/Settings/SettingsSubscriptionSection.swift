@@ -29,17 +29,28 @@ struct SettingsSubscriptionSection: View {
 
     var body: some View {
         Section {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    if entitlements.isPro {
-                        Image(systemName: "checkmark.seal.fill")
-                            .foregroundStyle(DeckHandTheme.mint)
-                    }
-                    Text(row.title)
+            HStack(spacing: 12) {
+                if entitlements.isPro {
+                    ProBadge()
+                } else {
+                    PHGlyph(glyph: PixelGlyphs.lock, pitch: 2, stepsWithType: true)
+                        .foregroundStyle(.secondary)
+                        .frame(minWidth: 28)
                 }
-                Text(row.detail)
-                    .font(.footnote)
-                    .foregroundStyle(row.needsPaymentAttention ? DeckHandTheme.warning : .secondary)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(row.title)
+                        .font(.headline)
+                    Text(row.detail)
+                        .font(.footnote)
+                        .foregroundStyle(row.needsPaymentAttention ? PixelHandTheme.warning : .secondary)
+                }
+                Spacer(minLength: 8)
+                if entitlements.isPro {
+                    // The LED-panel PRO mark, small enough for a row.
+                    DotMatrixText("PRO", pitch: 2, label: "", showsUnlit: true, glows: false)
+                        .foregroundStyle(PixelHandTheme.accent)
+                        .accessibilityHidden(true)
+                }
             }
             .padding(.vertical, 2)
             .accessibilityElement(children: .combine)

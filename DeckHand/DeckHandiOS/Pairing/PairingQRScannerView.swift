@@ -31,22 +31,29 @@ struct PairingQRScannerSheet: View {
                         dismiss()
                     }
                     .ignoresSafeArea()
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .strokeBorder(.white.opacity(0.85), lineWidth: 3)
+                    DottedViewfinder()
                         .frame(width: 240, height: 240)
                         .accessibilityHidden(true)
                 case .notDetermined:
-                    ProgressView().tint(.white)
+                    DotWave(pitch: 6, label: "Waiting for the camera")
                 default:
                     cameraOff
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                Text("On your Mac, open Pixel Hand in the menu bar and choose “Pair a Device…”.")
-                    .font(.footnote)
-                    .foregroundStyle(.white.opacity(0.8))
-                    .multilineTextAlignment(.center)
-                    .padding()
+                VStack(spacing: PixelHandTheme.Space.sm) {
+                    Text("Point at the code on your Mac")
+                        .phText(.display)
+                        .foregroundStyle(.white)
+                    Text("Menu bar › Pixel Hand › Pair a Device…")
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.72))
+                }
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, PixelHandTheme.Space.xl)
+                .padding(.vertical, PixelHandTheme.Space.lg)
+                .frame(maxWidth: .infinity)
+                .background(.black.opacity(0.45))
             }
             .navigationTitle("Scan Pairing Code")
             .navigationBarTitleDisplayMode(.inline)
@@ -65,10 +72,10 @@ struct PairingQRScannerSheet: View {
     }
 
     private var cameraOff: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "camera.fill")
-                .font(.system(size: 34))
-                .foregroundStyle(.white.opacity(0.6))
+        VStack(spacing: PixelHandTheme.Space.lg) {
+            PHGlyph(glyph: PixelGlyphs.capture, pitch: CGFloat(PixelPitch.emptyState), showsUnlit: true)
+                .foregroundStyle(PixelHandTheme.Brand.phosphor)
+                .pixelOnNavy()
             Text("Pixel Hand can’t use the camera.")
                 .font(.headline)
                 .foregroundStyle(.white)
@@ -81,13 +88,60 @@ struct PairingQRScannerSheet: View {
                     UIApplication.shared.open(url)
                 }
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.ph(.primary, size: .regular))
         }
         .padding(32)
     }
 }
 
 /// The camera preview that reports a pairing invite once.
+/// The scanner's frame: 6 pt square dots along each corner (no solid
+/// stroke), and a phosphor scanline sweeping down. Reduce Motion: the line
+/// rests in the middle.
+private struct DottedViewfinder: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Canvas { context, size in
+                let dot: CGFloat = 6, step: CGFloat = 9, arm = 6
+                let maxX = size.width - dot, maxY = size.height - dot
+                var path = Path()
+                func add(_ x: CGFloat, _ y: CGFloat) {
+                    path.addRoundedRect(in: CGRect(x: x, y: y, width: dot, height: dot), cornerSize: CGSize(width: 2, height: 2))
+                }
+                for i in 0..<arm {
+                    let d = CGFloat(i) * step
+                    add(d, 0); add(0, d)
+                    add(maxX - d, 0); add(maxX, d)
+                    add(d, maxY); add(0, maxY - d)
+                    add(maxX - d, maxY); add(maxX, maxY - d)
+                }
+                context.fill(path, with: .color(PixelHandTheme.Brand.phosphor))
+            }
+            .shadow(color: PixelHandTheme.Brand.glow.opacity(0.8), radius: 4)
+
+            if reduceMotion {
+                scanline.offset(y: 120)
+            } else {
+                TimelineView(.animation) { timeline in
+                    let t = timeline.date.timeIntervalSinceReferenceDate
+                    let phase = (sin(t * .pi / 1.4) + 1) / 2
+                    scanline.offset(y: 16 + CGFloat(phase) * 208)
+                }
+            }
+        }
+    }
+
+    private var scanline: some View {
+        Rectangle()
+            .fill(PixelHandTheme.Brand.phosphor)
+            .frame(height: 1.5)
+            .shadow(color: PixelHandTheme.Brand.glow, radius: 6)
+            .padding(.horizontal, 12)
+    }
+}
+
 struct PairingQRScanner: UIViewControllerRepresentable {
     let onInvite: (PairingInvite) -> Void
 

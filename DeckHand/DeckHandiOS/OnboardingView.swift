@@ -2,9 +2,13 @@
 //  OnboardingView.swift
 //  DeckHandiOS
 //
-//  First-run walkthrough. Four pages: what the app is, then the three things
-//  it does, ending on what the user has to do on the Mac before any of it
-//  works. Shown once, then never again unless settings are reset.
+//  First-run walkthrough: what the app is, the three things it does, and the
+//  one step on the Mac. Every page has its own dot-art scene on the navy
+//  plate, glyph bullets, a dot-matrix step counter and Back / Continue.
+//  Two columns (scene left, text right) when `LayoutMetrics` says so: iPad
+//  landscape, large Stage Manager windows and iPhone landscape. Content
+//  scrolls, so nothing clips at AX sizes or in landscape.
+//  Spec: `Product/Design/06-Pixel-Identity.md` §9, `04-Interaction-Model.md` §5.
 //
 
 import SwiftUI
@@ -13,250 +17,297 @@ struct OnboardingView: View {
     let onFinish: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var page = 0
+    /// +1 going forward, -1 going back: picks the text's slide direction.
+    @State private var direction = 1
 
-    private var pages: [OnboardingPage] { OnboardingPage.all }
+    private let pages = OnboardingPage.all
+    private var isLast: Bool { page == pages.count - 1 }
 
     var body: some View {
-        ZStack {
-            DeckHandTheme.brandBackground()
-                .ignoresSafeArea()
-
+        GeometryReader { proxy in
+            let metrics = LayoutMetrics(width: proxy.size.width, height: proxy.size.height)
+            let twoColumns = metrics.usesTwoColumnPages
             VStack(spacing: 0) {
-                skipButton
-
-                TabView(selection: $page) {
-                    ForEach(Array(pages.enumerated()), id: \.element.id) { index, item in
-                        OnboardingPageView(page: item)
-                            .tag(index)
-                    }
+                topBar(metrics: metrics)
+                if twoColumns {
+                    twoColumnPage(metrics: metrics, size: proxy.size)
+                } else {
+                    singleColumnPage(metrics: metrics, size: proxy.size)
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-
-                pageIndicator
-                    .padding(.bottom, 28)
-
-                continueButton
-                    .frame(maxWidth: 420)
-                    .padding(.horizontal, 28)
-                    .padding(.bottom, 20)
             }
+            .contentShape(Rectangle())
+            .simultaneousGesture(swipe)
         }
+        .background(DeckHandTheme.brandBackground().ignoresSafeArea())
+        .foregroundStyle(.white)
+        .pixelOnNavy()
         .preferredColorScheme(.dark)
     }
 
-    // MARK: - Chrome
+    // MARK: - Layouts
 
-    private var skipButton: some View {
-        HStack {
-            Spacer()
-            Button("Skip") { onFinish() }
-                .font(.system(size: 15, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.5))
-                .padding(.horizontal, 24)
-                .padding(.top, 12)
-                // Hidden rather than removed on the last page so the header
-                // doesn't change height under the content.
-                .opacity(page == pages.count - 1 ? 0 : 1)
-                .disabled(page == pages.count - 1)
-                .animation(.easeOut(duration: 0.18), value: page)
+    /// Phones in portrait, iPad portrait and Split View: scene, text and
+    /// bullets scroll; dots and buttons stay pinned at the bottom.
+    private func singleColumnPage(metrics: LayoutMetrics, size: CGSize) -> some View {
+        let isRoomy = metrics.widthClass != .compact
+        let nominal: CGFloat = isRoomy ? 340 : 248
+        // Keeps the scene from pushing the title off a short screen.
+        let scene = min(nominal, max(168, (size.height * 0.34).rounded()))
+        return VStack(spacing: 0) {
+            ScrollView {
+                VStack(spacing: isRoomy ? 40 : 28) {
+                    sceneView(size: scene)
+                    VStack(spacing: isRoomy ? 28 : 20) {
+                        text(alignment: .center, maxWidth: isRoomy ? 520 : 340, roomy: isRoomy)
+                        bullets(alignment: .center)
+                    }
+                    .modifier(PageTextTransition(page: page, direction: direction, reduceMotion: reduceMotion))
+                }
+                .padding(.horizontal, isRoomy ? 48 : 24)
+                .padding(.vertical, 16)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: max(0, size.height - bottomReserve(roomy: isRoomy) - 44), alignment: .center)
+            }
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
+
+            VStack(spacing: isRoomy ? 24 : 16) {
+                PageDots(count: pages.count, current: page)
+                buttons(maxWidth: 420)
+            }
+            .padding(.horizontal, isRoomy ? 48 : 24)
+            .padding(.top, 12)
+            .padding(.bottom, isRoomy ? 24 : 8)
         }
     }
 
-    private var pageIndicator: some View {
-        HStack(spacing: 7) {
-            ForEach(pages.indices, id: \.self) { index in
-                Capsule()
-                    .fill(index == page ? DeckHandTheme.Brand.sky : Color.white.opacity(0.22))
-                    .frame(width: index == page ? 22 : 7, height: 7)
+    /// iPad landscape and iPhone landscape: scene left, a left-aligned text
+    /// column right with the dots and buttons under the text.
+    private func twoColumnPage(metrics: LayoutMetrics, size: CGSize) -> some View {
+        let isWide = metrics.widthClass == .wide
+        let scene: CGFloat = isWide ? 400 : min(248, max(168, size.height - 120))
+        let textWidth: CGFloat = isWide ? 440 : 400
+        return ScrollView {
+            HStack(alignment: .center, spacing: isWide ? 72 : 40) {
+                sceneView(size: scene)
+                VStack(alignment: .leading, spacing: isWide ? 28 : 18) {
+                    VStack(alignment: .leading, spacing: isWide ? 28 : 18) {
+                        text(alignment: .leading, maxWidth: textWidth, roomy: isWide)
+                        bullets(alignment: .leading)
+                    }
+                    .modifier(PageTextTransition(page: page, direction: direction, reduceMotion: reduceMotion))
+                    PageDots(count: pages.count, current: page)
+                        .padding(.top, 4)
+                    buttons(maxWidth: textWidth)
+                }
+                .frame(maxWidth: textWidth, alignment: .leading)
+            }
+            .padding(.horizontal, isWide ? 72 : 32)
+            .padding(.vertical, 16)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: max(0, size.height - 44), alignment: .center)
+        }
+        .scrollIndicators(.hidden)
+        .scrollBounceBehavior(.basedOnSize)
+    }
+
+    private func bottomReserve(roomy: Bool) -> CGFloat {
+        // Dots + one button row (two at AX sizes) + padding.
+        (typeSize.isAccessibilitySize ? 140 : 84) + (roomy ? 48 : 24)
+    }
+
+    // MARK: - Pieces
+
+    private func topBar(metrics: LayoutMetrics) -> some View {
+        HStack(spacing: 10) {
+            DotMatrixText(
+                String(format: "%02d/%02d", page + 1, pages.count),
+                pitch: 1.6,
+                label: "Step \(page + 1) of \(pages.count)"
+            )
+            .foregroundStyle(PixelHandTheme.Brand.phosphor)
+            .contentTransition(.identity)
+            Spacer()
+            Button("Skip") { onFinish() }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.7))
+                .frame(minWidth: 44, minHeight: 44)
+                // Hidden rather than removed on the last page so the bar
+                // keeps its height.
+                .opacity(isLast ? 0 : 1)
+                .disabled(isLast)
+                .accessibilityHidden(isLast)
+        }
+        .padding(.horizontal, metrics.widthClass == .compact ? 20 : 32)
+        .frame(minHeight: 44)
+        .padding(.top, 4)
+    }
+
+    private func sceneView(size: CGFloat) -> some View {
+        // A ZStack so the outgoing and incoming scenes overlap while the
+        // pixel dissolve runs instead of stacking.
+        ZStack {
+            OnboardingSceneView(scene: pages[page].scene, size: size)
+                .id(page)
+                .transition(reduceMotion ? .opacity : .pixelDissolve)
+        }
+        .frame(width: size, height: size)
+    }
+
+    private func text(alignment: TextAlignment, maxWidth: CGFloat, roomy: Bool) -> some View {
+        let item = pages[page]
+        return VStack(alignment: alignment == .leading ? .leading : .center, spacing: 12) {
+            Text(item.title)
+                .font(PixelHandFonts.geist(.medium, size: roomy ? 40 : 30, relativeTo: .largeTitle))
+                .tracking(roomy ? -1 : -0.8)
+                .foregroundStyle(.white)
+                .accessibilityAddTraits(.isHeader)
+            Text(item.body)
+                .font(.body)
+                .foregroundStyle(.white.opacity(0.72))
+                .lineSpacing(2)
+        }
+        .multilineTextAlignment(alignment)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: maxWidth, alignment: alignment == .leading ? .leading : .center)
+    }
+
+    @ViewBuilder
+    private func bullets(alignment: HorizontalAlignment) -> some View {
+        let item = pages[page]
+        if !item.bullets.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(item.bullets) { bullet in
+                    OnboardingBulletRow(bullet: bullet)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: alignment == .leading ? .leading : .center)
+        }
+    }
+
+    private func buttons(maxWidth: CGFloat) -> some View {
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(spacing: 12))
+            : AnyLayout(HStackLayout(spacing: 12))
+        return layout {
+            if typeSize.isAccessibilitySize {
+                continueButton
+                if page > 0 { backButton.frame(maxWidth: .infinity) }
+            } else {
+                if page > 0 { backButton.frame(width: 120) }
+                continueButton
             }
         }
-        .animation(.spring(duration: 0.32, bounce: 0.16), value: page)
-        .accessibilityHidden(true)
+        .frame(maxWidth: maxWidth)
+    }
+
+    private var backButton: some View {
+        Button {
+            go(to: page - 1)
+        } label: {
+            Text("Back").frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.ph(.secondary))
     }
 
     private var continueButton: some View {
         Button {
-            if page < pages.count - 1 {
-                withAnimation(.easeOut(duration: 0.26)) { page += 1 }
-            } else {
-                onFinish()
-            }
+            if isLast { onFinish() } else { go(to: page + 1) }
         } label: {
-            Text(page == pages.count - 1 ? "Get Started" : "Continue")
-                .font(.system(size: 17, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 54)
-                .background(
-                    RoundedRectangle(cornerRadius: DeckHandTheme.Radius.lg, style: .continuous)
-                        .fill(DeckHandTheme.Brand.actionGradient)
-                )
-                .shadow(color: DeckHandTheme.Brand.cobalt.opacity(0.5), radius: 18, y: 6)
+            Text(isLast ? "Find my Mac" : page == 0 ? "Get started" : "Continue")
         }
-        .buttonStyle(PressableButtonStyle())
+        .buttonStyle(.ph(.primary, fullWidth: true))
+        .shadow(color: PixelHandTheme.Brand.cobalt.opacity(0.45), radius: 16, y: 6)
+    }
+
+    // MARK: - Paging
+
+    private var swipe: some Gesture {
+        DragGesture(minimumDistance: 24)
+            .onEnded { value in
+                let dx = value.translation.width
+                guard abs(dx) > 60, abs(dx) > abs(value.translation.height) * 1.5 else { return }
+                if dx < 0, !isLast { go(to: page + 1) }
+                if dx > 0, page > 0 { go(to: page - 1) }
+            }
+    }
+
+    private func go(to index: Int) {
+        guard pages.indices.contains(index), index != page else { return }
+        direction = index > page ? 1 : -1
+        withAnimation(reduceMotion ? PixelHandMotion.reducedFade : .easeOut(duration: 0.3)) {
+            page = index
+        }
     }
 }
 
 // MARK: - Page model
 
 struct OnboardingPage: Identifiable {
-    let id = UUID()
-    /// `nil` on the first page, which shows the app mark instead of a symbol.
-    let symbol: String?
+    struct Bullet: Identifiable {
+        let glyph: GlyphBitmap
+        let text: String
+        var id: String { text }
+    }
+
+    let scene: OnboardingScene
     let title: String
     let body: String
-    /// Short supporting lines rendered as a checklist. Empty on most pages.
-    let bullets: [String]
+    /// Glyph rows under the text. Empty on the welcome page.
+    let bullets: [Bullet]
+
+    var id: OnboardingScene { scene }
 
     static let all: [OnboardingPage] = [
         OnboardingPage(
-            symbol: nil,
+            scene: .mark,
             title: "Pixel Hand",
-            body: "Your iPad becomes a trackpad, a second view of your Mac, and a capture tool — over your own Wi-Fi, with nothing in between.",
+            body: "Your iPhone or iPad becomes a trackpad, a live view of your Mac and a set of buttons for the app in front. Over your own network, with nothing in between.",
             bullets: []
         ),
         OnboardingPage(
-            symbol: "hand.point.up.left",
+            scene: .trackpad,
             title: "A real trackpad",
-            body: "Move, click, and scroll with the same gestures you already use. Sensitivity, haptics, and scroll direction are all yours to set.",
+            body: "Move, click and scroll with the gestures you already know. The dots light up under your fingers.",
             bullets: [
-                "Two fingers to scroll",
-                "Three fingers to switch spaces",
-                "Press and hold to right-click",
+                Bullet(glyph: PixelGlyphs.click, text: "Two fingers to scroll"),
+                Bullet(glyph: PixelGlyphs.missionControl, text: "Three fingers to switch desktops"),
+                Bullet(glyph: PixelGlyphs.pointer, text: "Tap, then hold to drag"),
             ]
         ),
         OnboardingPage(
-            symbol: "rectangle.on.rectangle",
+            scene: .mirror,
             title: "Watch your Mac",
-            body: "Pin a live view of the Mac screen anywhere on the iPad. Pinch it larger when you need to read, drop it back to a corner when you don't.",
+            body: "Keep a live view of the screen next to the trackpad. Pinch it bigger to read, flick it to a corner when you’re done.",
             bullets: [
-                "Drag it anywhere",
-                "Pinch to resize",
-                "Sharpens as it grows",
+                Bullet(glyph: PixelGlyphs.pictureInPicture, text: "Drag it anywhere"),
+                Bullet(glyph: PixelGlyphs.region, text: "Pinch to resize"),
+                Bullet(glyph: PixelGlyphs.screen, text: "Gets sharper as it grows"),
             ]
         ),
         OnboardingPage(
-            symbol: "camera.viewfinder",
-            title: "Capture and mark up",
-            body: "Pull a screenshot from the Mac, crop it, annotate it, or lift the text out of it — then save or share it from the iPad.",
+            scene: .capture,
+            title: "Capture and read",
+            body: "Take the whole screen, one window or a region. Mark it up, or lift the text straight out of it.",
             bullets: [
-                "Full screen, region, or window",
-                "Annotate before you send",
-                "Recognize text in place",
+                Bullet(glyph: PixelGlyphs.capture, text: "Full screen, window or region"),
+                Bullet(glyph: PixelGlyphs.type, text: "Mark up before you share"),
+                Bullet(glyph: PixelGlyphs.readText, text: "Copy the text from any capture"),
             ]
         ),
         OnboardingPage(
-            symbol: "wifi",
-            title: "One thing on the Mac",
-            body: "Open Pixel Hand on your Mac and keep both devices on the same Wi-Fi. The first time you connect, the Mac asks you to approve this iPad.",
+            scene: .pairing,
+            title: "One step on your Mac",
+            body: "Open Pixel Hand on your Mac. The first time you connect, you pair once with a code from its menu bar.",
             bullets: [
-                "Same Wi-Fi network",
-                "Pixel Hand running on the Mac",
-                "Approve the iPad once",
+                Bullet(glyph: PixelGlyphs.mac, text: "Free at pixelhand.app/mac"),
+                Bullet(glyph: PixelGlyphs.wifi, text: "Same Wi-Fi, or a cable"),
+                Bullet(glyph: PixelGlyphs.lock, text: "Pair once with a code"),
             ]
         ),
     ]
-}
-
-// MARK: - Page
-
-private struct OnboardingPageView: View {
-    let page: OnboardingPage
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var revealed = false
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 24)
-
-            artwork
-                .padding(.bottom, 44)
-
-            VStack(spacing: 14) {
-                Text(page.title)
-                    .font(.system(size: 36, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-
-                Text(page.body)
-                    .font(.system(size: 17, weight: .regular, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.62))
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(3)
-                    .frame(maxWidth: 460)
-            }
-            .padding(.horizontal, 32)
-            .opacity(revealed ? 1 : 0)
-            .offset(y: revealed ? 0 : 10)
-
-            if !page.bullets.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(Array(page.bullets.enumerated()), id: \.offset) { index, bullet in
-                        HStack(spacing: 11) {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(DeckHandTheme.Brand.mint)
-                                .frame(width: 18, height: 18)
-                                .background(
-                                    Circle().fill(DeckHandTheme.Brand.mint.opacity(0.14))
-                                )
-                            Text(bullet)
-                                .font(.system(size: 15, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.78))
-                        }
-                        .opacity(revealed ? 1 : 0)
-                        .offset(y: revealed ? 0 : 8)
-                        .animation(
-                            reduceMotion
-                                ? .easeOut(duration: 0.2)
-                                : .easeOut(duration: 0.32).delay(0.16 + Double(index) * 0.06),
-                            value: revealed
-                        )
-                    }
-                }
-                .padding(.top, 30)
-            }
-
-            Spacer(minLength: 24)
-        }
-        .animation(
-            reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.34).delay(0.06),
-            value: revealed
-        )
-        .onAppear { revealed = true }
-        .onDisappear { revealed = false }
-    }
-
-    @ViewBuilder
-    private var artwork: some View {
-        if let symbol = page.symbol {
-            ZStack {
-                Circle()
-                    .fill(DeckHandTheme.Brand.cobalt.opacity(0.22))
-                    .frame(width: 148, height: 148)
-                    .blur(radius: 18)
-
-                RoundedRectangle(cornerRadius: 40, style: .continuous)
-                    .fill(DeckHandTheme.Brand.screenGradient)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 40, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
-                    )
-                    .frame(width: 136, height: 136)
-                    .shadow(color: DeckHandTheme.Brand.cobalt.opacity(0.4), radius: 26)
-
-                Image(systemName: symbol)
-                    .font(.system(size: 54, weight: .light))
-                    .foregroundStyle(DeckHandTheme.Brand.tileGradient)
-            }
-            .scaleEffect(revealed ? 1 : 0.92)
-            .opacity(revealed ? 1 : 0)
-        } else {
-            DeckHandMark(size: 172)
-        }
-    }
 }
 
 // MARK: - Button style
@@ -269,4 +320,8 @@ struct PressableButtonStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.975 : 1)
             .animation(.easeOut(duration: 0.14), value: configuration.isPressed)
     }
+}
+
+#Preview("Onboarding · iPhone") {
+    OnboardingView {}
 }
