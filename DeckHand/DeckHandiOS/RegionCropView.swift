@@ -15,9 +15,10 @@
 //      side — much sharper than re-scaling the iPad-side JPEG, since the
 //      Mac still has access to the native pixel grid.
 //
-//  Visual: white outline + white square handles (with a 1pt black inner
-//  stroke for visibility on light backgrounds). Brand cobalt only appears
-//  on the "Capture region" affordance.
+//  Visual (UX-009): the capture in a black well on the navy stage, the
+//  selection as a phosphor rim with a cyan glow and pixel-square handles,
+//  everything outside dimmed. The header strip reads the selection's size
+//  in the capture's pixels (`REGION · 812X540`); Reset is always there.
 //
 
 import SwiftUI
@@ -30,11 +31,8 @@ struct RegionCropView: View {
     /// the user cancelled.
     let onConfirm: (CGRect?) -> Void
 
-    @Environment(\.colorScheme) private var colorScheme
-
-    /// Current rectangle, in screen-space coordinates relative to the
-    /// view's coordinate space. `nil` means "no selection yet" — the next
-    /// drag will lay one down.
+    /// Current rectangle, in the picture well's coordinates. `nil` means
+    /// "no selection yet": the next drag lays one down.
     @State private var selection: CGRect?
     /// What kind of drag we're currently servicing. Decided at the *first*
     /// onChanged tick of a gesture and stays fixed until onEnded.
@@ -43,17 +41,14 @@ struct RegionCropView: View {
     /// where we need to know the original frame the drag is editing).
     @State private var dragStartSelection: CGRect?
     @State private var dragStartLocation: CGPoint?
-    /// On-screen frame of the underlying `Image`, captured via the
-    /// transparent GeometryReader. We map between screen / image space
-    /// using this.
+    /// Where the picture is drawn inside the well (aspect fit).
     @State private var imageFrame: CGRect = .zero
 
     /// Minimum drag length before we treat a fresh-draw gesture as a real
     /// rectangle. Prevents accidental taps from queuing degenerate crops.
     private let minimumDragLength: CGFloat = 24
-    private let handleVisualSize: CGFloat = 14
-    /// Inflated touch target for handles. The white square is 14pt but we
-    /// still want it finger-friendly.
+    private let handleVisualSize: CGFloat = 10
+    /// Inflated touch target for handles: 44 pt around a 10 pt square.
     private let handleHitInset: CGFloat = -22
     /// Minimum size the user can shrink the rect to during a resize, so
     /// they can't accidentally squish it into a degenerate strip and have
@@ -61,145 +56,117 @@ struct RegionCropView: View {
     private let minimumRectSide: CGFloat = 32
 
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-
-            GeometryReader { geo in
-                ZStack {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: geo.size.width, height: geo.size.height)
-                        .background(
-                            GeometryReader { _ in
-                                Color.clear
-                                    .onAppear { imageFrame = imageRectInside(geo.size) }
-                                    .onChange(of: geo.size) { _, _ in
-                                        imageFrame = imageRectInside(geo.size)
-                                    }
-                            }
-                        )
-
-                    // Dim everything outside the current selection.
-                    if let rect = selection {
-                        DimOutside(selection: rect)
-                            .ignoresSafeArea()
+        CaptureStage {
+            VStack(spacing: PixelHandTheme.Space.md) {
+                CaptureHeader(
+                    strip: strip,
+                    style: canConfirm ? .live : .dim,
+                    closeLabel: "Cancel region",
+                    onClose: { onConfirm(nil) }
+                ) {
+                    // Always enabled: with no selection it simply clears
+                    // nothing (UX-009: region reset always enabled).
+                    CaptureIconButton(glyph: CaptureGlyphs.reset, label: "Reset selection") {
+                        withAnimation(.easeOut(duration: 0.15)) { selection = nil }
                     }
+                }
 
-                    // Selection rectangle.
-                    if let rect = selection {
-                        Rectangle()
-                            .strokeBorder(Color.white, lineWidth: 2)
-                            .frame(width: rect.width, height: rect.height)
-                            .position(x: rect.midX, y: rect.midY)
-                            .allowsHitTesting(false)
-                            .shadow(color: .black.opacity(0.45), radius: 1)
+                CapturePictureWell {
+                    GeometryReader { geo in
+                        ZStack {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: geo.size.width, height: geo.size.height)
+                                .accessibilityLabel("The Mac's screen")
 
-                        // Handles: 4 corners + 4 edge midpoints.
-                        ForEach(Handle.allCases, id: \.self) { handle in
-                            HandleSquare(size: handleVisualSize)
-                                .position(handle.position(in: rect))
-                                .allowsHitTesting(false)
+                            if let rect = selection {
+                                DimOutside(selection: rect)
+
+                                Rectangle()
+                                    .strokeBorder(PixelHandTheme.Brand.phosphor, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                                    .frame(width: rect.width, height: rect.height)
+                                    .position(x: rect.midX, y: rect.midY)
+                                    .shadow(color: PixelHandTheme.Brand.glow.opacity(0.8), radius: 3)
+                                    .allowsHitTesting(false)
+
+                                ForEach(Handle.allCases, id: \.self) { handle in
+                                    HandleSquare(size: handleVisualSize)
+                                        .position(handle.position(in: rect))
+                                        .allowsHitTesting(false)
+                                }
+                            }
+                        }
+                        .contentShape(Rectangle())
+                        .gesture(
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { value in
+                                    handleDragChange(value)
+                                }
+                                .onEnded { _ in
+                                    dragKind = .none
+                                    dragStartSelection = nil
+                                    dragStartLocation = nil
+                                }
+                        )
+                        .onAppear { imageFrame = CaptureGeometry.fitted(image, in: geo.size) }
+                        .onChange(of: geo.size) { _, size in
+                            // A new fit invalidates an on-screen selection.
+                            imageFrame = CaptureGeometry.fitted(image, in: size)
+                            selection = nil
                         }
                     }
                 }
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            handleDragChange(value)
-                        }
-                        .onEnded { _ in
-                            dragKind = .none
-                            dragStartSelection = nil
-                            dragStartLocation = nil
-                        }
-                )
-            }
-            .ignoresSafeArea()
+                .accessibilityElement(children: .contain)
+                .accessibilityHint("Drag to mark a region. Drag inside it to move, corners and edges to resize.")
 
-            VStack {
-                topBar
-                    .padding(.horizontal, 20)
-                    .padding(.top, 16)
+                Text(headlineText)
+                    .font(.footnote)
+                    .foregroundStyle(Color.white.opacity(0.72))
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, PixelHandTheme.Space.lg)
 
-                Spacer()
-
-                bottomBar
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 32)
+                Button {
+                    GestureHaptic.medium.trigger()
+                    guard let normalized = normalizedSelection() else { return }
+                    onConfirm(normalized)
+                } label: {
+                    Label {
+                        Text("Capture Region")
+                    } icon: {
+                        PHGlyph(glyph: PixelGlyphs.region, pitch: 2)
+                    }
+                }
+                .buttonStyle(.ph(.primary, size: .large, fullWidth: true))
+                .disabled(!canConfirm)
+                .padding(.horizontal, PixelHandTheme.Space.lg)
+                .padding(.bottom, PixelHandTheme.Space.sm)
             }
         }
     }
 
-    // MARK: - Top / bottom chrome
-
-    private var topBar: some View {
-        HStack {
-            Button {
-                GestureHaptic.light.trigger()
-                onConfirm(nil)
-            } label: {
-                Text("Cancel")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.9))
-            }
-
-            Spacer()
-
-            Text(headlineText)
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.85))
-                .multilineTextAlignment(.center)
-
-            Spacer()
-
-            // Reset selection
-            Button {
-                GestureHaptic.light.trigger()
-                selection = nil
-            } label: {
-                Image(systemName: "arrow.counterclockwise")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(canConfirm ? Color.white.opacity(0.9) : Color.white.opacity(0.3))
-            }
-            .disabled(!canConfirm)
+    private var strip: CaptureStrip {
+        if let selection,
+           let size = CaptureGeometry.selectionPixels(
+               MirrorRect(selection),
+               fitted: MirrorRect(imageFrame),
+               imageWidth: Double(image.size.width * image.scale),
+               imageHeight: Double(image.size.height * image.scale)
+           ) {
+            return CaptureStrip(items: ["REGION", size], spoken: "Region, \(size.replacingOccurrences(of: "X", with: " by ")) pixels")
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(.ultraThinMaterial.opacity(0.6), in: RoundedRectangle(cornerRadius: 14))
-    }
-
-    private var bottomBar: some View {
-        HStack(spacing: 12) {
-            Spacer()
-            Button {
-                GestureHaptic.medium.trigger()
-                guard let normalized = normalizedSelection() else { return }
-                onConfirm(normalized)
-            } label: {
-                Label("Capture region", systemImage: "rectangle.dashed.badge.record")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 12)
-                    .background(
-                        Capsule().fill(canConfirm ? DeckHandTheme.Brand.cobalt : Color.gray.opacity(0.5))
-                    )
-            }
-            .disabled(!canConfirm)
-            Spacer()
-        }
+        return CaptureStrip(items: ["REGION", "DRAG TO MARK"], spoken: "Region, nothing marked yet")
     }
 
     private var headlineText: String {
         if selection == nil {
-            return "Drag to mark a region"
+            return "Drag across the screen to mark a region."
         }
         if !canConfirm {
-            return "Drag a corner or edge to resize"
+            return "Make the region a little bigger."
         }
-        return "Drag to move · Corners to resize"
+        return "Drag inside to move it, corners and edges to resize."
     }
 
     // MARK: - Drag dispatch
@@ -322,18 +289,6 @@ struct RegionCropView: View {
 
     // MARK: - Geometry helpers
 
-    private func imageRectInside(_ container: CGSize) -> CGRect {
-        let imgW = image.size.width
-        let imgH = image.size.height
-        guard imgW > 0, imgH > 0 else { return .zero }
-        let scale = min(container.width / imgW, container.height / imgH)
-        let drawW = imgW * scale
-        let drawH = imgH * scale
-        let x = (container.width - drawW) / 2
-        let y = (container.height - drawH) / 2
-        return CGRect(x: x, y: y, width: drawW, height: drawH)
-    }
-
     private func clampToImage(_ point: CGPoint) -> CGPoint {
         guard imageFrame.width > 0, imageFrame.height > 0 else { return point }
         return CGPoint(
@@ -342,29 +297,15 @@ struct RegionCropView: View {
         )
     }
 
-    private func translateToImageSpace(_ rectOnScreen: CGRect) -> CGRect? {
-        guard imageFrame.width > 0, imageFrame.height > 0 else { return nil }
-        let dx = rectOnScreen.minX - imageFrame.minX
-        let dy = rectOnScreen.minY - imageFrame.minY
-        return CGRect(x: dx, y: dy, width: rectOnScreen.width, height: rectOnScreen.height)
-    }
-
     /// Final 0…1 normalized rect in image space, ready to ship to the Mac.
     /// `nil` if the rect is too small or doesn't exist yet.
     private func normalizedSelection() -> CGRect? {
-        guard let onScreen = selection,
-              onScreen.width >= minimumDragLength,
-              onScreen.height >= minimumDragLength,
-              let inImage = translateToImageSpace(onScreen)
-        else { return nil }
-        let w = imageFrame.width
-        let h = imageFrame.height
-        return CGRect(
-            x: max(0, inImage.minX / w),
-            y: max(0, inImage.minY / h),
-            width: min(1.0, inImage.width / w),
-            height: min(1.0, inImage.height / h)
-        )
+        guard let selection else { return nil }
+        return CaptureGeometry.normalizedSelection(
+            MirrorRect(selection),
+            fitted: MirrorRect(imageFrame),
+            minimumSide: Double(minimumDragLength)
+        ).map { CGRect($0) }
     }
 
     private var canConfirm: Bool {
@@ -405,27 +346,26 @@ private enum Handle: CaseIterable, Hashable {
 
 // MARK: - Subviews
 
-/// White square handle with a thin black inner stroke so it stays visible
-/// on both light and dark image content.
+/// A pixel-square handle: phosphor with a navy core, glowing, readable on
+/// light and dark screens alike.
 private struct HandleSquare: View {
     let size: CGFloat
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(Color.white)
-                .frame(width: size, height: size)
-                .shadow(color: .black.opacity(0.5), radius: 1.5)
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .strokeBorder(Color.black.opacity(0.45), lineWidth: 1)
-                .frame(width: size, height: size)
-        }
+        RoundedRectangle(cornerRadius: 2, style: .continuous)
+            .fill(PixelHandTheme.Brand.phosphor)
+            .frame(width: size, height: size)
+            .overlay(
+                RoundedRectangle(cornerRadius: 1, style: .continuous)
+                    .fill(PixelHandTheme.Brand.screen)
+                    .frame(width: size * 0.4, height: size * 0.4)
+            )
+            .shadow(color: PixelHandTheme.Brand.glow, radius: 3)
     }
 }
 
-/// Black-out the area outside `selection` so the user has clear sense of
-/// what's being captured. Single `Path` with even-odd fill so we don't have
-/// to manage four sub-rects.
+/// Dims everything outside `selection` with the navy scrim. One even-odd
+/// `Path`, so there are no seams between four sub-rects.
 private struct DimOutside: View {
     let selection: CGRect
 
@@ -435,7 +375,7 @@ private struct DimOutside: View {
                 path.addRect(CGRect(origin: .zero, size: geo.size))
                 path.addRect(selection)
             }
-            .fill(Color.black.opacity(0.55), style: FillStyle(eoFill: true))
+            .fill(PixelHandTheme.Brand.screen.opacity(0.62), style: FillStyle(eoFill: true))
             .allowsHitTesting(false)
         }
     }

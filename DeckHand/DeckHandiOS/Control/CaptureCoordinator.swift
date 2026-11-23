@@ -40,9 +40,11 @@ final class CaptureCoordinator {
     /// draw a rect against actual Mac pixels rather than a black canvas.
     var regionReferenceImage: UIImage?
     var isRegionCropPresented = false
-    /// Image fed into `OCRResultView` once the OCR-intent capture lands.
-    var ocrImage: UIImage?
-    var isOCRPresented = false
+    /// What the capture on screen is (the sheet's status strip), and the
+    /// step the capture sheet opens at: "Recognize Text" opens straight at
+    /// read text (UX-009: one sheet, no separate OCR sheet).
+    var capturedKind: CaptureKind = .fullScreen
+    var captureInitialStep: CaptureStep = .preview
     /// Latest window list pushed back from the Mac and the picker's load
     /// state. We re-fetch every time the picker opens so the user never
     /// sees stale entries for windows that were closed since the last request.
@@ -100,6 +102,7 @@ final class CaptureCoordinator {
 
         screenshotImage = nil
         screenshotErrorMessage = nil
+        screenshotErrorIsMirror = false
         isRequestingScreenshot = true
         // Region-picking and OCR intents don't show the loading overlay
         // until the user has confirmed the capture path; the loading
@@ -241,20 +244,22 @@ final class CaptureCoordinator {
         // image lands in the right UI surface — preview sheet,
         // crop overlay, or OCR sheet.
         switch screenshotIntent {
-        case .fullScreen, .window, .regionFinal:
+        case .fullScreen, .window, .regionFinal, .ocr:
+            capturedKind = switch screenshotIntent {
+            case .window(let window): .window(appName: window.appName)
+            case .regionFinal: .region
+            default: .fullScreen
+            }
+            captureInitialStep = screenshotIntent == .ocr ? .readText : .preview
+            // isScreenshotPresented is already true; the cover swaps its
+            // loading state for the capture sheet.
             screenshotImage = img
-            // isScreenshotPresented is already true; ZStack swaps to ScreenshotPreviewView
             screenshotIntent = .fullScreen
         case .regionPicking:
             // Tear down the loading overlay; hand off to crop UI.
             isScreenshotPresented = false
             regionReferenceImage = img
             isRegionCropPresented = true
-        case .ocr:
-            isScreenshotPresented = false
-            ocrImage = img
-            isOCRPresented = true
-            screenshotIntent = .fullScreen
         }
     }
 

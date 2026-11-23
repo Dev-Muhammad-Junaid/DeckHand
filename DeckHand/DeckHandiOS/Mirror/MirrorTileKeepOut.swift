@@ -61,7 +61,7 @@ final class MirrorTileKeepOut {
             caption: local(.caption),
             keyboard: local(.keyboard)
         )
-        return (pad.map(CGRect.init), areas.map(CGRect.init))
+        return (pad.map { CGRect($0) }, areas.map { CGRect($0) })
     }
 }
 
