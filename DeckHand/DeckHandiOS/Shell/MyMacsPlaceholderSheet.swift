@@ -69,8 +69,10 @@ struct MyMacsPlaceholderSheet: View {
 }
 
 /// A Mac card at the placeholder's level: a navy 16:10 tile with the Mac
-/// glyph, the live pixel and a 2 pt cobalt ring on the focused Mac.
-private struct MacCardPlaceholder: View {
+/// glyph, the live pixel and a 2 pt cobalt ring on the focused Mac. Shared
+/// by My Macs and the iPad Macs sidebar (one component, one size per
+/// class: `07-Polish-Spec.md` §5.9).
+struct MacCardPlaceholder: View {
     let name: String
     let subtitle: String
     let isLive: Bool

@@ -17,6 +17,9 @@ import SwiftUI
 struct ScreenSurface: View {
     let session: ControlSessionModel
     let macName: String
+    /// The trackpad goes under the pane when it fits. The iPad Split preset
+    /// draws its own pad next to the deck, so it turns this off (UX-007).
+    var includesTrackpad = true
 
     @EnvironmentObject private var settings: DeckHandSettings
     @Environment(\.colorScheme) private var colorScheme
@@ -30,7 +33,9 @@ struct ScreenSurface: View {
     var body: some View {
         GeometryReader { proxy in
             if session.isMirrorActive {
-                let layout = Self.split(size: proxy.size, aspect: MirrorPicture.aspect(session))
+                let layout = includesTrackpad
+                    ? Self.split(size: proxy.size, aspect: MirrorPicture.aspect(session))
+                    : (pane: proxy.size.height, showsTrackpad: false)
                 VStack(spacing: PixelHandTheme.Space.md) {
                     MirrorPane(session: session, macName: macName)
                         .frame(height: layout.pane)

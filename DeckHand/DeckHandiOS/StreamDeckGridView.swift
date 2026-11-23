@@ -27,6 +27,10 @@ struct StreamDeckGridView: View {
     /// it turns off this view's Quick Actions bar and edit buttons. The
     /// classic layout keeps them.
     var showsQuickActions = true
+    /// Keys per row and the side inset: the shell's deck columns and
+    /// panels pass their own (UX-007); the classic layout keeps 4 and 20.
+    var columnCount = 4
+    var horizontalInset: CGFloat = 20
 
     // Persisted user preferences
     @AppStorage("pinnedBundleIDs") private var pinnedData: Data = Data()
@@ -41,12 +45,9 @@ struct StreamDeckGridView: View {
     /// FABs; only one mode is active at a time.
     @State private var editFABMode: EditFABMode = .hidden
 
-    private let columns = [
-        GridItem(.flexible(), spacing: 16),
-        GridItem(.flexible(), spacing: 16),
-        GridItem(.flexible(), spacing: 16),
-        GridItem(.flexible(), spacing: 16),
-    ]
+    private var columns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 16), count: max(1, columnCount))
+    }
 
     private var filteredApps: [InstalledAppInfo] {
         let visible = installedApps.filter { !hiddenIDs.contains($0.bundleID) }
@@ -65,7 +66,7 @@ struct StreamDeckGridView: View {
             VStack(alignment: .leading, spacing: 0) {
                 // ── Search bar ──────────────────────────────────
                 SearchField(text: $searchText, prompt: "Search apps")
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, horizontalInset)
                     .padding(.top, 16)
                     .padding(.bottom, 8)
 
@@ -102,7 +103,7 @@ struct StreamDeckGridView: View {
                                       onHide: { hideApp(app) })
                         }
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, horizontalInset)
                     .padding(.bottom, 20)
                 }
 
@@ -120,7 +121,7 @@ struct StreamDeckGridView: View {
                                       onHide: { hideApp(app) })
                         }
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, horizontalInset)
                     .padding(.bottom, 40)
                 } else if installedApps.isEmpty {
                     DeckHandLoadingStateView(title: "Loading apps from Mac…")

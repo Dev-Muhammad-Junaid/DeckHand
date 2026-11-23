@@ -183,4 +183,15 @@ struct CanvasPlanTests {
         #expect(memory.presets.count == LayoutPresetMemory.maximumEntries)
         #expect(memory.preset(for: "Mac 39|columns") == .screen)
     }
+
+    @Test("Layout glyphs: 9 × 9, lit, unique names, outside the spec's 40")
+    func layoutGlyphs() {
+        for glyph in PixelGlyphs.layout {
+            #expect(glyph.rows.count == 9, "\(glyph.name)")
+            #expect(!glyph.litPoints.isEmpty, "\(glyph.name)")
+            #expect(PixelGlyphs.named(glyph.name) == nil, "\(glyph.name)")
+        }
+        #expect(PixelGlyphs.layoutSplit.accent != nil)
+        #expect(PixelGlyphs.all.count == 40)
+    }
 }

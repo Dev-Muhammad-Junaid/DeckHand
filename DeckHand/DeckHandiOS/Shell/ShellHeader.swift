@@ -7,6 +7,12 @@
 //  lives in More, away from the primary actions; the session id is no
 //  longer shown. Board: `.hdr2`. (UX-003 shell, the basis of UX-008.)
 //
+//  On iPad (UX-007) the header also carries the layout presets, and on
+//  wide windows the Ask field (⌘K) between them and capture, and the
+//  sidebar button while the Macs sidebar is hidden. In the iPhone
+//  landscape rail it sits on top of the deck column without padding or the
+//  screen button (the rail has the Screen tab).
+//
 
 import SwiftUI
 
@@ -30,6 +36,14 @@ struct ShellHeader: View {
     let onSettings: () -> Void
     let onClassicLayout: () -> Void
     let onDisconnect: () -> Void
+    /// iPad: the layout presets (UX-007).
+    var presets: Binding<LayoutPreset>?
+    /// Wide: Ask as a field in the header (a circle when the row is tight).
+    var onAsk: (() -> Void)?
+    /// Wide, sidebar hidden: the button that shows it again.
+    var onShowSidebar: (() -> Void)?
+    var showsMirrorToggle = true
+    var horizontalPadding: CGFloat = PixelHandTheme.Space.lg
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var swipeOffset: CGFloat = 0
@@ -49,18 +63,39 @@ struct ShellHeader: View {
             if let badge = linkBadge {
                 LinkBadge(kind: badge)
             }
-            Spacer(minLength: 0)
-            GlassCircleButton(
-                glyph: PixelGlyphs.pictureInPicture,
-                label: isMirrorActive ? "Hide the Mac’s screen" : "Show the Mac’s screen",
-                isOn: isMirrorActive,
-                action: onToggleMirror
-            )
-            .requiresPro(.mirror)
+            if let onAsk {
+                if let presets {
+                    LayoutPresetPicker(selection: presets)
+                }
+                ViewThatFits(in: .horizontal) {
+                    AskField(macName: peerName, action: onAsk)
+                    HStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        AskCircleButton(size: PixelHandTheme.ControlHeight.standard, action: onAsk)
+                    }
+                }
+            } else {
+                Spacer(minLength: 0)
+                if let presets {
+                    LayoutPresetPicker(selection: presets)
+                }
+            }
+            if showsMirrorToggle {
+                GlassCircleButton(
+                    glyph: PixelGlyphs.pictureInPicture,
+                    label: isMirrorActive ? "Hide the Mac’s screen" : "Show the Mac’s screen",
+                    isOn: isMirrorActive,
+                    action: onToggleMirror
+                )
+                .requiresPro(.mirror)
+            }
             captureMenu
+            if let onShowSidebar {
+                GlassCircleButton(glyph: PixelGlyphs.sidebar, label: "Show the Macs sidebar", action: onShowSidebar)
+            }
             moreMenu
         }
-        .padding(.horizontal, PixelHandTheme.Space.lg)
+        .padding(.horizontal, horizontalPadding)
         .frame(minHeight: PixelHandTheme.ControlHeight.dock)
         .phGlassGroup()
     }
