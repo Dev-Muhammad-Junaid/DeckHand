@@ -1,6 +1,6 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Mac loop needed:** run `/loop 1h Follow the "Build loop" section in DeckHand/Integration/MAC-BUILD.md on claude/pixelhand-integration` in a Mac session. (Build 3 waited about 14 h with no Mac build. Builds 4–7 have been queued since; build 7, the complete Sill phase, replaces all of them.)
+> **Mac builds:** build 7 was built on the Mac (2026-11-20, results in `STATUS.md`). Build 8 is queued (`72de5cb`). Mac builds are now run from the primary session or the owner's Mac session.
 
 ## Needs the owner
 
@@ -11,8 +11,6 @@
   later: paywall review screenshot per subscription (needs a build with the
   paywall), App Review notes' demo video, Paid Applications agreement
   (with Apple), CloudKit schema deploy before release.
-- **Mac build loop:** see the note above. No Mac has built anything since
-  build 2, and the roadmap phase waits for a green Mac build.
 
 The owner approved the full program (see `DECISIONS.md`). A scheduled cloud
 task starts a fresh coordinator session every 2 hours; it has no memory, so
@@ -105,3 +103,8 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   design-foundation and deck2-model and queued build 8 (`72de5cb`, protocol
   12). On its request, started the screens the owner touches: UX Pointer, UX
   shell (dock, strip, header, Settings) and UX Screen.
+- 2026-11-23 18:55 UTC: the coordinator tick queued for 2026-11-20 00:55 was
+  delivered almost 4 days late. All three UX lanes had failed at about
+  2026-11-19 23:54 (most likely the usage limit), one commit each. I sent
+  each one a message to resume from its last push. Build 8 still has no Mac
+  results.
