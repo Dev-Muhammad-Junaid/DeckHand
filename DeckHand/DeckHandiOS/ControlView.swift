@@ -60,6 +60,12 @@ struct ControlView: View {
         }
     }
 
+    private var hasStatusPills: Bool {
+        session.hostAccessibilityGranted == false
+            || session.macLockState.bannerText(macName: peerName) != nil
+            || session.hostScreenRecordingGranted == false
+    }
+
     var body: some View {
         Group {
             if usesPixelHandShell {
@@ -103,19 +109,26 @@ struct ControlView: View {
                         // Host-permission warnings: the host reports what it
                         // can execute; missing permissions show here instead
                         // of taps failing silently.
-                        if session.hostAccessibilityGranted == false {
-                            HostCapabilityBanner(
-                                text: "The Mac is missing Accessibility permission — mouse, keyboard, and shortcuts won't work. Fix it in the Mac's menu bar panel."
-                            )
+                        VStack(spacing: PixelHandTheme.Space.sm) {
+                            if session.hostAccessibilityGranted == false {
+                                StatusPill(
+                                    title: "\(peerName) needs Accessibility.",
+                                    message: "Mouse, keyboard and shortcuts won’t work until you allow it in Pixel Hand’s menu on the Mac."
+                                )
+                            }
+                            if let lockText = session.macLockState.bannerText(macName: peerName) {
+                                StatusPill(kind: .locked, message: lockText)
+                            }
+                            if session.hostScreenRecordingGranted == false {
+                                StatusPill(
+                                    title: "\(peerName) needs Screen Recording.",
+                                    message: "Screenshots and the live screen won’t work until you allow it on the Mac."
+                                )
+                            }
                         }
-                        if let lockText = session.macLockState.bannerText(macName: peerName) {
-                            HostCapabilityBanner(text: lockText)
-                        }
-                        if session.hostScreenRecordingGranted == false {
-                            HostCapabilityBanner(
-                                text: "The Mac is missing Screen Recording permission — screenshots and the live mirror won't work."
-                            )
-                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, hasStatusPills ? PixelHandTheme.Space.sm : 0)
+                        .transition(.opacity)
 
                         tabSwitcher
                             .padding(.horizontal, 16)

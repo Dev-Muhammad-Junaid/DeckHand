@@ -24,17 +24,27 @@ struct ShellHeader: View {
     let onWindow: () -> Void
     let onOCR: () -> Void
     let onPrimaryCapture: () -> Void
+    /// Tap on the Mac pill: My Macs. Swiping the pill sideways will switch
+    /// Macs in 1.3; until then the swipe nudges the pill and opens My Macs.
+    let onMacs: () -> Void
     let onSettings: () -> Void
     let onClassicLayout: () -> Void
     let onDisconnect: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var swipeOffset: CGFloat = 0
 
     var body: some View {
         HStack(spacing: PixelHandTheme.Space.sm) {
             MacPill(
                 name: peerName,
                 subtitle: subtitle,
-                status: isLocked ? .locked : (isLive ? .online : .offline)
+                status: isLocked ? .locked : (isLive ? .online : .offline),
+                action: onMacs
             )
+            .accessibilityHint("Shows My Macs.")
+            .offset(x: swipeOffset)
+            .simultaneousGesture(pillSwipe)
             .layoutPriority(1)
             if let badge = linkBadge {
                 LinkBadge(kind: badge)
@@ -53,6 +63,25 @@ struct ShellHeader: View {
         .padding(.horizontal, PixelHandTheme.Space.lg)
         .frame(minHeight: PixelHandTheme.ControlHeight.dock)
         .phGlassGroup()
+    }
+
+    /// The pill swipe placeholder (UX-008): follows the finger a little
+    /// with resistance, springs back, and opens My Macs past 40 pt.
+    private var pillSwipe: some Gesture {
+        DragGesture(minimumDistance: 16)
+            .onChanged { value in
+                guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                swipeOffset = reduceMotion ? 0 : max(-24, min(24, value.translation.width * 0.25))
+            }
+            .onEnded { value in
+                withAnimation(PixelHandMotion.reduced(PixelHandMotion.spring, reduceMotion: reduceMotion)) {
+                    swipeOffset = 0
+                }
+                if abs(value.translation.width) > 40, abs(value.translation.width) > abs(value.translation.height) {
+                    GestureHaptic.selection.trigger()
+                    onMacs()
+                }
+            }
     }
 
     /// Quiet on plain Wi-Fi: only cable and VPN get a badge.

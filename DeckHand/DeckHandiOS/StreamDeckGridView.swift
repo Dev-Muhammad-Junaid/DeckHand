@@ -23,6 +23,10 @@ struct StreamDeckGridView: View {
     /// When a dialog is active, the Quick Actions bar swaps its contextual
     /// segment to surface the dialog's buttons instead of app shortcuts.
     let uiContext: UIContextSnapshot
+    /// The Pixel Hand shell shows the context strip and app dock itself, so
+    /// it turns off this view's Quick Actions bar and edit buttons. The
+    /// classic layout keeps them.
+    var showsQuickActions = true
 
     // Persisted user preferences
     @AppStorage("pinnedBundleIDs") private var pinnedData: Data = Data()
@@ -69,7 +73,7 @@ struct StreamDeckGridView: View {
                 // Replaces the old static 4-column grid. Morphs as the Mac's
                 // frontmost app changes, surfacing that app's top shortcuts
                 // inline alongside global macros and media transport.
-                if searchText.isEmpty {
+                if searchText.isEmpty && showsQuickActions {
                     SectionHeader(title: "QUICK ACTIONS")
                     QuickActionsBar(
                         sender: sender,
@@ -130,7 +134,7 @@ struct StreamDeckGridView: View {
         }
         .background(Color.clear)
         .overlay(alignment: .bottomTrailing) {
-            if !isDialogActive {
+            if !isDialogActive && showsQuickActions {
                 VStack(spacing: 12) {
                     NumericFAB(isActive: editFABMode == .numericKeypad) {
                         withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
