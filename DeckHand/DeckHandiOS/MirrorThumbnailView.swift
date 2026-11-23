@@ -86,10 +86,11 @@ struct MirrorThumbnailView: View {
         static let edgeMargin: CGFloat = 8
         static let trailingInset: CGFloat = 16
         /// The Pointer surface's foot, which the tile never covers (UX-006):
-        /// the 52 pt click strip, 12 pt, the 24 pt caption, 8 pt clear.
+        /// the 52 pt click strip, 12 pt, the 24 pt caption, 8 pt clear, plus
+        /// the desktop dots plate that hangs 24 pt under the tile.
         /// Reserved across the whole width: the caption is bottom-leading,
         /// so a tile dragged left still stays above it.
-        static let bottomInset: CGFloat = 52 + 12 + 24 + 8
+        static let bottomInset: CGFloat = 52 + 12 + 24 + 8 + 24
         static let cornerRadius: CGFloat = 10
     }
 

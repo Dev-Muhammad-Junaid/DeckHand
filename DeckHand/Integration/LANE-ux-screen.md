@@ -67,8 +67,9 @@ Linux (581 Core tests pass):
 - Close and ‹ › → pixel glyphs on navy circles with 44 pt targets; the
   loading spinner → `DotWave`.
 - **Tile anchored clear of the Pointer foot** (UX-Pointer follow-up):
-  `MirrorThumbnailView` reserves a 96 pt band across the whole width at the
-  bottom (52 pt click strip + 12 + 24 pt caption + 8). The tile's home is
+  `MirrorThumbnailView` reserves a 120 pt band across the whole width at the
+  bottom (52 pt click strip + 12 + 24 pt caption + 8 clear + 24 for the
+  desktop dots plate under the tile). The tile's home is
   just above it; drag can't take it lower (anywhere left or right, so it
   can't slide over the bottom-leading caption); pinch tops out at the height
   above the band. Saved layouts from older builds are clamped on render.
@@ -109,8 +110,7 @@ the main one (one a full-screen app) makes every element appear.
 10. Pointer tab, tile on: drag it to the bottom-left and bottom-right
     corners and pinch it to its largest: it never covers the Click |
     Right-click strip or the `2 FINGERS · SCROLL` caption. The desktop dots
-    plate under the tile sits in the 8 pt clear gap (may touch the caption's
-    top edge at the bottom-left; note if it does).
+    plate under the tile stays above the caption too.
 
 **iPhone SE (375 × 667)**: pane + trackpad both fit (trackpad ≥ 200 pt);
 toolbar fits on one line; strip drops `60 FPS`, then `DESK`, never mid-word.
