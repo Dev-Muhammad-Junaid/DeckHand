@@ -723,3 +723,33 @@ Mac should check:
    (HEVC, window mirror, audio, display picker, desktop dots).
 
 Status: READY FOR MAC BUILD (build 10)
+
+## Build 11 queued (2026-11-23)
+
+If build 10 hasn't been built, build this instead. Build 11 holds build 10
+(Pointer and Screen surfaces, tile anchoring) plus the **UX shell lane**
+(`LANE-ux-shell.md`):
+- **UX-005:** an app dock of the Mac's running apps with Dock-style
+  running dots, and a context strip with dialog buttons first, then the
+  front app's chips. The keyboard button now lives in the dock, and the
+  dock folds into the strip under 700 pt.
+- **UX-008:** tapping or swiping the Mac pill opens a My Macs placeholder;
+  status pills replace the old capability banner (the locked-Mac banner is
+  still shown).
+- **Settings redesign:** every Settings screen uses the new building
+  blocks, including other lanes' sections.
+
+Protocol is still **12**. Linux: Core **603 tests pass** and the type check
+is clean. The SwiftUI changes were parse-checked only.
+
+Mac should check:
+1. Build both apps and fix compile errors using the "Compile risks"
+   sections in `LANE-ux-shell.md`, `LANE-ux-screen.md` and
+   `LANE-ux-pointer.md`. Record any fixes here.
+2. Run `swift test --package-path DeckHand/Core` (expect 603) and
+   `DeckHandTests`.
+3. Work through the check tables in the three handoffs. Do Settings on
+   iPhone and iPad, light and dark, at AX3. Lock the Mac and confirm the
+   lock banner still appears.
+
+Status: READY FOR MAC BUILD (build 11)
