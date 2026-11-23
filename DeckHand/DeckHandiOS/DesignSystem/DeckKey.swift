@@ -28,6 +28,10 @@ struct DeckKey: View {
     var kind: Kind = .standard
     var asksFirst = false
     var delivery: DeliveryState = .idle
+    /// A real app icon drawn instead of the glyph (launch keys). Deck UI lane.
+    var icon: Image?
+    /// The glyph's colour from the key's palette token; `nil` = accent.
+    var tint: Color?
     var onRemove: (() -> Void)?
     let action: () -> Void
 
@@ -38,8 +42,14 @@ struct DeckKey: View {
             ZStack {
                 background
                 VStack(spacing: 4) {
-                    PHGlyph(glyph: glyph, pitch: PixelPitch.key)
-                        .foregroundStyle(kind == .system ? Color(red: 0.81, green: 0.88, blue: 1) : PixelHandTheme.accent)
+                    if let icon {
+                        icon.resizable().interpolation(.high).scaledToFit()
+                            .frame(width: 30, height: 30)
+                            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                    } else {
+                        PHGlyph(glyph: glyph, pitch: PixelPitch.key)
+                            .foregroundStyle(kind == .system ? Color(red: 0.81, green: 0.88, blue: 1) : (tint ?? PixelHandTheme.accent))
+                    }
                     Text(title)
                         .font(.phKeyLabel)
                         .foregroundStyle(kind == .system ? .white : PixelHandTheme.ink)
@@ -126,13 +136,22 @@ struct DeckKeyRow: View {
     let glyph: GlyphBitmap
     var chord: String?
     var delivery: DeliveryState = .idle
+    /// A real app icon drawn instead of the glyph. Deck UI lane.
+    var icon: Image?
+    var tint: Color?
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: PixelHandTheme.Space.md) {
-                PHGlyph(glyph: glyph, pitch: PixelPitch.key)
-                    .foregroundStyle(PixelHandTheme.accent)
+                if let icon {
+                    icon.resizable().interpolation(.high).scaledToFit()
+                        .frame(width: 30, height: 30)
+                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                } else {
+                    PHGlyph(glyph: glyph, pitch: PixelPitch.key)
+                        .foregroundStyle(tint ?? PixelHandTheme.accent)
+                }
                 Text(title)
                     .font(.headline)
                     .foregroundStyle(PixelHandTheme.ink)

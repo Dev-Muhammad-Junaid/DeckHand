@@ -155,6 +155,14 @@ struct DeckTextAndGridTests {
         let wide = LayoutMetrics(width: 1366, height: 1024)
         #expect(wide.deckGrid(for: .large) == LayoutMetrics.deckColumnGrid)
     }
+
+    @Test("A narrow pane is the deck column: 3 keys of 96 at 336 pt")
+    func paneGrid() {
+        #expect(DeckGrid.pane(width: 336, height: 900, band: .standard) == LayoutMetrics.deckColumnGrid)
+        #expect(DeckGrid.pane(width: 336, height: 900, band: .standard).keySize == 96)
+        #expect(DeckGrid.pane(width: 402, height: 700, band: .standard).columns == 4)
+        #expect(DeckGrid.pane(width: 700, height: 900, band: .standard).columns == 6)
+    }
 }
 
 @Suite("Deck editor changes")

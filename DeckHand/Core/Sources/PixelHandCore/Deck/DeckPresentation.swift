@@ -361,3 +361,18 @@ extension LayoutMetrics {
         return DeckGrid(containerWidth: width, columns: columns, margin: margin, gutter: 12)
     }
 }
+
+extension DeckGrid {
+    /// Narrower than this, the deck is in a column (the wide layout's
+    /// 336 pt deck column, Slide Over): 3 keys with 12 pt insets.
+    public static let columnThreshold: Double = 360
+
+    /// The grid for a deck pane `width` × `height` at `band`: 3 columns in
+    /// a narrow column (3 × 96 at 336 pt), otherwise the size class's grid.
+    public static func pane(width: Double, height: Double, band: TypeBand) -> DeckGrid {
+        if width < columnThreshold {
+            return DeckGrid(containerWidth: width, columns: 3, margin: 12, gutter: 12)
+        }
+        return LayoutMetrics(width: width, height: height).deckGrid(for: band)
+    }
+}
