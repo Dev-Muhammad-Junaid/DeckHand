@@ -30,10 +30,11 @@ private struct FreeMacBadgeModifier: ViewModifier {
         content
             .overlay(alignment: .topTrailing) {
                 if locked {
-                    ProLockBadge()
-                        .scaleEffect(1.3)
-                        .offset(x: -6, y: 6)
+                    // The PRO badge, as on the board's My Macs.
+                    ProBadge()
+                        .offset(x: -12, y: 10)
                         .allowsHitTesting(false)
+                        .accessibilityHidden(true)
                 }
             }
             .accessibilityHint(locked ? "Needs \(SubscriptionCopy.productName): the free plan works with one Mac" : "")

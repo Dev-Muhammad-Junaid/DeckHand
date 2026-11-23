@@ -83,15 +83,39 @@ private struct RequiresProModifier: ViewModifier {
     }
 }
 
-/// The small lock on a locked control.
+/// The small lock on a locked control: the lock glyph in dots on the
+/// icon's sky → cobalt tile.
 struct ProLockBadge: View {
     var body: some View {
-        Image(systemName: "lock.fill")
-            .font(.system(size: 8, weight: .bold))
+        PHGlyph(glyph: PixelGlyphs.lock, pitch: 1.4)
             .foregroundStyle(.white)
-            .frame(width: 15, height: 15)
-            .background(Circle().fill(DeckHandTheme.Brand.cobalt))
-            .overlay(Circle().strokeBorder(.white.opacity(0.35), lineWidth: 0.5))
+            .frame(width: 18, height: 18)
+            .background(
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(PixelHandTheme.Brand.tileGradient)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .strokeBorder(.white.opacity(0.35), lineWidth: 0.5)
+            )
+            .shadow(color: PixelHandTheme.Brand.cobalt.opacity(0.5), radius: 3)
             .accessibilityHidden(true)
+    }
+}
+
+extension ProFeature {
+    /// The pixel glyph for this feature on the paywall and locked cards.
+    var glyph: GlyphBitmap {
+        switch self {
+        case .trackpad: PixelGlyphs.pointer
+        case .keyboard: PixelGlyphs.keyboard
+        case .mediaKeys: PixelGlyphs.play
+        case .decks: PixelGlyphs.deck
+        case .mirror: PixelGlyphs.screen
+        case .capture: PixelGlyphs.capture
+        case .multipleMacs: PixelGlyphs.mac
+        case .sharing: PixelGlyphs.share
+        case .ai: PixelGlyphs.ask
+        }
     }
 }
