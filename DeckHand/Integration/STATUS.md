@@ -696,3 +696,60 @@ Mac should check:
    light/dark, AX3), plus build 8's checks if 8 was skipped.
 
 Status: READY FOR MAC BUILD (build 9)
+
+## Build 10 queued (2026-11-23)
+
+If build 9 hasn't been built, build this instead. Build 10 holds build 9
+(the redesigned Pointer surface) plus the **UX Screen lane**
+(`LANE-ux-screen.md`):
+- **UX-006:** the Screen tab is a docked `MirrorPane` above the trackpad,
+  with a glass toolbar, a display picker sheet and a scanline transition.
+- **UX-016:** dot-matrix status strips (`LIVE · D1 · 60`), the cursor badge,
+  desktop dots on navy plates, a stats strip, and pixel chrome on the
+  floating tile.
+
+Protocol is still **12**. Linux: Core **586 tests pass**, the type check is
+clean. The apps were not compiled here.
+
+The floating tile now reserves a 120 pt band at the bottom (click strip,
+caption, desktop dots). It can't be dragged or pinched over the Pointer
+surface's click strip or caption. This is check 10 in `LANE-ux-screen.md`.
+
+Mac should check:
+1. Build both apps and fix compile errors with each handoff's "Compile
+   risks" (`LANE-ux-pointer.md`, `LANE-ux-screen.md`). Record any fixes here.
+2. `swift test --package-path DeckHand/Core` (expect 586) and `DeckHandTests`.
+3. The check tables in both handoffs, including the mirror regressions
+   (HEVC, window mirror, audio, display picker, desktop dots).
+
+Status: READY FOR MAC BUILD (build 10)
+
+## Build 11 queued (2026-11-23)
+
+If build 10 hasn't been built, build this instead. Build 11 holds build 10
+(Pointer and Screen surfaces, tile anchoring) plus the **UX shell lane**
+(`LANE-ux-shell.md`):
+- **UX-005:** an app dock of the Mac's running apps with Dock-style
+  running dots, and a context strip with dialog buttons first, then the
+  front app's chips. The keyboard button now lives in the dock, and the
+  dock folds into the strip under 700 pt.
+- **UX-008:** tapping or swiping the Mac pill opens a My Macs placeholder;
+  status pills replace the old capability banner (the locked-Mac banner is
+  still shown).
+- **Settings redesign:** every Settings screen uses the new building
+  blocks, including other lanes' sections.
+
+Protocol is still **12**. Linux: Core **603 tests pass** and the type check
+is clean. The SwiftUI changes were parse-checked only.
+
+Mac should check:
+1. Build both apps and fix compile errors using the "Compile risks"
+   sections in `LANE-ux-shell.md`, `LANE-ux-screen.md` and
+   `LANE-ux-pointer.md`. Record any fixes here.
+2. Run `swift test --package-path DeckHand/Core` (expect 603) and
+   `DeckHandTests`.
+3. Work through the check tables in the three handoffs. Do Settings on
+   iPhone and iPad, light and dark, at AX3. Lock the Mac and confirm the
+   lock banner still appears.
+
+Status: READY FOR MAC BUILD (build 11)

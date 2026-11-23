@@ -85,8 +85,12 @@ struct MirrorThumbnailView: View {
         static let maxFill: CGFloat = 0.94
         static let edgeMargin: CGFloat = 8
         static let trailingInset: CGFloat = 16
-        /// Clears the gesture button bar along the bottom of the control surface.
-        static let bottomInset: CGFloat = 96
+        /// The Pointer surface's foot, which the tile never covers (UX-006):
+        /// the 52 pt click strip, 12 pt, the 24 pt caption, 8 pt clear, plus
+        /// the desktop dots plate that hangs 24 pt under the tile.
+        /// Reserved across the whole width: the caption is bottom-leading,
+        /// so a tile dragged left still stays above it.
+        static let bottomInset: CGFloat = 52 + 12 + 24 + 8 + 24
         static let cornerRadius: CGFloat = 10
     }
 
@@ -110,7 +114,8 @@ struct MirrorThumbnailView: View {
             return Layout.expandedWidth
         }
         let byWidth = containerSize.width * Layout.maxFill
-        let byHeight = containerSize.height * Layout.maxFill / frameAspect
+        let usableHeight = max(containerSize.height - Layout.bottomInset - Layout.edgeMargin, 0)
+        let byHeight = usableHeight / frameAspect
         return max(Layout.compactWidth, min(byWidth, byHeight))
     }
 
@@ -135,7 +140,8 @@ struct MirrorThumbnailView: View {
         let lowX = Layout.edgeMargin - homeX
         let highX = containerSize.width - Layout.edgeMargin - width - homeX
         let lowY = Layout.edgeMargin - homeY
-        let highY = containerSize.height - Layout.edgeMargin - height - homeY
+        // Never below home: the band under it is the click strip and caption.
+        let highY = containerSize.height - Layout.bottomInset - height - homeY
 
         return CGSize(
             width: min(max(proposed.width, min(lowX, highX)), max(lowX, highX)),
@@ -210,7 +216,7 @@ struct MirrorThumbnailView: View {
                 Spacer(minLength: 0)
                 spaceChevron(direction: .next, state: nextChevron, symbol: "chevron.right.circle.fill", label: "Next desktop")
             }
-            .padding(.horizontal, 6)
+            .padding(.horizontal, 0)
         }
         .frame(width: width)
         .clipShape(RoundedRectangle(cornerRadius: Layout.cornerRadius, style: .continuous))
@@ -226,12 +232,16 @@ struct MirrorThumbnailView: View {
         }
         .overlay(alignment: .topTrailing) {
             Button(action: onClose) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 18))
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(.white, .black.opacity(0.55))
+                // UX-006: pixel close on a navy plate, 44 pt target.
+                PHGlyph(glyph: PixelGlyphs.close, pitch: 1.6)
+                    .foregroundStyle(.white)
+                    .frame(width: 24, height: 24)
+                    .background(PixelHandTheme.Brand.screen.opacity(0.72), in: Circle())
+                    .frame(width: PixelHandTheme.ControlHeight.hit, height: PixelHandTheme.ControlHeight.hit)
+                    .contentShape(Rectangle())
+                    .pixelOnNavy()
             }
-            .padding(6)
+            .buttonStyle(.plain)
             .accessibilityLabel("Close live mirror")
         }
         .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
@@ -319,10 +329,10 @@ struct MirrorThumbnailView: View {
         } else {
             ZStack {
                 Rectangle().fill(.black.opacity(0.85))
-                ProgressView()
-                    .tint(.white)
+                DotWave(pitch: 4, label: "Waiting for the Mac’s screen")
             }
             .aspectRatio(16.0 / 10.0, contentMode: .fit)
+            .pixelOnNavy()
         }
     }
 
@@ -371,15 +381,18 @@ struct MirrorThumbnailView: View {
     ) -> some View {
         if state == .hidden {
             // Keeps the HStack's shape; nothing to tap or read out.
-            Color.clear.frame(width: 28, height: 28).accessibilityHidden(true)
+            Color.clear.frame(width: PixelHandTheme.ControlHeight.hit, height: PixelHandTheme.ControlHeight.hit).accessibilityHidden(true)
         } else {
             Button {
                 performSpaceSwitch(direction)
             } label: {
-                Image(systemName: symbol)
-                    .font(.system(size: 28))
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(.white, .black.opacity(0.45))
+                PHGlyph(glyph: direction == .previous ? PixelGlyphs.spaceLeft : PixelGlyphs.spaceRight, pitch: 1.8)
+                    .foregroundStyle(.white)
+                    .frame(width: 28, height: 28)
+                    .background(PixelHandTheme.Brand.screen.opacity(0.6), in: Circle())
+                    .frame(width: PixelHandTheme.ControlHeight.hit, height: PixelHandTheme.ControlHeight.hit)
+                    .contentShape(Rectangle())
+                    .pixelOnNavy()
             }
             .buttonStyle(.plain)
             .disabled(state == .dimmed)
