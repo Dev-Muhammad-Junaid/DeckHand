@@ -2,305 +2,247 @@
 //  AnnotationView.swift
 //  DeckHandiOS
 //
+//  The capture sheet's annotate step (UX-009): draw on the capture with a
+//  pen, then bake the marks into the capture at its own resolution.
+//
+//  - `AnnotationCanvas`: the picture in its well with the marks over it.
+//    Marks are stored in the capture's own coordinates (Core
+//    `CaptureGeometry`), so rotating or resizing the window keeps them on
+//    the right spot, and drawing is clipped to the picture.
+//  - `AnnotationToolbar`: pen widths, Undo and Clear (Clear asks) on one
+//    row, inks on a second row that scrolls, so the tools fit 320 pt and
+//    work at AX5.
+//  - `AnnotationRenderer`: composites the marks onto the capture at its
+//    native size and scale (the old export was screen-sized and kept the
+//    letterbox bars).
+//
+//  The host (`ScreenshotPreviewView`) owns the marks and the header, so
+//  annotate is a state inside the one capture sheet, not a sheet of its own.
+//
 
 import SwiftUI
 import UIKit
 
-// MARK: - Stroke Model
+// MARK: - Model
 
-private struct Stroke: Identifiable {
+/// One pen stroke, in the capture's own points (top-left origin).
+struct AnnotationStroke: Identifiable, Equatable {
     let id = UUID()
     var points: [CGPoint]
-    var color: UIColor
+    var ink: CaptureSheetChrome.Ink
+    /// Width in the capture's points; drawn on screen scaled to fit.
     var width: CGFloat
 }
 
-// MARK: - AnnotationView
+// MARK: - Canvas
 
-struct AnnotationView: View {
-    /// The base screenshot to annotate.
+struct AnnotationCanvas: View {
     let image: UIImage
-    /// Called with the composited (image + drawing) UIImage, or `nil` if cancelled.
-    let onFinish: (UIImage?) -> Void
+    @Binding var strokes: [AnnotationStroke]
+    let ink: CaptureSheetChrome.Ink
+    /// Pen width in screen points (`CaptureSheetChrome.penWidths`).
+    let penWidth: CGFloat
 
-    // Drawing state
-    @State private var strokes: [Stroke] = []
-    @State private var currentStroke: Stroke?
-
-    // Tool state
-    @State private var selectedColor: UIColor = .systemRed
-    @State private var strokeWidth: CGFloat = 4
-
-    // Canvas size — captured by GeometryReader so we can export at the right scale
-    @State private var canvasSize: CGSize = .zero
-
-    // Palette options
-    private let palette: [UIColor] = [
-        .systemRed, .systemOrange, .systemYellow,
-        .systemGreen, .systemCyan, .systemBlue,
-        .systemPurple, .white, .black
-    ]
-
-    // Width presets
-    private let widths: [CGFloat] = [2, 4, 8, 14]
+    @State private var live: AnnotationStroke?
 
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-
-            // ── Base image ───────────────────────────────────────────────
-            GeometryReader { geo in
+        GeometryReader { proxy in
+            let fitted = CaptureGeometry.fitted(image, in: proxy.size)
+            let toImage = image.size.width / max(fitted.width, 1)
+            ZStack(alignment: .topLeading) {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: geo.size.width, height: geo.size.height)
-                    .onAppear { canvasSize = geo.size }
-                    .onChange(of: geo.size) { _, newSize in canvasSize = newSize }
-            }
-            .ignoresSafeArea()
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .accessibilityLabel("Capture being annotated")
 
-            // ── Drawing canvas ───────────────────────────────────────────
-            Canvas { ctx, size in
-                // Already-finished strokes
-                for stroke in strokes {
-                    drawStroke(stroke, in: &ctx)
+                Canvas { context, _ in
+                    context.clip(to: Path(fitted))
+                    for stroke in strokes { draw(stroke, fitted: fitted, in: &context) }
+                    if let live { draw(live, fitted: fitted, in: &context) }
                 }
-                // Live stroke
-                if let live = currentStroke {
-                    drawStroke(live, in: &ctx)
-                }
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
             }
-            .ignoresSafeArea()
+            .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0, coordinateSpace: .local)
                     .onChanged { value in
-                        if currentStroke == nil {
-                            currentStroke = Stroke(points: [], color: selectedColor, width: strokeWidth)
+                        let point = imagePoint(value.location, fitted: fitted)
+                        if live == nil {
+                            live = AnnotationStroke(points: [], ink: ink, width: penWidth * toImage)
                         }
-                        currentStroke?.points.append(value.location)
+                        live?.points.append(point)
                     }
                     .onEnded { _ in
-                        if let finished = currentStroke {
+                        if let finished = live, !finished.points.isEmpty {
                             strokes.append(finished)
+                            GestureHaptic.selection.trigger()
                         }
-                        currentStroke = nil
+                        live = nil
                     }
             )
-
-            // ── UI Chrome ────────────────────────────────────────────────
-            VStack {
-                // Top bar
-                topBar
-                    .padding(.horizontal, 20)
-                    .padding(.top, 16)
-
-                Spacer()
-
-                // Bottom toolbar
-                bottomToolbar
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 32)
-            }
         }
     }
 
-    // MARK: - Top Bar
-
-    private var topBar: some View {
-        HStack {
-            Button("Cancel") {
-                onFinish(nil)
-            }
-            .font(.system(size: 15, weight: .medium))
-            .foregroundStyle(.white.opacity(0.8))
-
-            Spacer()
-
-            Text("Annotate")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
-
-            Spacer()
-
-            Button("Done") {
-                onFinish(exportAnnotatedImage())
-            }
-            .font(.system(size: 15, weight: .semibold))
-            .foregroundStyle(DeckHandTheme.Brand.sky)
-        }
-        .padding(.horizontal, 4)
-        .padding(.vertical, 10)
-        .background(.ultraThinMaterial.opacity(0.6), in: RoundedRectangle(cornerRadius: 14))
+    private func imagePoint(_ location: CGPoint, fitted: CGRect) -> CGPoint {
+        let p = CaptureGeometry.imagePoint(
+            x: Double(location.x), y: Double(location.y),
+            fitted: MirrorRect(fitted),
+            imageWidth: Double(image.size.width), imageHeight: Double(image.size.height)
+        )
+        return CGPoint(x: p.x, y: p.y)
     }
 
-    // MARK: - Bottom Toolbar
-
-    private var bottomToolbar: some View {
-        VStack(spacing: 14) {
-            // Stroke width pills
-            HStack(spacing: 10) {
-                ForEach(widths, id: \.self) { w in
-                    Button {
-                        withAnimation(.spring(response: 0.22, dampingFraction: 0.7)) {
-                            strokeWidth = w
-                        }
-                    } label: {
-                        Circle()
-                            .fill(Color(uiColor: selectedColor))
-                            .frame(width: w * 2.2 + 6, height: w * 2.2 + 6)
-                            .overlay(
-                                Circle()
-                                    .strokeBorder(.white.opacity(strokeWidth == w ? 0.9 : 0.25),
-                                                  lineWidth: strokeWidth == w ? 2 : 1)
-                            )
-                            .scaleEffect(strokeWidth == w ? 1.15 : 1.0)
-                            .animation(.spring(response: 0.22, dampingFraction: 0.7), value: strokeWidth)
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                Spacer()
-
-                // Undo button
-                Button {
-                    GestureHaptic.light.trigger()
-                    if !strokes.isEmpty { strokes.removeLast() }
-                } label: {
-                    Image(systemName: "arrow.uturn.backward.circle.fill")
-                        .font(.system(size: 28))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(.white.opacity(strokes.isEmpty ? 0.3 : 0.85))
-                }
-                .buttonStyle(.plain)
-                .disabled(strokes.isEmpty)
-                .animation(.easeInOut(duration: 0.15), value: strokes.isEmpty)
-
-                // Clear button
-                Button {
-                    GestureHaptic.medium.trigger()
-                    withAnimation { strokes.removeAll() }
-                } label: {
-                    Image(systemName: "trash.circle.fill")
-                        .font(.system(size: 28))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(.white.opacity(strokes.isEmpty ? 0.3 : 0.7))
-                }
-                .buttonStyle(.plain)
-                .disabled(strokes.isEmpty)
-                .animation(.easeInOut(duration: 0.15), value: strokes.isEmpty)
-            }
-
-            // Color palette
-            HStack(spacing: 10) {
-                ForEach(palette, id: \.self) { color in
-                    Button {
-                        withAnimation(.spring(response: 0.22, dampingFraction: 0.7)) {
-                            selectedColor = color
-                        }
-                    } label: {
-                        Circle()
-                            .fill(Color(uiColor: color))
-                            .frame(width: 30, height: 30)
-                            .overlay(
-                                Circle()
-                                    .strokeBorder(
-                                        selectedColor == color ? .white : .white.opacity(0.25),
-                                        lineWidth: selectedColor == color ? 2.5 : 1
-                                    )
-                            )
-                            .scaleEffect(selectedColor == color ? 1.2 : 1.0)
-                            .animation(.spring(response: 0.22, dampingFraction: 0.7), value: selectedColor == color)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .background(.ultraThinMaterial.opacity(0.9), in: RoundedRectangle(cornerRadius: 20))
-    }
-
-    // MARK: - Drawing Helper
-
-    private func drawStroke(_ stroke: Stroke, in ctx: inout GraphicsContext) {
-        guard stroke.points.count > 1 else {
-            // Single tap — draw a dot
-            if let pt = stroke.points.first {
-                var dot = ctx
-                dot.fill(
-                    Path(ellipseIn: CGRect(x: pt.x - stroke.width / 2,
-                                           y: pt.y - stroke.width / 2,
-                                           width: stroke.width,
-                                           height: stroke.width)),
-                    with: .color(Color(uiColor: stroke.color))
-                )
+    /// Draws a stroke stored in image points into the on-screen fit.
+    private func draw(_ stroke: AnnotationStroke, fitted: CGRect, in context: inout GraphicsContext) {
+        let scale = fitted.width / max(image.size.width, 1)
+        let points = stroke.points.map { CGPoint(x: fitted.minX + $0.x * scale, y: fitted.minY + $0.y * scale) }
+        let width = stroke.width * scale
+        let color = stroke.ink.color
+        guard points.count > 1 else {
+            if let p = points.first {
+                context.fill(Path(ellipseIn: CGRect(x: p.x - width / 2, y: p.y - width / 2, width: width, height: width)), with: .color(color))
             }
             return
         }
-
-        var path = Path()
-        path.move(to: stroke.points[0])
-        for i in 1 ..< stroke.points.count {
-            // Smooth with quadratic curve
-            let prev = stroke.points[i - 1]
-            let curr = stroke.points[i]
-            let mid = CGPoint(x: (prev.x + curr.x) / 2, y: (prev.y + curr.y) / 2)
-            path.addQuadCurve(to: mid, control: prev)
-        }
-        path.addLine(to: stroke.points.last!)
-
-        var copy = ctx
-        copy.stroke(
-            path,
-            with: .color(Color(uiColor: stroke.color)),
-            style: StrokeStyle(lineWidth: stroke.width, lineCap: .round, lineJoin: .round)
+        context.stroke(
+            AnnotationRenderer.smoothPath(points),
+            with: .color(color),
+            style: StrokeStyle(lineWidth: width, lineCap: .round, lineJoin: .round)
         )
     }
+}
 
-    // MARK: - Export
+// MARK: - Toolbar
 
-    /// Composites the strokes on top of the original image and returns a new UIImage.
-    private func exportAnnotatedImage() -> UIImage {
-        let size = canvasSize
-        guard size != .zero else { return image }
+/// Row 1: pen widths · Undo · Clear. Row 2: inks, scrolling when the row is
+/// wider than the dock. Every target is 44 pt.
+struct AnnotationToolbar: View {
+    @Binding var ink: CaptureSheetChrome.Ink
+    @Binding var penWidth: CGFloat
+    let canUndo: Bool
+    let onUndo: () -> Void
+    let onClear: () -> Void
 
-        let renderer = UIGraphicsImageRenderer(size: size)
-        return renderer.image { _ in
-            // Draw the base image scaled to fit the canvas
-            let imgSize = image.size
-            let scale = min(size.width / imgSize.width, size.height / imgSize.height)
-            let drawW = imgSize.width * scale
-            let drawH = imgSize.height * scale
-            let drawX = (size.width - drawW) / 2
-            let drawY = (size.height - drawH) / 2
-            image.draw(in: CGRect(x: drawX, y: drawY, width: drawW, height: drawH))
+    var body: some View {
+        VStack(spacing: PixelHandTheme.Space.xs) {
+            HStack(spacing: 0) {
+                ForEach(CaptureSheetChrome.penWidths, id: \.self) { width in
+                    widthButton(CGFloat(width))
+                }
+                Spacer(minLength: PixelHandTheme.Space.sm)
+                CaptureIconButton(glyph: CaptureGlyphs.undo, label: "Undo", isEnabled: canUndo, action: onUndo)
+                CaptureIconButton(glyph: CaptureGlyphs.clear, label: "Clear all marks", isEnabled: canUndo, action: onClear)
+            }
 
-            // Replay all strokes using UIKit
-            for stroke in strokes {
-                guard !stroke.points.isEmpty else { continue }
-                stroke.color.setStroke()
-                let path = UIBezierPath()
-                path.lineWidth = stroke.width
-                path.lineCapStyle = .round
-                path.lineJoinStyle = .round
-
-                if stroke.points.count == 1 {
-                    let pt = stroke.points[0]
-                    let r = stroke.width / 2
-                    UIBezierPath(ovalIn: CGRect(x: pt.x - r, y: pt.y - r,
-                                               width: stroke.width, height: stroke.width)).fill()
-                } else {
-                    path.move(to: stroke.points[0])
-                    for i in 1 ..< stroke.points.count {
-                        let prev = stroke.points[i - 1]
-                        let curr = stroke.points[i]
-                        let mid = CGPoint(x: (prev.x + curr.x) / 2, y: (prev.y + curr.y) / 2)
-                        path.addQuadCurve(to: mid, controlPoint: prev)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 0) {
+                    ForEach(CaptureSheetChrome.Ink.allCases, id: \.self) { option in
+                        inkButton(option)
                     }
-                    path.addLine(to: stroke.points.last!)
+                }
+            }
+            .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        }
+    }
+
+    private func widthButton(_ width: CGFloat) -> some View {
+        let selected = penWidth == width
+        return Button {
+            GestureHaptic.selection.trigger()
+            penWidth = width
+        } label: {
+            Circle()
+                .fill(ink.color)
+                .frame(width: min(width * 1.6 + 4, 26), height: min(width * 1.6 + 4, 26))
+                .frame(width: 36, height: 36)
+                .overlay(
+                    RoundedRectangle(cornerRadius: PixelHandTheme.Radius.kbd, style: .continuous)
+                        .strokeBorder(selected ? PixelHandTheme.Brand.phosphor : Color.clear, lineWidth: PixelHandTheme.Stroke.selection)
+                )
+                .frame(width: PixelHandTheme.ControlHeight.hit, height: PixelHandTheme.ControlHeight.hit)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Pen width \(Int(width))")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func inkButton(_ option: CaptureSheetChrome.Ink) -> some View {
+        let selected = ink == option
+        return Button {
+            GestureHaptic.selection.trigger()
+            ink = option
+        } label: {
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(option.color)
+                .frame(width: 26, height: 26)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.25), lineWidth: PixelHandTheme.Stroke.hairline)
+                )
+                .padding(3)
+                .overlay(
+                    RoundedRectangle(cornerRadius: PixelHandTheme.Radius.kbd + 1, style: .continuous)
+                        .strokeBorder(selected ? PixelHandTheme.Brand.phosphor : Color.clear, lineWidth: PixelHandTheme.Stroke.selection)
+                )
+                .shadow(color: selected ? PixelHandTheme.Brand.glow.opacity(0.6) : .clear, radius: 4)
+                .frame(width: PixelHandTheme.ControlHeight.hit, height: PixelHandTheme.ControlHeight.hit)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(option.label)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+// MARK: - Export
+
+enum AnnotationRenderer {
+    /// The capture with every stroke baked in, at the capture's own size and
+    /// scale. Strokes are already in the capture's points.
+    static func render(_ image: UIImage, strokes: [AnnotationStroke]) -> UIImage {
+        guard !strokes.isEmpty, image.size.width > 0, image.size.height > 0 else { return image }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = image.scale
+        format.opaque = false
+        let renderer = UIGraphicsImageRenderer(size: image.size, format: format)
+        return renderer.image { context in
+            image.draw(in: CGRect(origin: .zero, size: image.size))
+            let cg = context.cgContext
+            cg.setLineCap(.round)
+            cg.setLineJoin(.round)
+            for stroke in strokes {
+                guard let first = stroke.points.first else { continue }
+                stroke.ink.uiColor.setStroke()
+                stroke.ink.uiColor.setFill()
+                if stroke.points.count == 1 {
+                    let r = stroke.width / 2
+                    UIBezierPath(ovalIn: CGRect(x: first.x - r, y: first.y - r, width: stroke.width, height: stroke.width)).fill()
+                } else {
+                    let path = UIBezierPath(cgPath: smoothPath(stroke.points).cgPath)
+                    path.lineWidth = stroke.width
+                    path.lineCapStyle = .round
+                    path.lineJoinStyle = .round
                     path.stroke()
                 }
             }
         }
+    }
+
+    /// Quadratic smoothing through the midpoints, the same on screen and in
+    /// the export.
+    static func smoothPath(_ points: [CGPoint]) -> Path {
+        var path = Path()
+        guard let first = points.first else { return path }
+        path.move(to: first)
+        for i in 1..<points.count {
+            let prev = points[i - 1]
+            let curr = points[i]
+            path.addQuadCurve(to: CGPoint(x: (prev.x + curr.x) / 2, y: (prev.y + curr.y) / 2), control: prev)
+        }
+        if let last = points.last { path.addLine(to: last) }
+        return path
     }
 }

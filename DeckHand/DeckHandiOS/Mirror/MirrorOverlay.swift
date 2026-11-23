@@ -14,6 +14,8 @@
 //  - the HEVC display layer in place of the JPEG image (S5);
 //  - the desktop dots under the mirror, and ‹ › dimmed or hidden at the
 //    ends of the mirrored display's Spaces (from `system.displayState`);
+//  - placement: the tile anchors to the Pointer pad's top-trailing corner
+//    and keeps clear of the areas the surface reserves (`MirrorTileKeepOut`);
 //  - S14: "Window…" in the picker (mirror one window), "Pointer outside
 //    the window" while a window is mirrored, and the notice when a
 //    mirrored window ends and the mirror goes back to its display.
@@ -28,8 +30,18 @@ struct MirrorOverlay: View {
     @EnvironmentObject private var settings: DeckHandSettings
 
     var body: some View {
+        // Reads its own window frame so the surface's reserved areas
+        // (reported in window coordinates) can be brought into the tile's.
+        GeometryReader { proxy in
+            tile(container: proxy.frame(in: .global))
+        }
+        .frame(width: containerSize.width, height: containerSize.height)
+    }
+
+    private func tile(container: CGRect) -> some View {
         let strip = session.mirrorSpaceStrip
-        MirrorThumbnailView(
+        let placement = MirrorTileKeepOut.shared.layout(for: session.sender, in: container)
+        return MirrorThumbnailView(
             image: session.mirrorImage,
             containerSize: containerSize,
             onClose: { session.toggleMirror(settings: settings) },
@@ -56,7 +68,10 @@ struct MirrorOverlay: View {
             videoLayer: session.mirrorShowsVideo
                 ? AnyView(MirrorVideoLayerView(renderer: session.mirrorVideoRenderer))
                 : nil,
-            videoSize: session.mirrorVideoSize
+            videoSize: session.mirrorVideoSize,
+            homeAnchor: placement.anchor,
+            keepOut: placement.keepOut,
+            belowAccessoryHeight: strip.dots.isEmpty ? 0 : MirrorSpaceDots.footprint
         )
         // S5: HEVC on or off takes effect at once.
         .onChange(of: settings.mirrorPrefersHEVC) {
@@ -185,6 +200,9 @@ struct MirrorDisplayPicker: View {
 /// full-screen app desktops hollow (`DesktopDots`). Nothing when Spaces aren't known.
 struct MirrorSpaceDots: View {
     let strip: MirrorSpaceStrip
+
+    /// Height the dots take under the tile: the 4 pt gap and the plate.
+    static let footprint: CGFloat = 4 + PixelHandTheme.ControlHeight.badge
 
     var body: some View {
         if !strip.dots.isEmpty {

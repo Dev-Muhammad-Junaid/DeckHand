@@ -41,14 +41,11 @@ struct CaptureCapsule: View {
                 Label("Recognize Text", systemImage: "text.viewfinder")
             }
         } label: {
+            // UX-009: the pixel capture glyph; the dot wave while the Mac works.
             if isBusy {
-                ProgressView().controlSize(.small)
+                DotWave(pitch: 2.4, label: "Capturing")
             } else {
-                HStack(spacing: 3) {
-                    Image(systemName: "camera.viewfinder")
-                    Image(systemName: "chevron.down")
-                        .font(.caption2)
-                }
+                PHGlyph(glyph: PixelGlyphs.capture, pitch: PixelPitch.header)
             }
         } primaryAction: {
             guard !isBusy else { return }
@@ -56,6 +53,6 @@ struct CaptureCapsule: View {
         }
         .disabled(isBusy)
         .accessibilityLabel("Capture")
-        .accessibilityHint("Tap for a full-screen capture, long-press for region or window options.")
+        .accessibilityHint("Tap for your default capture. Touch and hold for full screen, region, window or text.")
     }
 }

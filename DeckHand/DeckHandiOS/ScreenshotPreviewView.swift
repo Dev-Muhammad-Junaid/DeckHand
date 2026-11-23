@@ -2,6 +2,23 @@
 //  ScreenshotPreviewView.swift
 //  DeckHandiOS
 //
+//  The capture sheet (UX-009): one presentation from Control with three
+//  steps inside it, never a sheet on a sheet:
+//
+//    preview   → the capture in a black well under a scanline, pinch and
+//                double-tap to zoom, swipe down to close; dock: Save, Copy,
+//                Share, Annotate, Read text.
+//    annotate  → pen on the capture (`AnnotationView.swift`); Done bakes
+//                the marks in at native resolution, Cancel and Clear ask
+//                before throwing marks away.
+//    readText  → Vision text (`OCRResultView.swift`), selectable; dock:
+//                Copy, Share, back to the picture. "Recognize Text" from
+//                the capture menu opens straight here.
+//
+//  The header is a close glyph and a dot-matrix status strip
+//  (`REGION · 812X540 · MARKED`); everything sits on the navy stage.
+//  Words come from Core `CaptureSheetChrome`.
+//
 
 import Photos
 import SwiftUI
@@ -9,284 +26,359 @@ import UIKit
 
 struct ScreenshotPreviewView: View {
     let image: UIImage
+    var kind: CaptureKind = .fullScreen
+    /// `.readText` when the capture menu's "Recognize Text" opened the sheet.
+    var initialStep: CaptureStep = .preview
     let onDismiss: () -> Void
 
-    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var settings: DeckHandSettings
-    @State private var didAutoSave = false
-    @State private var showShareSheet = false
-    @State private var toastMessage: String?
-    @State private var imageScale: CGFloat = 1.0
-    @State private var imageOffset: CGSize = .zero
-    @State private var lastScale: CGFloat = 1.0
-    @State private var lastOffset: CGSize = .zero
-    @State private var isSaving = false
-    @State private var toastTask: Task<Void, Never>?
-    @State private var showAnnotationView = false
-    @State private var showOCRView = false
-    // Holds the annotated version once the user finishes annotating;
-    // all Save/Copy/Share actions use this instead of the original.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    @State private var step: CaptureStep = .preview
+    @State private var didApplyInitialStep = false
+    /// The capture with marks baked in, once annotated; every action uses it.
     @State private var annotatedImage: UIImage?
 
+    // Preview zoom.
+    @State private var zoom: CGFloat = 1
+    @State private var lastZoom: CGFloat = 1
+    @State private var pan: CGSize = .zero
+    @State private var lastPan: CGSize = .zero
+    @State private var dismissDrag: CGFloat = 0
+    @State private var revealed = false
+
+    // Annotate.
+    @State private var strokes: [AnnotationStroke] = []
+    @State private var ink: CaptureSheetChrome.Ink = CaptureSheetChrome.defaultInk
+    @State private var penWidth = CGFloat(CaptureSheetChrome.defaultPenWidth)
+    @State private var confirmClear = false
+    @State private var confirmDiscard = false
+
+    // Read text.
+    @State private var textState: TextReadState = .reading
+    /// Which picture `textState` was read from, so annotating re-reads.
+    @State private var textSource: ObjectIdentifier?
+
+    // Save / share / toast.
+    @State private var didAutoSave = false
+    @State private var isSaving = false
+    @State private var showShareSheet = false
+    @State private var toast: (message: String, failed: Bool)?
+    @State private var toastTask: Task<Void, Never>?
+
+    private var current: UIImage { annotatedImage ?? image }
+
     var body: some View {
-        ZStack(alignment: .bottom) {
-            // Background
-            Color.black.ignoresSafeArea()
-
-            // Zoomable image — shows annotated version if one exists
-            GeometryReader { geo in
-                Image(uiImage: annotatedImage ?? image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: geo.size.width, height: geo.size.height)
-                    .scaleEffect(imageScale)
-                    .offset(imageOffset)
-                    .gesture(
-                        MagnificationGesture()
-                            .onChanged { val in
-                                imageScale = max(1.0, lastScale * val)
-                            }
-                            .onEnded { _ in
-                                lastScale = imageScale
-                                if imageScale < 1.0 {
-                                    withAnimation(.spring()) { imageScale = 1.0; imageOffset = .zero }
-                                    lastScale = 1.0; lastOffset = .zero
-                                }
-                            }
-                        .simultaneously(with:
-                            DragGesture()
-                                .onChanged { val in
-                                    guard imageScale > 1.01 else { return }
-                                    imageOffset = CGSize(
-                                        width: lastOffset.width + val.translation.width,
-                                        height: lastOffset.height + val.translation.height
-                                    )
-                                }
-                                .onEnded { _ in lastOffset = imageOffset }
-                        )
-                    )
-                    .onTapGesture(count: 2) {
-                        withAnimation(.spring(response: 0.3)) {
-                            if imageScale > 1.01 {
-                                imageScale = 1.0; imageOffset = .zero
-                                lastScale = 1.0; lastOffset = .zero
-                            } else {
-                                imageScale = 2.5
-                                lastScale = 2.5
-                            }
-                        }
-                    }
-            }
-            .ignoresSafeArea()
-
-            // Top bar
-            VStack {
-                HStack {
-                    if annotatedImage != nil {
-                        Text("Annotated")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(DeckHandTheme.Brand.sky)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Capsule().fill(DeckHandTheme.Brand.sky.opacity(0.18)))
-                    }
-
-                    Spacer()
-
-                    Button(action: onDismiss) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 28, weight: .medium))
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.white.opacity(0.7))
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
-
-                Spacer()
-            }
-
-            // Bottom action bar
-            VStack(spacing: 0) {
-                // Toast
-                if let toast = toastMessage {
-                    Text(toast)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(
-                            Capsule().fill(.white.opacity(0.18))
-                        )
-                        .padding(.bottom, 10)
-                        .transition(.opacity)
-                }
-
-                // Action row
-                HStack(spacing: 0) {
-                    ActionButton(
-                        icon: "square.and.arrow.down",
-                        label: "Save",
-                        color: .white,
-                        isLoading: isSaving
-                    ) {
-                        toastTask?.cancel()
-                        toastTask = Task { await saveToPhotos() }
-                    }
-
-                    ActionButton(
-                        icon: "doc.on.doc",
-                        label: "Copy",
-                        color: .white
-                    ) {
-                        UIPasteboard.general.image = annotatedImage ?? image
-                        toastTask?.cancel()
-                        toastTask = Task { await showToast("Copied to Clipboard") }
-                    }
-
-                    ActionButton(
-                        icon: "square.and.arrow.up",
-                        label: "Share",
-                        color: .white
-                    ) {
-                        showShareSheet = true
-                    }
-
-                    ActionButton(
-                        icon: "pencil.tip",
-                        label: "Annotate",
-                        color: .white
-                    ) {
-                        GestureHaptic.medium.trigger()
-                        showAnnotationView = true
-                    }
-
-                    // Runs Vision OCR on whatever image is currently showing
-                    // — the cropped region, the full screen, or the window.
-                    // The user asked for this specifically on region grabs;
-                    // exposing it on every preview costs nothing extra and
-                    // keeps the action row uniform.
-                    ActionButton(
-                        icon: "text.viewfinder",
-                        label: "Text",
-                        color: .white
-                    ) {
-                        GestureHaptic.light.trigger()
-                        showOCRView = true
+        CaptureStage {
+            VStack(spacing: PixelHandTheme.Space.md) {
+                header
+                Group {
+                    switch step {
+                    case .preview: previewStage
+                    case .annotate: annotateStage
+                    case .readText: OCRResultView(state: textState, onRetry: { Task { await readText(force: true) } })
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(
-                    Rectangle()
-                        .fill(.ultraThinMaterial.opacity(0.9))
-                        .ignoresSafeArea(edges: .bottom)
-                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .transition(.opacity)
+                dock
             }
+            .overlay(alignment: .bottom) { toastView }
         }
+        .offset(y: dismissDrag)
+        .animation(PixelHandMotion.reduced(PixelHandMotion.standard, reduceMotion: reduceMotion), value: step)
         .sheet(isPresented: $showShareSheet) {
-            ShareSheet(items: [annotatedImage ?? image])
+            // The system share sheet is the one presentation over the
+            // capture: it is Apple's, not another level of ours.
+            ShareSheet(items: shareItems)
         }
-        .sheet(isPresented: $showOCRView) {
-            // Run OCR against the annotated image when present — text drawn
-            // on top is text the user might want to capture too — falling
-            // back to the original capture otherwise.
-            OCRResultView(image: annotatedImage ?? image) {
-                showOCRView = false
+        .confirmationDialog("Clear all marks?", isPresented: $confirmClear, titleVisibility: .visible) {
+            Button("Clear Marks", role: .destructive) {
+                withAnimation(.easeOut(duration: 0.15)) { strokes.removeAll() }
             }
         }
-        .fullScreenCover(isPresented: $showAnnotationView) {
-            AnnotationView(image: annotatedImage ?? image) { result in
-                showAnnotationView = false
-                if let annotated = result {
-                    // Reset zoom so the new annotated image fits cleanly
-                    withAnimation(.spring(response: 0.3)) {
-                        annotatedImage = annotated
-                        imageScale = 1.0
-                        imageOffset = .zero
-                        lastScale = 1.0
-                        lastOffset = .zero
-                    }
-                    toastTask?.cancel()
-                    toastTask = Task { await showToast("Annotation applied") }
-                }
-            }
+        .confirmationDialog("Discard your marks?", isPresented: $confirmDiscard, titleVisibility: .visible) {
+            Button("Discard Marks", role: .destructive) { leaveAnnotate(keep: false) }
+            Button("Keep Annotating", role: .cancel) {}
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.75), value: toastMessage)
-        .onDisappear {
-            // Cancel any in-flight toast timer so it doesn't fire against a deallocated view
-            toastTask?.cancel()
+        .onAppear {
+            revealed = true
+            guard !didApplyInitialStep else { return }
+            didApplyInitialStep = true
+            step = initialStep
+        }
+        .task(id: step) {
+            if step == .readText { await readText(force: false) }
         }
         .task {
             // Auto-save runs once per capture, on the image as it arrived.
             // Annotating afterwards is an explicit act, so it gets an
             // explicit Save rather than silently writing a second asset.
-            guard settings.autoSaveToPhotos, !didAutoSave else { return }
+            guard settings.autoSaveToPhotos, !didAutoSave, initialStep == .preview else { return }
             didAutoSave = true
             await saveToPhotos()
         }
+        .onDisappear { toastTask?.cancel() }
     }
 
-    // MARK: - Actions
+    // MARK: Header
+
+    @ViewBuilder
+    private var header: some View {
+        switch step {
+        case .preview:
+            let size = CaptureGeometry.pixelSize(of: current)
+            CaptureHeader(
+                strip: CaptureSheetChrome.strip(kind: kind, pixelWidth: size.width, pixelHeight: size.height, annotated: annotatedImage != nil),
+                closeLabel: "Close capture",
+                onClose: onDismiss
+            )
+        case .annotate:
+            CaptureHeader(
+                strip: CaptureSheetChrome.annotateStrip(marks: strokes.count),
+                closeLabel: "Cancel annotation",
+                onClose: {
+                    if strokes.isEmpty {
+                        leaveAnnotate(keep: false)
+                    } else {
+                        confirmDiscard = true
+                    }
+                }
+            ) {
+                Button("Done") { leaveAnnotate(keep: true) }
+                    .buttonStyle(.ph(.primary, size: .small))
+                    .disabled(strokes.isEmpty)
+            }
+        case .readText:
+            CaptureHeader(
+                strip: textState.strip,
+                style: textState == .reading ? .dim : .live,
+                closeGlyph: initialStep == .readText ? PixelGlyphs.close : PixelGlyphs.spaceLeft,
+                closeLabel: initialStep == .readText ? "Close" : "Back to the capture",
+                onClose: {
+                    if initialStep == .readText {
+                        onDismiss()
+                    } else {
+                        step = .preview
+                    }
+                }
+            )
+        }
+    }
+
+    // MARK: Preview
+
+    private var previewStage: some View {
+        CapturePictureWell {
+            GeometryReader { proxy in
+                Image(uiImage: current)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .scaleEffect(zoom)
+                    .offset(pan)
+                    .mirrorScanline(on: revealed)
+                    .gesture(zoomGesture.simultaneously(with: panGesture))
+                    .onTapGesture(count: 2) { toggleZoom() }
+                    .accessibilityLabel("Capture")
+                    .accessibilityHint("Pinch or double-tap to zoom.")
+                    .accessibilityAddTraits(.isImage)
+            }
+            .clipped()
+        }
+    }
+
+    private var zoomGesture: some Gesture {
+        MagnifyGesture()
+            .onChanged { value in zoom = max(1, lastZoom * value.magnification) }
+            .onEnded { _ in
+                lastZoom = zoom
+                if zoom <= 1.01 { resetZoom() }
+            }
+    }
+
+    /// Zoomed: pans the picture. At 1×: a downward swipe closes the sheet.
+    private var panGesture: some Gesture {
+        DragGesture()
+            .onChanged { value in
+                if zoom > 1.01 {
+                    pan = CGSize(width: lastPan.width + value.translation.width, height: lastPan.height + value.translation.height)
+                } else {
+                    dismissDrag = max(0, value.translation.height)
+                }
+            }
+            .onEnded { value in
+                if zoom > 1.01 {
+                    lastPan = pan
+                } else if value.translation.height > 120 || value.predictedEndTranslation.height > 260 {
+                    onDismiss()
+                } else {
+                    withAnimation(.snappy(duration: 0.2)) { dismissDrag = 0 }
+                }
+            }
+    }
+
+    private func toggleZoom() {
+        withAnimation(.snappy(duration: 0.25)) {
+            if zoom > 1.01 {
+                resetZoom()
+            } else {
+                zoom = 2.5
+                lastZoom = 2.5
+            }
+        }
+    }
+
+    private func resetZoom() {
+        zoom = 1; lastZoom = 1; pan = .zero; lastPan = .zero
+    }
+
+    // MARK: Annotate
+
+    private var annotateStage: some View {
+        CapturePictureWell {
+            AnnotationCanvas(image: current, strokes: $strokes, ink: ink, penWidth: penWidth)
+        }
+    }
+
+    private func leaveAnnotate(keep: Bool) {
+        if keep, !strokes.isEmpty {
+            annotatedImage = AnnotationRenderer.render(current, strokes: strokes)
+            resetZoom()
+            showToast("Marks applied")
+        }
+        strokes.removeAll()
+        step = .preview
+    }
+
+    // MARK: Dock
+
+    @ViewBuilder
+    private var dock: some View {
+        switch step {
+        case .preview:
+            CaptureDock {
+                HStack(spacing: 0) {
+                    CaptureActionButton(glyph: CaptureGlyphs.save, title: "Save", isBusy: isSaving) {
+                        toastTask?.cancel()
+                        Task { await saveToPhotos() }
+                    }
+                    CaptureActionButton(glyph: CaptureGlyphs.copy, title: "Copy") {
+                        UIPasteboard.general.image = current
+                        showToast("Copied")
+                    }
+                    CaptureActionButton(glyph: PixelGlyphs.share, title: "Share") { showShareSheet = true }
+                    CaptureActionButton(glyph: CaptureGlyphs.annotate, title: "Annotate") {
+                        resetZoom()
+                        step = .annotate
+                    }
+                    CaptureActionButton(glyph: PixelGlyphs.readText, title: "Read text") { step = .readText }
+                }
+            }
+        case .annotate:
+            CaptureDock {
+                AnnotationToolbar(
+                    ink: $ink,
+                    penWidth: $penWidth,
+                    canUndo: !strokes.isEmpty,
+                    onUndo: { if !strokes.isEmpty { strokes.removeLast() } },
+                    onClear: { confirmClear = true }
+                )
+            }
+        case .readText:
+            CaptureDock {
+                HStack(spacing: 0) {
+                    CaptureActionButton(glyph: CaptureGlyphs.copy, title: "Copy all", isEnabled: textState.text != nil) {
+                        UIPasteboard.general.string = textState.text
+                        showToast("Text copied")
+                    }
+                    CaptureActionButton(glyph: PixelGlyphs.share, title: "Share", isEnabled: textState.text != nil) {
+                        showShareSheet = true
+                    }
+                    if initialStep != .readText {
+                        CaptureActionButton(glyph: PixelGlyphs.screen, title: "Picture") { step = .preview }
+                    }
+                }
+            }
+        }
+    }
+
+    private var shareItems: [Any] {
+        if step == .readText, let text = textState.text { return [text] }
+        return [current]
+    }
+
+    // MARK: Toast
+
+    @ViewBuilder
+    private var toastView: some View {
+        if let toast {
+            PHToast(message: toast.message, isFailure: toast.failed)
+                .padding(.bottom, 132)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                .allowsHitTesting(false)
+        }
+    }
+
+    private func showToast(_ message: String, failed: Bool = false) {
+        toastTask?.cancel()
+        withAnimation(.snappy(duration: 0.2)) { toast = (message, failed) }
+        toastTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.2)) { toast = nil }
+        }
+    }
+
+    // MARK: Read text
+
+    @MainActor
+    private func readText(force: Bool) async {
+        let source = ObjectIdentifier(current)
+        guard force || textSource != source else { return }
+        textSource = source
+        textState = .reading
+        let result = await TextReader.read(current)
+        guard textSource == source else { return }
+        textState = result
+    }
+
+    // MARK: Save
 
     @MainActor
     private func saveToPhotos() async {
         guard !isSaving else { return }
         isSaving = true
         defer { isSaving = false }
-
-        // Exit immediately if the view was dismissed before we started
         guard !Task.isCancelled else { return }
 
-        // Request authorization using the modern async API
         let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
         guard status == .authorized || status == .limited else {
-            await showToast("Photos permission denied")
+            showToast("Allow Photos access in Settings to save", failed: true)
             return
         }
 
-        // Use the annotated version if one exists, otherwise the original.
-        // Convert to Data (Sendable) before crossing the @Sendable closure boundary.
-        //
-        // Windowed screenshots come through as PNGs with the macOS-native
-        // shadow halo encoded as transparent pixels. JPEG would flatten that
-        // halo to white on save, which throws away the whole reason we're
-        // capturing windows separately. Keep JPEG for fully-opaque captures
-        // (full screen + region) so the saved file stays compact.
-        let imageToSave = annotatedImage ?? image
-        let imgData: Data?
-        if Self.imageHasAlpha(imageToSave) {
-            imgData = imageToSave.pngData()
-        } else {
-            imgData = imageToSave.jpegData(compressionQuality: 0.92)
-        }
-        guard let imgData else {
-            await showToast("Save failed: could not encode image")
+        // Window captures arrive as PNGs with the macOS shadow halo as
+        // transparent pixels; JPEG would flatten it to white. Keep JPEG
+        // for opaque captures (full screen, region) so files stay compact.
+        let picture = current
+        let data = Self.imageHasAlpha(picture) ? picture.pngData() : picture.jpegData(compressionQuality: 0.92)
+        guard let data else {
+            showToast("Couldn’t encode the capture", failed: true)
             return
         }
-
         do {
             try await PHPhotoLibrary.shared().performChanges({ @Sendable in
                 let request = PHAssetCreationRequest.forAsset()
-                request.addResource(with: .photo, data: imgData, options: nil)
+                request.addResource(with: .photo, data: data, options: nil)
             })
-            await showToast("Saved to Photos ✓")
+            showToast("Saved to Photos")
         } catch {
-            await showToast("Save failed: \(error.localizedDescription)")
+            showToast("Save failed: \(error.localizedDescription)", failed: true)
         }
     }
 
-    @MainActor
-    private func showToast(_ message: String) async {
-        withAnimation { toastMessage = message }
-        try? await Task.sleep(nanoseconds: 2_500_000_000)
-        withAnimation { toastMessage = nil }
-    }
-
-    /// `true` when the underlying CGImage carries any kind of real alpha
-    /// channel. Used to choose between PNG and JPEG on Save-to-Photos so
-    /// windowed shots keep their transparent shadow halo.
+    /// `true` when the underlying CGImage carries a real alpha channel.
     private static func imageHasAlpha(_ image: UIImage) -> Bool {
         guard let cg = image.cgImage else { return false }
         switch cg.alphaInfo {
@@ -297,56 +389,6 @@ struct ScreenshotPreviewView: View {
         @unknown default:
             return true
         }
-    }
-}
-
-// MARK: - Action Button
-
-private struct ActionButton: View {
-    let icon: String
-    let label: String
-    let color: Color
-    var isLoading: Bool = false
-    let action: () -> Void
-
-    @State private var isPressed = false
-
-    var body: some View {
-        Button(action: {
-            guard !isLoading else { return }
-            GestureHaptic.light.trigger()
-            action()
-        }) {
-            VStack(spacing: 6) {
-                if isLoading {
-                    ProgressView()
-                        .tint(color.opacity(0.85))
-                        .frame(width: 24, height: 24)
-                } else {
-                    Image(systemName: icon)
-                        .font(.system(size: 24, weight: .thin))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(color.opacity(isPressed ? 1.0 : 0.85))
-                }
-                Text(label)
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(color.opacity(isLoading ? 0.4 : 0.65))
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isPressed ? Color.white.opacity(0.1) : Color.clear)
-            )
-            .scaleEffect(isPressed ? 0.92 : 1.0)
-            .animation(.spring(response: 0.18, dampingFraction: 0.65), value: isPressed)
-        }
-        .buttonStyle(.plain)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
-        )
     }
 }
 
