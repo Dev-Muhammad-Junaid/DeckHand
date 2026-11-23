@@ -6,7 +6,7 @@ integration (`92126e3`) merged in before handoff. **No protocol change**:
 protocol 12 as before.
 
 Written in a Linux container. Core was built and tested here (Swift 6.2,
-**651 tests pass**, 72 of them in the deck suites, 30 new). `DeckSurfaceModel`
+**651 tests pass**, 72 of them in the deck suites, 29 new). `DeckSurfaceModel`
 type-checks against the stubs (`Scripts/linux-typecheck/run.sh`, now in its
 default list). **The SwiftUI files were not compiled**: they were checked by
 reading them against the repo's APIs. The owner's Xcode build is the first
@@ -97,7 +97,7 @@ deck from `DeckStore`, not the old app grid. The classic layout
 | `Core/…/Deck/DeckPresentation.swift` | `DeckGlyphs` (resolve, symbol map, action glyphs), `PixelGlyphData` → `GlyphBitmap` and editor ops, `Action.chordText` / `summary`, `SystemMacro.title`, `MediaKey.title`, `DeckShownKey` + `shownKeys(on:frontBundleID:dialog:)`, `orderedPages`, `addingStandardPages`, `displayTitle`, `deckStyle(for:)`, `deckGrid(for:)`, `DeckGrid.pane` |
 | `Core/…/Deck/DeckEditing.swift` | Page and key edits (add, rename, delete, pin, add/update/remove/duplicate/move/nudge keys; editing a curated preset stores a copy and hides the preset), `DeckKey.draft(for:)`, `DeckUndoHistory` |
 | `Core/…/Deck/ActionLibrary.swift` | `ActionKind`, `ActionPreset`, `ActionLibrary.sections/filter`, `Action.converted(to:)`, `ChordParsing`, `MenuPathText`, inspector copy for validation issues |
-| `Core/Tests/…/DeckUITests.swift` | 30 tests |
+| `Core/Tests/…/DeckUITests.swift` | 29 tests |
 | `DeckHandiOS/Surfaces/DeckSurface.swift` | The Deck tab |
 | `DeckHandiOS/Deck/DeckSurfaceModel.swift` | Follow, pin, edit mode, undo/redo (shared) |
 | `DeckHandiOS/Deck/DeckKeyButton.swift` | A key from the model, its receipt and Ask-first confirmation; `DeckKeyTint`, `DeckKeyFace` |
