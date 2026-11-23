@@ -2,8 +2,8 @@
 //  SettingsPointerSection.swift
 //  DeckHandiOS
 //
-//  Settings › Pointer and gestures: sensitivity, haptics, scrolling, send
-//  rate, Mac gestures (S11) and Pencil hover (S12); and Settings ›
+//  Settings › Pointer and gestures: sensitivity, haptics, scrolling, the
+//  click strip, send rate, Mac gestures (S11) and Pencil hover (S12); and Settings ›
 //  Clipboard (S10). Split out of SettingsView.swift (PH-010); owned by the
 //  iOS interaction lane.
 //
@@ -13,6 +13,8 @@ import UIKit
 
 struct SettingsPointerSection: View {
     @EnvironmentObject private var settings: DeckHandSettings
+    /// The Pointer surface's Click | Right-click strip (UX-004).
+    @AppStorage(PointerSurfaceSettings.showsClickStripKey) private var showsClickStrip = true
 
     var body: some View {
         Section {
@@ -40,6 +42,15 @@ struct SettingsPointerSection: View {
             }
 
             Toggle("Natural scrolling", isOn: $settings.naturalScrolling)
+
+            Toggle(isOn: $showsClickStrip) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Click strip")
+                    Text(TrackpadInputCopy.clickStripCaption)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
 
             Toggle(isOn: $settings.trackpadGestures) {
                 VStack(alignment: .leading, spacing: 2) {

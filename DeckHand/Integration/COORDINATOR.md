@@ -1,6 +1,6 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Mac builds:** build 7 was built on the Mac (2026-11-20, results in `STATUS.md`). Build 8 is queued (`72de5cb`). Mac builds are now run from the primary session or the owner's Mac session.
+> **Mac builds:** build 7 was built on the Mac (2026-11-20, results in `STATUS.md`). Build 9 is queued (build 8 plus UX Pointer). Mac builds are now run from the primary session or the owner's Mac session.
 
 ## Needs the owner
 
@@ -24,9 +24,9 @@ weekly usage limit is close).
 | --- | --- | --- | --- |
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac) — **archived since 2026-11-18; start a new Mac session** | session_01H5HwATvLJkqCFPruLyBsX8 (archived) | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
-| Lane: UX Pointer (UX-004) | session_01H5HwAVdfG4498dtwP5qFgf | claude/pixelhand-lane-ux-pointer | `LANE-ux-pointer.md` ends `Lane: READY TO MERGE` |
 | Lane: UX shell (UX-005 dock + strip, UX-008, Settings; UX-007 if time) | session_01H5HwATr5aqiTiBW55LMwiH | claude/pixelhand-lane-ux-shell | `LANE-ux-shell.md` ends `Lane: READY TO MERGE` |
 | Lane: UX Screen (UX-006, UX-016, UX-009) | session_01H5HwAVpabGAHKrSdsNDi1k | claude/pixelhand-lane-ux-screen | `LANE-ux-screen.md` ends `Lane: READY TO MERGE` |
+| Lane: UX onboarding (UX-010 onboarding + picker, UX-011 paywall) | session_01H5HwASiRB6CXssuGg7CDa1 | claude/pixelhand-lane-ux-onboarding | `LANE-ux-onboarding.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -108,3 +108,8 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   2026-11-19 23:54 (most likely the usage limit), one commit each. I sent
   each one a message to resume from its last push. Build 8 still has no Mac
   results.
+- 2026-11-23 ~19:00 UTC: UX Pointer finished; merged it clean (protocol 12,
+  Core 571 tests, type check clean) and queued build 9. Its follow-ups:
+  UX Screen should anchor the floating tile clear of the click strip;
+  UX shell should move the keyboard button into the app dock.
+  Started UX onboarding (UX-010, UX-011) in the free slot.

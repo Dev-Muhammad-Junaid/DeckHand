@@ -671,3 +671,28 @@ Mac should check:
 
 Status: READY FOR MAC BUILD (build 8)
 
+
+## Build 9 queued (2026-11-23)
+
+If build 8 hasn't been built, build this instead. Build 9 holds everything
+in build 8 plus the **UX Pointer lane** (`LANE-ux-pointer.md`), the first
+redesigned control surface. The shell's Pointer tab is now the board's
+"Control surface · Pointer":
+- a navy pixel pad with the dot field;
+- a dot-matrix caption that names the gesture in progress;
+- a Click | Right-click strip (touch and hold it for more);
+- a glass keyboard button;
+- a coach mark on first use.
+
+The classic layout still uses the old `TrackpadView` and is unchanged.
+Protocol stays **12**. Linux: Core **571 tests pass**, type check clean. The
+apps were not compiled here.
+
+Mac should check:
+1. Build both apps, fixing compile errors with the "Compile risks" list in
+   `LANE-ux-pointer.md`. Record any fixes here.
+2. `swift test --package-path DeckHand/Core` (expect 571) and `DeckHandTests`.
+3. The check table in `LANE-ux-pointer.md` (iPhone portrait/landscape, iPad,
+   light/dark, AX3), plus build 8's checks if 8 was skipped.
+
+Status: READY FOR MAC BUILD (build 9)
