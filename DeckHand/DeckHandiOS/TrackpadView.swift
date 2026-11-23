@@ -7,6 +7,9 @@ import QuartzCore
 import SwiftUI
 import UIKit
 
+/// The classic layout's trackpad, with the gesture bar and the inline
+/// sensitivity slider. The Pixel Hand shell shows `PointerSurface` instead;
+/// both drive the Mac through `TrackpadInputLayer`.
 struct TrackpadView: View {
     let sender: TrackpadSender
     let colorScheme: ColorScheme
@@ -47,68 +50,18 @@ struct TrackpadView: View {
                     )
                     .shadow(color: surfaceShadowColor, radius: 16, y: 8)
 
-                // The icon's dot screen: lights under fingers and on taps.
-                DotField(model: dots)
-                    .clipShape(RoundedRectangle(cornerRadius: DeckHandTheme.Radius.hero, style: .continuous))
-
-                // Multi-touch surface — replaces the old DragGesture
-                MultiTouchTrackpad(
-                    callbacks: TrackpadCallbacks(
-                        onCursorDelta: { dx, dy in
-                            Task { await sender.sendMouseDelta(dx: dx, dy: dy) }
-                        },
-                        onScrollDelta: { dx, dy in
-                            Task { await sender.sendScroll(dx: dx, dy: dy) }
-                        },
-                        onScrollEnded: {
-                            Task { await sender.endScroll() }
-                        },
-                        onSystemGesture: { gesture in
-                            // Toggle-back: the opposite gesture closes what
-                            // this one opened; the same one again waits.
-                            guard let command = gestureMap.resolve(gesture) else { return }
-                            Task { await sender.sendGesture(command) }
-                        },
-                        onTap: { pos in
-                            gestureMap.forget()
-                            Task { await sender.sendClick(.left) }
-                            dots.pulse(at: pos)
-                        },
-                        onDoubleTap: { pos in
-                            gestureMap.forget()
-                            Task { await sender.sendDoubleClick(.left) }
-                            dots.pulse(at: pos)
-                        },
-                        onLongPress: { pos in
-                            gestureMap.forget()
-                            Task { await sender.sendClick(.right) }
-                            // Filled ring: a right-click reads differently from a tap.
-                            dots.pulse(at: pos, filled: true)
-                        },
-                        onDragButton: { isDown in
-                            gestureMap.forget()
-                            Task {
-                                if isDown {
-                                    await sender.sendMouseDown(.left)
-                                } else {
-                                    await sender.sendMouseUp(.left)
-                                }
-                            }
-                        },
-                        onGestureChanged: { gesture in
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                activeGesture = gesture
-                            }
-                        },
-                        onTouchesChanged: { points in
-                            dots.setTouches(points)
-                        }
-                    ),
-                    sensitivity: settings.pointerSensitivity,
+                // The icon's dot screen and the multi-touch surface: lights
+                // under fingers and on taps.
+                TrackpadInputLayer(
+                    sender: sender,
+                    dots: dots,
+                    gestureMap: $gestureMap,
                     scrollMode: scrollMode,
-                    naturalScrolling: settings.naturalScrolling,
-                    systemGestures: settings.trackpadGestures,
-                    pencilHover: settings.pencilHoverPointer
+                    onGestureChanged: { gesture in
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            activeGesture = gesture
+                        }
+                    }
                 )
                 .clipShape(RoundedRectangle(cornerRadius: DeckHandTheme.Radius.hero, style: .continuous))
 
@@ -206,6 +159,101 @@ struct TrackpadView: View {
         }
         .background(bg)
         .animation(.spring(response: 0.28, dampingFraction: 0.85), value: showKeyboard)
+    }
+}
+
+// MARK: - Trackpad input layer
+
+/// The dot field and the multi-touch surface, wired to the Mac. Shared by
+/// the classic `TrackpadView` and the shell's `PointerSurface` (UX-004), so
+/// typing, drags, S11 gestures and S12 Pencil hover behave the same in both.
+struct TrackpadInputLayer: View {
+    let sender: TrackpadSender
+    let dots: DotFieldModel
+    /// Gesture → Mac view, with toggle-back (S11). A click forgets what a
+    /// gesture opened.
+    @Binding var gestureMap: GestureMap
+    var scrollMode = false
+    /// Draws the dot field under the touch surface. Off when the host lays
+    /// the field out itself (the Pointer surface runs it under its click
+    /// strip too); both start at the same top-leading origin.
+    var drawsDotField = true
+    var onGestureChanged: (TrackpadGestureKind?) -> Void = { _ in }
+    /// A three- or four-finger gesture reached the Mac.
+    var onSystemGesture: (MultiFingerGesture) -> Void = { _ in }
+
+    @EnvironmentObject private var settings: DeckHandSettings
+
+    var body: some View {
+        ZStack {
+            if drawsDotField {
+                DotField(model: dots)
+            }
+            MultiTouchTrackpad(
+                callbacks: callbacks,
+                sensitivity: settings.pointerSensitivity,
+                scrollMode: scrollMode,
+                naturalScrolling: settings.naturalScrolling,
+                systemGestures: settings.trackpadGestures,
+                pencilHover: settings.pencilHoverPointer
+            )
+        }
+    }
+
+    private var callbacks: TrackpadCallbacks {
+        let sender = self.sender
+        let dots = self.dots
+        let gestureMap = self.$gestureMap
+        let onGestureChanged = self.onGestureChanged
+        let onSystemGesture = self.onSystemGesture
+        return TrackpadCallbacks(
+            onCursorDelta: { dx, dy in
+                Task { await sender.sendMouseDelta(dx: dx, dy: dy) }
+            },
+            onScrollDelta: { dx, dy in
+                Task { await sender.sendScroll(dx: dx, dy: dy) }
+            },
+            onScrollEnded: {
+                Task { await sender.endScroll() }
+            },
+            onSystemGesture: { gesture in
+                // Toggle-back: the opposite gesture closes what this one
+                // opened; the same one again waits.
+                guard let command = gestureMap.wrappedValue.resolve(gesture) else { return }
+                onSystemGesture(gesture)
+                Task { await sender.sendGesture(command) }
+            },
+            onTap: { pos in
+                gestureMap.wrappedValue.forget()
+                Task { await sender.sendClick(.left) }
+                dots.pulse(at: pos)
+            },
+            onDoubleTap: { pos in
+                gestureMap.wrappedValue.forget()
+                Task { await sender.sendDoubleClick(.left) }
+                dots.pulse(at: pos)
+            },
+            onLongPress: { pos in
+                gestureMap.wrappedValue.forget()
+                Task { await sender.sendClick(.right) }
+                // Filled ring: a right-click reads differently from a tap.
+                dots.pulse(at: pos, filled: true)
+            },
+            onDragButton: { isDown in
+                gestureMap.wrappedValue.forget()
+                Task {
+                    if isDown {
+                        await sender.sendMouseDown(.left)
+                    } else {
+                        await sender.sendMouseUp(.left)
+                    }
+                }
+            },
+            onGestureChanged: onGestureChanged,
+            onTouchesChanged: { points in
+                dots.setTouches(points)
+            }
+        )
     }
 }
 
