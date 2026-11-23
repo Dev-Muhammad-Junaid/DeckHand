@@ -25,6 +25,7 @@ weekly usage limit is close).
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac) — **archived since 2026-11-18; start a new Mac session** | session_01H5HwATvLJkqCFPruLyBsX8 (archived) | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
 | Lane: UX arrangements (UX-007) | session_01H5HwATPNioSdZ3GkNKUfmk | claude/pixelhand-lane-ux-arrangements | `LANE-ux-arrangements.md` ends `Lane: READY TO MERGE` |
+| Lane: UX Deck 2 UI (UX-020) | session_01H5HwARQmWyZUHse3i6panK | claude/pixelhand-lane-ux-deck2 | `LANE-ux-deck2.md` ends `Lane: READY TO MERGE` |
 | Lane: UX onboarding (UX-010 onboarding + picker, UX-011 paywall) | session_01H5HwASiRB6CXssuGg7CDa1 | claude/pixelhand-lane-ux-onboarding | `LANE-ux-onboarding.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
@@ -124,3 +125,4 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   tile placement, which replaces Screen's fixed band because it also covers
   the keyboard button and pad resizes). Core 622 tests; type check clean.
   Queued build 12.
+  Started UX Deck 2 UI (UX-020). Running: UX onboarding, UX arrangements, UX Deck 2.
