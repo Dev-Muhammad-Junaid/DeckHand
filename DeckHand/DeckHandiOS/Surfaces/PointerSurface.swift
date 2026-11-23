@@ -122,12 +122,16 @@ struct PointerSurface: View {
                             onDoubleClick: { doubleClick() },
                             onLocate: { locatePointer() }
                         )
+                        .mirrorTileKeepOut(.clickStrip, owner: sender)
                         .transition(.opacity)
                     }
                 }
             }
             .clipShape(shape)
         }
+        // The floating screen tile anchors to the pad and keeps clear of the
+        // strip, caption and keyboard button (`MirrorTileKeepOut`).
+        .mirrorTileKeepOut(.pad, owner: sender)
         .animation(PixelHandMotion.reduced(PixelHandMotion.standard, reduceMotion: reduceMotion), value: stripShown)
         .animation(PixelHandMotion.reduced(PixelHandMotion.quick, reduceMotion: reduceMotion), value: caption)
     }
@@ -180,6 +184,7 @@ struct PointerSurface: View {
     /// strip (board: `pad__cap2`).
     private var captionLayer: some View {
         PointerCaptionPill(caption: caption)
+            .mirrorTileKeepOut(.caption, owner: sender)
             .padding(PixelHandTheme.Space.md)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             .allowsHitTesting(false)
@@ -197,6 +202,7 @@ struct PointerSurface: View {
             GestureHaptic.selection.trigger()
             showKeyboard.toggle()
         }
+        .mirrorTileKeepOut(.keyboard, owner: sender)
         .padding(PixelHandTheme.Space.md)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }

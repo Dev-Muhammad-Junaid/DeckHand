@@ -9,6 +9,12 @@
 //  frame slides off in the direction of travel while the live stream
 //  comes in from the other side.
 //
+//  Placement: the tile rests at its home anchor's top-trailing corner (the
+//  Pointer pad, else the canvas), 12 pt in, and every drag, pinch and
+//  layout change is clamped by `MirrorTilePlacement` (Core) so it stays on
+//  the canvas and clear of the areas the surface reserves (the Pointer
+//  surface's click strip, caption row and keyboard button).
+//
 //  The view is intentionally dumb: frame decode, the cursor and the
 //  start/stop protocol live in `ControlSessionModel+Mirror` and the binary
 //  stream reader. This shows whatever `image` (JPEG) or `videoLayer` (HEVC,
@@ -53,6 +59,14 @@ struct MirrorThumbnailView: View {
     /// layer), at `videoSize`'s aspect.
     var videoLayer: AnyView?
     var videoSize: CGSize?
+    /// The rect the tile's home is anchored to (top-trailing), in container
+    /// coordinates: the Pointer pad. The container when nil.
+    var homeAnchor: CGRect?
+    /// Areas the tile never covers, in container coordinates.
+    var keepOut: [CGRect] = []
+    /// Height of `belowAccessory` plus its gap, counted when clearing
+    /// `keepOut` so the dots don't land on a reserved area either.
+    var belowAccessoryHeight: CGFloat = 0
 
     /// Persisted drag offset (committed at drag end) + live in-drag delta.
     @State private var committedOffset: CGSize = .zero
@@ -83,10 +97,6 @@ struct MirrorThumbnailView: View {
         static let expandedWidth: CGFloat = 340
         /// Fraction of the container the mirror may fill at full zoom.
         static let maxFill: CGFloat = 0.94
-        static let edgeMargin: CGFloat = 8
-        static let trailingInset: CGFloat = 16
-        /// Clears the gesture button bar along the bottom of the control surface.
-        static let bottomInset: CGFloat = 96
         static let cornerRadius: CGFloat = 10
     }
 
@@ -116,35 +126,67 @@ struct MirrorThumbnailView: View {
 
     private var minWidth: CGFloat { min(Layout.compactWidth, maxWidth) }
 
-    /// On-screen width right now, including any in-flight pinch.
-    private var width: CGFloat { clampWidth(committedWidth * pinchScale) }
+    /// On-screen width right now, including any in-flight pinch, capped so
+    /// the tile still has a clear spot beside the reserved areas.
+    private var width: CGFloat { fittedWidth(committedWidth * pinchScale) }
 
     private func clampWidth(_ proposed: CGFloat) -> CGFloat {
         min(max(proposed, minWidth), maxWidth)
     }
 
-    /// Keeps the mirror on screen regardless of how large it has been
-    /// pinched, or how far it was dragged back when it was smaller. Home is
-    /// the bottom-trailing corner, so offsets are measured from there.
-    private func clampOffset(_ proposed: CGSize, width: CGFloat) -> CGSize {
-        guard containerSize.width > 0, containerSize.height > 0 else { return proposed }
-        let height = width * frameAspect
-        let homeX = containerSize.width - Layout.trailingInset - width
-        let homeY = containerSize.height - Layout.bottomInset - height
+    private func fittedWidth(_ proposed: CGFloat) -> CGFloat {
+        let clamped = clampWidth(proposed)
+        guard containerSize.width > 0, containerSize.height > 0 else { return clamped }
+        return CGFloat(MirrorTilePlacement.fittingWidth(
+            proposed: Double(clamped),
+            minimum: Double(minWidth),
+            aspect: Double(frameAspect),
+            extraHeight: Double(belowAccessoryHeight),
+            in: bounds,
+            avoiding: keepOutRects
+        ))
+    }
 
-        let lowX = Layout.edgeMargin - homeX
-        let highX = containerSize.width - Layout.edgeMargin - width - homeX
-        let lowY = Layout.edgeMargin - homeY
-        let highY = containerSize.height - Layout.edgeMargin - height - homeY
+    private var bounds: MirrorRect {
+        MirrorRect(x: 0, y: 0, width: Double(containerSize.width), height: Double(containerSize.height))
+    }
 
-        return CGSize(
-            width: min(max(proposed.width, min(lowX, highX)), max(lowX, highX)),
-            height: min(max(proposed.height, min(lowY, highY)), max(lowY, highY))
+    private var keepOutRects: [MirrorRect] { keepOut.map(MirrorRect.init) }
+
+    /// The tile's resting frame at this width (offset zero).
+    private func home(width: CGFloat) -> MirrorRect {
+        MirrorTilePlacement.home(
+            width: Double(width),
+            height: Double(width * frameAspect + belowAccessoryHeight),
+            anchor: homeAnchor.map(MirrorRect.init) ?? bounds
         )
     }
 
-    private var liveOffset: CGSize {
-        clampOffset(
+    /// Where the tile sits for an offset from home: on the canvas and clear
+    /// of `keepOut`, however far it was dragged or however big it was
+    /// pinched.
+    private func placedOrigin(_ offset: CGSize, width: CGFloat) -> CGPoint {
+        let rest = home(width: width)
+        guard containerSize.width > 0, containerSize.height > 0 else {
+            return CGPoint(x: rest.x + Double(offset.width), y: rest.y + Double(offset.height))
+        }
+        var proposed = rest
+        proposed.x += Double(offset.width)
+        proposed.y += Double(offset.height)
+        let placed = MirrorTilePlacement.place(proposed, in: bounds, avoiding: keepOutRects)
+        return CGPoint(x: placed.x, y: placed.y)
+    }
+
+    /// The offset from home that `placedOrigin` settled on, so a committed
+    /// drag or pinch stores where the tile really is.
+    private func clampOffset(_ proposed: CGSize, width: CGFloat) -> CGSize {
+        let origin = placedOrigin(proposed, width: width)
+        let rest = home(width: width)
+        return CGSize(width: origin.x - CGFloat(rest.x), height: origin.y - CGFloat(rest.y))
+    }
+
+    private var liveOrigin: CGPoint {
+        placedOrigin(
             CGSize(
                 width: committedOffset.width + dragDelta.width,
                 height: committedOffset.height + dragDelta.height
@@ -216,7 +258,7 @@ struct MirrorThumbnailView: View {
         .clipShape(RoundedRectangle(cornerRadius: Layout.cornerRadius, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: Layout.cornerRadius, style: .continuous)
-                .strokeBorder(.white.opacity(0.22), lineWidth: 0.5)
+                .strokeBorder(.white.opacity(0.22), lineWidth: PixelHandTheme.Stroke.hairline)
         )
         .overlay(alignment: .topLeading) { topLeadingAccessory }
         .overlay(alignment: .bottom) { bottomAccessory }
@@ -239,11 +281,11 @@ struct MirrorThumbnailView: View {
             .accessibilityLabel("Close live mirror")
         }
         .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
-        .padding(.trailing, Layout.trailingInset)
-        .padding(.bottom, Layout.bottomInset)
-        .offset(x: liveOffset.width, y: liveOffset.height)
+        .offset(x: liveOrigin.x, y: liveOrigin.y)
         .gesture(
-            DragGesture()
+            // Global space: the tile moves under the finger, so a local
+            // translation would chase itself.
+            DragGesture(coordinateSpace: .global)
                 .updating($dragDelta) { value, state, _ in
                     state = value.translation
                 }
@@ -253,7 +295,7 @@ struct MirrorThumbnailView: View {
                             width: committedOffset.width + value.translation.width,
                             height: committedOffset.height + value.translation.height
                         ),
-                        width: width
+                        width: fittedWidth(committedWidth)
                     )
                     publishLayout()
                 }
@@ -267,7 +309,7 @@ struct MirrorThumbnailView: View {
                             restoreWidth = max(committedWidth, Layout.compactWidth)
                             // A pinch that shrank the mirror can leave it
                             // parked outside the container it was dragged to.
-                            committedOffset = clampOffset(committedOffset, width: committedWidth)
+                            committedOffset = clampOffset(committedOffset, width: fittedWidth(committedWidth))
                             publishLayout()
                         }
                 )
@@ -282,6 +324,15 @@ struct MirrorThumbnailView: View {
             restoreWidth = max(committedWidth, Layout.compactWidth)
         }
         .animation(.snappy(duration: 0.2), value: committedWidth)
+        // The pad shrinking (keyboard open) or the strip appearing moves the
+        // tile clear smoothly instead of jumping.
+        .animation(.snappy(duration: 0.2), value: keepOut)
+        .animation(.snappy(duration: 0.2), value: homeAnchor)
+        .frame(
+            width: containerSize.width > 0 ? containerSize.width : nil,
+            height: containerSize.height > 0 ? containerSize.height : nil,
+            alignment: .topLeading
+        )
         .accessibilityLabel("Live mirror of the Mac screen")
         .accessibilityHint("Drag to move. Pinch to resize. Tap to shrink or restore. Chevrons switch desktops. The menu at the top left picks a display.")
     }
