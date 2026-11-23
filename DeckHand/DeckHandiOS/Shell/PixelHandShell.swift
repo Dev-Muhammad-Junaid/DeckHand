@@ -311,7 +311,12 @@ struct PixelHandShell: View {
     private func surfaceView(_ surface: ControlSurface, sender: TrackpadSender, metrics: LayoutMetrics) -> some View {
         switch surface {
         case .pointer:
-            PointerSurface(sender: sender, clipboard: session.clipboard, margin: metrics.margin)
+            PointerSurface(
+                sender: sender,
+                clipboard: session.clipboard,
+                margin: metrics.margin,
+                keyboardInDock: metrics.arrangement != .rail && CGFloat(metrics.height) >= Self.foldedDockHeight
+            )
         case .screen:
             ScreenSurface(session: session, macName: peerName)
                 .padding(.horizontal, metrics.margin)
