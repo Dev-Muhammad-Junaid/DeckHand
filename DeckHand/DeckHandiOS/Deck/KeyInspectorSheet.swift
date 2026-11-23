@@ -324,7 +324,7 @@ private struct AppPicker: View {
 
     var body: some View {
         let sorted = apps.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
-        Picker("App", selection: Binding(get: { bundleID }, set: onChange)) {
+        Picker("App", selection: Binding(get: { bundleID }, set: { onChange($0) })) {
             if !sorted.contains(where: { $0.bundleID == bundleID }) {
                 Text(bundleID).tag(bundleID)
             }
