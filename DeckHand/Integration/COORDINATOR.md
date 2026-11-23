@@ -1,6 +1,6 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Mac loop needed:** run `/loop 1h Follow the "Build loop" section in DeckHand/Integration/MAC-BUILD.md on claude/pixelhand-integration` in a Mac session. (Build 3 waited about 14 h with no Mac build. Builds 4–7 have been queued since; build 7, the complete Sill phase, replaces all of them.)
+> **Mac builds:** build 7 was built on the Mac (2026-11-20, results in `STATUS.md`). Build 9 is queued (build 8 plus UX Pointer). Mac builds are now run from the primary session or the owner's Mac session.
 
 ## Needs the owner
 
@@ -11,8 +11,6 @@
   later: paywall review screenshot per subscription (needs a build with the
   paywall), App Review notes' demo video, Paid Applications agreement
   (with Apple), CloudKit schema deploy before release.
-- **Mac build loop:** see the note above. No Mac has built anything since
-  build 2, and the roadmap phase waits for a green Mac build.
 
 The owner approved the full program (see `DECISIONS.md`). A scheduled cloud
 task starts a fresh coordinator session every 2 hours; it has no memory, so
@@ -24,11 +22,11 @@ weekly usage limit is close).
 
 | Work | Session | Branch | Done when |
 | --- | --- | --- | --- |
-| Fixes from Mac build 7 (started by the primary session) | (see primary) | claude/pixelhand-lane-build7-fixes | marker `Lane: READY TO MERGE`; then queue build 8 |
-| Lane: Design foundation (UX-001, UX-015, UX-002, UX-003; UX-008 if time) | session_01H5HwAV3VhDHk1ihCzNeneg | claude/pixelhand-lane-design-foundation | `LANE-design-foundation.md` ends `Lane: READY TO MERGE` |
-| Lane: Deck 2 model (D1 + Mac execution + DeckStore) | session_01H5HwAV6p8GVQAcj8VAQXfB | claude/pixelhand-lane-deck2-model | `LANE-deck2-model.md` ends `Lane: READY TO MERGE` |
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac) — **archived since 2026-11-18; start a new Mac session** | session_01H5HwATvLJkqCFPruLyBsX8 (archived) | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
+| Lane: UX shell (UX-005 dock + strip, UX-008, Settings; UX-007 if time) | session_01H5HwATr5aqiTiBW55LMwiH | claude/pixelhand-lane-ux-shell | `LANE-ux-shell.md` ends `Lane: READY TO MERGE` |
+| Lane: UX Screen (UX-006, UX-016, UX-009) | session_01H5HwAVpabGAHKrSdsNDi1k | claude/pixelhand-lane-ux-screen | `LANE-ux-screen.md` ends `Lane: READY TO MERGE` |
+| Lane: UX onboarding (UX-010 onboarding + picker, UX-011 paywall) | session_01H5HwASiRB6CXssuGg7CDa1 | claude/pixelhand-lane-ux-onboarding | `LANE-ux-onboarding.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -36,10 +34,12 @@ weekly usage limit is close).
 Design: Option A "Dock & Canvas", tickets in `DeckHand/Product/Design/05-Implementation-Plan.md`.
 
 Next, in order (max 3 running, counting fix sessions):
-1. After Design foundation merges: UX-004 Pointer surface (iOS interaction),
-   UX-005 context strip + app dock, UX-006 Screen surface (Mirror), UX-007
-   arrangements, UX-008 header, then UX-009…UX-019 (pixel identity).
-2. After Deck 2 model merges and the shell exists: UX-020 Deck 2 UI (D2/D3).
+1. Running: UX-004, UX-005/008 + Settings, UX-006/016/009. Next: UX-007
+   arrangements (if UX shell didn't finish it), UX-010 onboarding + picker,
+   UX-011 paywall, UX-012 Mac panel, UX-017 transitions, UX-018
+   loading/empty/focus, UX-019 icon/launch/menu-bar hand, UX-013 a11y,
+   UX-014 copy + shim removal.
+2. UX-020 Deck 2 UI (D2/D3); the model and shell are both merged now.
 3. App Intents / widgets / Control Center.
 4. Multi-Mac (UX-030), sharing between paired devices (UX-031).
 5. AI on-device first (UX-021, UX-022).
@@ -99,4 +99,17 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
 - 2026-11-19 ~23:30 UTC: primary session merged build7-fixes, design-foundation
   and deck2-model (all marked READY TO MERGE) and queued build 8. No lane
   sessions running now; start the next redesign/roadmap lanes.
-
+- 2026-11-19 ~23:50 UTC: the primary session merged build7-fixes,
+  design-foundation and deck2-model and queued build 8 (`72de5cb`, protocol
+  12). On its request, started the screens the owner touches: UX Pointer, UX
+  shell (dock, strip, header, Settings) and UX Screen.
+- 2026-11-23 18:55 UTC: the coordinator tick queued for 2026-11-20 00:55 was
+  delivered almost 4 days late. All three UX lanes had failed at about
+  2026-11-19 23:54 (most likely the usage limit), one commit each. I sent
+  each one a message to resume from its last push. Build 8 still has no Mac
+  results.
+- 2026-11-23 ~19:00 UTC: UX Pointer finished; merged it clean (protocol 12,
+  Core 571 tests, type check clean) and queued build 9. Its follow-ups:
+  UX Screen should anchor the floating tile clear of the click strip;
+  UX shell should move the keyboard button into the app dock.
+  Started UX onboarding (UX-010, UX-011) in the free slot.
