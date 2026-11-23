@@ -132,28 +132,30 @@ struct PixelDissolveModifier: ViewModifier, Animatable {
 
     func body(content: Content) -> some View {
         let progress = self.progress
-        if progress >= 1 {
-            content
-        } else {
-            content.mask {
-                Canvas { context, size in
-                    let cell = PixelHandMotion.dissolveCell
-                    let columns = Int((size.width / cell).rounded(.up))
-                    let rows = Int((size.height / cell).rounded(.up))
-                    var path = Path()
-                    for row in 0..<max(rows, 0) {
-                        for column in 0..<max(columns, 0) where Self.rank(column, row) < progress {
-                            path.addRect(CGRect(x: CGFloat(column) * cell, y: CGFloat(row) * cell, width: cell, height: cell))
-                        }
-                    }
-                    context.fill(path, with: .color(.black))
+        // Always masked (a full mask at 1) so the view keeps its identity
+        // and its state when the transition ends.
+        content.mask {
+            Canvas { context, size in
+                guard progress < 1 else {
+                    context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.black))
+                    return
                 }
+                let cell = PixelHandMotion.dissolveCell
+                let columns = Int((size.width / cell).rounded(.up))
+                let rows = Int((size.height / cell).rounded(.up))
+                var path = Path()
+                for row in 0..<max(rows, 0) {
+                    for column in 0..<max(columns, 0) where Self.rank(column, row) < progress {
+                        path.addRect(CGRect(x: CGFloat(column) * cell, y: CGFloat(row) * cell, width: cell, height: cell))
+                    }
+                }
+                context.fill(path, with: .color(.black))
             }
         }
     }
 
     /// A stable pseudo-random rank in 0..<1 for a cell.
-    static func rank(_ x: Int, _ y: Int) -> Double {
+    nonisolated static func rank(_ x: Int, _ y: Int) -> Double {
         var h = UInt32(truncatingIfNeeded: x &* 73_856_093 ^ y &* 19_349_663)
         h ^= h >> 13
         h = h &* 0x5bd1_e995

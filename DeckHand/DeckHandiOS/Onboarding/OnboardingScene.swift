@@ -148,7 +148,7 @@ private struct MiniMacDesktop: View {
             // Menu bar.
             context.fill(Path(CGRect(x: 0, y: 0, width: w, height: h * 0.06)), with: .color(.black.opacity(0.35)))
             for i in 0..<4 {
-                let x = w * (0.04 + Double(i) * 0.06)
+                let x = w * (0.04 + CGFloat(i) * 0.06)
                 context.fill(
                     Path(roundedRect: CGRect(x: x, y: h * 0.022, width: w * 0.04, height: h * 0.018), cornerRadius: 1),
                     with: .color(.white.opacity(i == 0 ? 0.85 : 0.45))
@@ -156,10 +156,10 @@ private struct MiniMacDesktop: View {
             }
             // Editor window.
             let editor = CGRect(x: w * 0.07, y: h * 0.14, width: w * 0.62, height: h * 0.62)
-            window(in: &context, rect: editor, lines: 7)
+            Self.window(in: &context, rect: editor, lines: 7)
             // Side window.
             let side = CGRect(x: w * 0.6, y: h * 0.3, width: w * 0.33, height: h * 0.4)
-            window(in: &context, rect: side, lines: 3)
+            Self.window(in: &context, rect: side, lines: 3)
             if showsDialog {
                 let dialog = CGRect(x: w * 0.26, y: h * 0.32, width: w * 0.34, height: h * 0.24)
                 context.fill(
@@ -186,7 +186,7 @@ private struct MiniMacDesktop: View {
         }
     }
 
-    private func window(in context: inout GraphicsContext, rect: CGRect, lines: Int) {
+    nonisolated private static func window(in context: inout GraphicsContext, rect: CGRect, lines: Int) {
         let radius = rect.height * 0.06
         context.fill(Path(roundedRect: rect, cornerRadius: radius), with: .color(Color(red: 0.953, green: 0.957, blue: 0.976)))
         let bar = CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height * 0.12)
@@ -244,7 +244,7 @@ private struct TrackpadScene: View {
         let size = self.size
         let progress = self.progress
         let k = sceneScale(size)
-        let end = trailPoint(1, size: size)
+        let end = Self.trailPoint(1, size: size)
         ZStack(alignment: .topLeading) {
             Canvas { context, canvasSize in
                 let pitch: CGFloat = 15
@@ -257,8 +257,8 @@ private struct TrackpadScene: View {
                 let samples: [(CGPoint, CGFloat, Double)] = (0...20).compactMap { n in
                     let t = Double(n) / 20
                     guard t <= progress else { return nil }
-                    let radius = (18 + 44 * t) * k
-                    return (trailPoint(t, size: size), radius, 0.25 + 0.75 * t)
+                    let radius = CGFloat(18 + 44 * t) * k
+                    return (Self.trailPoint(t, size: size), radius, 0.25 + 0.75 * t)
                 }
                 var glowLayer = context
                 glowLayer.addFilter(.shadow(color: PixelHandTheme.Brand.glow.opacity(0.8), radius: 3))
@@ -305,10 +305,10 @@ private struct TrackpadScene: View {
     }
 
     /// The board's trail: x from 20 % to 75 %, y a gentle upward curve.
-    private func trailPoint(_ t: Double, size: CGFloat) -> CGPoint {
+    nonisolated private static func trailPoint(_ t: Double, size: CGFloat) -> CGPoint {
         CGPoint(
-            x: size * (0.2 + 0.55 * t),
-            y: size * (0.74 - 0.42 * t + 0.25 * t * t)
+            x: size * CGFloat(0.2 + 0.55 * t),
+            y: size * CGFloat(0.74 - 0.42 * t + 0.25 * t * t)
         )
     }
 }
