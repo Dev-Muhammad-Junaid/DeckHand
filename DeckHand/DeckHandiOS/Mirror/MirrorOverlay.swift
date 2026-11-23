@@ -154,26 +154,22 @@ struct MirrorDisplayPicker: View {
                     }
                 }
             } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: chipSymbol(windowActive: windowActive))
-                    Text(selectedLabel)
-                        .lineLimit(1)
-                }
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 4)
-                .background(.black.opacity(0.55), in: Capsule())
+                let micro = MirrorPaneChrome.tileStrip(
+                    displays: session.mirrorDisplays,
+                    mirroredDisplayID: session.selectedMirrorDisplayID,
+                    mirroringWindow: windowActive,
+                    host: session.mirrorHostStats,
+                    client: session.mirrorClientStats
+                )
+                // UX-016: the tile's micro strip (`LIVE · D1 · 60`) is the
+                // picker's button.
+                StatusStrip(items: micro.items, pitch: 1.4, accessibilityText: micro.spoken)
+                    .frame(minHeight: PixelHandTheme.ControlHeight.hit, alignment: .topLeading)
+                    .contentShape(Rectangle())
             }
             .padding(6)
             .accessibilityLabel(window.map { "Mirrored window: \($0.longLabel)" } ?? "Mirrored display: \(selectedLabel)")
         }
-    }
-
-    private func chipSymbol(windowActive: Bool) -> String {
-        if windowActive { return "macwindow" }
-        if settings.mirrorFollowsCursor { return "cursorarrow.motionlines" }
-        return session.mirrorDisplays.count > 1 ? "display.2" : "display"
     }
 
     private var selectedLabel: String {
@@ -185,36 +181,25 @@ struct MirrorDisplayPicker: View {
 
 // MARK: - Desktop dots
 
-/// One dot per Space of the mirrored display, the current one filled;
-/// full-screen apps as short labels. Nothing when Spaces aren't known.
+/// One dot per Space of the mirrored display, the current one lit;
+/// full-screen app desktops hollow (`DesktopDots`). Nothing when Spaces aren't known.
 struct MirrorSpaceDots: View {
     let strip: MirrorSpaceStrip
 
     var body: some View {
         if !strip.dots.isEmpty {
-            HStack(spacing: 5) {
-                ForEach(strip.dots) { dot in
-                    switch dot.kind {
-                    case .desktop:
-                        Circle()
-                            .fill(dot.isCurrent ? Color.white : Color.white.opacity(0.35))
-                            .frame(width: 6, height: 6)
-                    case let .fullScreen(label):
-                        Text(label)
-                            .font(.system(size: 9, weight: .semibold))
-                            .lineLimit(1)
-                            .foregroundStyle(dot.isCurrent ? Color.black : Color.white.opacity(0.75))
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(
-                                Capsule().fill(dot.isCurrent ? Color.white : Color.white.opacity(0.18))
-                            )
-                    }
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(.black.opacity(0.55), in: Capsule())
+            DesktopDots(
+                count: strip.dots.count,
+                current: strip.dots.firstIndex(where: \.isCurrent) ?? 0,
+                fullScreen: Set(strip.dots.compactMap { dot -> Int? in
+                    if case .fullScreen = dot.kind { return dot.index }
+                    return nil
+                })
+            )
+            .padding(.horizontal, 4)
+            .frame(height: PixelHandTheme.ControlHeight.badge)
+            .background(PixelHandTheme.Brand.screen.opacity(0.84), in: RoundedRectangle(cornerRadius: PixelHandTheme.Radius.badge, style: .continuous))
+            .pixelOnNavy()
             .animation(.easeInOut(duration: 0.2), value: strip)
             .allowsHitTesting(false)
             .accessibilityElement(children: .ignore)
@@ -237,71 +222,45 @@ struct MirrorBottomChrome: View {
         VStack(alignment: .leading, spacing: 4) {
             if let notice = session.mirrorNotice {
                 // S14: the mirrored window ended; the mirror shows its display.
-                Label(notice, systemImage: "macwindow.badge.plus")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(3)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 4)
-                    .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                MirrorNoticeLabel(glyph: PixelGlyphs.displays, text: notice)
                     .transition(.opacity)
             }
-            if let display = chrome.cursorElsewhere {
-                cursorBadge(display)
-                    .transition(.opacity)
+            if let badge = MirrorPaneChrome.cursorBadge(
+                chrome: chrome,
+                displays: session.mirrorDisplays,
+                mirroredDisplayID: session.selectedMirrorDisplayID,
+                layout: session.displayLayout
+            ) {
+                MirrorCursorBadgeView(badge: badge) {
+                    session.selectMirrorDisplay(badge.displayID)
+                }
+                .transition(.opacity)
             }
             if chrome.cursorOutsideWindow {
                 // S14: the pointer is somewhere else on the Mac.
-                Label("Pointer outside the window", systemImage: "cursorarrow.rays")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 4)
-                    .background(.black.opacity(0.6), in: Capsule())
+                MirrorNoticeLabel(glyph: PixelGlyphs.pointer, text: "Pointer outside the window")
                     .allowsHitTesting(false)
                     .transition(.opacity)
             }
             if settings.showMirrorStats {
-                Text(MirrorStatsLine.text(
-                    host: session.mirrorHostStats,
-                    client: session.mirrorClientStats,
-                    clientName: UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone"
-                ))
-                .font(.system(size: 9, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white)
-                .lineLimit(2)
-                .padding(.horizontal, 5)
-                .padding(.vertical, 3)
-                .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+                StatusStrip(
+                    items: MirrorPaneChrome.statsStrip(
+                        host: session.mirrorHostStats,
+                        client: session.mirrorClientStats,
+                        link: RemoteLinkStatus.shared.current
+                    ),
+                    pitch: 1.3,
+                    accessibilityText: MirrorStatsLine.text(
+                        host: session.mirrorHostStats,
+                        client: session.mirrorClientStats,
+                        clientName: UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone"
+                    )
+                )
                 .allowsHitTesting(false)
-                .accessibilityLabel("Stream stats")
             }
         }
         .padding(6)
         .frame(maxWidth: .infinity, alignment: .leading)
         .animation(.easeInOut(duration: 0.2), value: chrome)
-    }
-
-    private func cursorBadge(_ display: DisplayInfo) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: "cursorarrow")
-            Text("Cursor on \(display.shortLabel)")
-                .lineLimit(1)
-            Button("Bring Here") { session.bringCursorToMirroredDisplay() }
-                .buttonStyle(.borderless)
-                .foregroundStyle(.white)
-                .underline()
-            Button("Show") { session.selectMirrorDisplay(display.displayID) }
-                .buttonStyle(.borderless)
-                .foregroundStyle(.white)
-                .underline()
-        }
-        .font(.caption2.weight(.semibold))
-        .foregroundStyle(.white)
-        .padding(.horizontal, 7)
-        .padding(.vertical, 4)
-        .background(.black.opacity(0.6), in: Capsule())
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("The cursor is on \(display.name)")
     }
 }
