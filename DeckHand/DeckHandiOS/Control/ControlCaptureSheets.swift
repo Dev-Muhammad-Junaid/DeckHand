@@ -49,7 +49,7 @@ struct ControlCaptureSheets: ViewModifier {
                 // memory resident until the *next* capture overwrote it.
                 .onDisappear { capture.screenshotImage = nil }
             }
-            .alert(capture.screenshotErrorIsMirror ? "Live Mirror Unavailable" : "Screenshot Failed", isPresented: Binding(
+            .alert(capture.screenshotErrorIsMirror ? "Live Screen Unavailable" : "Screenshot Failed", isPresented: Binding(
                 get: { capture.screenshotErrorMessage != nil },
                 set: { if !$0 { capture.dismissError() } }
             )) {

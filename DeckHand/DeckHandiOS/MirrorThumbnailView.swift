@@ -210,7 +210,7 @@ struct MirrorThumbnailView: View {
                 Spacer(minLength: 0)
                 spaceChevron(direction: .next, state: nextChevron, symbol: "chevron.right.circle.fill", label: "Next desktop")
             }
-            .padding(.horizontal, 6)
+            .padding(.horizontal, 0)
         }
         .frame(width: width)
         .clipShape(RoundedRectangle(cornerRadius: Layout.cornerRadius, style: .continuous))
@@ -226,12 +226,16 @@ struct MirrorThumbnailView: View {
         }
         .overlay(alignment: .topTrailing) {
             Button(action: onClose) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 18))
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(.white, .black.opacity(0.55))
+                // UX-006: pixel close on a navy plate, 44 pt target.
+                PHGlyph(glyph: PixelGlyphs.close, pitch: 1.6)
+                    .foregroundStyle(.white)
+                    .frame(width: 24, height: 24)
+                    .background(PixelHandTheme.Brand.screen.opacity(0.72), in: Circle())
+                    .frame(width: PixelHandTheme.ControlHeight.hit, height: PixelHandTheme.ControlHeight.hit)
+                    .contentShape(Rectangle())
+                    .pixelOnNavy()
             }
-            .padding(6)
+            .buttonStyle(.plain)
             .accessibilityLabel("Close live mirror")
         }
         .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
@@ -319,10 +323,10 @@ struct MirrorThumbnailView: View {
         } else {
             ZStack {
                 Rectangle().fill(.black.opacity(0.85))
-                ProgressView()
-                    .tint(.white)
+                DotWave(pitch: 4, label: "Waiting for the Mac’s screen")
             }
             .aspectRatio(16.0 / 10.0, contentMode: .fit)
+            .pixelOnNavy()
         }
     }
 
@@ -371,15 +375,18 @@ struct MirrorThumbnailView: View {
     ) -> some View {
         if state == .hidden {
             // Keeps the HStack's shape; nothing to tap or read out.
-            Color.clear.frame(width: 28, height: 28).accessibilityHidden(true)
+            Color.clear.frame(width: PixelHandTheme.ControlHeight.hit, height: PixelHandTheme.ControlHeight.hit).accessibilityHidden(true)
         } else {
             Button {
                 performSpaceSwitch(direction)
             } label: {
-                Image(systemName: symbol)
-                    .font(.system(size: 28))
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(.white, .black.opacity(0.45))
+                PHGlyph(glyph: direction == .previous ? PixelGlyphs.spaceLeft : PixelGlyphs.spaceRight, pitch: 1.8)
+                    .foregroundStyle(.white)
+                    .frame(width: 28, height: 28)
+                    .background(PixelHandTheme.Brand.screen.opacity(0.6), in: Circle())
+                    .frame(width: PixelHandTheme.ControlHeight.hit, height: PixelHandTheme.ControlHeight.hit)
+                    .contentShape(Rectangle())
+                    .pixelOnNavy()
             }
             .buttonStyle(.plain)
             .disabled(state == .dimmed)
