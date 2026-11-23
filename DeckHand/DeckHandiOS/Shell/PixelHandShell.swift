@@ -338,14 +338,6 @@ struct PixelHandShell: View {
     }
 
     private func deck(sender: TrackpadSender) -> some View {
-        StreamDeckGridView(
-            sender: sender,
-            colorScheme: colorScheme,
-            installedApps: session.installedApps,
-            activeBundleID: session.activeBundleID,
-            runningBundleIDs: session.runningBundleIDs,
-            uiContext: session.uiContext,
-            showsQuickActions: false
-        )
+        DeckSurface(session: session, sender: sender) // Deck 2 UI lane (UX-020)
     }
 }

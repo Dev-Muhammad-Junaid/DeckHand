@@ -223,3 +223,57 @@ public enum ChordParsing {
         return (mods, key)
     }
 }
+
+public enum MenuPathText {
+    /// "File › Export › PDF…" (or "File > Export > PDF…") as a path; empty
+    /// parts are dropped.
+    public static func parse(_ text: String) -> [String] {
+        text.replacingOccurrences(of: ">", with: "›")
+            .components(separatedBy: "›")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    /// A path as the inspector shows it.
+    public static func format(_ path: [String]) -> String {
+        path.joined(separator: " › ")
+    }
+}
+
+// MARK: - Inspector copy
+
+extension ActionValidation.Issue {
+    /// What the key inspector says about the problem, in plain words.
+    public var message: String {
+        switch self {
+        case .emptyChord: "Choose a key to press."
+        case .tooManyChordKeys: "That’s too many keys for one press."
+        case .badKeyName: "That key name isn’t one the Mac knows."
+        case .badBundleID: "Choose an app."
+        case .badContextID, .contextActionNotStorable: "Dialog buttons can’t be saved on a key."
+        case .emptyMenuPath: "Type the menu path, like File › New Tab."
+        case .menuPathTooDeep: "Menu paths can be at most \(ActionLimits.maxMenuPathComponents) levels deep."
+        case .badMenuTitle: "One of the menu titles is too long or empty."
+        case .badShortcutName: "Type the Shortcut’s name as it appears in the Shortcuts app."
+        case .emptySequence: "Add at least one step."
+        case .tooManySteps: "A sequence can have at most \(ActionLimits.maxSequenceSteps) steps."
+        case .nestedSequence: "A sequence can’t contain another sequence."
+        case .badDelay: "Pauses are 0 to \(ActionLimits.maxDelayMilliseconds / 1000) seconds."
+        case .totalDelayTooLong: "Pauses add up to more than \(ActionLimits.maxTotalDelayMilliseconds / 1000) seconds."
+        }
+    }
+}
+
+extension DeckValidation.Issue {
+    /// The inspector's line for a key problem, or `nil` for problems the
+    /// user can't cause there (IDs, duplicates).
+    public var inspectorMessage: String? {
+        switch self {
+        case .emptyLabel: "Give the key a label."
+        case .labelTooLong: "Labels can be at most \(DeckValidation.maxLabelLength) characters."
+        case .badGlyph: "The glyph can’t be saved. Try drawing it again."
+        case let .badAction(_, issue): issue.message
+        default: nil
+        }
+    }
+}

@@ -264,6 +264,20 @@ struct DeckEditingTests {
         #expect(action.converted(to: .appShortcut, frontBundleID: nil) == action)
     }
 
+    @Test("The inspector explains why a key can't be saved")
+    func inspectorMessages() {
+        let key = DeckKey(id: "k", appearance: KeyAppearance(label: " "), action: .macShortcut(name: ""))
+        let messages = DeckValidation.keyIssues(key).compactMap(\.inspectorMessage)
+        #expect(messages == ["Give the key a label.", "Type the Shortcut’s name as it appears in the Shortcuts app."])
+    }
+
+    @Test("Menu paths type with › or >")
+    func menuPathText() {
+        #expect(MenuPathText.parse(" File > Export ›PDF… ") == ["File", "Export", "PDF…"])
+        #expect(MenuPathText.parse(" › ") == [])
+        #expect(MenuPathText.format(["File", "New Tab"]) == "File › New Tab")
+    }
+
     @Test("Chords build in the Mac's modifier order and split back")
     func chords() {
         #expect(ChordParsing.chord(modifiers: ["shift", "cmd"], key: " T ") == ["cmd", "shift", "t"])
