@@ -121,3 +121,20 @@ struct ChordTextTests {
         #expect(ChordText.glyphs(["left"]) == "←")
     }
 }
+
+@Suite("Version line")
+struct VersionLineTests {
+    @Test("Drawn and spoken forms")
+    func forms() {
+        #expect(VersionLine.text(version: "1.1", build: "52") == "PIXEL HAND 1.1 - 52")
+        #expect(VersionLine.spoken(version: "1.1", build: "52") == "Pixel Hand version 1.1, build 52")
+        #expect(VersionLine.text(version: nil, build: nil) == "PIXEL HAND")
+    }
+
+    @Test("Every drawn character is in the dot-matrix font")
+    func drawable() {
+        let line = VersionLine.text(version: "1.2b(3)", build: "52_x")
+        #expect(line.allSatisfy { DotMatrixFont.pattern(for: $0) != nil })
+        #expect(line == "PIXEL HAND 1.2B3 - 52X")
+    }
+}
