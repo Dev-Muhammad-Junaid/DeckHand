@@ -26,6 +26,7 @@ weekly usage limit is close).
 | Mac build loop (owner's Mac) — **archived since 2026-11-18; start a new Mac session** | session_01H5HwATvLJkqCFPruLyBsX8 (archived) | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
 | Lane: UX shell (UX-005 dock + strip, UX-008, Settings; UX-007 if time) | session_01H5HwATr5aqiTiBW55LMwiH | claude/pixelhand-lane-ux-shell | `LANE-ux-shell.md` ends `Lane: READY TO MERGE` |
 | Lane: UX Screen (UX-006, UX-016, UX-009) | session_01H5HwAVpabGAHKrSdsNDi1k | claude/pixelhand-lane-ux-screen | `LANE-ux-screen.md` ends `Lane: READY TO MERGE` |
+| Lane: UX onboarding (UX-010 onboarding + picker, UX-011 paywall) | session_01H5HwASiRB6CXssuGg7CDa1 | claude/pixelhand-lane-ux-onboarding | `LANE-ux-onboarding.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -111,3 +112,4 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   Core 571 tests, type check clean) and queued build 9. Its follow-ups:
   UX Screen should anchor the floating tile clear of the click strip;
   UX shell should move the keyboard button into the app dock.
+  Started UX onboarding (UX-010, UX-011) in the free slot.
