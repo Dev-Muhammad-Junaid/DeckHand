@@ -24,6 +24,9 @@ struct ContextChip: View {
     var chord: String?
     var kind: Kind = .standard
     var delivery: DeliveryState = .idle
+    /// The spoken name when `title` is empty (a glyph-only chip such as a
+    /// media key).
+    var accessibilityTitle: String?
     let action: () -> Void
 
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -46,7 +49,7 @@ struct ContextChip: View {
         }
         .buttonStyle(ChipPressStyle())
         .padding(kind == .defaultAction ? 4 : 0)
-        .accessibilityLabel(title)
+        .accessibilityLabel(accessibilityTitle ?? title)
         .accessibilityHint(chord.map { "Shortcut \($0)" } ?? "")
     }
 
@@ -62,10 +65,12 @@ struct ContextChip: View {
                     PHGlyph(glyph: glyph, pitch: PixelPitch.chip, accent: kind == .defaultAction ? .white : nil)
                         .foregroundStyle(glyphColor)
                 }
-                Text(title)
-                    .font(.phChip)
-                    .foregroundStyle(textColor)
-                    .lineLimit(stacked ? 2 : 1)
+                if !title.isEmpty {
+                    Text(title)
+                        .font(.phChip)
+                        .foregroundStyle(textColor)
+                        .lineLimit(stacked ? 2 : 1)
+                }
             }
             if let chord {
                 Text(chord)

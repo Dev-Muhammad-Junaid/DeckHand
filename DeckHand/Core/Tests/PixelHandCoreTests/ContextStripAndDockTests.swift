@@ -104,3 +104,20 @@ struct ContextStripPlanTests {
         #expect(ContextStripPlan.accessibilityLabel(mode: .idle, appName: nil) == "Actions")
     }
 }
+
+@Suite("Chord text")
+struct ChordTextTests {
+    @Test("Modifiers in the Mac's order, then the key")
+    func order() {
+        #expect(ChordText.glyphs(["cmd", "shift", "z"]) == "⇧⌘Z")
+        #expect(ChordText.glyphs(["shift", "ctrl", "option", "cmd", "p"]) == "⌃⌥⇧⌘P")
+    }
+
+    @Test("Named keys use their symbols")
+    func named() {
+        #expect(ChordText.glyphs(["return"]) == "↩")
+        #expect(ChordText.glyphs(["delete"]) == "⌫")
+        #expect(ChordText.glyphs(["escape"]) == "esc")
+        #expect(ChordText.glyphs(["left"]) == "←")
+    }
+}
