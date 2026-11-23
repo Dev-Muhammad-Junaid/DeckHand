@@ -274,7 +274,7 @@ struct PixelHandShell: View {
                 header(
                     presets: preset,
                     onAsk: { isAskPresented = true },
-                    onShowSidebar: plan.canShowSidebar && !plan.showsSidebar ? { sidebarCollapsed = false } : nil,
+                    onShowSidebar: showSidebarAction(plan),
                     showsMirrorToggle: false,
                     horizontalPadding: 0
                 )
@@ -308,6 +308,13 @@ struct PixelHandShell: View {
         .padding(.leading, plan.showsSidebar ? 0 : CGFloat(metrics.margin))
         .padding(.trailing, CGFloat(metrics.margin))
         .padding(.bottom, PixelHandTheme.Space.sm)
+    }
+
+    /// The header's sidebar button, only while the sidebar could show but
+    /// is collapsed.
+    private func showSidebarAction(_ plan: CanvasPlan) -> (() -> Void)? {
+        guard plan.canShowSidebar, !plan.showsSidebar else { return nil }
+        return { sidebarCollapsed = false }
     }
 
     // MARK: - Presets
