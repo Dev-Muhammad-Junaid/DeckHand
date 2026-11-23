@@ -43,6 +43,7 @@ files=(
   "$app/DeckHandiOS/Network/RemoteHostTester.swift"
   "$app/DeckHandiOS/TrackpadSender.swift"
   "$app/DeckHandiOS/Deck/DeckStore.swift"
+  "$app/DeckHandiOS/Deck/DeckSurfaceModel.swift"
   "$app/DeckHandiOS/ShortcutStore.swift"
   "$app/DeckHandiOS/Clipboard/RemoteClipboard.swift"
   "$app/DeckHandiOS/Mirror/MirrorStreamReceiver.swift"

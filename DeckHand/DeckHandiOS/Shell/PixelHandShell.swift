@@ -708,17 +708,12 @@ struct PixelHandShell: View {
     }
 
     private func deck(sender: TrackpadSender, columns: Int, inset: CGFloat) -> some View {
-        StreamDeckGridView(
-            sender: sender,
-            colorScheme: colorScheme,
-            installedApps: session.installedApps,
-            activeBundleID: session.activeBundleID,
-            runningBundleIDs: session.runningBundleIDs,
-            uiContext: session.uiContext,
-            showsQuickActions: false,
-            columnCount: columns,
-            horizontalInset: inset
-        )
+        // Deck 2 UI (UX-020): DeckSurface sizes its own grid from the space it
+        // gets (DeckGrid.pane), so the arrangement's column hint is advisory;
+        // the inset still applies.
+        _ = columns
+        return DeckSurface(session: session, sender: sender)
+            .padding(.horizontal, inset)
     }
 }
 
