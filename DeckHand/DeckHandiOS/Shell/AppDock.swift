@@ -50,7 +50,7 @@ struct AppDock: View {
                     .padding(.leading, PixelHandTheme.Space.md)
                     .padding(.trailing, PixelHandTheme.Space.xl)
                 }
-                .mask(TrailingFade(width: PixelHandTheme.Space.xl))
+                .mask { TrailingFade(width: PixelHandTheme.Space.xl) }
                 .onChange(of: entries.first(where: \.isFront)?.bundleID) { _, front in
                     guard let front else { return }
                     withAnimation(PixelHandMotion.standard) { reader.scrollTo(front) }

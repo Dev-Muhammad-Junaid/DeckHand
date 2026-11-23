@@ -44,7 +44,7 @@ struct ContextStrip: View {
                         .padding(.trailing, PixelHandTheme.Space.xl)
                         .padding(.vertical, PixelHandTheme.Space.xs)
                 }
-                .mask(TrailingFade(width: PixelHandTheme.Space.xl))
+                .mask { TrailingFade(width: PixelHandTheme.Space.xl) }
             }
         }
         .accessibilityElement(children: .contain)
