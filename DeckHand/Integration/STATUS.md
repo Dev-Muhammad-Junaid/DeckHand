@@ -696,3 +696,31 @@ Mac should check:
    light/dark, AX3), plus build 8's checks if 8 was skipped.
 
 Status: READY FOR MAC BUILD (build 9)
+
+## Build 10 queued (2026-11-23)
+
+If build 9 hasn't been built, build this instead. Build 10 holds build 9
+(the redesigned Pointer surface) plus the **UX Screen lane**
+(`LANE-ux-screen.md`):
+- **UX-006:** the Screen tab is a docked `MirrorPane` above the trackpad,
+  with a glass toolbar, a display picker sheet and a scanline transition.
+- **UX-016:** dot-matrix status strips (`LIVE · D1 · 60`), the cursor badge,
+  desktop dots on navy plates, a stats strip, and pixel chrome on the
+  floating tile.
+
+Protocol is still **12**. Linux: Core **586 tests pass**, the type check is
+clean. The apps were not compiled here.
+
+Known overlap to check: the two lanes finished in parallel. On the
+**Pointer** tab with the mirror on, the floating tile may cover the new
+click strip or caption. A follow-up lane fixes this; note here whether it
+happens.
+
+Mac should check:
+1. Build both apps and fix compile errors with each handoff's "Compile
+   risks" (`LANE-ux-pointer.md`, `LANE-ux-screen.md`). Record any fixes here.
+2. `swift test --package-path DeckHand/Core` (expect 586) and `DeckHandTests`.
+3. The check tables in both handoffs, including the mirror regressions
+   (HEVC, window mirror, audio, display picker, desktop dots).
+
+Status: READY FOR MAC BUILD (build 10)
