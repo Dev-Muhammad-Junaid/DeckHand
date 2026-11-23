@@ -32,15 +32,15 @@ enum ControlSurface: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// What the canvas shows in its centre when the wide layout already
-    /// shows the deck in its own column. The selection itself is kept.
-    func centre(in arrangement: LayoutMetrics.Arrangement) -> ControlSurface {
-        arrangement == .columns && self == .deck ? .pointer : self
+    /// What the canvas shows in its centre when the deck already has its
+    /// own column (iPhone landscape rail, iPad). The selection itself is
+    /// kept, so the Deck tab comes back when the column goes.
+    func centre(hasDeckColumn: Bool) -> ControlSurface {
+        hasDeckColumn && self == .deck ? .pointer : self
     }
 
-    /// The tabs the arrangement offers. On wide layouts the deck has its own
-    /// column, so its tab goes.
-    static func tabs(for arrangement: LayoutMetrics.Arrangement) -> [ControlSurface] {
-        arrangement == .columns ? [.pointer, .screen] : allCases
+    /// The tabs the plan offers: the deck's tab goes when it has a column.
+    static func tabs(includeDeck: Bool) -> [ControlSurface] {
+        includeDeck ? allCases : [.pointer, .screen]
     }
 }
