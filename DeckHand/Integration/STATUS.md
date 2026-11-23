@@ -782,3 +782,48 @@ Mac should check:
    light and dark. After that, the other three handoffs' tables.
 
 Status: READY FOR MAC BUILD (build 12)
+
+## Build 13 queued (2026-11-24)
+
+If build 12 hasn't been built, build this one instead. Build 13 is build 12
+plus three more redesign lanes:
+
+- **UX onboarding** (`LANE-ux-onboarding.md`):
+  - **UX-010:** every onboarding page has a dot-art scene, glyph bullets and
+    a dot-matrix step counter, with two columns in iPad landscape. The Mac
+    picker and the pairing screens are restyled.
+  - **UX-011:** the paywall, Pro lock and Settings subscription row are
+    restyled. StoreKit behaviour and the required disclosures are unchanged.
+- **UX arrangements** (`LANE-ux-arrangements.md`, UX-007):
+  - iPhone landscape has a rail.
+  - iPad shows the screen over the trackpad, a deck column and a Macs
+    sidebar.
+  - Split View and Stage Manager fall back to simpler layouts.
+  - New Split, Screen and Pointer presets.
+- **Deck 2 UI** (`LANE-ux-deck2.md`, UX-020):
+  - The Deck tab has pages and a dot-matrix page counter, and follows the
+    front app with a pin.
+  - Edit mode adds an action library (menu command, Mac shortcut and
+    sequence), a key inspector, an 8 × 8 pixel-glyph editor and undo.
+  - Decks are Pro-gated.
+
+Coordinator merge fix: Deck 2 and arrangements both changed the shell's
+deck slot. It now shows `DeckSurface`, which sizes its own grid, with the
+arrangement's inset applied.
+
+Protocol is still **12**. Linux: Core **661 tests pass**, and the type
+check is clean. The apps were not compiled here.
+
+Mac should check:
+1. Build both apps and fix compile errors from each handoff's "Compile
+   risks" list (seven UX lanes since build 8). Record the fixes here.
+2. `swift test --package-path DeckHand/Core` (expect 661) and `DeckHandTests`.
+3. Work through the check tables in the three new handoffs. Prioritise:
+   - onboarding on iPad landscape;
+   - the iPad layout with the Macs sidebar;
+   - Split View at ½ and ⅓;
+   - Deck: migrated chips show as keys, add a page, edit a key, run a
+     menu-command key and a sequence key;
+   - the free tier lock on Deck.
+
+Status: READY FOR MAC BUILD (build 13)

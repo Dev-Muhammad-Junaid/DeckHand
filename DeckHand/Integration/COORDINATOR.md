@@ -1,6 +1,6 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Mac builds:** build 7 was built on the Mac (2026-11-20, results in `STATUS.md`). Build 12 is queued (build 8 plus UX Pointer, Screen, shell and capture). Mac builds are now run from the primary session or the owner's Mac session.
+> **Mac builds:** build 7 was built on the Mac (2026-11-20, results in `STATUS.md`). Build 13 is queued (build 8 plus seven UX lanes). Mac builds are now run from the primary session or the owner's Mac session.
 
 ## Needs the owner
 
@@ -24,9 +24,6 @@ weekly usage limit is close).
 | --- | --- | --- | --- |
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac) — **archived since 2026-11-18; start a new Mac session** | session_01H5HwATvLJkqCFPruLyBsX8 (archived) | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
-| Lane: UX arrangements (UX-007) | session_01H5HwATPNioSdZ3GkNKUfmk | claude/pixelhand-lane-ux-arrangements | `LANE-ux-arrangements.md` ends `Lane: READY TO MERGE` |
-| Lane: UX Deck 2 UI (UX-020) | session_01H5HwARQmWyZUHse3i6panK | claude/pixelhand-lane-ux-deck2 | `LANE-ux-deck2.md` ends `Lane: READY TO MERGE` |
-| Lane: UX onboarding (UX-010 onboarding + picker, UX-011 paywall) | session_01H5HwASiRB6CXssuGg7CDa1 | claude/pixelhand-lane-ux-onboarding | `LANE-ux-onboarding.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -126,3 +123,11 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   the keyboard button and pad resizes). Core 622 tests; type check clean.
   Queued build 12.
   Started UX Deck 2 UI (UX-020). Running: UX onboarding, UX arrangements, UX Deck 2.
+- 2026-11-24 ~00:00 UTC: the 19:55 tick reached the coordinator only at
+  23:52. All three lanes had finished by about 19:45. Merged UX onboarding,
+  UX arrangements and Deck 2 UI. Fixed the conflict in the shell's deck slot:
+  it now shows DeckSurface with the inset applied. Core 661 tests pass; the
+  type check is clean. Queued build 13. Next: UX-017 transitions with
+  UX-018 loading/empty/focus, UX-012 Mac panel with UX-019 icon/menu-bar
+  hand, UX-021 suggest a deck (on-device AI), then UX-013 a11y, UX-014 copy
+  and shim removal, App Intents/widgets, multi-Mac, sharing, Duo, PiP.
