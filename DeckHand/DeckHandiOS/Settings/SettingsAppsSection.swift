@@ -3,7 +3,6 @@
 //  DeckHandiOS
 //
 //  Settings › Apps: undo hidden apps. Only shows once something is hidden.
-//  Split out of SettingsView.swift (PH-010).
 //
 
 import SwiftUI
@@ -18,18 +17,15 @@ struct SettingsAppsSection: View {
         let hidden = settings.hiddenAppBundleIDs
         if !hidden.isEmpty {
             Section {
-                HStack {
-                    Text("Hidden apps")
-                    Spacer()
-                    Text("\(hidden.count)")
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
+                SettingsRow("Hidden apps", glyph: PixelGlyphs.deck) {
+                    SettingsValueText("\(hidden.count)")
                 }
                 Button("Show hidden apps") {
                     settings.unhideAllApps()
                 }
+                .foregroundStyle(PixelHandTheme.accent)
             } header: {
-                Text("Apps")
+                SettingsSectionHeader("Apps", glyph: PixelGlyphs.deck)
             } footer: {
                 Text("Hidden apps are removed from the Apps grid and its search results. This puts them all back.")
             }

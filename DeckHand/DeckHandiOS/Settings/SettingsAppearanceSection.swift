@@ -3,7 +3,6 @@
 //  DeckHandiOS
 //
 //  Settings › Appearance: theme.
-//  Split out of SettingsView.swift (PH-010).
 //
 
 import SwiftUI
@@ -23,7 +22,7 @@ struct SettingsAppearanceSection: View {
                 .labelsHidden()
             }
         } header: {
-            Text("Appearance")
+            SettingsSectionHeader("Appearance", glyph: PixelGlyphs.screen)
         } footer: {
             Text("Applies to the control screens. The device picker stays dark to match the app icon.")
         }

@@ -34,6 +34,9 @@ struct PointerSurface: View {
     var clipboard: RemoteClipboard?
     /// The canvas margin from `LayoutMetrics`.
     var margin: CGFloat = PixelHandTheme.Space.lg
+    /// The shell's app dock carries the keyboard button (UX-005), so the
+    /// pad hides its own corner button while the dock is shown.
+    var keyboardInDock = false
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -106,7 +109,7 @@ struct PointerSurface: View {
                     ZStack {
                         touchSurface
                         captionLayer
-                        chromeLayer
+                        if !keyboardInDock { chromeLayer }
                         if !coachMarkSeen && height >= 300 {
                             PointerCoachMark { dismissCoachMark() }
                                 .padding(PixelHandTheme.Space.lg)
