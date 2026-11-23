@@ -24,7 +24,8 @@ weekly usage limit is close).
 | --- | --- | --- | --- |
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac) — **archived since 2026-11-18; start a new Mac session** | session_01H5HwATvLJkqCFPruLyBsX8 (archived) | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
-| Lane: UX capture (tile vs Pointer fix, UX-009) | session_01H5HwATPUvvgLzivgTceR8t | claude/pixelhand-lane-ux-capture | `LANE-ux-capture.md` ends `Lane: READY TO MERGE` |
+| Lane: UX capture (UX-009; the tile fix is already merged) | session_01H5HwATPUvvgLzivgTceR8t | claude/pixelhand-lane-ux-capture | `LANE-ux-capture.md` ends `Lane: READY TO MERGE` |
+| Lane: UX arrangements (UX-007) | session_01H5HwATPNioSdZ3GkNKUfmk | claude/pixelhand-lane-ux-arrangements | `LANE-ux-arrangements.md` ends `Lane: READY TO MERGE` |
 | Lane: UX onboarding (UX-010 onboarding + picker, UX-011 paywall) | session_01H5HwASiRB6CXssuGg7CDa1 | claude/pixelhand-lane-ux-onboarding | `LANE-ux-onboarding.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
@@ -119,3 +120,4 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
 - 2026-11-23 ~19:05 UTC: merged the UX Screen tile fix (`23f9cbe`) and UX
   shell (UX-005, UX-008, Settings; Core 603 tests; type check clean; lock
   banner kept). Queued build 11. UX-007 arrangements are next.
+  Started UX arrangements (UX-007). Next in line: UX-020 Deck 2 UI, then UX-012 Mac panel, UX-017/018/019, UX-013, UX-014.
