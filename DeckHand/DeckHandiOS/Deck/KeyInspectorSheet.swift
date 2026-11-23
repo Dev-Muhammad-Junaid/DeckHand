@@ -341,8 +341,18 @@ private struct ChordField: View {
     let onChange: ([String]) -> Void
 
     @State private var text = ""
-    private static let symbols: [(name: String, glyph: String, label: String)] = [
-        ("cmd", "⌘", "Command"), ("shift", "⇧", "Shift"), ("option", "⌥", "Option"), ("ctrl", "⌃", "Control"),
+
+    private struct Modifier: Hashable {
+        let name: String
+        let glyph: String
+        let label: String
+    }
+
+    private static let symbols = [
+        Modifier(name: "cmd", glyph: "⌘", label: "Command"),
+        Modifier(name: "shift", glyph: "⇧", label: "Shift"),
+        Modifier(name: "option", glyph: "⌥", label: "Option"),
+        Modifier(name: "ctrl", glyph: "⌃", label: "Control"),
     ]
 
     var body: some View {

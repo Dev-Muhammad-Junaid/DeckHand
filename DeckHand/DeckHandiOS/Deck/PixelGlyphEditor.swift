@@ -86,6 +86,11 @@ struct PixelGlyphEditor: View {
 
     private var grid: some View {
         let glyph = self.glyph
+        let cell = self.cell
+        let gap = self.gap
+        let accent = PixelHandTheme.accent
+        let glow = PixelHandTheme.Brand.glow
+        let off = PixelHandTheme.fill2
         return Canvas { context, _ in
             for y in 0..<glyph.size {
                 for x in 0..<glyph.size {
@@ -93,11 +98,11 @@ struct PixelGlyphEditor: View {
                     let path = Path(roundedRect: rect, cornerRadius: cell * 0.3)
                     let color: Color
                     if glyph.accent == GlyphDot(x: x, y: y) {
-                        color = PixelHandTheme.Brand.glow
+                        color = glow
                     } else if glyph.isOn(x: x, y: y) {
-                        color = PixelHandTheme.accent
+                        color = accent
                     } else {
-                        color = PixelHandTheme.fill2
+                        color = off
                     }
                     context.fill(path, with: .color(color))
                 }

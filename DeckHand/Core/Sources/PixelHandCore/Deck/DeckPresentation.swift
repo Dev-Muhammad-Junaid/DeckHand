@@ -259,7 +259,13 @@ public struct DeckShownKey: Sendable, Equatable, Identifiable {
         case curated
         /// Shown on the Context page from the front app's page.
         case frontApp
+        /// A button of the dialog open on the Mac (Context page only). Runs
+        /// once; never stored.
+        case dialog
     }
+
+    /// Whether the editor can change this key.
+    public var isEditable: Bool { source == .stored || source == .curated }
 
     public var key: DeckKey
     public var source: Source
@@ -276,6 +282,26 @@ extension DeckDocument {
     /// hasn't hidden, then its stored keys; on the Context page its own
     /// keys, then the front app's. Keys pinned to the first row come first
     /// (in order), whatever their source.
+    public func shownKeys(on page: DeckPage, frontBundleID: String?, dialog: DialogContext?) -> [DeckShownKey] {
+        let keys = shownKeys(on: page, frontBundleID: frontBundleID)
+        guard page.kind == .context, let dialog else { return keys }
+        let buttons = dialog.buttons.prefix(8).map { button in
+            DeckShownKey(
+                key: DeckKey(
+                    id: "dialog.\(dialog.revision).\(button.id)",
+                    appearance: KeyAppearance(
+                        label: String(button.title.prefix(DeckValidation.maxLabelLength)),
+                        glyph: .pixel(id: button.isCancel ? "close" : button.isDefault ? "send" : "click"),
+                        tint: button.isDefault ? "navy" : nil
+                    ),
+                    action: .contextAction(id: button.id)
+                ),
+                source: .dialog
+            )
+        }
+        return buttons + keys
+    }
+
     public func shownKeys(on page: DeckPage, frontBundleID: String?) -> [DeckShownKey] {
         var keys = page.keys.map { DeckShownKey(key: $0, source: .stored) }
         switch page.kind {
@@ -301,6 +327,18 @@ extension DeckDocument {
         }
         let pinned = keys.filter { $0.key.pinnedToFirstRow }
         return pinned + keys.filter { !$0.key.pinnedToFirstRow }
+    }
+
+    /// The deck with a Context page added when it has none (product spec
+    /// §3.3: Home, app pages, Context, Shortcuts). `nil` when nothing
+    /// needs adding.
+    public func addingStandardPages() -> DeckDocument? {
+        guard !pages.contains(where: { $0.kind == .context }), pages.count < DeckValidation.maxPages else { return nil }
+        var copy = self
+        let index = copy.pages.firstIndex { $0.kind == .home }.map { $0 + 1 } ?? 0
+        let id = copy.page(id: "context") == nil ? "context" : DeckIDs.newPageID()
+        copy.pages.insert(DeckPage(id: id, title: "Context", kind: .context, keys: []), at: index)
+        return copy
     }
 
     /// The pages in the order the deck pages through them: Home first,

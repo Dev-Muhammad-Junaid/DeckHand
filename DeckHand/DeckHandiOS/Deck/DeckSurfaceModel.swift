@@ -42,6 +42,13 @@ final class DeckSurfaceModel: ObservableObject {
         return follower.followedBundleID
     }
 
+    /// Adds the standard pages a deck is missing (a Context page), once,
+    /// outside Undo.
+    func ensureStandardPages() {
+        guard let fixed = store.document.addingStandardPages() else { return }
+        store.replace(with: fixed)
+    }
+
     // MARK: Paging and following
 
     /// The user paged (swipe, dots, a new page).

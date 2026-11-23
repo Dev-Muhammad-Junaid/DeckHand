@@ -65,6 +65,34 @@ struct DeckShownKeysTests {
         #expect(finder.count == CuratedShortcuts.bindings(for: "com.apple.finder").count)
     }
 
+    @Test("The Context page leads with the open dialog's buttons")
+    func dialogButtons() throws {
+        let doc = deck()
+        let ctx = try #require(doc.page(id: "ctx"))
+        let dialog = DialogContext(revision: "r1", title: "Save?", message: nil, buttons: [
+            DialogButton(id: "b1", title: "Don’t Save", isDefault: false, isCancel: false),
+            DialogButton(id: "b2", title: "Cancel", isDefault: false, isCancel: true),
+            DialogButton(id: "b3", title: "Save", isDefault: true, isCancel: false),
+        ])
+        let shown = doc.shownKeys(on: ctx, frontBundleID: safari, dialog: dialog)
+        #expect(shown.prefix(3).map(\.key.label) == ["Don’t Save", "Cancel", "Save"])
+        #expect(shown.prefix(3).allSatisfy { $0.source == .dialog && !$0.isEditable })
+        #expect(shown[2].key.action == .contextAction(id: "b3"))
+        #expect(shown[2].key.appearance.tint == "navy")
+        let home = try #require(doc.page(id: "home"))
+        #expect(doc.shownKeys(on: home, frontBundleID: nil, dialog: dialog).count == 1)
+    }
+
+    @Test("A deck without a Context page gets one after Home")
+    func standardPages() throws {
+        var doc = deck()
+        #expect(doc.addingStandardPages() == nil)
+        doc.pages.removeAll { $0.kind == .context }
+        let fixed = try #require(doc.addingStandardPages())
+        #expect(fixed.pages.map(\.kind) == [.home, .context, .app(bundleID: safari)])
+        #expect(DeckValidation.isValid(fixed))
+    }
+
     @Test("Keys pinned to the first row come first")
     func pinnedFirst() throws {
         var doc = deck()

@@ -72,6 +72,7 @@ struct DeckSurface: View {
         .onChange(of: session.activeBundleID, initial: true) { _, bundleID in
             model.frontAppChanged(to: bundleID)
         }
+        .onAppear { if isUnlocked { model.ensureStandardPages() } }
         .onChange(of: isUnlocked) { _, unlocked in
             if !unlocked { model.isEditing = false }
         }
@@ -124,6 +125,12 @@ struct DeckSurface: View {
         }
     }
 
+    /// The dialog open on the Mac, for the Context page's keys.
+    private var dialog: DialogContext? {
+        if case let .dialog(dialog) = session.uiContext { return dialog }
+        return nil
+    }
+
     private var isMacLocked: Bool {
         session.macLockState.bannerText(macName: "") != nil
     }
@@ -157,7 +164,9 @@ struct DeckSurface: View {
             if pages.count > 1 {
                 PageCounter(current: shownIndex + 1, total: pages.count)
             }
-            Button(action: model.togglePin) {
+            Button {
+                model.togglePin()
+            } label: {
                 PHGlyph(glyph: PixelGlyphs.pin, pitch: PixelPitch.chip)
                     .foregroundStyle(isPinned ? PixelHandTheme.accent : PixelHandTheme.ink2)
                     .frame(width: 36, height: 36)
@@ -326,7 +335,7 @@ struct DeckSurface: View {
 
     @ViewBuilder
     private func pageContent(_ page: DeckPage, grid: DeckGrid, asRows: Bool) -> some View {
-        let keys = store.document.shownKeys(on: page, frontBundleID: session.activeBundleID)
+        let keys = store.document.shownKeys(on: page, frontBundleID: session.activeBundleID, dialog: dialog)
         let editing = model.isEditing && isUnlocked
         if keys.isEmpty && !editing {
             emptyPage(page)
@@ -362,8 +371,9 @@ struct DeckSurface: View {
 
     private func keyView(_ shown: DeckShownKey, page: DeckPage, grid: DeckGrid, asRow: Bool) -> some View {
         let editing = model.isEditing && isUnlocked
-        // On the Context page the front app's keys belong to that app's page.
-        let canEdit = shown.source != .frontApp
+        // The front app's keys belong to that app's page; dialog buttons
+        // only exist while the dialog is open.
+        let canEdit = shown.isEditable
         return DeckKeyButton(
             key: shown.key,
             sender: sender,
