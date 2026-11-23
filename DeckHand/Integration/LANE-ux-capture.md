@@ -103,7 +103,8 @@ Unavailable" and the Mac's message. The refusal itself is unchanged
 (Mac-side `LockGate`).
 
 **`CaptureCapsule`** (classic toolbar): pixel capture glyph, dot wave while
-busy. `SettingsCaptureSection` unchanged (the shell lane restyled Settings).
+busy. `SettingsCaptureSection` is unchanged: its rows already use the shared
+Settings components, and no capture setting changed.
 
 ## Checks on the Mac build
 
