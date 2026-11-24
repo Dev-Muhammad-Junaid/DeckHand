@@ -13,6 +13,10 @@
 //  drag to reorder, the ghost "Add key" opens the action library, Undo /
 //  Redo and the page menu in the header. Decks are Pro: in the free plan
 //  the surface is a dimmed preview with an inline card.
+//
+//  Suggestions (UX-021, D7): under an app page's grid (and the Context
+//  page's, for the front app), `DeckSuggestionsPanel` offers ghost keys
+//  from the app's real menus, ranked on the device.
 //  Spec: `04-Interaction-Model.md` §2 Deck, §6; board "Deck", "Deck editor
 //  (1.2)", "Deck at AX3", "Free tier".
 //
@@ -72,7 +76,10 @@ struct DeckSurface: View {
         .onChange(of: session.activeBundleID, initial: true) { _, bundleID in
             model.frontAppChanged(to: bundleID)
         }
-        .onAppear { if isUnlocked { model.ensureStandardPages() } }
+        .onAppear {
+            if isUnlocked { model.ensureStandardPages() }
+            DeckSuggestionsModel.shared.reorderer = isUnlocked ? OnDeviceDeckRanker.makeIfAvailable() : nil
+        }
         .onChange(of: isUnlocked) { _, unlocked in
             if !unlocked { model.isEditing = false }
         }
@@ -337,15 +344,18 @@ struct DeckSurface: View {
     private func pageContent(_ page: DeckPage, grid: DeckGrid, asRows: Bool) -> some View {
         let keys = store.document.shownKeys(on: page, frontBundleID: session.activeBundleID, dialog: dialog)
         let editing = model.isEditing && isUnlocked
-        if keys.isEmpty && !editing {
+        let target = suggestionTarget(page)
+        if keys.isEmpty && !editing && target == nil {
             emptyPage(page)
                 .padding(.leading, grid.leadingMargin)
                 .padding(.trailing, grid.trailingMargin)
                 .padding(.bottom, PixelHandTheme.Space.sm)
         } else {
             ScrollView(showsIndicators: false) {
-                Group {
-                    if asRows {
+                VStack(alignment: .leading, spacing: PixelHandTheme.Space.md) {
+                    if keys.isEmpty && !editing {
+                        emptyPage(page)
+                    } else if asRows {
                         LazyVStack(spacing: PixelHandTheme.Space.sm) {
                             ForEach(keys) { shown in keyView(shown, page: page, grid: grid, asRow: true) }
                             if editing { addRow }
@@ -360,12 +370,34 @@ struct DeckSurface: View {
                             if editing { addKey(size: grid.keySize) }
                         }
                     }
+                    if let target {
+                        DeckSuggestionsPanel(
+                            bundleID: target,
+                            appName: apps[target]?.displayName ?? page.displayTitle { apps[$0]?.displayName },
+                            isFrontApp: target == session.activeBundleID,
+                            sender: sender,
+                            apps: apps,
+                            grid: grid,
+                            asRows: asRows
+                        )
+                    }
                 }
                 .padding(.leading, grid.leadingMargin)
                 .padding(.trailing, grid.trailingMargin)
                 .padding(.top, editing ? 14 : 2)
                 .padding(.bottom, PixelHandTheme.Space.lg)
             }
+        }
+    }
+
+    /// The app a page suggests keys for (UX-021): an app page's own app,
+    /// or the front app on the Context page. `nil` in the free plan.
+    private func suggestionTarget(_ page: DeckPage) -> String? {
+        guard isUnlocked else { return nil }
+        switch page.kind {
+        case let .app(bundleID): return bundleID
+        case .context: return session.activeBundleID
+        case .home, .shortcuts, .custom: return nil
         }
     }
 

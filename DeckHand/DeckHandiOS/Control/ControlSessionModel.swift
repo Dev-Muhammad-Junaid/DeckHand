@@ -374,6 +374,8 @@ final class ControlSessionModel {
             handleSharingMessage(m)
 
         case let .deck(.appMenuShortcutsResponse(bundleID, shortcuts)):
+            // A reply the deck's suggestions asked for isn't imported (UX-021).
+            if DeckSuggestionsModel.shared.claim(bundleID: bundleID, shortcuts: shortcuts) { break }
             let added = ShortcutStore.shared.importBindings(shortcuts, for: bundleID)
             NotificationCenter.default.post(
                 name: .appMenuShortcutsImported,
