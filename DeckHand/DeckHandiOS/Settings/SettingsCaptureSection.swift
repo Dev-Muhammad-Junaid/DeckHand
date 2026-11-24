@@ -29,11 +29,16 @@ struct SettingsCaptureSection: View {
                 .labelsHidden()
             }
 
-            Toggle("Save to Photos automatically", isOn: $settings.autoSaveToPhotos)
+            SettingsToggle(
+                "Save to Photos automatically",
+                glyph: PixelGlyphs.share,
+                subtitle: "Asks for Photos access the first time.",
+                isOn: $settings.autoSaveToPhotos
+            )
         } header: {
-            Text("Screenshots")
+            SettingsSectionHeader("Screenshots", glyph: PixelGlyphs.capture)
         } footer: {
-            Text("Quality applies to full-screen captures. Region and window captures already ship at close to native resolution. Saving automatically asks for Photos access the first time a capture lands.")
+            Text("Quality applies to full-screen captures; region and window captures are always close to full resolution.")
         }
     }
 }

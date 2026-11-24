@@ -23,8 +23,6 @@ struct SettingsAboutSection: View {
             .buttonStyle(.plain)
         } header: {
             SettingsSectionHeader("About", glyph: PixelGlyphs.ask)
-        } footer: {
-            Text("Rows marked \(Text("Not available").italic()) are visible so you know they’re planned, but they do nothing yet.")
         }
     }
 }

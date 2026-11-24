@@ -114,12 +114,12 @@ struct StoreCopyTests {
         }
         #expect(row(.notSubscribed).title == "Free plan")
         #expect(row(.trial(plan: .monthly, endsOn: end, willRenew: true)).detail == "Free until 2027-01-29, then $2.99/month.")
-        #expect(row(.trial(plan: .monthly, endsOn: end, willRenew: false)).detail == "Trial ends 2027-01-29. It won't renew.")
+        #expect(row(.trial(plan: .monthly, endsOn: end, willRenew: false)).detail == "Trial ends 2027-01-29. It won’t renew.")
         #expect(row(.active(plan: .yearly, periodEnds: end, willRenew: true, renewsTo: nil, familyShared: false)) == .init(title: "Pixel Hand Pro, yearly", detail: "Renews 2027-01-29 at $19.99/year."))
         #expect(row(.active(plan: .monthly, periodEnds: end, willRenew: true, renewsTo: .yearly, familyShared: true)).detail == "Shared by your family. Switches to yearly on 2027-01-29.")
         #expect(row(.gracePeriod(plan: .monthly, until: end)).needsPaymentAttention)
         #expect(row(.billingRetry(plan: .monthly)).needsPaymentAttention)
-        #expect(row(.expired(on: now)).detail == "Pro ended 2027-01-15. You're on the free plan.")
+        #expect(row(.expired(on: now)).detail == "Pro ended 2027-01-15. You’re on the free plan.")
         #expect(row(.revoked).title == "Free plan")
     }
 

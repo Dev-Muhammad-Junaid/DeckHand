@@ -3,7 +3,7 @@
 //  DeckHandiOS
 //
 //  Settings › Subscription (Store lane): the plan this device is on, a way
-//  to buy, manage or fix it, Restore Purchases, and which Mac the free plan
+//  to buy, manage or fix it, Restore purchases, and which Mac the free plan
 //  covers.
 //
 
@@ -29,27 +29,24 @@ struct SettingsSubscriptionSection: View {
 
     var body: some View {
         Section {
-            HStack(spacing: 12) {
-                if entitlements.isPro {
-                    ProBadge()
-                } else {
-                    PHGlyph(glyph: PixelGlyphs.lock, pitch: 2, stepsWithType: true)
-                        .foregroundStyle(.secondary)
-                        .frame(minWidth: 28)
-                }
+            HStack(spacing: PixelHandTheme.Space.md) {
+                // One PRO mark per row (VQ-014): the dot-matrix one on the
+                // trailing edge. The leading tile is the same glyph tile as
+                // every other row, lit while Pro is on.
+                SettingsRowIcon(glyph: PixelGlyphs.lock, isLit: entitlements.isPro)
                 VStack(alignment: .leading, spacing: 3) {
                     if store.isDeveloperUnlockActive {
                         Text("Pro unlocked for testing")
                             .font(.headline)
                         Text("Every Pro feature is on without a subscription. Turn this off below to see the free plan.")
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(PixelHandTheme.ink2)
                     } else {
                         Text(row.title)
                             .font(.headline)
                         Text(row.detail)
                             .font(.footnote)
-                            .foregroundStyle(row.needsPaymentAttention ? PixelHandTheme.warning : .secondary)
+                            .foregroundStyle(row.needsPaymentAttention ? PixelHandTheme.warning : PixelHandTheme.ink2)
                     }
                 }
                 Spacer(minLength: 8)
@@ -79,7 +76,7 @@ struct SettingsSubscriptionSection: View {
                 .accessibilityIdentifier("ph.settings.subscribe")
             }
 
-            Button("Restore Purchases") {
+            Button("Restore purchases") {
                 Task { await store.restore() }
             }
             .disabled(store.isWorking)
@@ -92,7 +89,7 @@ struct SettingsSubscriptionSection: View {
             }
 
             if !entitlements.isPro, let freeMac = store.freeMac {
-                LabeledContent("Free plan's Mac", value: freeMac.name)
+                LabeledContent("Free plan’s Mac", value: freeMac.name)
             }
 
             if store.isDeveloperUnlockAvailable {
@@ -110,7 +107,7 @@ struct SettingsSubscriptionSection: View {
                 .accessibilityIdentifier("ph.settings.developerUnlock")
             }
         } header: {
-            Text("Subscription")
+            SettingsSectionHeader("Subscription", glyph: PixelGlyphs.add)
         } footer: {
             Text("The free plan includes the trackpad, keyboard and media keys with one Mac. Pro adds chips and decks, the live mirror, capture and text recognition, clipboard sharing and all your Macs. Family Sharing is supported.")
         }

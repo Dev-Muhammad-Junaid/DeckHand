@@ -58,14 +58,12 @@ struct SettingsView: View {
                         .foregroundStyle(PixelHandTheme.ink)
                         .accessibilityAddTraits(.isHeader)
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                        .fontWeight(.semibold)
-                        .tint(PixelHandTheme.accent)
-                        .accessibilityIdentifier("ph.settings.done")
+                ToolbarItem(placement: .topBarTrailing) {
+                    SettingsDoneButton { dismiss() }
                 }
             }
         }
+        .modifier(SettingsSheetSizing())
         // Applied here as well as at the app root: a sheet gets its own
         // presentation host, so without this the appearance change wouldn't
         // reach the very screen you changed it on until it was reopened.

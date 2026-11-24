@@ -4,7 +4,8 @@
 //
 //  Settings › Connection: the live session's link (S13) and same-iCloud
 //  recognition; Settings › Remote Access (S15): the addresses used to reach
-//  each paired Mac over a VPN, with a test button. Split out of
+//  each paired Mac over a VPN, with a test button; shown once a Mac is
+//  paired (VQ-012). Split out of
 //  SettingsView.swift (PH-010). Network lane.
 //
 
@@ -29,20 +30,15 @@ struct SettingsConnectionSection: View {
             }
             CloudRecognitionRow()
         } header: {
-            Text("Connection")
+            SettingsSectionHeader("Connection", glyph: PixelGlyphs.wifi)
         } footer: {
             Text(Self.footer(link: linkStatus.current, isAway: linkStatus.isAway))
         }
 
-        Section {
-            if pairing.macs.isEmpty {
-                // UX-018: the glyph empty state on navy.
-                PixelSurface(cornerRadius: PixelHandTheme.Radius.card) {
-                    PHEmptyState(glyph: PixelGlyphs.mac, title: "No paired Macs", message: "Pair with a Mac first, then set up its addresses here.")
-                }
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
-            } else {
+        // Only paired Macs can be reached remotely, so the section waits
+        // for one; Paired Macs below shows the one empty state (VQ-012).
+        if !pairing.macs.isEmpty {
+            Section {
                 ForEach(pairing.macs) { mac in
                     NavigationLink {
                         RemoteAccessMacView(mac: mac)
@@ -50,11 +46,11 @@ struct SettingsConnectionSection: View {
                         RemoteAccessMacRow(mac: mac)
                     }
                 }
+            } header: {
+                SettingsSectionHeader("Remote access", glyph: PixelGlyphs.vpn)
+            } footer: {
+                Text("Reach a paired Mac over Tailscale or another VPN when it isn’t on the same Wi-Fi.")
             }
-        } header: {
-            Text("Remote access")
-        } footer: {
-            Text("Reach a paired Mac over Tailscale or another VPN when it isn’t on the same Wi-Fi. A Mac on the VPN tells this device its address while you’re connected at home; you can also add a host name or IP address yourself. Only paired Macs can be reached this way.")
         }
     }
 
@@ -80,19 +76,11 @@ private struct RemoteAccessMacRow: View {
 
     var body: some View {
         let count = hostsStore.hosts(for: mac.ref).count
-        HStack(spacing: 12) {
-            Image(systemName: mac.kind.systemImage)
-                .foregroundStyle(PixelHandTheme.accent)
-                .frame(width: 24)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(mac.name)
-                Text(count == 0 ? "No saved addresses" : count == 1 ? "1 address" : "\(count) addresses")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .accessibilityElement(children: .combine)
+        SettingsRow(
+            mac.name,
+            glyph: PixelGlyphs.mac,
+            subtitle: count == 0 ? "No saved addresses" : count == 1 ? "1 address" : "\(count) addresses"
+        )
     }
 }
 
@@ -123,7 +111,7 @@ struct RemoteAccessMacView: View {
                     }
                 }
             } header: {
-                Text("Addresses")
+                SettingsSectionHeader("Addresses", glyph: PixelGlyphs.vpn)
             } footer: {
                 Text("Addresses marked “From the Mac” are updated each time you connect at home.")
             }
@@ -141,10 +129,10 @@ struct RemoteAccessMacView: View {
                     .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty)
                     .accessibilityIdentifier("ph.settings.addAddress")
             } header: {
-                Text("Add an address")
+                SettingsSectionHeader("Add an address", glyph: PixelGlyphs.add)
             } footer: {
                 Text(draftError ?? "A Tailscale IP or MagicDNS name, or the Mac’s address on another VPN. Host only: no http://, port or path.")
-                    .foregroundStyle(draftError == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
+                    .foregroundStyle(draftError == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(PixelHandTheme.danger))
             }
 
             Section {
@@ -178,7 +166,7 @@ struct RemoteAccessMacView: View {
                     Text("·")
                     Label(label(for: verdict), systemImage: icon(for: verdict))
                         .labelStyle(.titleAndIcon)
-                        .foregroundStyle(verdict == .reachable ? AnyShapeStyle(PixelHandTheme.accent) : AnyShapeStyle(.orange))
+                        .foregroundStyle(verdict == .reachable ? AnyShapeStyle(PixelHandTheme.accent) : AnyShapeStyle(PixelHandTheme.warning))
                 }
             }
             .font(.footnote)

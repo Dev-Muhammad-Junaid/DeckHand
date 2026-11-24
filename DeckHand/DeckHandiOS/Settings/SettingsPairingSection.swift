@@ -29,7 +29,7 @@ struct SettingsPairingSection: View {
                 }
             }
         } header: {
-            Text("Paired Macs")
+            SettingsSectionHeader("Paired Macs", glyph: PixelGlyphs.mac)
         } footer: {
             Text(footer)
         }
@@ -51,22 +51,15 @@ struct SettingsPairingSection: View {
 
     private func row(_ mac: PairedDevice) -> some View {
         let isLive = store.liveMac?.ref == mac.ref
-        return HStack(spacing: 12) {
-            Image(systemName: mac.kind.systemImage)
-                .foregroundStyle(PixelHandTheme.accent)
-                .frame(width: 24)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(mac.name)
-                Text(isLive ? "Connected" : "Paired \(mac.pairedAt.formatted(date: .abbreviated, time: .omitted))")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 8)
+        return SettingsRow(
+            mac.name,
+            glyph: PixelGlyphs.mac,
+            subtitle: isLive ? "Connected" : "Paired \(mac.pairedAt.formatted(date: .abbreviated, time: .omitted))",
+            isLit: isLive
+        ) {
             Button("Forget", role: .destructive) { confirming = mac }
                 .buttonStyle(.borderless)
         }
-        .accessibilityElement(children: .combine)
         .accessibilityAction(named: "Forget") { confirming = mac }
         .accessibilityIdentifier("ph.settings.pairedMac")
     }
