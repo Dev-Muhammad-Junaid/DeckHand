@@ -39,8 +39,8 @@ import Testing
     @Test("Names become dot-matrix safe: uppercased, unknown characters dropped, cut at 12")
     func dotMatrixSafeNames() {
         #expect(MirrorPaneChrome.dotMatrixSafe("Studio") == "STUDIO")
-        #expect(MirrorPaneChrome.dotMatrixSafe("Junaid’s  MacBook Pro") == "JUNAIDS MACB")
-        #expect(MirrorPaneChrome.dotMatrixSafe("Mac  mini (2)") == "MAC MINI 2")
+        #expect(MirrorPaneChrome.dotMatrixSafe("Junaid’s  MacBook Pro") == "JUNAID’S MAC")
+        #expect(MirrorPaneChrome.dotMatrixSafe("Mac  mini (2)") == "MAC MINI (2)")
         #expect(MirrorPaneChrome.dotMatrixSafe("ab cdefghijk lmn") == "AB CDEFGHIJK")
         let safe = MirrorPaneChrome.dotMatrixSafe("Ünïcode Mac é")
         #expect(safe.allSatisfy { DotMatrixFont.characters.contains($0) })

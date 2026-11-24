@@ -252,11 +252,56 @@ public struct RecentMac: Codable, Sendable, Equatable, Identifiable, Hashable {
     public var id: String
     public var name: String
     public var lastConnected: Date
+    /// The app in front on the Mac when the snapshot was written (the
+    /// widget strip's `STUDIO · XCODE`). Nil when unknown; older snapshots
+    /// don't have it.
+    public var frontApp: String?
+    /// Whether the remote was connected to this Mac, and whether the Mac
+    /// was locked, when the snapshot was written. Nil in older snapshots.
+    public var glance: Glance?
 
-    public init(id: String, name: String, lastConnected: Date) {
+    /// What the widget strip can say about the Mac besides its name.
+    public enum Glance: String, Codable, Sendable, Hashable {
+        /// Connected and unlocked: the strip names the front app.
+        case live
+        /// Connected, with the Mac's lock screen up (or nobody logged in).
+        case locked
+        /// The remote isn't connected to it.
+        case offline
+    }
+
+    public init(id: String, name: String, lastConnected: Date, frontApp: String? = nil, glance: Glance? = nil) {
         self.id = id
         self.name = name
         self.lastConnected = lastConnected
+        self.frontApp = frontApp
+        self.glance = glance
+    }
+
+    /// The strip items after the name (`06-Pixel-Identity.md` §3, widgets
+    /// `STUDIO · XCODE`): the front app while live, `LOCKED` or `OFFLINE`.
+    /// Empty when nothing is known, so the strip shows the name alone
+    /// rather than a word that says nothing.
+    public var stripDetails: [String] {
+        switch glance {
+        case .locked: return ["LOCKED"]
+        case .offline: return ["OFFLINE"]
+        case .live, nil:
+            let app = frontApp?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return app.isEmpty ? [] : [app]
+        }
+    }
+
+    /// Whether the strip's pixel is lit: only while connected and
+    /// unlocked (a disconnected state never shows mint).
+    public var isLive: Bool { glance == .live }
+
+    /// The Mac with what's on its screen now. Nothing else changes.
+    public func with(frontApp: String?, glance: Glance) -> RecentMac {
+        var copy = self
+        copy.frontApp = glance == .live ? frontApp.map { String($0.prefix(64)) } : nil
+        copy.glance = glance
+        return copy
     }
 
     /// `macs` with `mac` moved to the front (replacing an older record of

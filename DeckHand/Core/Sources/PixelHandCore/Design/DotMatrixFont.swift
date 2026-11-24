@@ -8,9 +8,13 @@
 //  it also gets a plain-language accessibility label in the app.
 //
 
+import Foundation
+
 /// A 5 × 7 cell font with one cell of tracking (a 6-cell advance).
-/// Uppercase A–Z, 0–9 and `space · : / % - . + < >`. Lowercase is
-/// uppercased; anything else draws as a space.
+/// Uppercase A–Z, 0–9 and `space · : / % - . + < > ' ’ , & ( ) ? !`.
+/// Lowercase is uppercased, accented letters lose their accents ("É" draws
+/// as "E"), typographic dashes and quotes draw as their plain forms, and
+/// anything else draws as a space.
 public enum DotMatrixFont {
     /// Cells across one character.
     public static let columns = 5
@@ -26,8 +30,7 @@ public enum DotMatrixFont {
     /// bit `row * 5 + column` is a lit dot. Lowercase letters map to
     /// uppercase. Returns nil for characters the font doesn't have.
     public static func pattern(for character: Character) -> UInt64? {
-        let upper = Character(String(character).uppercased())
-        guard let string = table[upper] ?? table[character] else { return nil }
+        guard let resolved = resolve(character), let string = table[resolved] else { return nil }
         var bits: UInt64 = 0
         for (index, cell) in string.enumerated() where cell == "1" {
             bits |= 1 << UInt64(index)
@@ -45,7 +48,31 @@ public enum DotMatrixFont {
     /// The text as the font draws it: uppercased, unknown characters as
     /// spaces (the board does the same).
     public static func normalized(_ text: String) -> [Character] {
-        text.uppercased().map { table[$0] == nil ? " " : $0 }
+        text.uppercased().map { resolve($0) ?? " " }
+    }
+
+    /// Typographic characters that draw as a character the font has.
+    static let aliases: [Character: Character] = [
+        "‘": "’", "ʼ": "’", "`": "'", "´": "'",
+        "–": "-", "—": "-", "‐": "-", "‑": "-", "−": "-",
+        "•": "·", "∙": "·",
+    ]
+
+    /// The table character that draws `character`: itself, its uppercase
+    /// form, an alias, or the letter without its accent. Nil when the font
+    /// has nothing for it.
+    static func resolve(_ character: Character) -> Character? {
+        if table[character] != nil { return character }
+        let upperString = String(character).uppercased()
+        if upperString.count == 1, let upper = upperString.first {
+            if table[upper] != nil { return upper }
+            if let alias = aliases[upper] { return alias }
+        }
+        let folded = upperString
+            .folding(options: [.diacriticInsensitive, .widthInsensitive], locale: nil)
+            .uppercased()
+        if folded.count == 1, let plain = folded.first, table[plain] != nil { return plain }
+        return nil
     }
 
     /// Width of `text` in cells: 6 per character less the trailing

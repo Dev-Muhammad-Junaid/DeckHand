@@ -135,6 +135,6 @@ struct VersionLineTests {
     func drawable() {
         let line = VersionLine.text(version: "1.2b(3)", build: "52_x")
         #expect(line.allSatisfy { DotMatrixFont.pattern(for: $0) != nil })
-        #expect(line == "PIXEL HAND 1.2B3 - 52X")
+        #expect(line == "PIXEL HAND 1.2B(3) - 52X")
     }
 }
