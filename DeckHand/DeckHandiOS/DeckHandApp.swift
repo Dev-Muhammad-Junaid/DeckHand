@@ -51,6 +51,7 @@ struct DeckHandApp: App {
             loomContainer = nil
             startupError = error.localizedDescription
         }
+        IntentBridge.shared.start() // Intents lane: App Intents, widgets, controls
     }
 
     /// The name Macs see in their approval prompt. Loom rejects an empty

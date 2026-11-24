@@ -99,6 +99,7 @@ struct PixelHandShell: View {
             .animation(PixelHandMotion.reduced(PixelHandMotion.spring, reduceMotion: reduceMotion), value: plan.form)
             .animation(PixelHandMotion.reduced(PixelHandMotion.spring, reduceMotion: reduceMotion), value: plan.showsSidebar)
         }
+        .intentSurfaceRequests(selection: selection) // Intents lane: "Open Trackpad", "Start Mirror"
         .sheet(isPresented: $isAskPresented) {
             AskSheet(session: session, macName: peerName)
         }

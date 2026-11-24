@@ -96,6 +96,7 @@ struct ControlView: View {
         .task {
             await session.run(settings: settings)
         }
+        .intentBridge(session: session, settings: settings, macID: connection.peer.deviceID, macName: peerName) // Intents lane
     }
 
     // MARK: - Classic layout
