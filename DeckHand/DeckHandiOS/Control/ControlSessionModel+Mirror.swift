@@ -20,7 +20,10 @@
 //    until a display is picked or the Mac falls back (`mirror.error` with
 //    a `fallbackDisplayID`, shown as a passing notice);
 //  - the Mac's sound (S17) starts and stops with the mirror
-//    (ControlSessionModel+Audio.swift).
+//    (ControlSessionModel+Audio.swift);
+//  - Picture in Picture (UX-041) gets every frame and pointer update too,
+//    and its pause lowers the frame rate asked for
+//    (Mirror/ControlSessionModel+PiP.swift).
 //
 
 import LoomKit
@@ -50,14 +53,20 @@ extension ControlSessionModel: MirrorStreamSink {
     func runMirrorStatsLoop() async {
         mirrorVideoRenderer.onDecodeFailure = { [weak self] in
             guard let self, self.mirrorShowsVideo || self.isMirrorActive else { return }
+            // In the background the inline layer isn't fed (UX-041).
+            guard !self.mirrorAppInBackground else { return }
             self.handleWatchdog(self.mirrorWatchdog.decodeFailed(now: CACurrentMediaTime()))
         }
+        // UX-041: PiP lives as long as the session.
+        let pipObservers = startMirrorPiP()
+        defer { stopMirrorPiP(observers: pipObservers) }
         var windowStart = ContinuousClock.now
         while !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(250))
-            if isMirrorActive {
+            if isMirrorActive, !mirrorAppInBackground {
                 handleWatchdog(mirrorWatchdog.tick(now: CACurrentMediaTime()))
             }
+            tickMirrorPiP()
             let elapsed = ContinuousClock.now - windowStart
             guard elapsed >= .seconds(MirrorStatsPolicy.reportInterval) else { continue }
             windowStart = .now
@@ -78,8 +87,10 @@ extension ControlSessionModel: MirrorStreamSink {
             // The Mac switched this remote to JPEG (fallback, or no encoder).
             mirrorShowsVideo = false
             mirrorVideoRenderer.flush()
+            resetMirrorPiPStream()
         }
         mirrorImage = image
+        feedMirrorPiP(image: image)
     }
 
     func mirrorDidReceiveVideo(_ event: MirrorVideoEvent) {
@@ -97,12 +108,19 @@ extension ControlSessionModel: MirrorStreamSink {
             }
 
         case let .frame(kind, afterDrop, sample):
+            if mirrorAppInBackground {
+                // UX-041: the inline layer can't decode in the background;
+                // only PiP gets the stream (and keeps its own recovery).
+                if let sample { feedMirrorPiP(sample: sample, isKeyFrame: kind == .keyFrame) }
+                return
+            }
             let verdict = mirrorWatchdog.frameArrived(kind, afterDrop: afterDrop, now: now)
             handleWatchdog(verdict.action)
             guard verdict.decode else {
                 mirrorStatsBox.update { $0.noteDropped() }
                 return
             }
+            if let sample { feedMirrorPiP(sample: sample, isKeyFrame: kind == .keyFrame) }
             guard let sample, mirrorVideoRenderer.enqueue(sample) else {
                 handleWatchdog(mirrorWatchdog.decodeFailed(now: now))
                 return
@@ -133,12 +151,14 @@ extension ControlSessionModel: MirrorStreamSink {
             mirrorCursorDisplayID = cursorDisplayID
         }
         followCursorIfNeeded(state)
+        feedMirrorPiPPointer()
     }
 
     func mirrorDidReceiveCursorShape(_ shape: MirrorCursorShape, image: UIImage) {
         mirrorCursorShapes.insert(shape, image: image)
         if mirrorCursor?.shapeID == shape.id {
             mirrorCursorSprite = MirrorCursorSprite(shape: shape, image: image)
+            feedMirrorPiPPointer()
         }
     }
 
@@ -171,6 +191,7 @@ extension ControlSessionModel: MirrorStreamSink {
         isMirrorActive = false
         clearMirrorState()
         syncMirrorAudio()
+        mirrorPiPMirrorActiveChanged()
         capture.showMirrorError(message)
     }
 
@@ -192,7 +213,7 @@ extension ControlSessionModel: MirrorStreamSink {
             if settings.rememberMirrorLayout, let saved = settings.mirrorLayout {
                 mirrorNaturalWidth = MirrorThumbnailView.streamWidth(for: CGFloat(saved.width))
             }
-            let fps = settings.mirrorFrameRate.rawValue
+            let fps = mirrorPiPState.requestedFPS(settingsFPS: settings.mirrorFrameRate.rawValue)
             let width = settings.mirrorStreamWidth(naturalWidth: mirrorNaturalWidth)
             let displayID = selectedMirrorDisplayID
             let codec = mirrorRequestedCodec(settings)
@@ -205,6 +226,8 @@ extension ControlSessionModel: MirrorStreamSink {
         }
         // S17: the Mac's sound comes and goes with the mirror.
         syncMirrorAudio()
+        // UX-041: so does Picture in Picture.
+        mirrorPiPMirrorActiveChanged()
     }
 
     /// Re-negotiates the mirror to match how large the user has pinched the
@@ -307,7 +330,8 @@ extension ControlSessionModel: MirrorStreamSink {
 
     private func restartMirror(displayID: UInt32?) {
         guard let sender, isMirrorActive, let settings = mirrorSettings else { return }
-        let fps = settings.mirrorFrameRate.rawValue
+        // UX-041: one frame a second while PiP is paused.
+        let fps = mirrorPiPState.requestedFPS(settingsFPS: settings.mirrorFrameRate.rawValue)
         let width = settings.mirrorStreamWidth(naturalWidth: mirrorNaturalWidth)
         let codec = mirrorRequestedCodec(settings)
         if codec != mirrorLastRequestedCodec {
@@ -364,6 +388,7 @@ extension ControlSessionModel: MirrorStreamSink {
         mirrorShowsVideo = false
         mirrorVideoSize = nil
         mirrorVideoRenderer.flush()
+        resetMirrorPiPStream()
         mirrorWatchdog = MirrorVideoWatchdog(now: CACurrentMediaTime())
         mirrorCursor = nil
         mirrorCursorInsideMirror = nil

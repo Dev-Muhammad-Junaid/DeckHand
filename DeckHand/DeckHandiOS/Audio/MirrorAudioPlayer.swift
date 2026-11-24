@@ -22,7 +22,9 @@
 //    sound plays alongside the iPad's own and ignores the silent switch,
 //    like a video. It is active only while sound is wanted and a stream is
 //    open; background, disconnect, an interruption or turning audio off
-//    stops the engine and deactivates the session.
+//    stops the engine and deactivates the session (unless Picture in
+//    Picture holds it, `MirrorAudioSessionHold`). While PiP shows a live
+//    picture the sound keeps playing in the background (UX-041).
 //
 //  Engine and session work runs on `controlQueue`; the render block takes
 //  `bufferLock` only for the copy and never allocates.
@@ -252,6 +254,8 @@ final class MirrorAudioPlayer: MirrorAudioSink, @unchecked Sendable {
         if let sourceNode { engine.detach(sourceNode) }
         self.engine = nil
         sourceNode = nil
+        // UX-041: PiP keeps the playback session while it could start.
+        guard !MirrorAudioSessionHold.shared.isHeld else { return }
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 

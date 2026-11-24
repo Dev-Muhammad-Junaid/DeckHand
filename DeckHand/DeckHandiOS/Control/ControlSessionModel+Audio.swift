@@ -6,7 +6,8 @@
 //  player is `mirrorAudio`, under `// MARK: Mirror` in ControlSessionModel):
 //
 //  - wanted = the mirror is open, Settings › Live mirror › "Play the Mac's
-//    sound" is on and Pixel Hand is in front;
+//    sound" is on and Pixel Hand is in front, or Picture in Picture shows
+//    the mirror, not paused (UX-041);
 //  - `syncMirrorAudio()` tells the Mac (`mirror.audio(enabled:)`) and the
 //    player whenever that changes: the mirror opens or closes or stops on
 //    the Mac, the setting changes, the app goes to the background or
@@ -44,9 +45,12 @@ extension ControlSessionModel {
         await MirrorAudioReceiver().run(connection: connection, sink: mirrorAudio)
     }
 
-    /// Whether the Mac's sound should play now.
+    /// Whether the Mac's sound should play now. In the background only
+    /// while Picture in Picture shows a live picture (UX-041).
     func mirrorAudioWanted(appActive: Bool) -> Bool {
-        isMirrorActive && appActive && (mirrorSettings?.mirrorPlaysMacAudio ?? false)
+        isMirrorActive
+            && (appActive || mirrorPiPState.allowsBackgroundAudio)
+            && (mirrorSettings?.mirrorPlaysMacAudio ?? false)
     }
 
     /// Brings the Mac and the player in line with `mirrorAudioWanted`.
