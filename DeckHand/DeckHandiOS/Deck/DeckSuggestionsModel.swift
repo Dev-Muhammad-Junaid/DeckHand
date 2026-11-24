@@ -69,11 +69,17 @@ final class DeckSuggestionsModel: ObservableObject {
     /// user removes come back and the model has some to choose from.
     static let poolSize = 48
 
-    @Published private(set) var bundleID: String?
-    @Published private(set) var phase: Phase = .idle
-    @Published private(set) var ranking: Ranking = .fallback
-    /// The full order, before filtering out what the page already has.
-    @Published private(set) var ordered: [DeckSuggestion] = []
+    /// One app's suggestions.
+    struct AppState: Equatable {
+        var phase: Phase = .idle
+        var ranking: Ranking = .fallback
+        /// The full order, before filtering out what the page already has.
+        var ordered: [DeckSuggestion] = []
+    }
+
+    /// Per app, so two pages (an app page and the Context page) can each
+    /// show their own panel.
+    @Published private(set) var states: [String: AppState] = [:]
     /// Apps whose panel the user closed this session.
     @Published private(set) var closedBundleIDs: Set<String> = []
     /// Suggestions the user hid one by one, by ID.
@@ -88,19 +94,22 @@ final class DeckSuggestionsModel: ObservableObject {
     private var pending: Set<String> = []
     private var appNames: [String: String] = [:]
     private var existingAtLoad: [String: [DeckKey]] = [:]
-    private var timeoutTask: Task<Void, Never>?
-    private var refineTask: Task<Void, Never>?
-    /// Bumped on every new ranking, so a late model answer for an older
-    /// one is dropped.
-    private var generation = 0
+    private var timeoutTasks: [String: Task<Void, Never>] = [:]
+    private var refineTasks: [String: Task<Void, Never>] = [:]
+    /// Bumped on every new ranking of an app, so a late model answer for
+    /// an older one is dropped.
+    private var generations: [String: Int] = [:]
 
     // MARK: Reads
+
+    func state(for bundleID: String) -> AppState { states[bundleID] ?? AppState() }
 
     /// What the panel shows for `bundleID`: the order, minus what the page
     /// already has (`existing`) and what the user hid, capped.
     func visible(for bundleID: String, existing: [DeckKey]) -> [DeckSuggestion] {
-        guard bundleID == self.bundleID, phase == .ready else { return [] }
-        let pool = ordered.filter { !hiddenIDs.contains($0.id) }
+        let state = state(for: bundleID)
+        guard state.phase == .ready else { return [] }
+        let pool = state.ordered.filter { !hiddenIDs.contains($0.id) }
         let allowed = Set(DeckSuggestionRanker.candidates(pool.map(\.binding), bundleID: bundleID, existing: existing).map(\.id))
         return Array(pool.filter { allowed.contains($0.id) }.prefix(DeckSuggestionRanker.maxSuggestions))
     }
@@ -122,22 +131,15 @@ final class DeckSuggestionsModel: ObservableObject {
     func load(bundleID: String, appName: String, existing: [DeckKey], sender: TrackpadSender, force: Bool = false) {
         appNames[bundleID] = appName
         existingAtLoad[bundleID] = existing
-        if bundleID != self.bundleID {
-            self.bundleID = bundleID
-            phase = .idle
-            ordered = []
-            ranking = .fallback
-            refineTask?.cancel()
-        }
         if !force, hasFreshMenus(for: bundleID), let entry = cache[bundleID] {
-            if phase != .ready { publish(entry.bindings, for: bundleID) }
+            if state(for: bundleID).phase != .ready { publish(entry.bindings, for: bundleID) }
             return
         }
         guard !pending.contains(bundleID) else { return }
         pending.insert(bundleID)
-        phase = .reading
-        timeoutTask?.cancel()
-        timeoutTask = Task { [weak self] in
+        states[bundleID, default: AppState()].phase = .reading
+        timeoutTasks[bundleID]?.cancel()
+        timeoutTasks[bundleID] = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(Self.replyTimeout * 1_000_000_000))
             guard !Task.isCancelled, let self else { return }
             self.replyTimedOut(bundleID: bundleID)
@@ -150,50 +152,47 @@ final class DeckSuggestionsModel: ObservableObject {
     func claim(bundleID: String, shortcuts: [AppShortcutBinding]) -> Bool {
         guard pending.remove(bundleID) != nil else { return false }
         cache[bundleID] = (shortcuts, Date())
-        if bundleID == self.bundleID {
-            timeoutTask?.cancel()
-            publish(shortcuts, for: bundleID)
-        }
+        timeoutTasks.removeValue(forKey: bundleID)?.cancel()
+        publish(shortcuts, for: bundleID)
         return true
     }
 
     private func replyTimedOut(bundleID: String) {
-        guard pending.remove(bundleID) != nil, bundleID == self.bundleID else { return }
-        phase = .failed
+        guard pending.remove(bundleID) != nil else { return }
+        timeoutTasks[bundleID] = nil
+        states[bundleID, default: AppState()].phase = .failed
     }
 
     private func publish(_ bindings: [AppShortcutBinding], for bundleID: String) {
-        generation += 1
+        let generation = (generations[bundleID] ?? 0) + 1
+        generations[bundleID] = generation
         let ranked = DeckSuggestionRanker.rank(
             bindings,
             bundleID: bundleID,
             existing: existingAtLoad[bundleID] ?? [],
             limit: Self.poolSize
         )
-        ordered = ranked
-        phase = .ready
+        states[bundleID] = AppState(phase: .ready, ranking: .fallback, ordered: ranked)
         refine(ranked, bundleID: bundleID, generation: generation)
     }
 
     /// Lets the on-device model reorder the deterministic ranking.
     private func refine(_ ranked: [DeckSuggestion], bundleID: String, generation: Int) {
-        refineTask?.cancel()
-        guard let reorderer, ranked.count > 1 else {
-            ranking = .fallback
-            return
-        }
-        ranking = .refining
+        refineTasks.removeValue(forKey: bundleID)?.cancel()
+        guard let reorderer, ranked.count > 1 else { return }
+        states[bundleID]?.ranking = .refining
         let appName = appNames[bundleID] ?? bundleID
         let lines = DeckSuggestionRanker.promptLines(for: ranked)
-        refineTask = Task { [weak self] in
+        refineTasks[bundleID] = Task { [weak self] in
             let picks = await reorderer.picks(appName: appName, candidates: lines, limit: DeckSuggestionRanker.maxSuggestions)
-            guard !Task.isCancelled, let self, self.generation == generation, self.bundleID == bundleID else { return }
+            guard !Task.isCancelled, let self, self.generations[bundleID] == generation else { return }
             if let picks, !picks.isEmpty {
-                self.ordered = DeckSuggestionRanker.applyingModelPicks(picks, to: ranked, limit: ranked.count)
-                self.ranking = .onDevice
+                self.states[bundleID]?.ordered = DeckSuggestionRanker.applyingModelPicks(picks, to: ranked, limit: ranked.count)
+                self.states[bundleID]?.ranking = .onDevice
             } else {
-                self.ranking = .fallback
+                self.states[bundleID]?.ranking = .fallback
             }
+            self.refineTasks[bundleID] = nil
         }
     }
 
