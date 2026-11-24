@@ -182,6 +182,9 @@ final class PixelHandUITests: XCTestCase {
         launch()
         guard connect() else { return }
         guard tapIfExists("ph.tab.screen") else { return }
+        snap("screen-empty")
+        let show = app.buttons["Show screen"].firstMatch
+        if show.waitForExistence(timeout: 2), show.isHittable { show.tap() }
         snap("screen-0s")
         sleep(1)
         snap("screen-1s")
@@ -197,6 +200,20 @@ final class PixelHandUITests: XCTestCase {
             snap("sound-toggled")
             tapIfExists("ph.mirror.sound")
         }
+        // Picture in Picture: start it, go Home, come back.
+        if tapIfExists("ph.mirror.pictureInPicture") {
+            sleep(2)
+            snap("pip-started")
+            XCUIDevice.shared.press(.home)
+            sleep(3)
+            snap("pip-on-home-screen")
+            app.activate()
+            sleep(2)
+            snap("pip-returned")
+        }
+        tapIfExists("ph.mirror.close")
+        sleep(1)
+        snap("mirror-closed")
     }
 
     func test07_Ask() {
