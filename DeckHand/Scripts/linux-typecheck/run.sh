@@ -28,6 +28,7 @@ files=(
   "$app/DeckHandMac/Network/RemoteAccessGate.swift"
   "$app/DeckHandMac/LockGate.swift"
   "$app/DeckHandMac/UI/MenuBarActivity.swift"
+  "$app/DeckHandMac/Transfer/MacTransferService.swift"
   "$app/DeckHandMac/Deck/MacShortcutRunner.swift"
   "$app/DeckHandMac/Input/DragGuard.swift"
   "$app/DeckHandMac/Input/TypingQueue.swift"
@@ -59,7 +60,7 @@ files=(
 for file in "${files[@]}"; do
   # StoreKit is stubbed inside this module, so `StoreKit.Transaction` (the
   # app names it by module where SwiftUI makes it ambiguous) loses its prefix.
-  sed -E -e '/^import (AppKit|Combine|LoomKit|Loom|CoreGraphics|IOKit|os|QuartzCore|StoreKit|SwiftUI|UIKit|UserNotifications)$/d' \
+  sed -E -e '/^import (AppKit|Combine|LoomKit|Loom|CoreGraphics|IOKit|os|QuartzCore|StoreKit|SwiftUI|UIKit|UserNotifications|CryptoKit|UniformTypeIdentifiers|Photos|PhotosUI)$/d' \
     -e 's/\bStoreKit\.(Transaction|Product|VerificationResult|AppStore)\b/\1/g' \
     "$file" > "$work/$(basename "$file")"
 done

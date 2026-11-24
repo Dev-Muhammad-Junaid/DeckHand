@@ -116,6 +116,8 @@ struct MacMenuBarView: View {
                 }
             }
 
+            MacTransferSection() // Sharing lane: Send, prompts, transfers (S1/S2)
+
             PanelDivider()
 
             // ── Pairing (S4) ──────────────────────────────────────────

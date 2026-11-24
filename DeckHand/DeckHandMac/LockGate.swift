@@ -111,6 +111,7 @@ enum MacSystemSession {
         // display activity for the connection.
         MacLockMonitor.shared.addConnection(handle, id: id)
         SpacesMonitor.shared.addConnection(handle, id: id)
+        MacTransferService.shared.addConnection(handle, id: id) // Sharing lane: transfers (S1)
     }
 
     static func connectionRemoved(id: UUID) {
@@ -118,9 +119,11 @@ enum MacSystemSession {
         SpacesMonitor.shared.removeConnection(id: id)
         LockGate.shared.forget(id)
         InteractionSession.connectionRemoved(id: id) // iOS interaction lane: drag release, clipboard
+        MacTransferService.shared.removeConnection(id: id) // Sharing lane: transfers (S1)
     }
 
     static func lockStateChanged(from previous: MacLockState, to next: MacLockState) {
+        MacTransferService.shared.lockStateChanged(next) // Sharing lane: the lock cancels incoming transfers (S1)
         let wasWithheld = LockPolicy.withholdsContext(previous)
         let withheld = LockPolicy.withholdsContext(next)
         if wasWithheld != withheld {

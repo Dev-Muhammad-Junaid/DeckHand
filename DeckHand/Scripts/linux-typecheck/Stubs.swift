@@ -466,3 +466,104 @@ extension PeerCompatibility {
     /// `Shared/PeerCompatibility+Loom.swift` on Apple platforms.
     init(advertisement: LoomPeerAdvertisement) { fatalError("stub") }
 }
+
+// MARK: Transfers (Sharing lane, S1)
+// Loom's transfer engine, as LoomKit exposes it on a connection.
+public struct LoomTransferOffer: Codable, Hashable, Sendable {
+    public let id: UUID
+    public let logicalName: String
+    public let byteLength: UInt64
+    public let contentType: String?
+    public let sha256Hex: String?
+    public let metadata: [String: String]
+    public init(id: UUID = UUID(), logicalName: String, byteLength: UInt64, contentType: String? = nil, sha256Hex: String? = nil, metadata: [String: String] = [:]) {
+        self.id = id; self.logicalName = logicalName; self.byteLength = byteLength
+        self.contentType = contentType; self.sha256Hex = sha256Hex; self.metadata = metadata
+    }
+}
+public enum LoomTransferState: String, Codable, Sendable {
+    case offered, waitingForAcceptance, transferring, completed, cancelled, failed, declined
+}
+public struct LoomTransferProgress: Sendable, Equatable {
+    public let transferID: UUID
+    public let logicalName: String
+    public let bytesTransferred: UInt64
+    public let totalBytes: UInt64
+    public let state: LoomTransferState
+}
+public protocol LoomTransferSource: Sendable {}
+public protocol LoomTransferSink: Sendable {}
+public actor LoomFileTransferSource: LoomTransferSource {
+    public let url: URL
+    public let byteLength: UInt64 = 0
+    public init(url: URL) throws { self.url = url }
+}
+public actor LoomFileTransferSink: LoomTransferSink {
+    public let url: URL
+    public init(url: URL) throws { self.url = url }
+}
+public final class LoomOutgoingTransfer: @unchecked Sendable {
+    public let offer: LoomTransferOffer
+    init(offer: LoomTransferOffer) { self.offer = offer }
+    public func cancel() async {}
+    public nonisolated func makeProgressObserver() -> AsyncStream<LoomTransferProgress> { AsyncStream { _ in } }
+}
+public final class LoomIncomingTransfer: @unchecked Sendable {
+    public let offer: LoomTransferOffer
+    init(offer: LoomTransferOffer) { self.offer = offer }
+    public func accept(using sink: any LoomTransferSink, resumeOffset: UInt64 = 0) async throws {}
+    public func decline() async throws {}
+    public nonisolated func makeProgressObserver() -> AsyncStream<LoomTransferProgress> { AsyncStream { _ in } }
+}
+public actor LoomTransferEngine {
+    public func offerTransfer(_ offer: LoomTransferOffer, source: any LoomTransferSource) async throws -> LoomOutgoingTransfer {
+        LoomOutgoingTransfer(offer: offer)
+    }
+}
+extension LoomConnectionHandle {
+    public nonisolated var incomingTransfers: AsyncStream<LoomIncomingTransfer> { AsyncStream { _ in } }
+    public var transferEngine: LoomTransferEngine { LoomTransferEngine() }
+}
+// AppKit pieces the Mac's transfer service uses.
+final class NSPasteboard: @unchecked Sendable {
+    struct PasteboardType: Hashable, Sendable { static let string = PasteboardType() }
+    struct ReadingOptionKey: Hashable, Sendable { static let urlReadingFileURLsOnly = ReadingOptionKey() }
+    static let general = NSPasteboard()
+    @discardableResult func clearContents() -> Int { 0 }
+    @discardableResult func setString(_ string: String, forType type: PasteboardType) -> Bool { true }
+    func string(forType type: PasteboardType) -> String? { nil }
+    func readObjects(forClasses classes: [AnyClass], options: [ReadingOptionKey: Any]?) -> [Any]? { nil }
+}
+final class NSURL {}
+extension NSWorkspace {
+    @discardableResult func open(_ url: URL) -> Bool { true }
+    func activateFileViewerSelecting(_ urls: [URL]) {}
+}
+@MainActor final class NSApplication { var servicesProvider: AnyObject? }
+@MainActor let NSApp: NSApplication! = NSApplication()
+@MainActor final class MacTransferServicesProvider { static let shared = MacTransferServicesProvider() }
+@MainActor final class MacTransferPromptPanel {
+    static let shared = MacTransferPromptPanel()
+    func show() {}
+    func hide() {}
+}
+// UniformTypeIdentifiers
+struct UTType: Sendable {
+    static let data = UTType(identifier: "public.data")
+    static let image = UTType(identifier: "public.image")
+    static let movie = UTType(identifier: "public.movie")
+    let identifier: String
+    init(identifier: String) { self.identifier = identifier }
+    init?(filenameExtension: String) { self.identifier = "public.data" }
+    func conforms(to other: UTType) -> Bool { false }
+}
+// CryptoKit
+protocol Digest: Sequence where Element == UInt8 {}
+struct SHA256Digest: Digest {
+    func makeIterator() -> IndexingIterator<[UInt8]> { [UInt8]().makeIterator() }
+}
+struct SHA256 {
+    mutating func update(data: Data) {}
+    func finalize() -> SHA256Digest { SHA256Digest() }
+    static func hash(data: Data) -> SHA256Digest { SHA256Digest() }
+}
