@@ -51,12 +51,10 @@ struct ControlToolbar: ToolbarContent {
                 // Surface the live connection id so the session can be
                 // matched against the Mac and a silent session swap is
                 // visible in the UI.
-                #if DEBUG
                 Text("session \(connectionID.uuidString.prefix(8))")
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(.tertiary)
                     .accessibilityHidden(true)
-                #endif
             }
         }
         ToolbarItem(placement: .topBarTrailing) {
