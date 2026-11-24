@@ -19,6 +19,12 @@
 //    columns     wide and tall       Macs sidebar · centre (presets, Ask
 //                                    field, screen over pad, floating dock)
 //                                    · deck column with the strip on top
+//    book        iPhone Duo open,    leading pane (screen over pad, dock) ·
+//                vertical crease     crease band · trailing pane (header,
+//                                    strip, deck, tab bar)  — UX-040
+//    laptop      iPhone Duo,         top pane (header, screen) · crease
+//                horizontal crease   band · bottom pane (strip, pad or
+//                                    deck, tab bar)         — UX-040
 //
 
 import Foundation
@@ -57,7 +63,7 @@ public enum LayoutPreset: String, Sendable, Hashable, CaseIterable, Codable {
 /// The concrete arrangement of the canvas for one window size.
 public struct CanvasPlan: Sendable, Hashable {
     public enum Form: String, Sendable, Hashable, CaseIterable {
-        case single, rail, stacked, sideBySide, columns
+        case single, rail, stacked, sideBySide, columns, book, laptop
     }
 
     // MARK: Constants (points)
@@ -97,10 +103,26 @@ public struct CanvasPlan: Sendable, Hashable {
     /// Whether the window is wide enough for the sidebar at all; the toggle
     /// is offered only then.
     public let canShowSidebar: Bool
+    /// The two panes around the iPhone Duo crease (book, laptop); `nil`
+    /// otherwise.
+    public let duoPanes: DuoPanes?
 
-    public init(width: Double, height: Double, sidebarCollapsed: Bool = false) {
+    /// `crease` is the keep-out band from `DuoPoseMachine` (system division
+    /// or inferred). With one, the plan is `book` or `laptop`, whatever the
+    /// size class says.
+    public init(width: Double, height: Double, sidebarCollapsed: Bool = false, crease: DuoCreaseBand? = nil) {
         let metrics = LayoutMetrics(width: width, height: height)
         self.metrics = metrics
+        if let crease {
+            let panes = DuoPanes(width: metrics.width, height: metrics.height, band: crease)
+            duoPanes = panes
+            form = panes.pose == .book ? .book : .laptop
+            deckColumnWidth = panes.pose == .book ? panes.second.width : 0
+            canShowSidebar = false
+            showsSidebar = false
+            return
+        }
+        duoPanes = nil
         switch metrics.arrangement {
         case .single:
             form = .single
@@ -172,16 +194,21 @@ public struct CanvasPlan: Sendable, Hashable {
 
     /// The rail has no room for a dock row: it folds into the strip's
     /// leading app chip, and the keyboard button moves to the rail.
-    public var foldsDockIntoStrip: Bool { form == .rail }
+    public var foldsDockIntoStrip: Bool { form == .rail || form == .laptop }
 
     /// The surfaces the tab bar offers: the deck goes when it has a column.
     public var tabSurfacesIncludeDeck: Bool { !hasDeckColumn }
+
+    /// Whether the plan splits around the iPhone Duo crease.
+    public var isDuoOpen: Bool { duoPanes != nil }
 
     /// Deck keys per row in the deck column or panel.
     public var deckColumnKeys: Int {
         switch form {
         case .single: return metrics.deckColumns
         case .stacked: return metrics.deckColumns
+        case .book: return duoPanes?.secondMetrics.deckColumns ?? 4
+        case .laptop: return duoPanes?.secondMetrics.deckColumns ?? metrics.deckColumns
         case .rail, .sideBySide, .columns: return 3
         }
     }
