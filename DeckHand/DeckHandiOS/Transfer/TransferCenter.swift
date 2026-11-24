@@ -580,7 +580,7 @@ final class TransferCenter {
         supportFolder.appendingPathComponent("Partial", isDirectory: true).appendingPathComponent(TransferResume.partialFileName(for: id))
     }
 
-    static func fileSize(_ url: URL) -> UInt64? {
+    nonisolated static func fileSize(_ url: URL) -> UInt64? {
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
               let size = (attributes[.size] as? NSNumber)?.uint64Value else { return nil }
         return size
