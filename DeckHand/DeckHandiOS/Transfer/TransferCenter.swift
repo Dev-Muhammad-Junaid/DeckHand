@@ -213,6 +213,8 @@ final class TransferCenter {
     /// Offers everything waiting for the connected Mac.
     private func drain() {
         guard let link, link.isPaired() else { return }
+        // Sharing is Pro: without it, items wait (the Send button is locked).
+        guard SubscriptionStore.shared.entitlement.allows(.sharing) else { return }
         for item in outbox.ready(for: link.deviceID) {
             outbox.markSending(item.id, to: link.deviceID, name: link.name)
             Task { await offer(item.id, link: link) }
@@ -538,6 +540,7 @@ final class TransferCenter {
 
     /// The paired Macs, for the Share extension's picker.
     private func publishPairedMacs() {
+        TransferSharedContainer.setSharingAllowed(SubscriptionStore.shared.entitlement.allows(.sharing))
         let macs = PairedMacsStore.shared.macs.filter { $0.kind == .mac }.map { TransferMacEntry(deviceID: $0.deviceID, name: $0.name) }
         TransferSharedContainer.writePairedMacs(macs)
     }

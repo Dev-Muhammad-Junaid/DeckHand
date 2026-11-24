@@ -55,6 +55,19 @@ enum TransferSharedContainer {
         try? data.write(to: macsFile, options: .atomic)
     }
 
+    private static let sharingAllowedKey = "transfer.sharingAllowed"
+
+    /// Whether this device has Pixel Hand Pro, as the app last saw it, so
+    /// the Share extension (which has no StoreKit state) can say so before
+    /// queueing. The app checks again before sending.
+    static var sharingAllowed: Bool {
+        UserDefaults(suiteName: appGroup)?.bool(forKey: sharingAllowedKey) ?? false
+    }
+
+    static func setSharingAllowed(_ allowed: Bool) {
+        UserDefaults(suiteName: appGroup)?.set(allowed, forKey: sharingAllowedKey)
+    }
+
     /// Drops one item for the app (the Share extension). `fill` writes
     /// the payload into the given URL. The item's description goes last,
     /// so the app never picks up a half-written folder.

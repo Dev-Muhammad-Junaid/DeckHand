@@ -341,17 +341,20 @@ private struct SendPanel: View {
     }
 }
 
-/// A tray item dragged onto a Mac card.
-struct StagedItemReference: Codable, Transferable {
+/// A tray item dragged onto a Mac card: its id as text with a prefix, so
+/// no custom type has to be declared in Info.plist.
+struct StagedItemReference: Transferable {
+    static let prefix = "pixelhand-staged-item:"
     let id: String
-    static var transferRepresentation: some TransferRepresentation {
-        CodableRepresentation(contentType: .pixelHandStagedItem)
-    }
-}
 
-extension UTType {
-    /// In-app only: a tray item's id while it is dragged.
-    static let pixelHandStagedItem = UTType(exportedAs: "com.widgetsflow.pixelhand.staged-item")
+    static var transferRepresentation: some TransferRepresentation {
+        ProxyRepresentation(exporting: { prefix + $0.id })
+    }
+
+    /// The id in dropped text, when it is a tray item.
+    static func id(in text: String) -> String? {
+        text.hasPrefix(prefix) ? String(text.dropFirst(prefix.count)) : nil
+    }
 }
 
 /// A photo or video from the picker, copied to a temporary file.
@@ -406,7 +409,7 @@ private struct MacDropCard: View {
         .disabled(!canSend && !isTargeted)
         .accessibilityLabel("Send to \(listing.name)")
         .accessibilityHint(canSend ? "" : "Pick something to send first.")
-        .onDrop(of: [.pixelHandStagedItem, .fileURL, .image, .movie, .url, .plainText], isTargeted: $isTargeted) { providers in
+        .onDrop(of: [.fileURL, .image, .movie, .url, .plainText], isTargeted: $isTargeted) { providers in
             receive(providers)
             return true
         }
@@ -414,12 +417,7 @@ private struct MacDropCard: View {
 
     private func receive(_ providers: [NSItemProvider]) {
         for provider in providers {
-            if provider.hasItemConformingToTypeIdentifier(UTType.pixelHandStagedItem.identifier) {
-                _ = provider.loadTransferable(type: StagedItemReference.self) { result in
-                    guard case let .success(reference) = result else { return }
-                    Task { @MainActor in onDropStaged([reference.id]) }
-                }
-            } else if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier), !provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+            if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier), !provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
                 _ = provider.loadObject(ofClass: URL.self) { url, _ in
                     guard let url else { return }
                     Task { @MainActor in onDropExternal([StagedTransferItem(payload: .text(url.absoluteString))]) }
@@ -427,7 +425,13 @@ private struct MacDropCard: View {
             } else if provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier), !provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
                 _ = provider.loadObject(ofClass: NSString.self) { text, _ in
                     guard let text = text as? String else { return }
-                    Task { @MainActor in onDropExternal([StagedTransferItem(payload: .text(text))]) }
+                    Task { @MainActor in
+                        if let id = StagedItemReference.id(in: text) {
+                            onDropStaged([id]) // a tray item
+                        } else {
+                            onDropExternal([StagedTransferItem(payload: .text(text))])
+                        }
+                    }
                 }
             } else {
                 let type = provider.registeredContentTypes.first(where: { $0.conforms(to: .image) || $0.conforms(to: .movie) }) ?? .item
