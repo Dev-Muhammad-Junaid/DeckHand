@@ -81,6 +81,22 @@ end-to-end results, open bugs. Push, then give the owner a short summary.
 The coordinating cloud session ("Deckhand project status review") reads that
 section and routes bugs to cloud fix sessions.
 
+## One build worktree (owner request, 2026-11-24: Mac storage)
+
+All editing happens in cloud sessions; the Mac only builds and installs, so
+it needs exactly **one** worktree. Every Mac build session and loop uses:
+
+    ~/Developer/DeckHand-build/.claude/worktrees/pixelhand-build
+
+- If it exists, reuse it: `git -C <it> fetch origin claude/pixelhand-integration && git -C <it> checkout -B pixelhand-build FETCH_HEAD`.
+- If it doesn't, create it once:
+  `git -C ~/Developer/DeckHand-build worktree add ~/Developer/DeckHand-build/.claude/worktrees/pixelhand-build origin/claude/pixelhand-integration`.
+- Don't create other worktrees for builds. If a session was started in its
+  own worktree, `cd` to the one above for the build.
+- Build with `-derivedDataPath ~/Developer/DeckHand-build/.derived` so all
+  builds share one DerivedData folder instead of one per worktree.
+- Keep at most one previous app copy for comparison; delete older ones.
+
 ## Build loop (run with `/loop 1h …` in the Mac build session)
 
 Every tick:
