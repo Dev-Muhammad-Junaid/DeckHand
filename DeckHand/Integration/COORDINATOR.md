@@ -1,6 +1,6 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Waiting for visual QA (build 18):** build 18 is green and installed. The owner reports many rough edges: layout, wording, responsiveness, how some features behave, and loading/animation glitches. A visual QA run on the owner's Mac writes `DeckHand/Integration/VISUAL-QA-build18.md` and a "Visual QA (build 18)" section in `STATUS.md`. When it lands, split the findings into up to 3 fix lanes: (1) layout, wording and responsiveness; (2) feature behaviour and flows; (3) loading, animation and visual identity. Fold in "Owner testing (build 18)" too. Work P1 → P2 → P3. Each lane re-reads `DeckHand/Product/Design/` and marks finding IDs done in its handoff. Then merge and queue the next build. The review page waits until these are done.
+> **Build 18 QA fixes running** (82 findings in `VISUAL-QA-build18.md`, split into three lanes below; every ID is assigned to exactly one lane). After they merge: queue build 19; the visual QA UI tests re-check the same flows; then the review page.
 
 > **Mac builds:** build 16 is green (2026-11-24). Build 17 (Unlock Pro for testing, from the primary session) is queued. The primary session or the owner's Mac session runs Mac builds.
 
@@ -28,6 +28,9 @@ weekly usage limit is close).
 | --- | --- | --- | --- |
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac) — **archived since 2026-11-18; start a new Mac session** | session_01H5HwATvLJkqCFPruLyBsX8 (archived) | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
+| QA fixes A: surfaces (33 findings: shell, deck, mirror pane, keyboard, Ask, capture, onboarding, AX3, Stage Manager) | session_01H5HwAVaBukC2xVL8jr3BMa | claude/pixelhand-lane-qa-surfaces | `LANE-qa-surfaces.md` ends `Lane: READY TO MERGE` |
+| QA fixes B: flows (29: VQ-001 loopback refusal, pairing, Mac app, reconnect, paywall, diagnostics) | session_01H5HwASCyPAhMYeQoyMCYGN | claude/pixelhand-lane-qa-flows | `LANE-qa-flows.md` ends `Lane: READY TO MERGE` |
+| QA fixes C: identity (20: Settings, widgets, Lock Screen, Control Center, dot-matrix font) | session_01H5HwAS4j31VzKJ4fJhWYGB | claude/pixelhand-lane-qa-identity | `LANE-qa-identity.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -175,3 +178,8 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
 - 2026-11-24 ~19:00 UTC: build 18 green and installed (primary session).
   The owner found many rough edges. The primary queued a visual QA run;
   waiting for `VISUAL-QA-build18.md` before starting up to three fix lanes.
+- 2026-11-24 23:45 UTC: the build 18 visual QA landed: 82 findings (P1 13,
+  P2 43, P3 26). Split them by area into QA fix lanes A (surfaces, 33),
+  B (flows, 29, starting with VQ-001, which blocks simulator QA) and
+  C (identity, 20). Each does P1 → P2 → P3 and reports per-ID status. No
+  owner findings yet beyond the QA run.
