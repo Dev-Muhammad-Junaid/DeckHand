@@ -81,7 +81,7 @@ final class AskModel: ObservableObject {
 
     /// The on-device planner, set by the sheet when the user has Pro and
     /// the model is available; `nil` uses the parser alone.
-    var planner: (any AskPlanning)?
+    @Published var planner: (any AskPlanning)?
 
     private var planTask: Task<Void, Never>?
     private var runTask: Task<Void, Never>?
