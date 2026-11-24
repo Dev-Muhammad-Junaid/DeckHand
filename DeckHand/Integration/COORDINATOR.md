@@ -1,6 +1,6 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Pause lifted 2026-11-24 16:10 UTC:** builds 15 and 16 are green on the Mac. The last lane (UX polish: UX-013 + UX-014) is running with non-structural edits only, so owner bug-fix sessions can merge alongside it. Owner findings go under "Owner testing" in `STATUS.md`; the coordinator turns them into one fix session.
+> **Waiting for visual QA (build 18):** build 18 is green and installed. The owner reports many rough edges: layout, wording, responsiveness, how some features behave, and loading/animation glitches. A visual QA run on the owner's Mac writes `DeckHand/Integration/VISUAL-QA-build18.md` and a "Visual QA (build 18)" section in `STATUS.md`. When it lands, split the findings into up to 3 fix lanes: (1) layout, wording and responsiveness; (2) feature behaviour and flows; (3) loading, animation and visual identity. Fold in "Owner testing (build 18)" too. Work P1 → P2 → P3. Each lane re-reads `DeckHand/Product/Design/` and marks finding IDs done in its handoff. Then merge and queue the next build. The review page waits until these are done.
 
 > **Mac builds:** build 16 is green (2026-11-24). Build 17 (Unlock Pro for testing, from the primary session) is queued. The primary session or the owner's Mac session runs Mac builds.
 
@@ -172,3 +172,6 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   green on the merged state. Waiting for "Mac build results (build 18)" and
   owner findings. If build 18 is green with no open findings, publish the
   review page and mark PROGRAMME COMPLETE.
+- 2026-11-24 ~19:00 UTC: build 18 green and installed (primary session).
+  The owner found many rough edges. The primary queued a visual QA run;
+  waiting for `VISUAL-QA-build18.md` before starting up to three fix lanes.
