@@ -2,12 +2,13 @@
 //  PairingCode.swift
 //  PixelHandCore
 //
-//  The short code the Mac shows to pair a remote (S4): six random digits and
-//  a Damm check digit, shown as "123-4567". The remote types it, or scans
+//  The short code the Mac shows to pair a remote (S4): seven random digits
+//  and a Damm check digit, shown as two groups of four, "4821 0934"
+//  (VQ-005: one format on the Mac, in onboarding and in the entry field). The remote types it, or scans
 //  it inside a QR code (`PairingInvite`), and sends it with
 //  `pairing.submitCode`. The Mac checks it with `PairingCodeWindow`.
 //
-//  Strength: 10^6 codes, at most `PairingCodeWindow.maxWrongAttempts`
+//  Strength: 10^7 codes, at most `PairingCodeWindow.maxWrongAttempts`
 //  guesses per code, a code lives `PairingCodeWindow.lifetime`, and only a
 //  device that already proved a Loom identity key can submit one.
 //
@@ -16,7 +17,7 @@ import Foundation
 
 public struct PairingCode: Equatable, Hashable, Sendable, CustomStringConvertible {
     /// Random digits in a code.
-    public static let secretLength = 6
+    public static let secretLength = 7
     /// Digits in a code, check digit included.
     public static let length = secretLength + 1
     /// The longest text `parse` looks at. Anything longer is refused
@@ -38,7 +39,7 @@ public struct PairingCode: Equatable, Hashable, Sendable, CustomStringConvertibl
         for _ in 0..<secretLength {
             secret.append(Character(Unicode.Scalar(UInt8.random(in: 0...9, using: &generator) + 48)))
         }
-        // Six ASCII digits always have a check digit.
+        // ASCII digits always have a check digit.
         return PairingCode(validDigits: secret + String(DammCheck.checkDigit(for: secret)!))
     }
 
@@ -87,9 +88,34 @@ public struct PairingCode: Equatable, Hashable, Sendable, CustomStringConvertibl
         self = code
     }
 
-    /// "123-4567": short groups are easier to read aloud and to copy.
+    /// Digits per group when a code is shown or typed.
+    public static let groupSize = 4
+
+    /// "4821 0934": two groups of four, easier to read aloud and to copy.
     public var formatted: String {
-        "\(digits.prefix(3))-\(digits.dropFirst(3))"
+        Self.grouped(digits)
+    }
+
+    /// The digits of `input` as people type them, grouped in fours with a
+    /// space: "48210" → "4821 0". Anything that isn't an ASCII digit is
+    /// dropped, and the result stops at `length` digits, so the entry field
+    /// shows exactly what will be sent.
+    public static func grouped(_ input: String) -> String {
+        var out = ""
+        var count = 0
+        for scalar in input.unicodeScalars.prefix(maxInputLength * 2) where ("0"..."9").contains(scalar) {
+            guard count < length else { break }
+            if count > 0, count % groupSize == 0 { out.append(" ") }
+            out.unicodeScalars.append(scalar)
+            count += 1
+        }
+        return out
+    }
+
+    /// The typed text is complete (all `length` digits are there).
+    public static func isComplete(_ input: String) -> Bool {
+        if case .incomplete = parse(input) { return false }
+        return !input.isEmpty
     }
 
     public var description: String { formatted }

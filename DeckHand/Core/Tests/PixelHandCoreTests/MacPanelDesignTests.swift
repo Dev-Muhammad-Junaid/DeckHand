@@ -98,15 +98,14 @@ struct MenuBarHandTests {
 
 @Suite("Pair a device window")
 struct PairingCodeDisplayTests {
-    @Test("Groups of four with the check digit alone and dimmed")
+    @Test("Two groups of four; the check digit ends the last group")
     func groups() throws {
         let code = try #require(PairingCode(Self.validCode()))
         let groups = PairingCodeDisplay.groups(code)
         #expect(groups.map(\.text).joined() == code.digits)
+        #expect(groups.count == 2)
         #expect(groups.last?.isCheck == true)
-        #expect(groups.last?.text.count == 1)
-        #expect(groups.dropLast().allSatisfy { !$0.isCheck && $0.text.count <= 4 })
-        #expect(groups.first?.text.count == 4)
+        #expect(groups.allSatisfy { $0.text.count == 4 })
         #expect(PairingCodeDisplay.spoken(code).hasSuffix(code.digits.map(String.init).joined(separator: " ")))
     }
 
@@ -151,10 +150,10 @@ struct PairingCodeDisplayTests {
         }
     }
 
-    /// Six digits plus a valid Damm check digit.
+    /// Seven digits plus a valid Damm check digit.
     static func validCode() -> String {
         for check in 0...9 {
-            let candidate = "482109\(check)"
+            let candidate = "4821093\(check)"
             if PairingCode(candidate) != nil { return candidate }
         }
         return ""

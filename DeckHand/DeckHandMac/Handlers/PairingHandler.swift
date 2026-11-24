@@ -38,7 +38,7 @@ final class PairingHandler: DomainHandler {
         case .forget:
             DeviceAuthorizationManager.shared.remoteAskedToForget(connection)
 
-        case .authorizationStatus, .codeResult, .pairedStatus:
+        case .authorizationStatus, .codeResult, .pairedStatus, .refused:
             break // Mac → remote only
         }
     }

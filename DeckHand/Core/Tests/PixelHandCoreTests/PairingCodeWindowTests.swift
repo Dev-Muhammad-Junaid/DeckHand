@@ -15,8 +15,8 @@ import Testing
     private let t0 = Date(timeIntervalSince1970: 1_800_000_000)
     private let ipad = String(repeating: "a1", count: 32)
     private let attacker = String(repeating: "f0", count: 32)
-    private let code = PairingCode("5724125")!
-    private let wrong = PairingCode("111111" + String(DammCheck.checkDigit(for: "111111")!))!
+    private let code = PairingCode("57241250")!
+    private let wrong = PairingCode("1111111" + String(DammCheck.checkDigit(for: "1111111")!))!
 
     private func active(at time: Date? = nil) -> PairingCodeWindow {
         var window = PairingCodeWindow()
@@ -30,7 +30,7 @@ import Testing
     func rightCodeIsAccepted() {
         var window = active()
         #expect(window.display(now: t0) == .code(code, expiresAt: t0 + PairingCodeWindow.lifetime, attemptsLeft: 5))
-        let r1 = window.verify("572-4125", identityKeyID: ipad, now: t0 + 10)
+        let r1 = window.verify("5724 1250", identityKeyID: ipad, now: t0 + 10)
         #expect(r1 == .accepted)
         #expect(window.state == .used(identityKeyID: ipad, at: t0 + 10))
         #expect(window.display(now: t0 + 11) == .paired(identityKeyID: ipad))
@@ -162,7 +162,7 @@ import Testing
     @Test("Malformed and mistyped codes on the wire count as wrong")
     func malformedCounts() {
         var window = active()
-        let r22 = window.verify("5724124", identityKeyID: attacker, now: t0)
+        let r22 = window.verify("57241251", identityKeyID: attacker, now: t0)
         #expect(r22 == .wrongCode(attemptsLeft: 4)) // bad check digit
         let r23 = window.verify("abc", identityKeyID: attacker, now: t0)
         #expect(r23 == .wrongCode(attemptsLeft: 3))
@@ -197,7 +197,7 @@ import Testing
         var window = active()
         _ = window.verify(wrong.digits, identityKeyID: attacker, now: t0)
         _ = window.verify(wrong.digits, identityKeyID: attacker, now: t0)
-        let next = PairingCode("123456" + String(DammCheck.checkDigit(for: "123456")!))!
+        let next = PairingCode("1234567" + String(DammCheck.checkDigit(for: "1234567")!))!
         window.issue(next, now: t0 + 200)
         // The old code is gone.
         let r31 = window.verify(code.digits, identityKeyID: attacker, now: t0 + 201)

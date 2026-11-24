@@ -193,7 +193,7 @@ import Testing
         ("pairing.authorizationStatus.pending", .pairing(.authorizationStatus(state: .pending))),
         ("pairing.authorizationStatus.denied", .pairing(.authorizationStatus(state: .denied))),
         ("pairing.requestAuthorizationStatus", .pairing(.requestAuthorizationStatus)),
-        ("pairing.submitCode", .pairing(.submitCode(code: "5724125"))),
+        ("pairing.submitCode", .pairing(.submitCode(code: "57241250"))),
         ("pairing.codeResult", .pairing(.codeResult(result: .accepted))),
         ("pairing.codeResult.wrongCode", .pairing(.codeResult(result: .wrongCode(attemptsLeft: 3)))),
         ("pairing.codeResult.lockedOut", .pairing(.codeResult(result: .lockedOut(retryAfter: 60)))),
@@ -202,6 +202,8 @@ import Testing
         ("pairing.pairedStatus", .pairing(.pairedStatus(paired: true))),
         ("pairing.pairedStatus.false", .pairing(.pairedStatus(paired: false))),
         ("pairing.forget", .pairing(.forget)),
+        ("pairing.refused", .pairing(.refused(reason: .declined))),
+        ("pairing.refused.notPairedRemote", .pairing(.refused(reason: .notPairedRemote))),
         // session
         ("session.ping", .session(.ping(seq: 7))),
         ("session.pong", .session(.pong(seq: 7))),
@@ -343,6 +345,7 @@ import Testing
             case .codeResult: "pairing.codeResult"
             case .pairedStatus: "pairing.pairedStatus"
             case .forget: "pairing.forget"
+            case .refused: "pairing.refused"
             }
         case let .session(m):
             switch m {
@@ -369,7 +372,7 @@ import Testing
     }
 
     /// Cases in protocol version 11. Bump with every added or removed case.
-    static let expectedCaseCount = 56
+    static let expectedCaseCount = 57
 
     /// The current version, for the hand-written JSON below.
     static let v = PixelHandProtocol.version

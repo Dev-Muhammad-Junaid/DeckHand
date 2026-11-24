@@ -48,7 +48,10 @@ public enum PixelHandProtocol {
     /// - 12: Deck 2 actions (`menuCommand`, `macShortcut`, `sequence`).
     /// - 13: transfers (S1): `sharing.transferStatus`; bytes through Loom's
     ///   transfer engine with a `TransferManifest` in the offer.
-    public static let version = 13
+    /// - 14: `pairing.refused(reason:)`: why the Mac refused (a person's
+    ///   Deny, a timeout, a remote path without pairing, no verified key, a
+    ///   newer request); pairing codes are eight digits (seven and a check).
+    public static let version = 14
 
     /// Bonjour TXT key carrying `version`. Short, because TXT keys should
     /// stay under 9 bytes.

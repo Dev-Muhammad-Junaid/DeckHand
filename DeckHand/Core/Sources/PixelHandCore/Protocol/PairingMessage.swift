@@ -39,6 +39,26 @@ public enum PairingMessage: Codable, Sendable, Equatable {
     /// Remote → Mac: the user chose "Forget" for this Mac. The Mac removes
     /// this device from its paired list and ends the session.
     case forget
+    /// Mac → remote: why the request was refused (protocol 14, VQ-002).
+    /// Sent just before `authorizationStatus(.denied)`, so the remote can
+    /// tell a person's Deny from a rule. A remote that doesn't know it
+    /// still sees the `denied` after it.
+    case refused(reason: AuthRefusal)
+}
+
+/// Why the Mac refused a request (`pairing.refused`).
+public enum AuthRefusal: String, Codable, Sendable, CaseIterable {
+    /// A person clicked Deny on the Mac.
+    case declined
+    /// Nobody answered before the request expired.
+    case timedOut
+    /// Not paired, and it reached the Mac from another network (a VPN,
+    /// Tailscale, cellular). Pair on the same network first.
+    case notPairedRemote
+    /// The handshake didn't prove an identity key.
+    case unverified
+    /// A newer request from the same device replaced this one.
+    case replaced
 }
 
 /// The Mac's decision about a remote.
