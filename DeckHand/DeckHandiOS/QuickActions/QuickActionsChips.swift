@@ -18,6 +18,7 @@ struct ShortcutChip: View {
     let onTap: @MainActor () async -> CommandDelivery
 
     @State private var isPressed = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var delivery = DeliveryTracker()
 
     var body: some View {
@@ -42,7 +43,7 @@ struct ShortcutChip: View {
                     .fill(PixelHandTheme.color(PaletteTokens.fill, for: colorScheme))
             )
             .deliveryDots(delivery.state)
-            .scaleEffect(isPressed ? 0.93 : 1.0)
+            .scaleEffect(isPressed && !reduceMotion ? 0.93 : 1.0)
             .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isPressed)
         }
         .buttonStyle(.plain)

@@ -305,14 +305,17 @@ struct QuickActionsBar: View {
                 GestureHaptic.medium.trigger()
                 Task { await sender.sendSystemAction(.missionControl) }
             }
+            .accessibilityLabel("Mission Control")
             IconButton(symbol: "square.grid.3x3.fill", colorScheme: colorScheme) {
                 GestureHaptic.medium.trigger()
                 Task { await sender.sendSystemAction(.launchpad) }
             }
+            .accessibilityLabel("Launchpad")
             IconButton(symbol: "macwindow", colorScheme: colorScheme) {
                 GestureHaptic.medium.trigger()
                 Task { await sender.sendSystemAction(.showDesktop) }
             }
+            .accessibilityLabel("Show Desktop")
         }
     }
 
@@ -322,14 +325,17 @@ struct QuickActionsBar: View {
                 GestureHaptic.light.trigger()
                 Task { await sender.sendMediaKey(.previous) }
             }
+            .accessibilityLabel("Previous track")
             IconButton(symbol: "playpause.fill", colorScheme: colorScheme) {
                 GestureHaptic.medium.trigger()
                 Task { await sender.sendMediaKey(.playPause) }
             }
+            .accessibilityLabel("Play or pause")
             IconButton(symbol: "forward.fill", colorScheme: colorScheme) {
                 GestureHaptic.light.trigger()
                 Task { await sender.sendMediaKey(.next) }
             }
+            .accessibilityLabel("Next track")
         }
     }
 

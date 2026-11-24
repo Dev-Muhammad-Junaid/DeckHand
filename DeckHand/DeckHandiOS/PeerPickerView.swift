@@ -275,7 +275,7 @@ struct PeerPickerView: View {
                 await MainActor.run {
                     DeckHandLog.connection.error("📡 Connect failed for \(peer.name, privacy: .public): \(error.localizedDescription, privacy: .public)")
                     connecting = nil
-                    showError("Couldn’t connect to \(peer.name). Make sure Pixel Hand is open on the Mac, then try again.")
+                    showError("Couldn’t connect to \(peer.name). \(error.localizedDescription)")
                 }
             }
         }

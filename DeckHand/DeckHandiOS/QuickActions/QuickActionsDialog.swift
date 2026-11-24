@@ -41,6 +41,7 @@ struct DialogInfoButton: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Dialog details")
             .popover(isPresented: $showingPopover, arrowEdge: .bottom) {
                 DialogInfoPopover(title: title, message: message, colorScheme: colorScheme)
                     .presentationCompactAdaptation(.popover)
@@ -83,6 +84,7 @@ struct DialogButtonChip: View {
     let onTap: @MainActor () async -> CommandDelivery
 
     @State private var isPressed = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var delivery = DeliveryTracker()
 
     var body: some View {
@@ -111,7 +113,7 @@ struct DialogButtonChip: View {
                     )
             )
             .deliveryDots(delivery.state)
-            .scaleEffect(isPressed ? 0.93 : 1.0)
+            .scaleEffect(isPressed && !reduceMotion ? 0.93 : 1.0)
             .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isPressed)
         }
         .buttonStyle(.plain)

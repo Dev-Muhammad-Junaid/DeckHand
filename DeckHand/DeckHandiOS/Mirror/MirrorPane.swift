@@ -35,6 +35,20 @@ struct MirrorPane: View {
                 Color.black
                 MirrorPicture(session: session)
                     .mirrorScanline(on: scanKey)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(session.mirrorShowsVideo || session.mirrorImage != nil ? "Screen of \(macName)" : "Connecting to the screen of \(macName)")
+                    .accessibilityAddTraits(.isImage)
+                    .accessibilityActions {
+                        // Live Text on the JPEG stream; the HEVC layer has no still to read.
+                        if !session.mirrorShowsVideo, let image = session.mirrorImage {
+                            Button("Read text on screen") {
+                                Task {
+                                    let result = await TextReader.read(image)
+                                    AccessibilityNotification.Announcement(result.text ?? "No text found").post()
+                                }
+                            }
+                        }
+                    }
             }
             .clipShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous))
             .overlay(
