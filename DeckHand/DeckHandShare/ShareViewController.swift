@@ -157,7 +157,8 @@ final class ShareModel {
     }
 
     private static func copyFile(from provider: NSItemProvider, type: UTType, into folder: URL) async -> URL? {
-        await withCheckedContinuation { continuation in
+        let suggestedName = provider.suggestedName
+        return await withCheckedContinuation { continuation in
             _ = provider.loadFileRepresentation(for: type, openInPlace: false) { url, _, _ in
                 guard let url else {
                     continuation.resume(returning: nil)
@@ -165,7 +166,7 @@ final class ShareModel {
                 }
                 // Each file in its own folder, so equal names don't clash.
                 let destinationFolder = folder.appendingPathComponent(UUID().uuidString, isDirectory: true)
-                let name = TransferFileName.sanitized(provider.suggestedName.map { $0 + (url.pathExtension.isEmpty ? "" : ".\(url.pathExtension)") } ?? url.lastPathComponent, kind: .file)
+                let name = TransferFileName.sanitized(suggestedName.map { $0 + (url.pathExtension.isEmpty ? "" : ".\(url.pathExtension)") } ?? url.lastPathComponent, kind: .file)
                 let destination = destinationFolder.appendingPathComponent(name)
                 do {
                     try FileManager.default.createDirectory(at: destinationFolder, withIntermediateDirectories: true)
