@@ -36,8 +36,12 @@ struct SettingsConnectionSection: View {
 
         Section {
             if pairing.macs.isEmpty {
-                Text("Pair with a Mac first")
-                    .foregroundStyle(.secondary)
+                // UX-018: the glyph empty state on navy.
+                PixelSurface(cornerRadius: PixelHandTheme.Radius.card) {
+                    PHEmptyState(glyph: PixelGlyphs.mac, title: "No paired Macs", message: "Pair with a Mac first, then set up its addresses here.")
+                }
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
             } else {
                 ForEach(pairing.macs) { mac in
                     NavigationLink {
@@ -146,7 +150,7 @@ struct RemoteAccessMacView: View {
                     HStack {
                         Text("Test Connection")
                         Spacer()
-                        if isTesting { ProgressView() }
+                        if isTesting { DotWave(pitch: 3, label: "Testing") }
                     }
                 }
                 .disabled(hosts.isEmpty || isTesting)

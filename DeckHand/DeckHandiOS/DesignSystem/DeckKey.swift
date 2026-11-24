@@ -84,6 +84,7 @@ struct DeckKey: View {
             .contentShape(shape)
         }
         .buttonStyle(ChipPressStyle())
+        .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.key)
         .overlay(alignment: .topLeading) {
             if kind == .editing, let onRemove {
                 Button(action: onRemove) {
@@ -167,6 +168,7 @@ struct DeckKeyRow: View {
             .contentShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.key, style: .continuous))
         }
         .buttonStyle(ChipPressStyle())
+        .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.key)
         .accessibilityLabel(title)
         .accessibilityHint(chord.map { "Shortcut \($0)" } ?? "")
     }

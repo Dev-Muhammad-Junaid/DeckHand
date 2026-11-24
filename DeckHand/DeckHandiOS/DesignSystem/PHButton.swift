@@ -126,6 +126,7 @@ struct GlassCircleButton: View {
         }
         .buttonStyle(.plain)
         .phGlass(in: Circle(), interactive: true)
+        .phosphorFocusable(cornerRadius: size / 2)
         .frame(minWidth: PixelHandTheme.ControlHeight.hit, minHeight: PixelHandTheme.ControlHeight.hit)
         .accessibilityLabel(label)
         .accessibilityAddTraits(isOn ? .isSelected : [])

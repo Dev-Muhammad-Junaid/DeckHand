@@ -48,6 +48,7 @@ struct ContextChip: View {
             .contentShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous))
         }
         .buttonStyle(ChipPressStyle())
+        .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.chip)
         .padding(kind == .defaultAction ? 4 : 0)
         .accessibilityLabel(accessibilityTitle ?? title)
         .accessibilityHint(chord.map { "Shortcut \($0)" } ?? "")

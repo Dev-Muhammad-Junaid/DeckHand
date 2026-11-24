@@ -173,12 +173,15 @@ struct AppShortcutsSheet: View {
                             }
                         }
                     } label: {
-                        if isImporting {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Image(systemName: "ellipsis.circle.fill")
-                                .font(.system(size: 20))
-                        }
+                        Image(systemName: "ellipsis.circle.fill")
+                            .font(.system(size: 20))
+                    }
+                }
+                // UX-018: the dot wave instead of a spinner, beside the menu
+                // (a menu label in a toolbar can't host an animated view).
+                ToolbarItem(placement: .topBarTrailing) {
+                    if isImporting {
+                        DotWave(pitch: 3, label: "Importing shortcuts")
                     }
                 }
             }

@@ -86,6 +86,7 @@ struct SurfaceTabBar: View {
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .phosphorFocusable(cornerRadius: 27)
         .accessibilityLabel(surface.title)
         .accessibilityAddTraits(isOn ? [.isSelected, .isButton] : .isButton)
         .accessibilityShowsLargeContentViewer {

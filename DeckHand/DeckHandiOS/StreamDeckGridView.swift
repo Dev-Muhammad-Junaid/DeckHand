@@ -127,9 +127,17 @@ struct StreamDeckGridView: View {
                     DeckHandLoadingStateView(title: "Loading apps from Mac…")
                 } else if !searchText.isEmpty {
                     // Without this a search with no matches left a blank page.
-                    DeckHandEmptyState(glyph: PixelArt.launch, title: "No apps match “\(searchText)”.")
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 60)
+                    PixelSurface(cornerRadius: PixelHandTheme.Radius.card) {
+                        PHEmptyState(
+                            glyph: PixelGlyphs.find,
+                            title: "No matches",
+                            message: "No apps on the Mac match “\(searchText)”.",
+                            primaryTitle: "Clear search",
+                            primaryAction: { searchText = "" }
+                        )
+                    }
+                    .padding(.horizontal, horizontalInset)
+                    .padding(.vertical, 24)
                 }
             }
         }

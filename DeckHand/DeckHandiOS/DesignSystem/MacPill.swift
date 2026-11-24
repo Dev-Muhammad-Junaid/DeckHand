@@ -26,6 +26,7 @@ struct MacPill: View {
             if let action {
                 Button(action: action) { content }
                     .buttonStyle(.plain)
+                    .phosphorFocusable(cornerRadius: PixelHandTheme.ControlHeight.hit / 2)
             } else {
                 content
             }

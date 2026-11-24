@@ -17,8 +17,12 @@ struct SettingsPairingSection: View {
     var body: some View {
         Section {
             if store.macs.isEmpty {
-                Text("No paired Macs")
-                    .foregroundStyle(.secondary)
+                // UX-018: the glyph empty state on navy.
+                PixelSurface(cornerRadius: PixelHandTheme.Radius.card) {
+                    PHEmptyState(glyph: PixelGlyphs.mac, title: "No paired Macs", message: "Open Pixel Hand on your Mac, then choose it here to pair.")
+                }
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
             } else {
                 ForEach(store.macs) { mac in
                     row(mac)
