@@ -914,3 +914,71 @@ Mac should check:
    - the free tier on a second Mac
 
 Status: READY FOR MAC BUILD (build 15)
+
+## Mac build results (build 15) — 2026-11-24
+
+Built from `785d970` (build 15) on Xcode 27.2, Release, team `DD5AWPLT2V`,
+automatic signing with `-allowProvisioningUpdates`.
+
+**Build**
+- Mac app: builds after 1 fix.
+- iOS app + embedded `DeckHandWidgets` extension (`PixelHandWidgets.appex`):
+  builds after 3 fixes. The widget's App Group
+  `group.com.widgetsflow.pixelhand` and App ID
+  `com.widgetsflow.pixelhand.widgets` registered automatically; nothing to
+  add in the developer portal.
+- Both are signed with development profiles (`get-task-allow` is on in the
+  Release product), not distribution. Fine for testing, not for upload.
+
+**Fixes pushed** (one commit each, on `claude/pixelhand-integration`)
+1. `Shared/PixelHandTheme.swift`: `Color.init(_ rgb: RGBColor)` is ambiguous
+   on macOS (Carbon's `RGBColor` vs `PixelHandCore.RGBColor`); now
+   `PixelHandCore.RGBColor`. Design lane's compile risk #6.
+2. `PixelHandCore/Capture/CaptureSheetChrome.swift`: `CaptureStrip` had only
+   an internal memberwise init, so the iOS app couldn't build one; added a
+   public `init(items:spoken:)`.
+3. `DeckHandiOS/Deck/DeckSuggestionsModel.swift`: unqualified `DeckKey`
+   resolved to the app's view struct, not the model; now
+   `PixelHandCore.DeckKey`. Deck 2 lane's compile risk #3.
+4. `DeckHandiOS/DesignSystem/PixelTransitions.swift`:
+   `PixelDissolveModifier: ViewModifier, @preconcurrency Animatable` (Swift 6
+   conformance-isolation error).
+5. Track `DeckHandWidgets/Info.plist` and `DeckHandWidgets.entitlements`
+   (xcodegen generates them; the other targets' are tracked).
+6. `Tests/LoomTests/LoomNodeAdvertisementTests.swift`: the build-7 test used
+   `LoomTransportKind`, which is ambiguous between `Loom` and
+   `LoomNetworking`; qualified it and imported `LoomNetworking`; replaced
+   `allSatisfy(\.isCancelled)` with a closure (Xcode 27 reports the key path as
+   throwing inside `#expect`). The Loom test target did not compile before
+   this.
+
+None of the compile-risk items for Foundation Models (Ask, Suggest), Metal
+shaders, App Intents or the widget bundle needed changes.
+
+**Tests**
+- `swift test --package-path DeckHand/Core`: **781 pass**, 0 fail.
+- `swift test --scratch-path .build-local`, no `--skip`: **477 Swift Testing
+  tests pass** (suites: 377, 42, 15, 13, 10, 9, 6, 5), 0 failed, 0 skipped.
+- `DeckHandTests` (macOS): **8 pass**.
+
+**Install**
+- Mac: `/Applications/Pixel Hand.app` replaced (old copy quit first) and
+  launched with `open`; menu-bar item not yet confirmed by the owner.
+- iPad (Muhammad Junaid's iPad, iPad Air 11-inch M3): installed with the
+  widget extension and launched.
+
+**Bugs found:** none by the build gate. No visual or hands-on checks done by
+me; the owner is testing. Hands-on checks are listed under "Build 15 queued"
+above.
+
+**Notes**
+- Root `Package.resolved` gets modified by every xcodebuild; not committed.
+- The Xcode build log shows `appintentsnltrainingprocessor: Could not archive
+  SSU artifacts` for the iOS app. The build still succeeds; harmless unless
+  Siri/Spotlight phrases misbehave.
+
+## Owner testing (build 15)
+
+(One line per finding. The cloud coordinator turns these into fix sessions.)
+
+Status: BUILT (build 15) — green
