@@ -93,7 +93,7 @@ final class DeckSuggestionsModel: ObservableObject {
     private var cache: [String: (bindings: [AppShortcutBinding], at: Date)] = [:]
     private var pending: Set<String> = []
     private var appNames: [String: String] = [:]
-    private var existingAtLoad: [String: [DeckKey]] = [:]
+    private var existingAtLoad: [String: [PixelHandCore.DeckKey]] = [:]
     private var timeoutTasks: [String: Task<Void, Never>] = [:]
     private var refineTasks: [String: Task<Void, Never>] = [:]
     /// Bumped on every new ranking of an app, so a late model answer for
@@ -106,7 +106,7 @@ final class DeckSuggestionsModel: ObservableObject {
 
     /// What the panel shows for `bundleID`: the order, minus what the page
     /// already has (`existing`) and what the user hid, capped.
-    func visible(for bundleID: String, existing: [DeckKey]) -> [DeckSuggestion] {
+    func visible(for bundleID: String, existing: [PixelHandCore.DeckKey]) -> [DeckSuggestion] {
         let state = state(for: bundleID)
         guard state.phase == .ready else { return [] }
         let pool = state.ordered.filter { !hiddenIDs.contains($0.id) }
@@ -128,7 +128,7 @@ final class DeckSuggestionsModel: ObservableObject {
     /// otherwise asks the Mac. `force` asks again. The Mac brings the app
     /// forward to read its menus, so callers ask on their own only for the
     /// app already in front.
-    func load(bundleID: String, appName: String, existing: [DeckKey], sender: TrackpadSender, force: Bool = false) {
+    func load(bundleID: String, appName: String, existing: [PixelHandCore.DeckKey], sender: TrackpadSender, force: Bool = false) {
         appNames[bundleID] = appName
         existingAtLoad[bundleID] = existing
         if !force, hasFreshMenus(for: bundleID), let entry = cache[bundleID] {
