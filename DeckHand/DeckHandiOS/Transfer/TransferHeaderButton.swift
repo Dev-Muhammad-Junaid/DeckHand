@@ -1,0 +1,54 @@
+//
+//  TransferHeaderButton.swift
+//  DeckHandiOS – Transfer
+//
+//  S2: the shell header's Send button (one announced line in
+//  `ShellHeader`). Opens Send and Inbox; a dot shows unseen Inbox items.
+//  Sharing is Pixel Hand Pro, so the button is gated; the incoming prompt
+//  and notices hang off it so they show on the main screen too, and the
+//  App Group drops from the Share extension are taken in whenever the app
+//  comes to the front.
+//
+
+import SwiftUI
+
+struct TransferHeaderButton: View {
+    @State private var showsSheet = false
+    @State private var startTab: TransferSheet.Tab = .send
+    @Environment(\.scenePhase) private var scenePhase
+    private let center = TransferCenter.shared
+
+    var body: some View {
+        GlassCircleButton(
+            glyph: PixelGlyphs.send,
+            label: center.inbox.unseenCount > 0 ? "Send and Inbox, \(center.inbox.unseenCount) new" : "Send and Inbox"
+        ) {
+            startTab = center.inbox.unseenCount > 0 ? .inbox : .send
+            showsSheet = true
+        }
+        .overlay(alignment: .topTrailing) {
+            if center.inbox.unseenCount > 0 {
+                Circle()
+                    .fill(PixelHandTheme.accent)
+                    .frame(width: 10, height: 10)
+                    .offset(x: -4, y: 4)
+                    .accessibilityHidden(true)
+            }
+        }
+        .requiresPro(.sharing)
+        .sheet(isPresented: $showsSheet) {
+            TransferSheet(tab: startTab)
+                .presentationDetents([.medium, .large])
+        }
+        .background {
+            // Outside the Pro gate so it isn't disabled with the button.
+            Color.clear
+                .transferPromptAlert(enabled: !showsSheet)
+                .transferNoticeAlert(enabled: !showsSheet)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { center.refresh() }
+        }
+        .onAppear { center.refresh() }
+    }
+}
