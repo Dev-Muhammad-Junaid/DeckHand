@@ -30,8 +30,8 @@ struct ShellHeader: View {
     let onWindow: () -> Void
     let onOCR: () -> Void
     let onPrimaryCapture: () -> Void
-    /// Tap on the Mac pill: My Macs. Swiping the pill sideways will switch
-    /// Macs in 1.3; until then the swipe nudges the pill and opens My Macs.
+    /// Tap on the Mac pill: My Macs. Swiping the pill sideways switches to
+    /// the next or previous Mac (UX-030), or opens My Macs with no other.
     let onMacs: () -> Void
     let onSettings: () -> Void
     let onClassicLayout: () -> Void
@@ -114,7 +114,7 @@ struct ShellHeader: View {
                 }
                 if abs(value.translation.width) > 40, abs(value.translation.width) > abs(value.translation.height) {
                     GestureHaptic.selection.trigger()
-                    onMacs()
+                    if !MacSwitcher.shared.step(by: value.translation.width < 0 ? 1 : -1) { onMacs() } // Multi-Mac lane: swipe = next/previous Mac
                 }
             }
     }

@@ -217,6 +217,7 @@ struct TrackpadInputLayer: View {
                 Task { await sender.endScroll() }
             },
             onSystemGesture: { gesture in
+                if MacSwitcher.shared.handleTrackpadGesture(gesture) { return } // Multi-Mac lane: three fingers sideways switch Macs
                 // Toggle-back: the opposite gesture closes what this one
                 // opened; the same one again waits.
                 guard let command = gestureMap.wrappedValue.resolve(gesture) else { return }

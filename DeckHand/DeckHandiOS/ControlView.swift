@@ -92,6 +92,7 @@ struct ControlView: View {
             Task { await session.sender?.setSendRate(hz: rate.rawValue) }
         }
         .modifier(ControlCaptureSheets(capture: session.capture, runningBundleIDs: session.runningBundleIDs))
+        .macSessionGlance(session) // Multi-Mac lane: live glance for My Macs and the sidebar
         .task {
             await session.run(settings: settings)
         }

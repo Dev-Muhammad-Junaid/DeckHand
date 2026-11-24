@@ -103,7 +103,7 @@ struct PixelHandShell: View {
             AskPlaceholderSheet(macName: peerName)
         }
         .sheet(isPresented: $isMyMacsPresented) {
-            MyMacsPlaceholderSheet(
+            MyMacsSheet( // Multi-Mac lane: UX-030 replaces the placeholder
                 currentMacName: peerName,
                 currentSubtitle: headerSubtitle,
                 isLive: isLive,
@@ -120,6 +120,7 @@ struct PixelHandShell: View {
                     .presentationDragIndicator(.visible)
             }
         }
+        .perMacSurface($surfaceRawValue) // Multi-Mac lane: each Mac keeps its surface
         .onChange(of: session.runningBundleIDs, initial: true) { _, running in
             dockOrder = AppDockPlan.order(previous: dockOrder, running: running)
         }
