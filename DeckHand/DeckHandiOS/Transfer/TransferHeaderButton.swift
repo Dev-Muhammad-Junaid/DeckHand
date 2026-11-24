@@ -13,6 +13,9 @@
 import SwiftUI
 
 struct TransferHeaderButton: View {
+    /// Bumped by the header's More menu when this circle is folded into it
+    /// (build 18 QA, VQ-032/VQ-081): opens the sheet as a tap would.
+    var openRequest = 0
     @State private var showsSheet = false
     @State private var startTab: TransferSheet.Tab = .send
     @Environment(\.scenePhase) private var scenePhase
@@ -51,5 +54,9 @@ struct TransferHeaderButton: View {
             if phase == .active { center.refresh() }
         }
         .onAppear { center.refresh() }
+        .onChange(of: openRequest) { _, _ in
+            startTab = center.inbox.unseenCount > 0 ? .inbox : .send
+            showsSheet = true
+        }
     }
 }

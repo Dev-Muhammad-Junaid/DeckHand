@@ -7,6 +7,12 @@
 //  lives in More, away from the primary actions; the session id is no
 //  longer shown. Board: `.hdr2`. (UX-003 shell, the basis of UX-008.)
 //
+//  Build 18 QA: when the circles don't fit beside a readable Mac pill they
+//  fold into More (`ShellHeaderPlan`: first all but capture, then capture
+//  too; at the Huge type band always), the pill truncates its name at the
+//  tail, and in a Stage Manager window the row starts after the window
+//  controls. The classic layout is a DEBUG-only item.
+//
 //  On iPad (UX-007) the header also carries the layout presets, and on
 //  wide windows the Ask field (⌘K) between them and capture, and the
 //  sidebar button while the Macs sidebar is hidden. In the iPhone
@@ -14,6 +20,7 @@
 //  screen button (the rail has the Screen tab).
 //
 
+import PixelHandCore
 import SwiftUI
 
 struct ShellHeader: View {
@@ -46,14 +53,49 @@ struct ShellHeader: View {
     var horizontalPadding: CGFloat = PixelHandTheme.Space.lg
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.entitlements) private var entitlements
     @State private var swipeOffset: CGFloat = 0
+    /// The header's measured width, for `ShellHeaderPlan`.
+    @State private var width: CGFloat = 0
+    /// Stage Manager's window controls (iPadOS 26), measured by
+    /// `WindowControlsInset`; the header starts after them (VQ-080).
+    @State private var windowControlsInset: CGFloat = 0
+    /// Bumped by More › Send and Inbox while the send circle is folded.
+    @State private var transferRequest = 0
+    @State private var lockedFeature: LockedFeature?
+
+    /// The optional circles beside the pill (More is always there).
+    private var circleCount: Int {
+        (showsMirrorToggle ? 1 : 0) + 1 /* capture */ + 1 /* send */ + (onShowSidebar == nil ? 0 : 1)
+    }
+
+    /// Room the presets and the Ask circle take in the row.
+    private var reservedWidth: Double {
+        (presets == nil ? 0 : 168) + (onAsk == nil ? 0 : 52) + (linkBadge == nil ? 0 : 72)
+    }
+
+    /// Which circles stay in the row; the rest fold into More (VQ-032,
+    /// VQ-065, VQ-081). Before the first measure, everything shows.
+    private var actions: ShellHeaderPlan.Actions {
+        guard width > 0 else { return .full }
+        return ShellHeaderPlan.actions(
+            width: Double(width - windowControlsInset),
+            horizontalPadding: Double(horizontalPadding),
+            circles: circleCount,
+            reserved: reservedWidth,
+            band: typeSize.typeBand
+        )
+    }
 
     var body: some View {
+        let fit = self.actions
         HStack(spacing: PixelHandTheme.Space.sm) {
             MacPill(
                 name: peerName,
                 subtitle: subtitle,
                 status: isLocked ? .locked : (isLive ? .online : .offline),
+                nameLines: ShellHeaderPlan.pillNameLines(band: typeSize.typeBand),
                 action: onMacs
             )
             .accessibilityHint("Shows My Macs.")
@@ -61,10 +103,10 @@ struct ShellHeader: View {
             .offset(x: swipeOffset)
             .simultaneousGesture(pillSwipe)
             .layoutPriority(1)
-            if let badge = linkBadge {
+            if fit == .full, let badge = linkBadge {
                 LinkBadge(kind: badge)
             }
-            if let onAsk {
+            if fit == .full, let onAsk {
                 if let presets {
                     LayoutPresetPicker(selection: presets)
                 }
@@ -77,30 +119,51 @@ struct ShellHeader: View {
                 }
             } else {
                 Spacer(minLength: 0)
-                if let presets {
+                if fit == .full, let presets {
                     LayoutPresetPicker(selection: presets)
                 }
             }
-            if showsMirrorToggle {
-                GlassCircleButton(
-                    glyph: PixelGlyphs.pictureInPicture,
-                    label: isMirrorActive ? "Hide the Mac’s screen" : "Show the Mac’s screen",
-                    isOn: isMirrorActive,
-                    action: onToggleMirror
-                )
-                .accessibilityIdentifier("ph.header.screen")
-                .requiresPro(.mirror)
+            if fit == .full {
+                if showsMirrorToggle {
+                    GlassCircleButton(
+                        glyph: PixelGlyphs.pictureInPicture,
+                        label: isMirrorActive ? "Hide the Mac’s screen" : "Show the Mac’s screen",
+                        isOn: isMirrorActive,
+                        action: onToggleMirror
+                    )
+                    .accessibilityIdentifier("ph.header.screen")
+                    .requiresPro(.mirror)
+                }
             }
-            captureMenu
-            TransferHeaderButton() // Sharing lane: Send and Inbox (S2)
-            if let onShowSidebar {
-                GlassCircleButton(glyph: PixelGlyphs.sidebar, label: "Show the Macs sidebar", action: onShowSidebar)
+            if fit <= .captureAndMore {
+                captureMenu
             }
-            moreMenu
+            if fit == .full {
+                TransferHeaderButton() // Sharing lane: Send and Inbox (S2)
+                if let onShowSidebar {
+                    GlassCircleButton(glyph: PixelGlyphs.sidebar, label: "Show the Macs sidebar", action: onShowSidebar)
+                }
+            }
+            moreMenu(folded: fit)
         }
-        .padding(.horizontal, horizontalPadding)
+        .padding(.leading, horizontalPadding + windowControlsInset)
+        .padding(.trailing, horizontalPadding)
         .frame(minHeight: PixelHandTheme.ControlHeight.dock)
         .phGlassGroup()
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        .background { WindowControlsInset(inset: $windowControlsInset) }
+        .background {
+            // Folded: the send sheet and its alerts still live here.
+            if fit != .full {
+                TransferHeaderButton(openRequest: transferRequest)
+                    .hidden()
+                    .accessibilityHidden(true)
+                    .allowsHitTesting(false)
+            }
+        }
+        .sheet(item: $lockedFeature) { locked in
+            PaywallView(reason: .feature(locked.feature))
+        }
     }
 
     /// The pill swipe placeholder (UX-008): follows the finger a little
@@ -160,18 +223,73 @@ struct ShellHeader: View {
         .requiresPro(.capture)
     }
 
-    private var moreMenu: some View {
+    /// More: the circles that didn't fit, Settings, and Disconnect at the
+    /// end, away from the rest. Labels never wrap (VQ-035).
+    private func moreMenu(folded actions: ShellHeaderPlan.Actions) -> some View {
         Menu {
+            if actions != .full {
+                Section {
+                    if showsMirrorToggle {
+                        lockable(.mirror) {
+                            Button(action: onToggleMirror) {
+                                Label(isMirrorActive ? "Hide screen" : "Show screen", systemImage: "rectangle.inset.topright.filled")
+                            }
+                        }
+                    }
+                    if actions == .moreOnly {
+                        lockable(.capture) {
+                            Menu {
+                                Button("Full screen", action: onFullScreen)
+                                Button("Region", action: onRegion)
+                                Button("Window", action: onWindow)
+                                Button("Read text", action: onOCR)
+                            } label: {
+                                Label("Capture", systemImage: "camera.viewfinder")
+                            }
+                        }
+                    }
+                    lockable(.sharing) {
+                        Button {
+                            transferRequest += 1
+                        } label: {
+                            Label("Send and Inbox", systemImage: "paperplane")
+                        }
+                    }
+                    if let onShowSidebar {
+                        Button(action: onShowSidebar) {
+                            Label("Show Macs", systemImage: "sidebar.leading")
+                        }
+                    }
+                    if let onAsk {
+                        Button(action: onAsk) {
+                            Label("Ask", systemImage: "text.magnifyingglass")
+                        }
+                    }
+                    if let presets {
+                        Picker(selection: presets) {
+                            ForEach(LayoutPreset.allCases, id: \.self) { preset in
+                                Text(preset.title).tag(preset)
+                            }
+                        } label: {
+                            Label("Layout", systemImage: "rectangle.split.2x1")
+                        }
+                    }
+                }
+            }
             Button(action: onSettings) {
                 Label("Settings", systemImage: "gearshape")
             }
+            #if DEBUG
+            // The legacy layout is a developer tool, never customer UI (VQ-035).
             Button(action: onClassicLayout) {
-                Label("Use the classic layout", systemImage: "rectangle.grid.1x2")
+                Label("Classic layout (debug)", systemImage: "rectangle.grid.1x2")
             }
+            #endif
             Divider()
             Button(role: .destructive, action: onDisconnect) {
-                Label("Disconnect from \(peerName)", systemImage: "xmark.circle")
+                Label("Disconnect", systemImage: "xmark.circle")
             }
+            .accessibilityLabel("Disconnect from \(peerName)")
         } label: {
             PHGlyph(glyph: PixelGlyphs.settings, pitch: PixelPitch.header)
                 .foregroundStyle(PixelHandTheme.ink)
@@ -183,4 +301,25 @@ struct ShellHeader: View {
         .accessibilityIdentifier("ph.header.more")
         .phosphorFocusable(cornerRadius: PixelHandTheme.ControlHeight.standard / 2)
     }
+
+    /// A folded item for a Pro feature: as is when unlocked, otherwise a
+    /// "· Pro" item that opens the paywall for it.
+    @ViewBuilder
+    private func lockable<Content: View>(_ feature: ProFeature, @ViewBuilder content: () -> Content) -> some View {
+        if entitlements.allows(feature) {
+            content()
+        } else {
+            Button {
+                lockedFeature = LockedFeature(feature: feature)
+            } label: {
+                Label("\(SubscriptionCopy.title(feature)) · Pro", systemImage: "lock")
+            }
+        }
+    }
+}
+
+/// A Pro feature the folded More menu opens the paywall for.
+private struct LockedFeature: Identifiable {
+    let feature: ProFeature
+    var id: String { feature.rawValue }
 }
