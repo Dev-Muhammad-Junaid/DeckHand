@@ -20,6 +20,18 @@
 import Foundation
 
 public enum ContextStripPlan {
+    /// Pixel Hand's own Mac app. Its menu-bar panel comes to the front
+    /// whenever someone uses it; the strip, deck and dock keep the app
+    /// that was in front before (build 18 QA, VQ-063).
+    public static let hostBundleIDs: Set<String> = ["com.widgetsflow.pixelhand.mac"]
+
+    /// Whether a front-app report should replace the current front app:
+    /// not when it names Pixel Hand's own Mac app.
+    public static func acceptsFrontApp(bundleID: String?) -> Bool {
+        guard let bundleID else { return true }
+        return !hostBundleIDs.contains(bundleID)
+    }
+
     public enum Mode: Hashable, Sendable {
         /// The Mac shows a dialog: its buttons, in strip order.
         case dialog(title: String?, message: String?, buttons: [DialogButton])

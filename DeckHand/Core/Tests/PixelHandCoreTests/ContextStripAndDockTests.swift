@@ -137,4 +137,11 @@ struct VersionLineTests {
         #expect(line.allSatisfy { DotMatrixFont.pattern(for: $0) != nil })
         #expect(line == "PIXEL HAND 1.2B3 - 52X")
     }
+
+    @Test("Pixel Hand's own Mac panel never becomes the front app (VQ-063)")
+    func hostAppIgnored() {
+        #expect(!ContextStripPlan.acceptsFrontApp(bundleID: "com.widgetsflow.pixelhand.mac"))
+        #expect(ContextStripPlan.acceptsFrontApp(bundleID: "com.apple.Safari"))
+        #expect(ContextStripPlan.acceptsFrontApp(bundleID: nil))
+    }
 }

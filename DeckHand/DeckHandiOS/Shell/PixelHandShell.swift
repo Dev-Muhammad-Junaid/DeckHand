@@ -179,12 +179,17 @@ struct PixelHandShell: View {
         .safeAreaInset(edge: .bottom, spacing: PixelHandTheme.Space.sm) {
             VStack(spacing: PixelHandTheme.Space.sm) {
                 bottomChrome(metrics: metrics, foldsDock: height < Self.foldedDockHeight)
-                SurfaceTabBar(
-                    selection: selection,
-                    tabs: ControlSurface.tabs(includeDeck: true),
-                    onAsk: { isAskPresented = true }
-                )
-                .padding(.horizontal, CGFloat(metrics.margin))
+                // While typing, the tab bar steps aside so the pad stays
+                // usable above the keyboard (VQ-033).
+                if !isKeyboardShown {
+                    SurfaceTabBar(
+                        selection: selection,
+                        tabs: ControlSurface.tabs(includeDeck: true),
+                        onAsk: { isAskPresented = true }
+                    )
+                    .padding(.horizontal, CGFloat(metrics.margin))
+                    .transition(.opacity)
+                }
             }
         }
     }
@@ -649,7 +654,12 @@ struct PixelHandShell: View {
     private func bottomChrome(metrics: LayoutMetrics, foldsDock: Bool) -> some View {
         VStack(spacing: PixelHandTheme.Space.sm) {
             keyboardPanel(margin: CGFloat(metrics.margin))
-            stripOnly(metrics: metrics, foldedDock: foldsDock, margin: CGFloat(metrics.margin))
+            // While typing the strip collapses (the keyboard panel has the
+            // keys it would offer); the dock stays, it holds the keyboard
+            // toggle. A folded dock lives in the strip, so it stays then.
+            if !isKeyboardShown || foldsDock {
+                stripOnly(metrics: metrics, foldedDock: foldsDock, margin: CGFloat(metrics.margin))
+            }
             if !foldsDock {
                 dock
             }

@@ -6,8 +6,9 @@
 //  the canvas and the app dock. What it shows comes from
 //  `ContextStripPlan`: a dialog's buttons first (default first on compact),
 //  otherwise the front app's chips, then text editing when a field has focus,
-//  then "+ Shortcuts" (the rest of the app's shortcuts). Free plan: media
-//  keys and a dashed "App chips · Pro" chip.
+//  then "+ Shortcuts" (the rest of the app's shortcuts). Free plan:
+//  labelled media keys (Previous, Play/Pause, Next) and a dashed
+//  "App chips · Pro" chip.
 //
 //  Dynamic Type bands (`07-Polish-Spec.md` §6): standard is one row; large
 //  wraps into two rows with the chord under the label (the chip does that);
@@ -229,7 +230,8 @@ private struct StripChip: View {
         case .edit(let action):
             chip(title: action.label, chord: ChordText.glyphs(action.keys))
         case .media(let key):
-            chip(title: item.title, glyph: Self.glyph(for: key), iconOnly: true)
+            // Labelled, so they read as media keys, not navigation (VQ-056).
+            chip(title: Self.shortTitle(for: key), glyph: Self.glyph(for: key), spokenTitle: item.title)
         case .moreShortcuts:
             ContextChip(title: "Shortcuts", glyph: PixelGlyphs.add, kind: .suggestion) {
                 if let frontApp { onOpenAppSheet(frontApp) }
@@ -250,8 +252,8 @@ private struct StripChip: View {
         }
     }
 
-    private func chip(title: String, glyph: GlyphBitmap? = nil, chord: String? = nil, kind: ContextChip.Kind = .standard, iconOnly: Bool = false) -> some View {
-        ContextChip(title: iconOnly ? "" : title, glyph: glyph, chord: chord, kind: kind, delivery: delivery.state, accessibilityTitle: title) {
+    private func chip(title: String, glyph: GlyphBitmap? = nil, chord: String? = nil, kind: ContextChip.Kind = .standard, spokenTitle: String? = nil) -> some View {
+        ContextChip(title: title, glyph: glyph, chord: chord, kind: kind, delivery: delivery.state, accessibilityTitle: spokenTitle ?? title) {
             Self.haptic(for: item).trigger()
             Task { await DeliveryTracker.run($delivery) { await Self.send(item, sender: sender) } }
         }
@@ -293,6 +295,14 @@ private struct StripChip: View {
         case .dialog(let button): button.isDefault ? .medium : .light
         case .shortcut: .medium
         default: .light
+        }
+    }
+
+    static func shortTitle(for key: MediaKey) -> String {
+        switch key {
+        case .previous: "Previous"
+        case .playPause: "Play/Pause"
+        case .next: "Next"
         }
     }
 
