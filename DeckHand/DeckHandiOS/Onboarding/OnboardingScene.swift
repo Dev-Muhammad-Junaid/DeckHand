@@ -481,5 +481,5 @@ private struct PairingScene: View {
         }
         .padding(24)
     }
-    .background(DeckHandTheme.brandBackground())
+    .background(PixelHandTheme.brandBackground())
 }

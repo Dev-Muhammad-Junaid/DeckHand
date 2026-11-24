@@ -65,7 +65,7 @@ struct ControlToolbar: ToolbarContent {
                       ? "rectangle.fill.on.rectangle.fill"
                       : "rectangle.on.rectangle")
             }
-            .tint(isMirrorActive ? DeckHandTheme.mint : nil)
+            .tint(isMirrorActive ? PixelHandTheme.success : nil)
             .accessibilityLabel(isMirrorActive ? "Stop live mirror" : "Start live mirror")
             .requiresPro(.mirror) // Store lane
         }
@@ -108,7 +108,7 @@ struct ControlToolbar: ToolbarContent {
             Button(action: onDisconnect) {
                 Image(systemName: "minus.circle")
             }
-            .tint(DeckHandTheme.danger)
+            .tint(PixelHandTheme.danger)
             .accessibilityLabel("Disconnect")
         }
     }

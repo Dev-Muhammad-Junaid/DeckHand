@@ -89,6 +89,6 @@ struct NumpadChip: View {
     }
 
     private var background: Color {
-        key.isPrimary ? DeckHandTheme.accent : DeckHandTheme.subtleWellFill(colorScheme)
+        key.isPrimary ? PixelHandTheme.accent : PixelHandTheme.color(PaletteTokens.fill, for: colorScheme)
     }
 }

@@ -36,7 +36,7 @@ struct DialogInfoButton: View {
                 Image(systemName: "exclamationmark.bubble.fill")
                     .font(.system(size: 15, weight: .medium))
                     .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(DeckHandTheme.accent)
+                    .foregroundStyle(PixelHandTheme.accent)
                     .frame(width: 36, height: 36)
                     .contentShape(Rectangle())
             }
@@ -129,13 +129,13 @@ struct DialogButtonChip: View {
     }
 
     private var background: Color {
-        if button.isDefault { return DeckHandTheme.accent }
+        if button.isDefault { return PixelHandTheme.accent }
         if button.isCancel  { return Color.clear }
-        return DeckHandTheme.subtleWellFill(colorScheme)
+        return PixelHandTheme.color(PaletteTokens.fill, for: colorScheme)
     }
 
     private var stroke: Color {
-        if button.isDefault { return DeckHandTheme.accent.opacity(0.8) }
+        if button.isDefault { return PixelHandTheme.accent.opacity(0.8) }
         if button.isCancel  { return Color.primary.opacity(0.14) }
         return Color.primary.opacity(0.08)
     }

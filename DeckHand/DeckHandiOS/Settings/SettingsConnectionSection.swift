@@ -21,7 +21,7 @@ struct SettingsConnectionSection: View {
                 LabeledContent {
                     Label(link.displayName, systemImage: link.systemImage)
                         .labelStyle(.titleAndIcon)
-                        .foregroundStyle(link == .wired ? AnyShapeStyle(DeckHandTheme.accent) : AnyShapeStyle(.secondary))
+                        .foregroundStyle(link == .wired ? AnyShapeStyle(PixelHandTheme.accent) : AnyShapeStyle(.secondary))
                 } label: {
                     Text("Link")
                 }
@@ -82,7 +82,7 @@ private struct RemoteAccessMacRow: View {
         let count = hostsStore.hosts(for: mac.ref).count
         HStack(spacing: 12) {
             Image(systemName: mac.kind.systemImage)
-                .foregroundStyle(DeckHandTheme.accent)
+                .foregroundStyle(PixelHandTheme.accent)
                 .frame(width: 24)
             VStack(alignment: .leading, spacing: 2) {
                 Text(mac.name)
@@ -173,7 +173,7 @@ struct RemoteAccessMacView: View {
                     Text("·")
                     Label(label(for: verdict), systemImage: icon(for: verdict))
                         .labelStyle(.titleAndIcon)
-                        .foregroundStyle(verdict == .reachable ? AnyShapeStyle(DeckHandTheme.accent) : AnyShapeStyle(.orange))
+                        .foregroundStyle(verdict == .reachable ? AnyShapeStyle(PixelHandTheme.accent) : AnyShapeStyle(.orange))
                 }
             }
             .font(.footnote)

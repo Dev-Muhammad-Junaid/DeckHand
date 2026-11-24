@@ -111,7 +111,7 @@ struct AppShortcutsSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                DeckHandTheme.canvasBackground(colorScheme).ignoresSafeArea()
+                PixelHandTheme.color(PaletteTokens.canvas, for: colorScheme).ignoresSafeArea()
 
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
@@ -139,10 +139,10 @@ struct AppShortcutsSheet: View {
                             .font(.system(size: 13, weight: .medium, design: .rounded))
                         Spacer()
                     }
-                    .foregroundStyle(DeckHandTheme.accent)
+                    .foregroundStyle(PixelHandTheme.accent)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 10)
-                    .background(DeckHandTheme.subtleWellFill(colorScheme))
+                    .background(PixelHandTheme.color(PaletteTokens.fill, for: colorScheme))
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
@@ -307,7 +307,7 @@ struct AppShortcutsSheet: View {
             Image(uiImage: img).resizable().scaledToFit()
         } else {
             RoundedRectangle(cornerRadius: 10)
-                .fill(DeckHandTheme.subtleWellFill(colorScheme))
+                .fill(PixelHandTheme.color(PaletteTokens.fill, for: colorScheme))
                 .overlay(Image(systemName: "app").foregroundStyle(.secondary))
         }
     }
@@ -337,10 +337,10 @@ struct AppShortcutsSheet: View {
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .background(
-                            Capsule().fill(DeckHandTheme.accent.opacity(0.15))
-                                .overlay(Capsule().strokeBorder(DeckHandTheme.accent.opacity(0.3), lineWidth: 1))
+                            Capsule().fill(PixelHandTheme.accent.opacity(0.15))
+                                .overlay(Capsule().strokeBorder(PixelHandTheme.accent.opacity(0.3), lineWidth: 1))
                         )
-                        .foregroundStyle(DeckHandTheme.accent)
+                        .foregroundStyle(PixelHandTheme.accent)
                 }
                 .disabled(isImporting)
             }
@@ -353,7 +353,7 @@ struct AppShortcutsSheet: View {
                     store.restoreCurated(for: app.bundleID)
                 }
                 .font(.system(size: 12, design: .rounded))
-                .foregroundStyle(DeckHandTheme.accent)
+                .foregroundStyle(PixelHandTheme.accent)
             }
         }
         .frame(maxWidth: .infinity)
@@ -421,7 +421,7 @@ private struct ShortcutCard: View {
                 Image(systemName: binding.sfSymbol)
                     .font(.system(size: 15, weight: .regular))
                     .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(DeckHandTheme.accent)
+                    .foregroundStyle(PixelHandTheme.accent)
                     .frame(width: 22, height: 22)
 
                 Text(label)
@@ -447,7 +447,7 @@ private struct ShortcutCard: View {
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(DeckHandTheme.subtleWellFill(colorScheme))
+                    .fill(PixelHandTheme.color(PaletteTokens.fill, for: colorScheme))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
@@ -550,7 +550,7 @@ struct ShortcutEditor: View {
                 Section("Preview") {
                     HStack {
                         Image(systemName: sfSymbol.isEmpty ? "keyboard" : sfSymbol)
-                            .foregroundStyle(DeckHandTheme.accent)
+                            .foregroundStyle(PixelHandTheme.accent)
                         Text(previewBinding.displayName)
                             .font(.system(.body, design: .rounded))
                         Spacer()

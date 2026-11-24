@@ -65,7 +65,7 @@ struct PaywallView: View {
                 .frame(maxWidth: .infinity)
             }
             .scrollBounceBehavior(.basedOnSize)
-            .background(DeckHandTheme.brandBackground().ignoresSafeArea())
+            .background(PixelHandTheme.brandBackground().ignoresSafeArea())
             .foregroundStyle(.white)
             .pixelOnNavy()
             .navigationBarTitleDisplayMode(.inline)

@@ -40,7 +40,7 @@ struct OnboardingView: View {
             .contentShape(Rectangle())
             .simultaneousGesture(swipe)
         }
-        .background(DeckHandTheme.brandBackground().ignoresSafeArea())
+        .background(PixelHandTheme.brandBackground().ignoresSafeArea())
         .foregroundStyle(.white)
         .pixelOnNavy()
         .preferredColorScheme(.dark)

@@ -73,8 +73,8 @@ struct RemoteKeyboardPanel: View {
             .frame(height: 40)
             .padding(.horizontal, 10)
             .background(
-                RoundedRectangle(cornerRadius: DeckHandTheme.Radius.md, style: .continuous)
-                    .fill(DeckHandTheme.subtleWellFill(colorScheme))
+                RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous)
+                    .fill(PixelHandTheme.color(PaletteTokens.fill, for: colorScheme))
             )
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -92,7 +92,7 @@ struct RemoteKeyboardPanel: View {
                                 .foregroundStyle(isOn ? Color.white : Color.primary.opacity(0.85))
                                 .background(
                                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .fill(isOn ? DeckHandTheme.accent : DeckHandTheme.subtleWellFill(colorScheme))
+                                        .fill(isOn ? PixelHandTheme.accent : PixelHandTheme.color(PaletteTokens.fill, for: colorScheme))
                                 )
                         }
                         .buttonStyle(.plain)
@@ -117,7 +117,7 @@ struct RemoteKeyboardPanel: View {
                                 .foregroundStyle(key == .return ? Color.white : Color.primary.opacity(0.85))
                                 .background(
                                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .fill(key == .return ? DeckHandTheme.accent : DeckHandTheme.subtleWellFill(colorScheme))
+                                        .fill(key == .return ? PixelHandTheme.accent : PixelHandTheme.color(PaletteTokens.fill, for: colorScheme))
                                 )
                         }
                         .buttonStyle(.plain)

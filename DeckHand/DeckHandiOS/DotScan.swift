@@ -58,10 +58,10 @@ struct DotScan: View {
         // so the trail clears before the next pass starts.
         let head = phase * (Double(columns) + trail + 2) - 1
         let dot = pitch * PixelPainter.dotRatio
-        let unlit = DeckHandTheme.Brand.dotOff
-        let ray = DeckHandTheme.Brand.ray
-        let phosphor = DeckHandTheme.Brand.phosphor
-        let glow = DeckHandTheme.Brand.glow
+        let unlit = PixelHandTheme.Brand.dotOff
+        let ray = PixelHandTheme.Brand.ray
+        let phosphor = PixelHandTheme.Brand.phosphor
+        let glow = PixelHandTheme.Brand.glow
 
         for row in 0..<rows {
             for column in 0..<columns {

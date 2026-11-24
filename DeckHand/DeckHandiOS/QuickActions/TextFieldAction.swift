@@ -99,6 +99,6 @@ struct TextFieldChip: View {
     }
 
     private var background: Color {
-        action.isPrimary ? DeckHandTheme.accent : DeckHandTheme.subtleWellFill(colorScheme)
+        action.isPrimary ? PixelHandTheme.accent : PixelHandTheme.color(PaletteTokens.fill, for: colorScheme)
     }
 }

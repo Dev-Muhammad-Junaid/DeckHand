@@ -28,7 +28,7 @@ struct DeckHandEmptyState<Actions: View>: View {
                     .foregroundStyle(Color.secondary)
                 if let message {
                     Text(message)
-                        .font(DeckHandTheme.TypeStyle.captionRounded)
+                        .font(.footnote)
                         .foregroundStyle(Color.secondary.opacity(0.8))
                 }
             }

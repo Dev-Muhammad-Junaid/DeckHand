@@ -41,7 +41,7 @@ struct PeerPickerView: View {
 
     var body: some View {
         ZStack {
-            DeckHandTheme.brandBackground()
+            PixelHandTheme.brandBackground()
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {

@@ -39,7 +39,7 @@ struct ShortcutChip: View {
             .frame(minWidth: 56)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(DeckHandTheme.subtleWellFill(colorScheme))
+                    .fill(PixelHandTheme.color(PaletteTokens.fill, for: colorScheme))
             )
             .deliveryDots(delivery.state)
             .scaleEffect(isPressed ? 0.93 : 1.0)

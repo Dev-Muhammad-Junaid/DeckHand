@@ -242,17 +242,17 @@ struct PixelPalette: Equatable {
 
     /// The icon: phosphor outline, violet fill, cyan rays and bloom.
     static let brand = PixelPalette(
-        outline: DeckHandTheme.Brand.phosphor,
-        fill: DeckHandTheme.Brand.pixelViolet,
-        detail: DeckHandTheme.Brand.ray,
-        ray: DeckHandTheme.Brand.ray,
-        glow: DeckHandTheme.Brand.glow,
-        unlit: DeckHandTheme.Brand.dotOff
+        outline: PixelHandTheme.Brand.phosphor,
+        fill: PixelHandTheme.Brand.pixelViolet,
+        detail: PixelHandTheme.Brand.ray,
+        ray: PixelHandTheme.Brand.ray,
+        glow: PixelHandTheme.Brand.glow,
+        unlit: PixelHandTheme.Brand.dotOff
     )
 
     /// Every lit dot in one color, for status glyphs (a mint check, a red
     /// cross) and template images.
-    static func solid(_ color: Color, unlit: Color = DeckHandTheme.Brand.dotOff) -> PixelPalette {
+    static func solid(_ color: Color, unlit: Color = PixelHandTheme.Brand.dotOff) -> PixelPalette {
         PixelPalette(outline: color, fill: color.opacity(0.35), detail: color, ray: color, glow: color, unlit: unlit)
     }
 
@@ -365,7 +365,7 @@ struct PixelScreen<Content: View>: View {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(
                         RadialGradient(
-                            colors: [DeckHandTheme.Brand.screenHigh.opacity(0.85), DeckHandTheme.Brand.screen],
+                            colors: [PixelHandTheme.Brand.screenHigh.opacity(0.85), PixelHandTheme.Brand.screen],
                             center: UnitPoint(x: 0.5, y: 0.3),
                             startRadius: 0,
                             endRadius: 140
@@ -373,7 +373,7 @@ struct PixelScreen<Content: View>: View {
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .strokeBorder(DeckHandTheme.Brand.tileStroke, lineWidth: 1)
+                            .strokeBorder(PixelHandTheme.Brand.tileStroke, lineWidth: 1)
                     )
             )
             // Status colors inside resolve to their dark-appearance values.
@@ -386,7 +386,7 @@ struct PixelScreen<Content: View>: View {
 /// The icon's mint pixel as a status light: a small rounded square that
 /// breathes while something is live. Holds still under Reduce Motion.
 struct LivePixel: View {
-    var color: Color = DeckHandTheme.success
+    var color: Color = PixelHandTheme.success
     var size: CGFloat = 6
     /// Breathes twice as fast for transient states such as reconnecting.
     var isUrgent: Bool = false

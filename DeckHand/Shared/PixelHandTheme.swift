@@ -131,7 +131,7 @@ enum PixelHandTheme {
     static let scrim = Color(token: PaletteTokens.scrim)
 
     /// A token resolved for one appearance, for views that draw with a
-    /// forced scheme (and the `DeckHandTheme` shim's `(_ scheme:)` calls).
+    /// forced scheme.
     static func color(_ token: ColorToken, for scheme: ColorScheme) -> Color {
         let swatch = token.swatch(dark: scheme == .dark)
         return Color(swatch.color).opacity(swatch.opacity)
@@ -323,4 +323,86 @@ extension ShapeStyle where Self == Color {
     static var phFill: Color { PixelHandTheme.fill }
     static var phFill2: Color { PixelHandTheme.fill2 }
     static var phAccent: Color { PixelHandTheme.accent }
+}
+
+// MARK: - Brand background
+
+extension PixelHandTheme {
+    /// Full-bleed brand background: the icon's navy screen with a cobalt
+    /// bloom just above centre and the mint pixel's cast top-trailing.
+    static func brandBackground() -> some View {
+        ZStack {
+            Brand.screen
+            RadialGradient(
+                colors: [Brand.cobalt.opacity(0.34), Brand.cobalt.opacity(0.08), .clear],
+                center: UnitPoint(x: 0.5, y: 0.34),
+                startRadius: 8,
+                endRadius: 420
+            )
+            RadialGradient(
+                colors: [Brand.mint.opacity(0.12), .clear],
+                center: UnitPoint(x: 0.92, y: 0.08),
+                startRadius: 4,
+                endRadius: 260
+            )
+        }
+    }
+}
+
+// MARK: - Hex (dot art outside the token table)
+
+/// sRGB components parsed from a hex string. Kept as plain values so the
+/// dynamic-color providers below can capture them without touching UI types.
+private struct HexRGBA: Sendable {
+    let red: Double
+    let green: Double
+    let blue: Double
+    let opacity: Double
+
+    /// Parses `#RGB`, `#RRGGBB`, or `#RRGGBBAA` (with or without `#`).
+    init(_ hex: String) {
+        let h = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var i: UInt64 = 0
+        Scanner(string: h).scanHexInt64(&i)
+        let a, r, g, b: UInt64
+        switch h.count {
+        case 3:  (a, r, g, b) = (255, (i >> 8) * 17, (i >> 4 & 0xF) * 17, (i & 0xF) * 17)
+        case 6:  (a, r, g, b) = (255, i >> 16, i >> 8 & 0xFF, i & 0xFF)
+        case 8:  (a, r, g, b) = (i >> 24, i >> 16 & 0xFF, i >> 8 & 0xFF, i & 0xFF)
+        default: (a, r, g, b) = (255, 0, 0, 0)
+        }
+        red = Double(r) / 255
+        green = Double(g) / 255
+        blue = Double(b) / 255
+        opacity = Double(a) / 255
+    }
+}
+
+extension Color {
+    /// Parses `#RGB`, `#RRGGBB`, or `#RRGGBBAA` (with or without `#`).
+    init(hex: String) {
+        let c = HexRGBA(hex)
+        self.init(.sRGB, red: c.red, green: c.green, blue: c.blue, opacity: c.opacity)
+    }
+
+    /// A color that resolves to `light` or `dark` with the appearance it is
+    /// drawn in, including `.environment(\.colorScheme, …)` overrides.
+    init(light: String, dark: String) {
+        let l = HexRGBA(light)
+        let d = HexRGBA(dark)
+        #if canImport(UIKit)
+        self.init(uiColor: UIColor { traits in
+            let c = traits.userInterfaceStyle == .dark ? d : l
+            return UIColor(red: c.red, green: c.green, blue: c.blue, alpha: c.opacity)
+        })
+        #elseif canImport(AppKit)
+        self.init(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            let c = isDark ? d : l
+            return NSColor(srgbRed: c.red, green: c.green, blue: c.blue, alpha: c.opacity)
+        })
+        #else
+        self.init(.sRGB, red: l.red, green: l.green, blue: l.blue, opacity: l.opacity)
+        #endif
+    }
 }

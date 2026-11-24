@@ -255,9 +255,9 @@ private struct LitDots {
             }
         }
 
-        let phosphor = DeckHandTheme.Brand.phosphor
-        let ray = DeckHandTheme.Brand.ray
-        let glow = DeckHandTheme.Brand.glow
+        let phosphor = PixelHandTheme.Brand.phosphor
+        let ray = PixelHandTheme.Brand.ray
+        let glow = PixelHandTheme.Brand.glow
 
         for (index, e) in energy where e > 0.02 {
             guard let center = centers[index] else { continue }

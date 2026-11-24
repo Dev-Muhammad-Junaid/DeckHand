@@ -50,7 +50,7 @@ struct AppContextPill: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         } else {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(DeckHandTheme.subtleWellFill(colorScheme))
+                .fill(PixelHandTheme.color(PaletteTokens.fill, for: colorScheme))
                 .overlay(
                     Image(systemName: "app")
                         .font(.system(size: 13, weight: .thin))

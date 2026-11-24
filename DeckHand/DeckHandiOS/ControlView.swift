@@ -104,7 +104,7 @@ struct ControlView: View {
     private var classicLayout: some View {
         NavigationStack {
             ZStack {
-                DeckHandTheme.canvasBackground(colorScheme).ignoresSafeArea()
+                PixelHandTheme.color(PaletteTokens.canvas, for: colorScheme).ignoresSafeArea()
 
                 if let sender = session.sender {
                     VStack(spacing: 0) {
@@ -135,7 +135,7 @@ struct ControlView: View {
                         tabSwitcher
                             .padding(.horizontal, 16)
                             .padding(.vertical, 14)
-                        Divider().overlay(DeckHandTheme.navDivider(colorScheme))
+                        Divider().overlay(PixelHandTheme.color(PaletteTokens.hairline, for: colorScheme))
 
                         Group {
                             switch selectedTab {

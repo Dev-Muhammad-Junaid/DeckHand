@@ -118,10 +118,10 @@ struct QuickActionsBar: View {
         }
         .frame(height: 64)
         .background(barBackground)
-        .clipShape(RoundedRectangle(cornerRadius: DeckHandTheme.Radius.md, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: DeckHandTheme.Radius.md, style: .continuous)
-                .strokeBorder(DeckHandTheme.tabContainerBorder(colorScheme), lineWidth: 1)
+            RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous)
+                .strokeBorder(PixelHandTheme.color(PaletteTokens.hairline, for: colorScheme), lineWidth: 1)
         )
         .padding(.horizontal, 20)
         .animation(.spring(response: 0.32, dampingFraction: 0.82), value: activeBundleID)
@@ -342,6 +342,6 @@ struct QuickActionsBar: View {
     }
 
     private var barBackground: some View {
-        DeckHandTheme.tabContainerFill(colorScheme)
+        PixelHandTheme.color(PaletteTokens.fill, for: colorScheme)
     }
 }

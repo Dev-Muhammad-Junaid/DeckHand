@@ -79,7 +79,7 @@ struct PairingCodeEntryView: View {
                 .frame(maxWidth: .infinity)
             }
             .scrollBounceBehavior(.basedOnSize)
-            .background(DeckHandTheme.brandBackground().ignoresSafeArea())
+            .background(PixelHandTheme.brandBackground().ignoresSafeArea())
             .foregroundStyle(.white)
             .pixelOnNavy()
             .navigationTitle("Pair with \(macName)")

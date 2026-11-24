@@ -39,16 +39,16 @@ enum ApprovalGlyph: Equatable {
     var palette: PixelPalette {
         switch self {
         case .waiting: .brand
-        case .approved: .solid(DeckHandTheme.success)
-        case .denied: .solid(DeckHandTheme.danger)
+        case .approved: .solid(PixelHandTheme.success)
+        case .denied: .solid(PixelHandTheme.danger)
         case .disconnected:
             PixelPalette(
-                outline: DeckHandTheme.warning,
-                fill: DeckHandTheme.Brand.pixelViolet.opacity(0.25),
-                detail: DeckHandTheme.warning,
-                ray: DeckHandTheme.warning,
-                glow: DeckHandTheme.warning.opacity(0.6),
-                unlit: DeckHandTheme.Brand.dotOff
+                outline: PixelHandTheme.warning,
+                fill: PixelHandTheme.Brand.pixelViolet.opacity(0.25),
+                detail: PixelHandTheme.warning,
+                ray: PixelHandTheme.warning,
+                glow: PixelHandTheme.warning.opacity(0.6),
+                unlit: PixelHandTheme.Brand.dotOff
             )
         }
     }

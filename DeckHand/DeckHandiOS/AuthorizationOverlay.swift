@@ -25,7 +25,7 @@ struct AuthorizationOverlay: View {
 
     var body: some View {
         ZStack {
-            DeckHandTheme.authScrim(colorScheme)
+            PixelHandTheme.color(PaletteTokens.scrim, for: colorScheme)
                 .ignoresSafeArea()
 
             VStack(spacing: PixelHandTheme.Space.xl) {
@@ -123,12 +123,12 @@ struct AuthorizationOverlay: View {
         } else {
             shape
                 .fill(.regularMaterial)
-                .shadow(color: DeckHandTheme.dialogCardShadow(colorScheme), radius: 24, y: 12)
+                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.35 : 0.12), radius: 24, y: 12)
         }
         #else
         shape
             .fill(.regularMaterial)
-            .shadow(color: DeckHandTheme.dialogCardShadow(colorScheme), radius: 24, y: 12)
+            .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.35 : 0.12), radius: 24, y: 12)
         #endif
     }
 

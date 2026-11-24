@@ -25,12 +25,12 @@ struct DeckHandLoadingStateView: View {
                 .background(PixelHandTheme.Brand.screen, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .accessibilityHidden(true)
             Text(title)
-                .font(DeckHandTheme.TypeStyle.loadingTitle)
+                .font(.subheadline.weight(.medium))
                 .foregroundStyle(titleColor)
                 .multilineTextAlignment(.center)
             if let subtitle {
                 Text(subtitle)
-                    .font(DeckHandTheme.TypeStyle.captionRounded)
+                    .font(.footnote)
                     .foregroundStyle(subtitleColor ?? titleColor.opacity(0.88))
                     .multilineTextAlignment(.center)
             }
