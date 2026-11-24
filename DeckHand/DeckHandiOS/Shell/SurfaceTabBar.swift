@@ -103,6 +103,7 @@ struct SurfaceTabBar: View {
         }
         .buttonStyle(.plain)
         .phGlass(in: Circle(), interactive: true)
+        .keyboardShortcut("k", modifiers: .command)
         .accessibilityLabel("Ask")
         .accessibilityHint("Type what you want your Mac to do")
         .accessibilityShowsLargeContentViewer {

@@ -100,7 +100,7 @@ struct PixelHandShell: View {
             .animation(PixelHandMotion.reduced(PixelHandMotion.spring, reduceMotion: reduceMotion), value: plan.showsSidebar)
         }
         .sheet(isPresented: $isAskPresented) {
-            AskPlaceholderSheet(macName: peerName)
+            AskSheet(session: session, macName: peerName)
         }
         .sheet(isPresented: $isMyMacsPresented) {
             MyMacsPlaceholderSheet(
