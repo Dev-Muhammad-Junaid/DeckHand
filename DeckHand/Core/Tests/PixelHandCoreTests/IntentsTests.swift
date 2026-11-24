@@ -180,15 +180,17 @@ struct WidgetDeckSnapshotTests {
             ]),
             DeckPage(id: "c", title: "Studio", kind: .custom, keys: [
                 key("c1", "Build", .macShortcut(name: "Build")),
+                DeckKey(id: "c2", appearance: KeyAppearance(label: "Quit"), action: .shortcut(keys: ["cmd", "q"]), confirm: true),
             ]),
         ])
     }
 
-    @Test("Widget keys: Home pins first, then Home, then custom pages; no app pages or dialog presses")
+    @Test("Widget keys: Home pins first, then Home, then custom pages; no app pages, confirm keys or dialog presses")
     func widgetOrder() {
         let snapshot = WidgetDeckSnapshot.make(from: document, macs: [], isPro: true, now: now)
         #expect(snapshot.widgetKeys.map(\.id) == ["h3", "h1", "h2", "c1"])
-        #expect(snapshot.allKeys.map(\.id) == ["h1", "h2", "h3", "s1", "c1"])
+        #expect(snapshot.allKeys.map(\.id) == ["h1", "h2", "h3", "s1", "c1", "c2"])
+        #expect(snapshot.key(id: "c2")?.confirm == true)
         #expect(snapshot.key(id: "s1")?.pageTitle == "Safari")
         #expect(snapshot.key(id: "h4") == nil)
     }

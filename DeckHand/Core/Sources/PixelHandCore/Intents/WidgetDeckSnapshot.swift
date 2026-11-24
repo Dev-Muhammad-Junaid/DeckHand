@@ -60,8 +60,10 @@ public struct WidgetDeckSnapshot: Codable, Sendable, Equatable {
     /// Builds the snapshot from the deck. Widget keys: Home's first-row
     /// pins, then Home's other keys, then custom pages' keys, in order.
     /// App pages are left out of the widget (their keys only make sense
-    /// with that app in front) but listed for Shortcuts. Dialog presses
-    /// are never listed: they only exist while that dialog is up.
+    /// with that app in front) but listed for Shortcuts, and so are keys
+    /// set to "Ask before running" (Shortcuts and Siri ask; a widget
+    /// button can't). Dialog presses are never listed: they only exist
+    /// while that dialog is up.
     public static func make(
         from document: DeckDocument,
         macs: [RecentMac],
@@ -82,7 +84,7 @@ public struct WidgetDeckSnapshot: Codable, Sendable, Equatable {
         var chosen: [WidgetKey] = []
         var chosenIDs = Set<String>()
         func take(_ keys: [DeckKey], from page: DeckPage) {
-            for key in keys where chosen.count < maxWidgetKeys && isListable(key) && !chosenIDs.contains(key.id) {
+            for key in keys where chosen.count < maxWidgetKeys && isListable(key) && !key.confirm && !chosenIDs.contains(key.id) {
                 chosenIDs.insert(key.id)
                 chosen.append(WidgetKey(key, pageTitle: page.title))
             }
