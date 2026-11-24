@@ -7,6 +7,7 @@
 
 @testable import Loom
 import Foundation
+import LoomNetworking
 import Network
 import Testing
 
@@ -205,14 +206,14 @@ struct LoomNodeAdvertisementTests {
             !firstGeneration.contains { $0 === candidate }
         }
         #expect(!replacementGeneration.isEmpty)
-        #expect(firstGeneration.allSatisfy(\.isCancelled))
+        #expect(firstGeneration.allSatisfy { $0.isCancelled })
         #expect(replacementGeneration.allSatisfy { !$0.isCancelled })
         // The live replacement must accept connections; a port that is still
         // bound can't be taken over by another test.
         #expect(await canConnectToNodeTestPort(replacementPort))
 
         await node.stopAdvertising()
-        #expect(backend.listeners.allSatisfy(\.isCancelled))
+        #expect(backend.listeners.allSatisfy { $0.isCancelled })
     }
 
     @Test("Bonjour advertiser recovery delay backs off and caps")
@@ -426,14 +427,14 @@ private final class ListenerRecordingNetworkBackend: LoomNetworkBackend, @unchec
 
     func makeConnection(
         to endpoint: LoomNetworkEndpoint,
-        using transportKind: LoomTransportKind,
+        using transportKind: LoomNetworking.LoomTransportKind,
         configuration: LoomNetworkConnectionConfiguration
     ) throws -> any LoomNetworkConnection {
         try base.makeConnection(to: endpoint, using: transportKind, configuration: configuration)
     }
 
     func makeListener(
-        using transportKind: LoomTransportKind,
+        using transportKind: LoomNetworking.LoomTransportKind,
         configuration: LoomNetworkListenerConfiguration
     ) throws -> any LoomNetworkListener {
         let listener = RecordingNetworkListener(
@@ -457,7 +458,7 @@ private final class RecordingNetworkListener: LoomNetworkListener, @unchecked Se
         lock.withLock { cancelled }
     }
 
-    var transportKind: LoomTransportKind {
+    var transportKind: LoomNetworking.LoomTransportKind {
         base.transportKind
     }
 
