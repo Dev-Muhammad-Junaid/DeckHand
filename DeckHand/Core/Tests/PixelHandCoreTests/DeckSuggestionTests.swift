@@ -197,6 +197,17 @@ struct DeckSuggestionKeepTests {
         #expect(DeckValidation.isValid(document))
     }
 
+    @Test("A kept key whose ID is on another page gets a new ID, so the deck stays valid")
+    func keepUniqueIDs() {
+        let key = DeckSuggestion(binding: xcodeMenus[9], score: 0).key
+        var document = DeckDocument.empty
+        _ = document.addKey(key, toPage: DeckPage.homeID)
+        #expect(document.keepSuggestions([key], forApp: xcode) == 1)
+        let kept = document.appPage(for: xcode)!.keys[0]
+        #expect(kept.id != key.id)
+        #expect(DeckValidation.isValid(document))
+    }
+
     @Test("Keep stops at a full page")
     func keepFullPage() {
         var document = DeckDocument.empty

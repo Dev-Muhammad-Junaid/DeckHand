@@ -304,10 +304,15 @@ extension DeckDocument {
     public mutating func keepSuggestions(_ keys: [DeckKey], forApp bundleID: String, title: String? = nil) -> Int {
         guard !keys.isEmpty, let index = ensureAppPage(for: bundleID, title: title) else { return 0 }
         var added = 0
-        for key in keys {
+        var usedIDs = Set(pages.flatMap { $0.keys.map(\.id) })
+        for var key in keys {
             guard pages[index].keys.count < DeckValidation.maxKeysPerPage else { break }
             guard !pages[index].keys.contains(where: { $0.id == key.id }),
                   DeckValidation.keyIssues(key).isEmpty else { continue }
+            // Key IDs are unique across the deck; the same menu item on
+            // another page keeps its ID there.
+            if usedIDs.contains(key.id) { key.id = DeckIDs.newKeyID() }
+            usedIDs.insert(key.id)
             pages[index].keys.append(key)
             added += 1
         }
