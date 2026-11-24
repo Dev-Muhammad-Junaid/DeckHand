@@ -2,62 +2,73 @@
 //  PairingMenuSection.swift
 //  DeckHandMac
 //
-//  The menu bar panel's pairing section (S4): "Pair a Device…" shows a
-//  seven-digit code and its QR code for five minutes; below it, the paired
-//  devices, each with "Forget". Forgetting a device that is connected ends
-//  its session.
+//  The menu-bar panel's pairing part (S4, restyled for UX-012): the paired
+//  devices, each with a visible "Forget…" that confirms in place; a status
+//  line while a code is showing or pairing is paused; and "Pair a device…",
+//  which opens the "Pair a device" window (`PairDeviceWindow`) with the QR
+//  code and the seven-digit code. Forgetting a connected device ends its
+//  session.
 //
 
-import CoreImage
-import CoreImage.CIFilterBuiltins
 import SwiftUI
 
 struct PairingMenuSection: View {
     @EnvironmentObject private var authManager: DeviceAuthorizationManager
     @ObservedObject private var store = PairedDeviceStore.shared
+    private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text("PAIRED DEVICES")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                if case .none = authManager.pairingDisplay {
-                    Button("Pair a Device…") { authManager.showPairingCode() }
-                        .buttonStyle(.plain)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(DeckHandTheme.accent)
-                        .help("Show a code to type or scan on an iPhone or iPad. A paired device connects without asking.")
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 10)
-
-            PairingCodePanel()
+        VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
+            MacSectionLabel(text: "Paired")
+                .padding(.horizontal, PixelHandTheme.Space.lg)
 
             if store.devices.isEmpty {
-                Text("None yet. Paired iPhones and iPads connect without the Allow prompt.")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
+                Text("None yet. A paired iPhone or iPad connects without the Allow prompt.")
+                    .font(.callout)
+                    .foregroundStyle(PixelHandTheme.ink3)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, PixelHandTheme.Space.lg)
             } else {
                 ForEach(store.devices) { device in
                     PairedDeviceRow(device: device, isConnected: authManager.liveRefs.contains(device.ref))
                 }
             }
+
+            PairingStatusLine()
+
+            HStack(spacing: PixelHandTheme.Space.sm) {
+                Button("Pair a device…") { PairDeviceWindow.shared.open(authManager) }
+                    .buttonStyle(.macPrimary)
+                    .disabled(authManager.pairingDisplay.isLockedOut)
+                    .help("Show a code to scan or type on an iPhone or iPad. A paired device connects without asking.")
+                if case .code = authManager.pairingDisplay {
+                    Button("Show code") { PairDeviceWindow.shared.open(authManager) }
+                        .buttonStyle(.macSecondary)
+                        .help("Bring the Pair a device window forward")
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, PixelHandTheme.Space.lg)
+            .padding(.top, PixelHandTheme.Space.xs)
         }
-        .padding(.bottom, 8)
+        // Moves an expired code or a finished lockout on while the panel is open.
+        .onReceive(ticker) { _ in authManager.refreshPairingDisplay() }
     }
 }
 
-// MARK: - Code panel
+private extension PairingCodeWindow.Display {
+    var isLockedOut: Bool {
+        if case .lockedOut = self { return true }
+        return false
+    }
+}
 
-private struct PairingCodePanel: View {
+// MARK: - Status line
+
+/// One line under the paired list while a code is live, pairing is paused,
+/// or a device just paired.
+private struct PairingStatusLine: View {
     @EnvironmentObject private var authManager: DeviceAuthorizationManager
-    private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
         Group {
@@ -65,65 +76,47 @@ private struct PairingCodePanel: View {
             case .none:
                 EmptyView()
 
-            case let .code(code, expiresAt, attemptsLeft):
-                VStack(spacing: 8) {
-                    if let invite = authManager.pairingInvite, let qr = QRCodeImage.make(invite.payload) {
-                        Image(nsImage: qr)
-                            .interpolation(.none)
-                            .resizable()
-                            .frame(width: 132, height: 132)
-                            .padding(6)
-                            .background(RoundedRectangle(cornerRadius: 8).fill(.white))
-                            .accessibilityLabel("Pairing QR code")
+            case let .code(_, expiresAt, _):
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    let remaining = expiresAt.timeIntervalSince(context.date)
+                    HStack(spacing: PixelHandTheme.Space.sm) {
+                        MacDotBeam(lit: PairingCodeDisplay.beamLitCells(remaining: remaining), dot: 4, gap: 2)
+                        Text("Code showing · \(PairingCodeDisplay.countdown(remaining: remaining)) left")
+                            .font(.callout)
+                            .monospacedDigit()
+                            .foregroundStyle(PixelHandTheme.ink2)
                     }
-                    Text(code.formatted)
-                        .font(.system(size: 26, weight: .semibold, design: .monospaced))
-                        .textSelection(.enabled)
-                        .accessibilityLabel("Pairing code \(code.digits.map(String.init).joined(separator: " "))")
-                    TimelineView(.periodic(from: .now, by: 1)) { context in
-                        let left = max(0, Int(expiresAt.timeIntervalSince(context.date).rounded(.up)))
-                        Text("Scan it or type it in Pixel Hand on your iPhone or iPad. Expires in \(left / 60):\(String(format: "%02d", left % 60)).")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    if attemptsLeft < PairingCodeWindow.maxWrongAttempts {
-                        Text("\(PairingCodeWindow.maxWrongAttempts - attemptsLeft) wrong code(s) entered. \(attemptsLeft) left.")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(DeckHandTheme.warning)
-                    }
-                    Button("Cancel") { authManager.cancelPairingCode() }
-                        .controlSize(.small)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Pairing code showing, \(PairingCodeDisplay.spokenCountdown(remaining: remaining))")
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
 
             case let .lockedOut(until):
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     let left = max(1, Int(until.timeIntervalSince(context.date).rounded(.up)))
-                    Label("Too many wrong codes. Pairing is paused for \(ApprovalStatusCopy.durationText(seconds: left)).", systemImage: "lock.fill")
-                        .font(.system(size: 11))
-                        .foregroundStyle(DeckHandTheme.warning)
-                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(alignment: .firstTextBaseline, spacing: PixelHandTheme.Space.sm) {
+                        MacGlyph(glyph: PixelGlyphs.lock, pitch: 1.4, accent: PixelHandTheme.warning)
+                            .foregroundStyle(PixelHandTheme.warning)
+                        Text("Too many wrong codes. Pairing is paused for \(ApprovalStatusCopy.durationText(seconds: left)).")
+                            .font(.callout)
+                            .foregroundStyle(PixelHandTheme.warning)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 4)
 
             case .paired:
-                Label("Paired.", systemImage: "checkmark.circle.fill")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(DeckHandTheme.success)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 4)
-                    .task {
-                        try? await Task.sleep(for: .seconds(3))
-                        authManager.cancelPairingCode()
-                    }
+                HStack(spacing: PixelHandTheme.Space.sm) {
+                    LivePixel(color: PixelHandTheme.success, size: 6)
+                    Text("Paired.")
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(PixelHandTheme.success)
+                }
+                .task {
+                    try? await Task.sleep(for: .seconds(3))
+                    authManager.cancelPairingCode()
+                }
             }
         }
-        // Moves an expired code or a finished lockout on while the panel is open.
-        .onReceive(ticker) { _ in authManager.refreshPairingDisplay() }
+        .padding(.horizontal, PixelHandTheme.Space.lg)
     }
 }
 
@@ -136,56 +129,61 @@ private struct PairedDeviceRow: View {
     @State private var isConfirming = false
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: device.kind.systemImage)
-                .font(.system(size: 14))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(DeckHandTheme.accent)
-                .frame(width: 24)
-            VStack(alignment: .leading, spacing: 1) {
+        HStack(spacing: PixelHandTheme.Space.md) {
+            MacDeviceIcon(systemImage: device.kind.systemImage, isLive: isConnected)
+            VStack(alignment: .leading, spacing: 2) {
                 Text(device.name)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(PixelHandTheme.ink)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                Text(isConnected ? "Connected" : "Last seen \(device.lastSeenAt.formatted(.relative(presentation: .named)))")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
+                Text(isConnected ? "Connected now" : "Last seen \(device.lastSeenAt.formatted(.relative(presentation: .named)))")
+                    .font(.caption)
+                    .foregroundStyle(PixelHandTheme.ink2)
             }
-            Spacer(minLength: 4)
+            Spacer(minLength: PixelHandTheme.Space.xs)
             if isConfirming {
                 Button("Cancel") { isConfirming = false }
-                    .controlSize(.small)
+                    .buttonStyle(.macQuiet)
+                    .keyboardShortcut(.cancelAction)
                 Button("Forget") {
                     authManager.forget(device.ref)
                     isConfirming = false
                 }
-                .controlSize(.small)
-                .tint(DeckHandTheme.danger)
+                .buttonStyle(.macDestructive)
                 .help(isConnected ? "Unpair and disconnect now. It must be allowed or paired again." : "Unpair. It must be allowed or paired again.")
             } else {
                 Button("Forget…") { isConfirming = true }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .buttonStyle(.macSecondary)
+                    .help("Unpair \(device.name)")
+                    .accessibilityLabel("Forget \(device.name)")
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 4)
+        .padding(.horizontal, PixelHandTheme.Space.lg)
         .accessibilityElement(children: .contain)
     }
 }
 
-// MARK: - QR
+/// A device's symbol in a 28 pt circle; a mint pixel on its corner while
+/// it is connected.
+struct MacDeviceIcon: View {
+    let systemImage: String
+    var isLive = false
+    var tint: Color = PixelHandTheme.accent
 
-enum QRCodeImage {
-    /// A crisp QR image for `text`, or `nil` if Core Image can't make one.
-    static func make(_ text: String) -> NSImage? {
-        let filter = CIFilter.qrCodeGenerator()
-        filter.message = Data(text.utf8)
-        filter.correctionLevel = "M"
-        guard let output = filter.outputImage else { return nil }
-        let scaled = output.transformed(by: CGAffineTransform(scaleX: 8, y: 8))
-        guard let cgImage = CIContext().createCGImage(scaled, from: scaled.extent) else { return nil }
-        return NSImage(cgImage: cgImage, size: NSSize(width: scaled.extent.width, height: scaled.extent.height))
+    var body: some View {
+        Image(systemName: systemImage)
+            .font(.body)
+            .symbolRenderingMode(.hierarchical)
+            .foregroundStyle(tint)
+            .frame(width: 28, height: 28)
+            .background(Circle().fill(PixelHandTheme.fill))
+            .overlay(alignment: .bottomTrailing) {
+                if isLive {
+                    LivePixel(color: PixelHandTheme.success, size: 6)
+                        .offset(x: 1, y: 1)
+                }
+            }
+            .accessibilityHidden(true)
     }
 }

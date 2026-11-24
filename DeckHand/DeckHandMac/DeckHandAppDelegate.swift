@@ -53,6 +53,9 @@ final class DeckHandAppDelegate: NSObject, NSApplicationDelegate {
             // the transparent Tahoe menu bar. Being drawn rather than looked
             // up, it can't fail to resolve and collapse the item to zero width.
             iconController = StatusItemIconController(button: button)
+            iconController?.readiness = { [daemon] in
+                (running: daemon.container?.mainContext.isRunning ?? false, failed: daemon.fatalStartupError != nil)
+            }
             button.target = self
             button.action = #selector(togglePopover(_:))
         }

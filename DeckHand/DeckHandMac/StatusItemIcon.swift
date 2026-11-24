@@ -2,112 +2,120 @@
 //  StatusItemIcon.swift
 //  DeckHandMac
 //
-//  The menu bar icon: the app icon's dot hand as a template image, in three
-//  states. An outline means ready, rays blinking beside the fingertip mean
-//  an iPad is asking to connect, and a filled hand means one is connected.
+//  The menu-bar hand (UX-019, `06-Pixel-Identity.md` §8): the app icon's
+//  dot hand as a template image, so it follows light, dark and tinted menu
+//  bars. Which dots each state lights is Core's `MenuBarHand`:
+//
+//  | State | Look |
+//  | --- | --- |
+//  | Not ready (starting, failed) | whole hand at 50 % |
+//  | Ready | outline dots |
+//  | A device is asking | fingertip blinks at 1 Hz |
+//  | Connected | fill dots on |
+//  | Being controlled | fill dots and tap rays |
+//  | Receiving | a 3-dot beam runs along the cuff |
+//  | Locked (a device connected) | a padlock in the palm |
+//
+//  Reduce Motion holds the first frame: a steady fingertip, a still beam.
+//  Drawn rather than looked up, so it can't fail to resolve and collapse
+//  the item to zero width. One point per dot, each dot a whole point, keeps
+//  it crisp at 1× and 2×; at this size a gap between dots would vanish.
 //
 
 import AppKit
 
-enum StatusItemState: Equatable {
-    case ready
-    case request
-    case connected
-
-    var accessibilityDescription: String {
-        switch self {
-        case .ready: "Pixel Hand"
-        case .request: "Pixel Hand, connection request waiting"
-        case .connected: "Pixel Hand, iPad connected"
-        }
-    }
-}
-
 enum StatusItemIcon {
-    /// Rows above the hand for the tap rays. The full icon uses three; two
-    /// keep the menu bar icon within 20 pt while leaving a one-dot gap.
-    private static let headroom = 2
-    /// Tap rays above the fingertip (columns 5–6) in icon rows: straight up,
-    /// and one out to each side.
-    private static let rays: [(x: Int, y: Int)] = [(5, 0), (6, 0), (3, 1), (8, 1)]
-
-    /// One point per dot keeps the pixel art crisp on Retina displays.
-    private static let pitch: CGFloat = 1
-
-    static func image(for state: StatusItemState, raysLit: Bool) -> NSImage {
-        let hand = PixelArt.hand
-        let pitch = Self.pitch
-        let headroom = Self.headroom
-        let rays = Self.rays
-        let size = NSSize(width: CGFloat(hand.width) * pitch, height: CGFloat(hand.height + headroom) * pitch)
+    static func image(for state: MenuBarHandState, frame: Int) -> NSImage {
+        let dots = MenuBarHand.dots(for: state, frame: frame)
+        let size = NSSize(width: MenuBarHand.width, height: MenuBarHand.height)
         let image = NSImage(size: size, flipped: true) { _ in
-            func dot(_ x: Int, _ y: Int, alpha: CGFloat) {
-                NSColor.black.withAlphaComponent(alpha).setFill()
-                NSRect(x: CGFloat(x) * pitch, y: CGFloat(y) * pitch, width: pitch, height: pitch).fill()
-            }
-            for y in 0..<hand.height {
-                for x in 0..<hand.width {
-                    switch hand[x, y] {
-                    case .outline:
-                        dot(x, y + headroom, alpha: 1)
-                    case .fill where state == .connected:
-                        // Lighter than the outline so the knuckle lines still read.
-                        dot(x, y + headroom, alpha: 0.45)
-                    default:
-                        break
-                    }
-                }
-            }
-            if state == .request, raysLit {
-                rays.forEach { dot($0.x, $0.y, alpha: 1) }
+            for dot in dots {
+                NSColor.black.withAlphaComponent(dot.alpha).setFill()
+                NSRect(x: dot.x, y: dot.y, width: 1, height: 1).fill()
             }
             return true
         }
-        // Template: the menu bar tints it for light, dark and tinted bars.
         image.isTemplate = true
         image.accessibilityDescription = state.accessibilityDescription
         return image
     }
 }
 
-/// Keeps the status item's image in step with pending requests and live
-/// connections, and blinks the rays while a request waits.
+/// Keeps the status item's hand in step with the app: whether Loom is
+/// running, pending requests, live connections, the Mac's lock state and
+/// recent input or arrivals (`MenuBarActivity`).
 @MainActor
 final class StatusItemIconController {
     private weak var button: NSStatusBarButton?
-    private var state: StatusItemState = .ready
-    private var raysLit = true
-    private var blinkTask: Task<Void, Never>?
+    private var pendingRequests = 0
+    private var liveConnections = 0
+    private var state: MenuBarHandState = .notReady
+    private var frame = 0
+    private var shown: (MenuBarHandState, Int)?
+    private var tickTask: Task<Void, Never>?
+
+    /// Whether the app is up: `running` once Loom has started, `failed`
+    /// after a fatal start error. Unset reads as running.
+    var readiness: (() -> (running: Bool, failed: Bool))? {
+        didSet { refresh() }
+    }
 
     init(button: NSStatusBarButton) {
         self.button = button
-        render()
+        MenuBarActivity.shared.onChange = { [weak self] in self?.refresh() }
+        refresh()
+        startTicking()
     }
 
     func update(pendingRequests: Int, liveConnections: Int) {
-        let next: StatusItemState = pendingRequests > 0
-            ? .request
-            : (liveConnections > 0 ? .connected : .ready)
-        guard next != state else { return }
-        state = next
-        raysLit = true
-        render()
+        self.pendingRequests = pendingRequests
+        self.liveConnections = liveConnections
+        refresh()
+    }
 
-        blinkTask?.cancel()
-        blinkTask = nil
-        // A held still icon under Reduce Motion: the rays stay lit.
-        guard state == .request, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
-        blinkTask = Task { [weak self] in
+    /// Re-reads every input and redraws if the picture changed.
+    private func refresh() {
+        let now = Date()
+        let readiness = self.readiness?() ?? (running: true, failed: false)
+        let activity = MenuBarActivity.shared
+        let next = MenuBarHandState.resolve(.init(
+            isRunning: readiness.running,
+            failedToStart: readiness.failed,
+            pendingRequests: pendingRequests,
+            liveConnections: liveConnections,
+            isLocked: MacLockMonitor.shared.state.isLocked,
+            secondsSinceInput: activity.lastInput.map { now.timeIntervalSince($0) },
+            secondsSinceReceive: activity.lastReceive.map { now.timeIntervalSince($0) }
+        ))
+        if next != state {
+            state = next
+            frame = 0
+        }
+        render()
+    }
+
+    /// One loop for the blink, the beam, the lock state and the holds
+    /// running out: 10 Hz while the beam runs, 2 Hz otherwise.
+    private func startTicking() {
+        tickTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(520))
+                let fast = self?.state == .receiving
+                try? await Task.sleep(for: .milliseconds(fast ? 100 : 500))
                 guard let self, !Task.isCancelled else { return }
-                self.raysLit.toggle()
-                self.render()
+                if self.state.animates, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                    self.frame &+= 1
+                } else {
+                    self.frame = 0
+                }
+                self.refresh()
             }
         }
     }
 
     private func render() {
-        button?.image = StatusItemIcon.image(for: state, raysLit: raysLit)
+        if let shown, shown.0 == state, shown.1 == frame { return }
+        shown = (state, frame)
+        button?.image = StatusItemIcon.image(for: state, frame: frame)
+        button?.setAccessibilityLabel(state.accessibilityDescription)
     }
 }
