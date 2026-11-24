@@ -45,7 +45,10 @@ public enum PixelHandProtocol {
     /// - 11: the Mac's sound while mirroring (S17): `mirror.audio(enabled:)`,
     ///   `mirror.audioError`, the `audioFormat` / `audioPacket` frames on
     ///   `PixelHandStream.audio`, audio fields in the mirror stats.
-    public static let version = 12
+    /// - 12: Deck 2 actions (`menuCommand`, `macShortcut`, `sequence`).
+    /// - 13: transfers (S1): `sharing.transferStatus`; bytes through Loom's
+    ///   transfer engine with a `TransferManifest` in the offer.
+    public static let version = 13
 
     /// Bonjour TXT key carrying `version`. Short, because TXT keys should
     /// stay under 9 bytes.

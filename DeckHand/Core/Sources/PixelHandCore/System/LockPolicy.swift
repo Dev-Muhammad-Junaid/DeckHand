@@ -237,8 +237,22 @@ public enum LockPolicy {
                 return .refuse(reply: .none)
             case .macClipboard:
                 return .allow // Mac → remote; the handler ignores it
+            case .transferStatus:
+                // S1: an answer about a transfer the Mac sent; it moves no
+                // bytes and reads nothing. Incoming transfers themselves
+                // don't pass through here (they ride Loom's transfer
+                // engine): `allowsIncomingTransfer` refuses them.
+                return .allow
             }
         }
+    }
+
+    /// S1: whether the Mac takes a file, photo, link or text from a remote.
+    /// Refused while locked and off console: nothing lands in Downloads,
+    /// opens in the browser or reaches the clipboard on a Mac whose person
+    /// can't see it. In-flight transfers are cancelled at the lock.
+    public static func allowsIncomingTransfer(state: MacLockState) -> Bool {
+        !state.isLocked
     }
 
     /// Whether `action` may run in `state`; a `deck.run` is judged as the

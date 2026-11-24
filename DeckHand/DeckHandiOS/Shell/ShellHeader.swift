@@ -90,6 +90,7 @@ struct ShellHeader: View {
                 .requiresPro(.mirror)
             }
             captureMenu
+            TransferHeaderButton() // Sharing lane: Send and Inbox (S2)
             if let onShowSidebar {
                 GlassCircleButton(glyph: PixelGlyphs.sidebar, label: "Show the Macs sidebar", action: onShowSidebar)
             }

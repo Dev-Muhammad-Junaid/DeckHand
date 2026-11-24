@@ -227,6 +227,10 @@ final class ControlSessionModel {
         let interaction = Task { [weak self] in await self?.runInteraction(sender: s, settings: settings) }
         defer { interaction.cancel() }
 
+        // Transfers to and from this Mac (Sharing lane, ControlSessionModel+Transfer.swift).
+        let transfers = Task { [weak self] in await self?.runTransfers() }
+        defer { transfers.cancel() }
+
         // Single consolidated message loop — no competing consumers
         await listenForHostMessages(liveness: liveness)
     }

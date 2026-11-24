@@ -2,8 +2,9 @@
 //  SharingHandler.swift
 //  DeckHandMac
 //
-//  Domain: sharing. Clipboard text sync (S10), through `MacClipboardSync`.
-//  Owned by the iOS interaction lane.
+//  Domain: sharing. Clipboard text sync (S10), through `MacClipboardSync`
+//  (iOS interaction lane), and transfer status (S1, Sharing lane), through
+//  `MacTransferService`.
 //
 
 import LoomKit
@@ -21,6 +22,10 @@ final class SharingHandler: DomainHandler {
 
         case .macClipboard:
             break // Mac → remote only
+
+        case let .transferStatus(transferID, status):
+            // S1: the device's answer about something this Mac sent.
+            MacTransferService.shared.receivedStatus(status, for: transferID, from: connection.id)
         }
     }
 }
