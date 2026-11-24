@@ -293,3 +293,34 @@ struct AskPlanTests {
         #expect(try JSONDecoder().decode(AskPlan.self, from: data) == plan)
     }
 }
+
+@Suite("Ask Save as key lands on the right page")
+struct AskSaveTests {
+    @Test("a one-app plan goes on that app's page, created if missing")
+    func appPage() {
+        var deck = DeckDocument.empty
+        let plan = parser.plan("reload the page in Safari, then zoom in in Safari")
+        let result = deck.saveAskPlan(plan) { $0 == safari ? "Safari" : nil }
+        #expect(result?.pageID == DeckPage.appPageID(for: safari))
+        #expect(deck.appPage(for: safari)?.title == "Safari")
+        #expect(deck.appPage(for: safari)?.keys.first?.action == plan.savedAction)
+    }
+
+    @Test("a mixed plan goes on Home; a destructive one asks before running")
+    func home() {
+        var deck = DeckDocument.empty
+        let result = deck.saveAskPlan(parser.plan("open safari and close the tab"))
+        #expect(result?.pageID == DeckPage.homeID)
+        let key = deck.page(id: DeckPage.homeID)?.keys.first
+        #expect(key?.confirm == true)
+        #expect(key.map { DeckValidation.keyIssues($0).isEmpty } == true)
+    }
+
+    @Test("a typing plan isn't saved; a full deck refuses")
+    func refuses() {
+        var deck = DeckDocument.empty
+        #expect(deck.saveAskPlan(parser.plan("type hello")) == nil)
+        deck.pages[0].keys = (0..<DeckValidation.maxKeysPerPage).map { DeckKey(id: "k\($0)", label: "K", action: .media(key: .next)) }
+        #expect(deck.saveAskPlan(parser.plan("next song")) == nil)
+    }
+}
