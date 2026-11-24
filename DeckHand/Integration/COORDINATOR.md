@@ -164,3 +164,7 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   the primary (it needs a trusted device), so this file is the update. After
   UX polish merges and a Mac build is green: the review page, then
   PROGRAMME COMPLETE.
+- 2026-11-24 ~16:35 UTC: primary session merged UX polish (last queued lane)
+  and queued build 18 (build 17 + UX polish). Every planned lane is merged.
+  Remaining: green build 18, owner testing and fixes, release prep.
+

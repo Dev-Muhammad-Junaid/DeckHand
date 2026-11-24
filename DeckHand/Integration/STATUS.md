@@ -1115,5 +1115,19 @@ Mac should check:
    Ask), the widget shows Pro, and turning it off restores the free plan.
 3. `DeckHandTests` and Core tests unchanged.
 
-Status: READY FOR MAC BUILD (build 17)
+
+## Build 18 queued (2026-11-24, replaces build 17)
+
+Build 17 (Unlock Pro for testing) was never built; build 18 is build 17
+plus the **UX polish** lane (`LANE-ux-polish.md`, UX-013 + UX-014): light
+mode danger/warning colours darkened for contrast, VoiceOver labels,
+Reduce Motion, focus rings, `ph.<area>.<name>` accessibility IDs, copy
+fixes, and the compatibility shims removed. It also adds
+`DeveloperUnlock.swift` to the Linux type check.
+
+Mac should check: the build 17 list above (Settings › Subscription ›
+"Unlock Pro for testing"), then the "Checks on the Mac" table in
+`LANE-ux-polish.md`. Install on Mac and iPad as soon as it builds.
+
+Status: READY FOR MAC BUILD (build 18)
 
