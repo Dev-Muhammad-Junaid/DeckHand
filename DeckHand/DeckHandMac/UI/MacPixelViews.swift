@@ -87,7 +87,8 @@ struct MacDotText: View {
         )
         .shadow(color: glows ? PixelHandTheme.Brand.glow.opacity(0.7) : .clear, radius: glows ? 2 : 0)
         .accessibilityElement()
-        .accessibilityLabel(label ?? text)
+        // Spoken in sentence case, never as the uppercase dot string.
+        .accessibilityLabel(label ?? (text.prefix(1).uppercased() + text.dropFirst().lowercased()))
     }
 }
 
@@ -101,6 +102,8 @@ struct MacDotBeam: View {
     var gap: CGFloat = 4
     var color: Color = PixelHandTheme.accent
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         HStack(spacing: gap) {
             ForEach(0..<total, id: \.self) { index in
@@ -109,7 +112,7 @@ struct MacDotBeam: View {
                     .frame(width: dot, height: dot)
             }
         }
-        .animation(.easeOut(duration: 0.2), value: lit)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: lit)
         .accessibilityHidden(true)
     }
 }

@@ -89,6 +89,7 @@ struct MacMenuBarView: View {
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                         }
+                        .accessibilityElement(children: .combine)
                     }
                 }
                 .padding(.horizontal, PixelHandTheme.Space.lg)
@@ -167,6 +168,7 @@ struct MacMenuBarView: View {
                     .lineLimit(2)
             }
             .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("ph.mac.header")
             Spacer(minLength: 0)
             if failed {
                 MacDotText("ERROR", pitch: 1.4, label: "Failed to start")
@@ -208,6 +210,8 @@ struct MacMenuBarView: View {
             }
         }
         .padding(.horizontal, PixelHandTheme.Space.lg)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("ph.mac.waitingState")
     }
 
     private var lockedNote: some View {
@@ -282,6 +286,7 @@ struct MacMenuBarView: View {
                 .onChange(of: shareCrashReports) { _, enabled in
                     DeckHandDiagnostics.setEnabled(enabled)
                 }
+                .accessibilityIdentifier("ph.mac.shareCrashReports")
             HStack(spacing: PixelHandTheme.Space.sm) {
                 MacDotText(
                     VersionLine.text(version: Self.version, build: Self.build),
@@ -294,10 +299,14 @@ struct MacMenuBarView: View {
                     .buttonStyle(.macSecondary)
                     .disabled(!updater.canCheckForUpdates)
                     .help(updater.isConfigured ? "Check for a newer version of Pixel Hand" : "Updates aren't set up in this build")
+                    .accessibilityLabel("Check for updates")
+                    .accessibilityIdentifier("ph.mac.checkForUpdates")
                 Button("Quit") { NSApplication.shared.terminate(nil) }
                     .buttonStyle(.macSecondary)
                     .keyboardShortcut("q")
                     .help("Quit Pixel Hand")
+                    .accessibilityLabel("Quit Pixel Hand")
+                    .accessibilityIdentifier("ph.mac.quit")
             }
         }
         .padding(.horizontal, PixelHandTheme.Space.lg)
@@ -393,14 +402,16 @@ private struct PermissionRow: View {
                     .font(.callout.weight(.medium))
                     .foregroundStyle(PixelHandTheme.success)
             } else {
-                Button("Turn On…", action: onFix)
+                Button("Turn on…", action: onFix)
                     .buttonStyle(.macSecondary)
                     .help("Open System Settings to turn on \(title)")
                     .accessibilityLabel("Turn on \(title)")
+                    .accessibilityIdentifier("ph.mac.turnOn" + title.replacingOccurrences(of: " ", with: ""))
             }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(title), \(status == .granted ? "on" : "off")")
+        .accessibilityIdentifier("ph.mac.permission" + title.replacingOccurrences(of: " ", with: ""))
     }
 
     @ViewBuilder private var statusDot: some View {
@@ -457,6 +468,7 @@ private struct ConnectionRow: View {
                     .font(.caption2.monospaced())
                     .foregroundStyle(PixelHandTheme.ink3)
                     .textSelection(.enabled)
+                    .accessibilityHidden(true)
             }
             Spacer(minLength: PixelHandTheme.Space.xs)
             Button("Disconnect") {
@@ -465,9 +477,11 @@ private struct ConnectionRow: View {
             .buttonStyle(.macSecondary)
             .help("Disconnect and end this session's access. A paired device stays paired; use Forget… under Paired.")
             .accessibilityLabel("Disconnect \(connection.peerName)")
+            .accessibilityIdentifier("ph.mac.disconnect")
         }
         .padding(.horizontal, PixelHandTheme.Space.lg)
         .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ph.mac.deviceRow")
     }
 
     private var subtitle: String {
@@ -516,17 +530,23 @@ private struct PendingConnectionRow: View {
                 }
                 .buttonStyle(.macDestructive)
                 .help("Refuse this request")
+                .accessibilityLabel("Deny \(connection.peerName)")
+                .accessibilityIdentifier("ph.mac.deny")
                 Spacer(minLength: 0)
                 Button("Pair…") {
                     PairDeviceWindow.shared.open(authManager)
                 }
                 .buttonStyle(.macSecondary)
                 .help("Show a pairing code to enter on the device. Paired devices connect without asking.")
+                .accessibilityLabel("Pair \(connection.peerName)")
+                .accessibilityIdentifier("ph.mac.pairRequest")
                 Button("Allow") {
                     authManager.authorize(connection: connection)
                 }
                 .buttonStyle(.macPrimary)
                 .help("Allow for this session")
+                .accessibilityLabel("Allow \(connection.peerName)")
+                .accessibilityIdentifier("ph.mac.allow")
             }
             .padding(.leading, 28 + PixelHandTheme.Space.md)
         }
@@ -537,5 +557,6 @@ private struct PendingConnectionRow: View {
         )
         .padding(.horizontal, PixelHandTheme.Space.sm)
         .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ph.mac.pendingRow")
     }
 }
