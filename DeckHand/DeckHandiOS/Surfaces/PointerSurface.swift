@@ -140,6 +140,35 @@ struct PointerSurface: View {
     }
 
     private var touchSurface: some View {
+        // Typed names keep the action chain within the type checker's budget.
+        let scrollActionName: LocalizedStringKey = scrollMode ? "Turn off one-finger scrolling" : "Turn on one-finger scrolling"
+        let keyboardActionName: LocalizedStringKey = showKeyboard ? "Hide keyboard" : "Show keyboard"
+        return touchInputLayer
+        // A direct-touch area for VoiceOver, with every gesture as an action.
+        .accessibilityElement()
+        .accessibilityLabel("Trackpad")
+        .accessibilityValue(caption.spoken)
+        .accessibilityHint("Touch directly to move the pointer. Actions has clicks, scrolling and Mac gestures.")
+        .accessibilityAddTraits(.allowsDirectInteraction)
+        .accessibilityIdentifier("ph.trackpad")
+        .accessibilityAction(named: "Click") { click(.left) }
+        .accessibilityAction(named: "Double-click") { doubleClick() }
+        .accessibilityAction(named: "Right-click") { click(.right) }
+        .accessibilityAction(named: "Mission Control") { systemAction(.missionControl) }
+        .accessibilityAction(named: "App Exposé") { systemAction(.appExpose) }
+        .accessibilityAction(named: "Show Desktop") { systemAction(.showDesktop) }
+        .accessibilityAction(named: "Next Space") { spaceGesture(.left) }
+        .accessibilityAction(named: "Previous Space") { spaceGesture(.right) }
+        .accessibilityAction(named: "Find the pointer") { locatePointer() }
+        .accessibilityAction(named: scrollActionName) {
+            scrollMode.toggle()
+        }
+        .accessibilityAction(named: keyboardActionName) {
+            showKeyboard.toggle()
+        }
+    }
+
+    private var touchInputLayer: some View {
         TrackpadInputLayer(
             sender: sender,
             dots: dots,
@@ -160,28 +189,6 @@ struct PointerSurface: View {
                 showSystemGesture(gesture)
             }
         )
-        // A direct-touch area for VoiceOver, with every gesture as an action.
-        .accessibilityElement()
-        .accessibilityLabel("Trackpad")
-        .accessibilityValue(caption.spoken)
-        .accessibilityHint("Touch directly to move the pointer. Actions has clicks, scrolling and Mac gestures.")
-        .accessibilityAddTraits(.allowsDirectInteraction)
-        .accessibilityIdentifier("ph.trackpad")
-        .accessibilityAction(named: "Click") { click(.left) }
-        .accessibilityAction(named: "Double-click") { doubleClick() }
-        .accessibilityAction(named: "Right-click") { click(.right) }
-        .accessibilityAction(named: "Mission Control") { systemAction(.missionControl) }
-        .accessibilityAction(named: "App Exposé") { systemAction(.appExpose) }
-        .accessibilityAction(named: "Show Desktop") { systemAction(.showDesktop) }
-        .accessibilityAction(named: "Next Space") { spaceGesture(.left) }
-        .accessibilityAction(named: "Previous Space") { spaceGesture(.right) }
-        .accessibilityAction(named: "Find the pointer") { locatePointer() }
-        .accessibilityAction(named: scrollMode ? "Turn off one-finger scrolling" : "Turn on one-finger scrolling") {
-            scrollMode.toggle()
-        }
-        .accessibilityAction(named: showKeyboard ? "Hide keyboard" : "Show keyboard") {
-            showKeyboard.toggle()
-        }
     }
 
     /// The caption pill at the pad's bottom-leading corner, 12 pt above the
