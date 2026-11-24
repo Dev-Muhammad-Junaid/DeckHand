@@ -29,6 +29,7 @@ struct TrackpadView: View {
     @State private var gestureMap = GestureMap()
     /// The keyboard panel (typing, special keys, Paste to Mac).
     @State private var showKeyboard = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var bg: Color { PixelHandTheme.color(PaletteTokens.canvas, for: colorScheme) }
     private var surfaceShadowColor: Color {
@@ -64,22 +65,35 @@ struct TrackpadView: View {
                     }
                 )
                 .clipShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.pane, style: .continuous))
+                // A direct-touch area for VoiceOver, with the clicks as actions.
+                .accessibilityElement()
+                .accessibilityLabel("Trackpad")
+                .accessibilityHint("Touch directly to move the pointer. Actions has clicks and Mac gestures.")
+                .accessibilityAddTraits(.allowsDirectInteraction)
+                .accessibilityIdentifier("ph.trackpad")
+                .accessibilityAction(named: "Click") { gestureMap.forget(); Task { await sender.sendClick(.left) } }
+                .accessibilityAction(named: "Double-click") { gestureMap.forget(); Task { await sender.sendDoubleClick(.left) } }
+                .accessibilityAction(named: "Right-click") { gestureMap.forget(); Task { await sender.sendClick(.right) } }
+                .accessibilityAction(named: "Mission Control") { gestureMap.forget(); Task { await sender.sendSystemAction(.missionControl) } }
+                .accessibilityAction(named: "Show Desktop") { gestureMap.forget(); Task { await sender.sendSystemAction(.showDesktop) } }
+                .accessibilityAction(named: "Find the pointer") { Task { await sender.locateCursor() } }
+                .accessibilityAction(named: scrollMode ? "Turn off one-finger scrolling" : "Turn on one-finger scrolling") { scrollMode.toggle() }
 
                 // ── Gesture indicator (top-left corner) ──────────────
                 VStack {
                     HStack {
                         if let gesture = activeGesture {
                             GestureIndicator(gesture: gesture, colorScheme: .dark)
-                                .transition(.opacity.combined(with: .scale(scale: 0.85)))
+                                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.85)))
                         }
                         Spacer()
 
                         // Mode hint label
                         VStack(alignment: .trailing, spacing: 4) {
-                            Text(scrollMode ? "Scroll Mode" : "Trackpad")
+                            Text(scrollMode ? "Scroll mode" : "Trackpad")
                                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                                 .foregroundStyle(Color.secondary.opacity(0.7))
-                            Text("Tap • Click  |  Hold • Right  |  Hold, move • Drag  |  2F • Scroll  |  3F • Spaces, Mission Control")
+                            Text("Tap to click · Hold to right-click · Hold, then move to drag · Two fingers to scroll · Three fingers for Spaces and Mission Control")
                                 .font(.system(size: 9, weight: .medium))
                                 .foregroundStyle(Color.secondary.opacity(0.45))
                         }
@@ -104,7 +118,7 @@ struct TrackpadView: View {
                 )
                 .padding(.horizontal, 20)
                 .padding(.top, 10)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             }
 
             // ── Sensitivity slider ────────────────────────────────────
@@ -116,6 +130,7 @@ struct TrackpadView: View {
                     Image(systemName: "tortoise")
                         .foregroundStyle(Color.secondary)
                         .font(.system(size: 12))
+                        .accessibilityHidden(true)
                     Slider(
                         value: Binding(
                             get: { Double(TrackpadSensitivity.nearestIndex(to: settings.pointerSensitivity)) },
@@ -125,14 +140,17 @@ struct TrackpadView: View {
                         step: 1
                     )
                     .tint(Color.primary.opacity(0.6))
+                    .accessibilityLabel("Pointer speed")
+                    .accessibilityValue(TrackpadSensitivity.label(for: settings.pointerSensitivity))
                     Image(systemName: "hare")
                         .foregroundStyle(Color.secondary)
                         .font(.system(size: 12))
+                        .accessibilityHidden(true)
                     Text(TrackpadSensitivity.label(for: settings.pointerSensitivity))
                         .font(.system(size: 11, weight: .semibold, design: .rounded).monospacedDigit())
                         .foregroundStyle(Color.secondary)
                         .frame(width: 36, alignment: .trailing)
-                        .accessibilityLabel("Sensitivity \(TrackpadSensitivity.label(for: settings.pointerSensitivity))")
+                        .accessibilityHidden(true)
                 }
                 // Tick labels aligned under the slider track.
                 HStack {
@@ -145,6 +163,7 @@ struct TrackpadView: View {
                         }
                     }
                 }
+                .accessibilityHidden(true)
                 .padding(.leading, 26)   // clear the tortoise icon
                 .padding(.trailing, 70)  // clear the hare icon + readout
             }
@@ -158,7 +177,7 @@ struct TrackpadView: View {
                 .padding(.bottom, 16)
         }
         .background(bg)
-        .animation(.spring(response: 0.28, dampingFraction: 0.85), value: showKeyboard)
+        .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.28, dampingFraction: 0.85), value: showKeyboard)
     }
 }
 
@@ -347,7 +366,7 @@ struct GestureButtonBar: View {
 
             // Keyboard panel toggle: type on the Mac.
             GestureButton(
-                label: showKeyboard ? "Hide Keys" : "Keyboard",
+                label: showKeyboard ? "Hide keys" : "Keyboard",
                 icon: showKeyboard ? "keyboard.chevron.compact.down" : "keyboard",
                 color: PixelHandTheme.accent,
                 haptic: .selection,
@@ -355,14 +374,15 @@ struct GestureButtonBar: View {
             ) {
                 showKeyboard.toggle()
             }
+            .accessibilityLabel(showKeyboard ? "Hide keyboard" : "Show keyboard")
 
-            GestureButton(label: "Left Click",   icon: "cursorarrow.click",              color: PixelHandTheme.accent, haptic: .medium, colorScheme: colorScheme) {
+            GestureButton(label: "Click",        icon: "cursorarrow.click",              color: PixelHandTheme.accent, haptic: .medium, colorScheme: colorScheme) {
                 Task { await sender.sendClick(.left) }
             }
-            GestureButton(label: "Right Click",  icon: "cursorarrow.click.2",            color: PixelHandTheme.accent, haptic: .heavy,  colorScheme: colorScheme) {
+            GestureButton(label: "Right-click",  icon: "cursorarrow.click.2",            color: PixelHandTheme.accent, haptic: .heavy,  colorScheme: colorScheme) {
                 Task { await sender.sendClick(.right) }
             }
-            GestureButton(label: "Double Click", icon: "cursorarrow.click.badge.clock",  color: PixelHandTheme.accent, haptic: .double, colorScheme: colorScheme) {
+            GestureButton(label: "Double-click", icon: "cursorarrow.click.badge.clock",  color: PixelHandTheme.accent, haptic: .double, colorScheme: colorScheme) {
                 Task { await sender.sendDoubleClick(.left) }
             }
             // Locate / Find Cursor — pulses a cobalt crosshair on whichever
@@ -371,14 +391,17 @@ struct GestureButtonBar: View {
             GestureButton(label: "Locate", icon: "scope", color: PixelHandTheme.accent, haptic: .selection, colorScheme: colorScheme) {
                 Task { await sender.locateCursor() }
             }
+            .accessibilityLabel("Find the pointer")
             GestureButton(label: "Mission", icon: "macwindow.on.rectangle", color: PixelHandTheme.accent, haptic: .light, colorScheme: colorScheme) {
                 Task { await sender.sendSystemAction(.missionControl) }
             }
+            .accessibilityLabel("Mission Control")
             GestureButton(label: "Desktop", icon: "menubar.rectangle",       color: PixelHandTheme.accent, haptic: .light, colorScheme: colorScheme) {
                 // fn+F11 is a symbolic hot key a posted shortcut never fires;
                 // the host runs Show Desktop itself.
                 Task { await sender.sendSystemAction(.showDesktop) }
             }
+            .accessibilityLabel("Show Desktop")
         }
     }
 }
@@ -387,10 +410,11 @@ struct GestureButtonBar: View {
 private struct ScrollToggleButton: View {
     @Binding var isActive: Bool
     let colorScheme: ColorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button {
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+            withAnimation(reduceMotion ? nil : .spring(response: 0.2, dampingFraction: 0.7)) {
                 isActive.toggle()
             }
             GestureHaptic.medium.trigger()
@@ -415,6 +439,8 @@ private struct ScrollToggleButton: View {
             .scaleEffect(isActive ? 0.95 : 1.0)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("One-finger scrolling")
+        .accessibilityValue(isActive ? "On" : "Off")
     }
 }
 
@@ -524,6 +550,7 @@ struct GestureButton: View {
     let action: () -> Void
 
     @State private var isPressed = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button(action: {
@@ -549,7 +576,7 @@ struct GestureButton: View {
                     .fill(isPressed ? color.opacity(colorScheme == .dark ? 0.15 : 0.1) : Color.clear)
                     .animation(.easeOut(duration: 0.12), value: isPressed)
             )
-            .scaleEffect(isPressed ? 0.90 : 1.0)
+            .scaleEffect(isPressed && !reduceMotion ? 0.90 : 1.0)
             .animation(.spring(response: 0.18, dampingFraction: 0.6), value: isPressed)
         }
         .buttonStyle(.plain)

@@ -175,7 +175,7 @@ struct ContentRootView: View {
         }
         .padding(.horizontal, PixelHandTheme.Space.xl)
         .padding(.top, PixelHandTheme.Space.sm)
-        .transition(.opacity.combined(with: .move(edge: .top)))
+        .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
         .animation(.easeOut(duration: 0.22), value: switcher.notice)
         .animation(.easeOut(duration: 0.22), value: dialing?.deviceID)
         .animation(.easeOut(duration: 0.22), value: reconnecting?.deviceID)
