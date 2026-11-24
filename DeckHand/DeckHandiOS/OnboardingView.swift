@@ -139,6 +139,8 @@ struct OnboardingView: View {
                 .opacity(isLast ? 0 : 1)
                 .disabled(isLast)
                 .accessibilityHidden(isLast)
+                .accessibilityHint("Skips the tour")
+                .accessibilityIdentifier("ph.onboarding.skip")
         }
         .padding(.horizontal, metrics.widthClass == .compact ? 20 : 32)
         .frame(minHeight: 44)
@@ -164,6 +166,7 @@ struct OnboardingView: View {
                 .tracking(roomy ? -1 : -0.8)
                 .foregroundStyle(.white)
                 .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("ph.onboarding.title")
             Text(item.body)
                 .font(.body)
                 .foregroundStyle(.white.opacity(0.72))
@@ -210,6 +213,7 @@ struct OnboardingView: View {
             Text("Back").frame(maxWidth: .infinity)
         }
         .buttonStyle(.ph(.secondary))
+        .accessibilityIdentifier("ph.onboarding.back")
     }
 
     private var continueButton: some View {
@@ -220,6 +224,7 @@ struct OnboardingView: View {
         }
         .buttonStyle(.ph(.primary, fullWidth: true))
         .shadow(color: PixelHandTheme.Brand.cobalt.opacity(0.45), radius: 16, y: 6)
+        .accessibilityIdentifier("ph.onboarding.continue")
     }
 
     // MARK: - Paging

@@ -31,7 +31,7 @@ struct SettingsPointerSection: View {
                 .accessibilityValue(TrackpadSensitivity.label(for: settings.pointerSensitivity))
             }
 
-            SettingBlock("Haptics", caption: "Taps and gestures buzz the iPad.") {
+            SettingBlock("Haptics", caption: "Taps and gestures buzz your iPhone or iPad.") {
                 Picker("Haptics", selection: $settings.hapticStrength) {
                     ForEach(HapticStrength.allCases) { option in
                         Text(option.label).tag(option)

@@ -26,11 +26,11 @@ enum OnboardingScene: Hashable {
     /// What VoiceOver reads for the artwork.
     var accessibilityLabel: String {
         switch self {
-        case .mark: "Pixel Hand"
+        case .mark: "The Pixel Hand mark"
         case .trackpad: "A finger trail lighting the dots of the trackpad"
         case .mirror: "Your Mac's screen arriving live"
         case .capture: "A region of the Mac's screen selected, with its text lifted out"
-        case .pairing: "A Mac and an iPhone joined by a beam, with a pairing code"
+        case .pairing: "A Mac and an iPhone joined by a beam, with a pairing code below"
         }
     }
 
@@ -356,7 +356,7 @@ private struct MirrorScene: View {
             HStack(spacing: 8 * k) {
                 PHGlyph(glyph: PixelGlyphs.pictureInPicture, pitch: size >= 300 ? 3 : 2.2)
                     .foregroundStyle(PixelHandTheme.Brand.phosphor)
-                DotMatrixText("PINCH TO READ", pitch: size >= 300 ? 2 : 1.6, stepsWithType: false)
+                DotMatrixText("PINCH TO READ", pitch: size >= 300 ? 2 : 1.6, label: "Pinch to read", stepsWithType: false)
                     .foregroundStyle(PixelHandTheme.Brand.phosphor)
                     .accessibilityHidden(true)
             }
@@ -425,8 +425,8 @@ private struct CaptureScene: View {
             .offset(x: frame.minX, y: frame.minY)
 
             VStack(alignment: .leading, spacing: 8 * k) {
-                DotMatrixText("BUILD FAILED", pitch: pitch, stepsWithType: false)
-                DotMatrixText("MAIN.SWIFT:42", pitch: pitch, stepsWithType: false)
+                DotMatrixText("BUILD FAILED", pitch: pitch, label: "Build failed", stepsWithType: false)
+                DotMatrixText("MAIN.SWIFT:42", pitch: pitch, label: "main.swift, line 42", stepsWithType: false)
             }
             .foregroundStyle(PixelHandTheme.Brand.phosphor)
             .accessibilityHidden(true)
@@ -462,7 +462,7 @@ private struct PairingScene: View {
                 PHGlyph(glyph: PixelGlyphs.iPhone, pitch: glyphPitch, showsUnlit: true)
             }
             .foregroundStyle(Color(red: 0.81, green: 0.88, blue: 1))
-            DotMatrixText("4821 0937", pitch: large ? 3 : 2.2, stepsWithType: false)
+            DotMatrixText("4821 0937", pitch: large ? 3 : 2.2, label: "Example pairing code", stepsWithType: false)
                 .foregroundStyle(PixelHandTheme.Brand.phosphor)
                 .accessibilityHidden(true)
                 .opacity(max(0, (progress - 0.5) / 0.5))

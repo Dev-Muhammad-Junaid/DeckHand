@@ -79,9 +79,11 @@ struct RegionCropView: View {
                                 .scaledToFit()
                                 .frame(width: geo.size.width, height: geo.size.height)
                                 .accessibilityLabel("The Mac's screen")
+                                .accessibilityAction(named: "Mark the whole screen") { selection = imageFrame }
 
                             if let rect = selection {
                                 DimOutside(selection: rect)
+                                    .accessibilityHidden(true)
 
                                 Rectangle()
                                     .strokeBorder(PixelHandTheme.Brand.phosphor, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
@@ -89,11 +91,13 @@ struct RegionCropView: View {
                                     .position(x: rect.midX, y: rect.midY)
                                     .shadow(color: PixelHandTheme.Brand.glow.opacity(0.8), radius: 3)
                                     .allowsHitTesting(false)
+                                    .accessibilityHidden(true)
 
                                 ForEach(Handle.allCases, id: \.self) { handle in
                                     HandleSquare(size: handleVisualSize)
                                         .position(handle.position(in: rect))
                                         .allowsHitTesting(false)
+                                        .accessibilityHidden(true)
                                 }
                             }
                         }
@@ -124,6 +128,7 @@ struct RegionCropView: View {
                     .font(.footnote)
                     .foregroundStyle(Color.white.opacity(0.72))
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, PixelHandTheme.Space.lg)
 
@@ -133,13 +138,14 @@ struct RegionCropView: View {
                     onConfirm(normalized)
                 } label: {
                     Label {
-                        Text("Capture Region")
+                        Text("Capture region")
                     } icon: {
                         PHGlyph(glyph: PixelGlyphs.region, pitch: 2)
                     }
                 }
                 .buttonStyle(.ph(.primary, size: .large, fullWidth: true))
                 .disabled(!canConfirm)
+                .accessibilityIdentifier("ph.capture.confirmRegion")
                 .padding(.horizontal, PixelHandTheme.Space.lg)
                 .padding(.bottom, PixelHandTheme.Space.sm)
             }

@@ -96,6 +96,7 @@ struct CaptureIconButton: View {
         .opacity(isEnabled ? 1 : 0.35)
         .accessibilityLabel(label)
         .accessibilityAddTraits(isOn ? .isSelected : [])
+        .phosphorFocusable(cornerRadius: PixelHandTheme.ControlHeight.hit / 2)
     }
 }
 
@@ -141,6 +142,7 @@ struct CaptureActionButton: View {
         .disabled(!isEnabled)
         .opacity(isEnabled ? 1 : 0.35)
         .accessibilityLabel(title)
+        .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.chip)
     }
 }
 

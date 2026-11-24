@@ -127,7 +127,7 @@ struct KeyInspectorSheet: View {
                 }
                 if let onDelete {
                     Section {
-                        Button("Remove Key", role: .destructive) { isConfirmingDelete = true }
+                        Button("Remove key", role: .destructive) { isConfirmingDelete = true }
                             .confirmationDialog("Remove “\(key.label)”?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
                                 Button("Remove", role: .destructive) {
                                     onDelete()
@@ -137,7 +137,8 @@ struct KeyInspectorSheet: View {
                     }
                 }
             }
-            .navigationTitle(isNew ? "New Key" : "Edit Key")
+            .navigationTitle(isNew ? "New key" : "Edit key")
+            .accessibilityIdentifier("ph.deck.keyInspector")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -207,6 +208,7 @@ struct KeyInspectorSheet: View {
                         .buttonStyle(.plain)
                         .accessibilityLabel(glyph.label)
                         .accessibilityAddTraits(isOn ? [.isSelected, .isButton] : .isButton)
+                        .phosphorFocusable(cornerRadius: 10)
                     }
                 }
                 .padding(.vertical, 4)
@@ -254,6 +256,7 @@ struct KeyInspectorSheet: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel(tint.title)
                     .accessibilityAddTraits(isOn ? [.isSelected, .isButton] : .isButton)
+                    .phosphorFocusable(cornerRadius: 11)
                 }
             }
         }
@@ -458,7 +461,7 @@ private struct SequenceEditor: View {
                 }
                 Button("Pause") { steps.append(.delay(milliseconds: 500)) }
             } label: {
-                Label("Add Step", systemImage: "plus.circle")
+                Label("Add step", systemImage: "plus.circle")
             }
         }
     }

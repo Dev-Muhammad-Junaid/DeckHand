@@ -20,11 +20,12 @@ struct DeckHandEmptyState<Actions: View>: View {
             PixelScreen(cornerRadius: 14, padding: 12) {
                 PixelGlyph(bitmap: glyph, pitch: 4)
             }
+            .accessibilityHidden(true)
             .padding(.bottom, 2)
 
             VStack(spacing: 6) {
                 Text(title)
-                    .font(.system(size: 14, design: .rounded))
+                    .font(.system(.subheadline, design: .rounded))
                     .foregroundStyle(Color.secondary)
                 if let message {
                     Text(message)

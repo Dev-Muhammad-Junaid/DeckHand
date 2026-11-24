@@ -50,8 +50,8 @@ struct DeckHandMark: View {
             withAnimation(.spring(duration: 0.42, bounce: 0.18)) { hasAppeared = true }
             withAnimation(.easeOut(duration: 0.3).delay(0.35)) { raysLit = true }
         }
-        .accessibilityElement()
-        .accessibilityLabel("Pixel Hand")
+        // Decorative: every surface that shows the mark names the app in text.
+        .accessibilityHidden(true)
     }
 }
 

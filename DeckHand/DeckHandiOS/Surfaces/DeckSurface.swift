@@ -126,7 +126,7 @@ struct DeckSurface: View {
             Button("Cancel", role: .cancel) {}
         }
         .confirmationDialog("Delete “\(shownTitle)”?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
-            Button("Delete Page", role: .destructive) { model.deleteShownPage() }
+            Button("Delete page", role: .destructive) { model.deleteShownPage() }
         } message: {
             Text("Its keys go too. You can undo this while editing.")
         }
@@ -182,13 +182,16 @@ struct DeckSurface: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .phosphorFocusable(cornerRadius: 18)
             .accessibilityLabel(isPinned ? "Unpin page" : "Pin page")
+            .accessibilityIdentifier("ph.deck.pin")
             .accessibilityHint("A pinned page stays when the app in front changes")
             Button("Edit") {
                 GestureHaptic.light.trigger()
                 withAnimation(PixelHandMotion.reduced(PixelHandMotion.standard, reduceMotion: reduceMotion)) { model.isEditing = true }
             }
             .buttonStyle(.ph(.secondary, size: .small))
+            .accessibilityIdentifier("ph.deck.edit")
         }
         .padding(.leading, grid.leadingMargin)
         .padding(.trailing, grid.trailingMargin)
@@ -270,27 +273,27 @@ struct DeckSurface: View {
                 Button {
                     model.addPage(title: "Page \(pages.count + 1)", kind: .custom)
                 } label: {
-                    Label("New Page", systemImage: "plus.rectangle.on.rectangle")
+                    Label("New page", systemImage: "plus.rectangle.on.rectangle")
                 }
                 if let front = session.activeBundleID, store.document.appPage(for: front) == nil {
                     Button {
                         model.addPage(title: apps[front]?.displayName ?? "", kind: .app(bundleID: front))
                     } label: {
-                        Label("Page for \(apps[front]?.displayName ?? "This App")", systemImage: "app.badge")
+                        Label("Page for \(apps[front]?.displayName ?? "this app")", systemImage: "app.badge")
                     }
                 }
                 if !store.document.pages.contains(where: { $0.kind == .context }) {
                     Button {
                         model.addPage(title: "Context", kind: .context)
                     } label: {
-                        Label("Context Page", systemImage: "rectangle.on.rectangle")
+                        Label("Context page", systemImage: "rectangle.on.rectangle")
                     }
                 }
                 if !store.document.pages.contains(where: { $0.kind == .shortcuts }) {
                     Button {
                         model.addPage(title: "Shortcuts", kind: .shortcuts)
                     } label: {
-                        Label("Shortcuts Page", systemImage: "square.stack.3d.up")
+                        Label("Shortcuts page", systemImage: "square.stack.3d.up")
                     }
                 }
             }
@@ -299,16 +302,16 @@ struct DeckSurface: View {
                     renameText = shownPage?.title ?? ""
                     isRenaming = true
                 } label: {
-                    Label("Rename Page", systemImage: "pencil")
+                    Label("Rename page", systemImage: "pencil")
                 }
                 Toggle(isOn: Binding(get: { store.document.followFrontApp }, set: { model.setFollowsFrontApp($0) })) {
-                    Label("Follow Front App", systemImage: "arrow.triangle.2.circlepath")
+                    Label("Follow front app", systemImage: "arrow.triangle.2.circlepath")
                 }
                 if shownPage?.isDeletable == true {
                     Button(role: .destructive) {
                         isConfirmingDelete = true
                     } label: {
-                        Label("Delete Page", systemImage: "trash")
+                        Label("Delete page", systemImage: "trash")
                     }
                 }
             }
@@ -321,7 +324,9 @@ struct DeckSurface: View {
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
+        .phosphorFocusable(cornerRadius: 18)
         .accessibilityLabel("Page options")
+        .accessibilityIdentifier("ph.deck.pageMenu")
     }
 
     // MARK: Pages
@@ -439,21 +444,21 @@ struct DeckSurface: View {
             model.isEditing = true
             inspect(shown, page: page)
         } label: {
-            Label("Edit Key", systemImage: "slider.horizontal.3")
+            Label("Edit key", systemImage: "slider.horizontal.3")
         }
         Button {
             var key = shown.key
             key.confirm.toggle()
             model.edit { $0.updateKey(key, onPage: page.id) }
         } label: {
-            Label(shown.key.confirm ? "Run Without Asking" : "Ask Before Running", systemImage: shown.key.confirm ? "checkmark.circle" : "questionmark.circle")
+            Label(shown.key.confirm ? "Run without asking" : "Ask before running", systemImage: shown.key.confirm ? "checkmark.circle" : "questionmark.circle")
         }
         Button {
             var key = shown.key
             key.pinnedToFirstRow.toggle()
             model.edit { $0.updateKey(key, onPage: page.id) }
         } label: {
-            Label(shown.key.pinnedToFirstRow ? "Unpin From First Row" : "Pin to First Row", systemImage: "pin")
+            Label(shown.key.pinnedToFirstRow ? "Unpin from first row" : "Pin to first row", systemImage: "pin")
         }
         Button {
             model.edit { _ = $0.duplicateKey(id: shown.id, onPage: page.id, frontBundleID: session.activeBundleID) }
@@ -536,6 +541,7 @@ struct DeckSurface: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel(page.displayTitle { apps[$0]?.displayName })
                     .accessibilityAddTraits(index == shownIndex ? [.isSelected, .isButton] : .isButton)
+                    .accessibilityIdentifier("ph.deck.pageDot")
                 }
             }
             .accessibilityElement(children: .contain)

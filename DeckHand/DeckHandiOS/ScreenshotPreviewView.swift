@@ -93,13 +93,13 @@ struct ScreenshotPreviewView: View {
             ShareSheet(items: shareItems)
         }
         .confirmationDialog("Clear all marks?", isPresented: $confirmClear, titleVisibility: .visible) {
-            Button("Clear Marks", role: .destructive) {
+            Button("Clear marks", role: .destructive) {
                 withAnimation(.easeOut(duration: 0.15)) { strokes.removeAll() }
             }
         }
         .confirmationDialog("Discard your marks?", isPresented: $confirmDiscard, titleVisibility: .visible) {
-            Button("Discard Marks", role: .destructive) { leaveAnnotate(keep: false) }
-            Button("Keep Annotating", role: .cancel) {}
+            Button("Discard marks", role: .destructive) { leaveAnnotate(keep: false) }
+            Button("Keep annotating", role: .cancel) {}
         }
         .onAppear {
             revealed = true
@@ -183,6 +183,8 @@ struct ScreenshotPreviewView: View {
                     .accessibilityLabel("Capture")
                     .accessibilityHint("Pinch or double-tap to zoom.")
                     .accessibilityAddTraits(.isImage)
+                    .accessibilityAction(named: zoom > 1.01 ? "Zoom out" : "Zoom in") { toggleZoom() }
+                    .accessibilityIdentifier("ph.capture.preview")
             }
             .clipped()
         }
@@ -219,7 +221,7 @@ struct ScreenshotPreviewView: View {
     }
 
     private func toggleZoom() {
-        withAnimation(.snappy(duration: 0.25)) {
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.25)) {
             if zoom > 1.01 {
                 resetZoom()
             } else {
@@ -315,7 +317,7 @@ struct ScreenshotPreviewView: View {
         if let toast {
             PHToast(message: toast.message, isFailure: toast.failed)
                 .padding(.bottom, 132)
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .bottom)))
                 .allowsHitTesting(false)
         }
     }

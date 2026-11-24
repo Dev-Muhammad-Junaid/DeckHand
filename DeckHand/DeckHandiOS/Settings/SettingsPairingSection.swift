@@ -55,6 +55,7 @@ struct SettingsPairingSection: View {
             Image(systemName: mac.kind.systemImage)
                 .foregroundStyle(PixelHandTheme.accent)
                 .frame(width: 24)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(mac.name)
                 Text(isLive ? "Connected" : "Paired \(mac.pairedAt.formatted(date: .abbreviated, time: .omitted))")
@@ -67,6 +68,7 @@ struct SettingsPairingSection: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityAction(named: "Forget") { confirming = mac }
+        .accessibilityIdentifier("ph.settings.pairedMac")
     }
 
     private var footer: String {

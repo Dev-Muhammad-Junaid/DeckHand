@@ -42,6 +42,9 @@ struct MyMacsSheet: View {
                             }
                             .buttonStyle(PressableButtonStyle())
                             .accessibilityHint(hint(for: listing))
+                            .accessibilityAddTraits(listing.isActive ? .isSelected : [])
+                            .accessibilityIdentifier("ph.macs.card")
+                            .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.chip + 4)
                             .contextMenu { menu(for: listing) }
                         }
                     }

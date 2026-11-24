@@ -36,10 +36,10 @@ struct RemoteKeyboardPanel: View {
     private static let keys: [KeyButton] = [
         KeyButton(key: .escape, symbol: "escape", label: "Escape"),
         KeyButton(key: .tab, symbol: "arrow.right.to.line", label: "Tab"),
-        KeyButton(key: .left, symbol: "arrow.left", label: "Left"),
-        KeyButton(key: .down, symbol: "arrow.down", label: "Down"),
-        KeyButton(key: .up, symbol: "arrow.up", label: "Up"),
-        KeyButton(key: .right, symbol: "arrow.right", label: "Right"),
+        KeyButton(key: .left, symbol: "arrow.left", label: "Left arrow"),
+        KeyButton(key: .down, symbol: "arrow.down", label: "Down arrow"),
+        KeyButton(key: .up, symbol: "arrow.up", label: "Up arrow"),
+        KeyButton(key: .right, symbol: "arrow.right", label: "Right arrow"),
         KeyButton(key: .delete, symbol: "delete.left", label: "Delete"),
         KeyButton(key: .return, symbol: "return", label: "Return"),
     ]
@@ -96,8 +96,11 @@ struct RemoteKeyboardPanel: View {
                                 )
                         }
                         .buttonStyle(.plain)
+                        .phosphorFocusable(cornerRadius: 8)
                         .accessibilityLabel(item.label)
                         .accessibilityAddTraits(isOn ? .isSelected : [])
+                        .accessibilityHint("Holds for the next key")
+                        .accessibilityIdentifier("ph.keyboard.modifier")
                     }
 
                     Divider().frame(height: 28)
@@ -121,7 +124,9 @@ struct RemoteKeyboardPanel: View {
                                 )
                         }
                         .buttonStyle(.plain)
+                        .phosphorFocusable(cornerRadius: 8)
                         .accessibilityLabel(item.label)
+                        .accessibilityIdentifier("ph.keyboard.key")
                     }
                 }
                 .padding(.vertical, 2)

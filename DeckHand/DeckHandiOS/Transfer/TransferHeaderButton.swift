@@ -35,6 +35,7 @@ struct TransferHeaderButton: View {
                     .accessibilityHidden(true)
             }
         }
+        .accessibilityIdentifier("ph.transfer.send")
         .requiresPro(.sharing)
         .sheet(isPresented: $showsSheet) {
             TransferSheet(tab: startTab)

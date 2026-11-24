@@ -31,6 +31,10 @@ struct PairingQRScannerSheet: View {
                         dismiss()
                     }
                     .ignoresSafeArea()
+                    .accessibilityElement()
+                    .accessibilityLabel("Camera, scanning for a pairing code")
+                    .accessibilityHint("Point your camera at the QR code on your Mac")
+                    .accessibilityIdentifier("ph.pairing.scanner")
                     DottedViewfinder()
                         .frame(width: 240, height: 240)
                         .accessibilityHidden(true)
@@ -50,12 +54,13 @@ struct PairingQRScannerSheet: View {
                         .foregroundStyle(.white.opacity(0.72))
                 }
                 .multilineTextAlignment(.center)
+                .accessibilityElement(children: .combine)
                 .padding(.horizontal, PixelHandTheme.Space.xl)
                 .padding(.vertical, PixelHandTheme.Space.lg)
                 .frame(maxWidth: .infinity)
                 .background(.black.opacity(0.45))
             }
-            .navigationTitle("Scan Pairing Code")
+            .navigationTitle("Scan pairing code")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
@@ -89,6 +94,7 @@ struct PairingQRScannerSheet: View {
                 }
             }
             .buttonStyle(.ph(.primary, size: .regular))
+            .accessibilityIdentifier("ph.pairing.openSettings")
         }
         .padding(32)
     }

@@ -79,6 +79,7 @@ struct DeckSuggestionsPanel: View {
             .animation(PixelHandMotion.reduced(PixelHandMotion.standard, reduceMotion: reduceMotion), value: shown.map(\.id))
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Suggestions")
+            .accessibilityIdentifier("ph.deck.suggestions")
         }
     }
 
@@ -118,6 +119,7 @@ struct DeckSuggestionsPanel: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Close suggestions")
+            .phosphorFocusable(cornerRadius: 15)
             .padding(.trailing, -8)
         }
     }
@@ -229,7 +231,7 @@ struct DeckSuggestionsPanel: View {
         Button {
             suggestions.hide(shown.id)
         } label: {
-            Label("Hide Suggestion", systemImage: "eye.slash")
+            Label("Hide suggestion", systemImage: "eye.slash")
         }
     }
 

@@ -84,15 +84,15 @@ struct ClipboardRow: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(settings.pasteRightAway ? "to the Mac, where its cursor is" : "to the Mac's clipboard")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(.system(.caption2, design: .rounded, weight: .medium))
                     .foregroundStyle(Color.secondary)
                 if let status = clipboard?.pasteStatus {
                     Text(status)
-                        .font(.system(size: 10, design: .rounded))
+                        .font(.system(.caption2, design: .rounded))
                         .foregroundStyle(Color.secondary.opacity(0.8))
                 } else if settings.clipboardSync, let fromMac = clipboard?.lastFromMac {
                     Text("Copied on the Mac: “\(fromMac)”")
-                        .font(.system(size: 10, design: .rounded))
+                        .font(.system(.caption2, design: .rounded))
                         .foregroundStyle(Color.secondary.opacity(0.8))
                         .lineLimit(1)
                 }

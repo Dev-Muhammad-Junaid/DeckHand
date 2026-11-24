@@ -51,9 +51,12 @@ struct ControlToolbar: ToolbarContent {
                 // Surface the live connection id so the session can be
                 // matched against the Mac and a silent session swap is
                 // visible in the UI.
+                #if DEBUG
                 Text("session \(connectionID.uuidString.prefix(8))")
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+                #endif
             }
         }
         ToolbarItem(placement: .topBarTrailing) {
@@ -66,7 +69,7 @@ struct ControlToolbar: ToolbarContent {
                       : "rectangle.on.rectangle")
             }
             .tint(isMirrorActive ? PixelHandTheme.success : nil)
-            .accessibilityLabel(isMirrorActive ? "Stop live mirror" : "Start live mirror")
+            .accessibilityLabel(isMirrorActive ? "Hide the Mac’s screen" : "Show the Mac’s screen")
             .requiresPro(.mirror) // Store lane
         }
         ToolbarItem(placement: .topBarTrailing) {

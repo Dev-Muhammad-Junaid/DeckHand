@@ -27,7 +27,7 @@ enum RemoteConnectError: LocalizedError {
         case let .refused(reason):
             reason.message
         case .identityMismatch:
-            "The Mac at that address isn’t the one you paired with, so Pixel Hand didn’t connect."
+            "The Mac at that address isn’t the one you paired with, so Pixel Hand didn’t connect. Check the address in Settings, or pair with your Mac again."
         }
     }
 }

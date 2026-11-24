@@ -122,7 +122,9 @@ struct AskSheet: View {
                     .background(canSubmit ? PixelHandTheme.accent : PixelHandTheme.ink3, in: Circle())
             }
             .disabled(!canSubmit)
+            .phosphorFocusable(cornerRadius: 18)
             .accessibilityLabel("Plan")
+            .accessibilityIdentifier("ph.ask.submit")
         }
         .padding(.leading, PixelHandTheme.Space.lg)
         .padding(.trailing, PixelHandTheme.Space.xs)
@@ -321,7 +323,7 @@ struct AskSheet: View {
             Button("Type text") { model.edit { $0.append(.typeText("text")) } }
             Button("Press Return") { model.edit { $0.append(.action(.shortcut(keys: ["return"]))) } }
             Button("Wait 1 second") { model.edit { $0.append(.delay(milliseconds: 1_000)) } }
-            Button("Play/Pause") { model.edit { $0.append(.action(.media(key: .playPause))) } }
+            Button("Play or pause") { model.edit { $0.append(.action(.media(key: .playPause))) } }
         } label: {
             Label("Add step", systemImage: "plus")
                 .font(.subheadline.weight(.semibold))
@@ -444,6 +446,8 @@ private struct FlowChips: View {
                         .background(PixelHandTheme.fill, in: Capsule())
                 }
                 .buttonStyle(.plain)
+                .phosphorFocusable(cornerRadius: 18)
+                .accessibilityIdentifier("ph.ask.example")
             }
         }
     }

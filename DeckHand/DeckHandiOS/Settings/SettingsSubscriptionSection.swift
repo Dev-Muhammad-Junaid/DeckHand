@@ -55,7 +55,7 @@ struct SettingsSubscriptionSection: View {
                 Spacer(minLength: 8)
                 if entitlements.isPro {
                     // The LED-panel PRO mark, small enough for a row.
-                    DotMatrixText("PRO", pitch: 2, label: "", showsUnlit: true, glows: false)
+                    DotMatrixText("PRO", pitch: 2, label: "Pro", showsUnlit: true, glows: false)
                         .foregroundStyle(PixelHandTheme.accent)
                         .accessibilityHidden(true)
                 }
@@ -71,16 +71,19 @@ struct SettingsSubscriptionSection: View {
                 // Nothing to buy or manage while testing.
             } else if entitlements.isPro, entitlements.isSettled {
                 Button("Manage subscription") { isManagePresented = true }
+                    .accessibilityIdentifier("ph.settings.manageSubscription")
             } else {
                 Button(store.isTrialEligible ? "Try Pixel Hand Pro free for 2 weeks" : "See Pixel Hand Pro") {
                     isPaywallPresented = true
                 }
+                .accessibilityIdentifier("ph.settings.subscribe")
             }
 
             Button("Restore Purchases") {
                 Task { await store.restore() }
             }
             .disabled(store.isWorking)
+            .accessibilityIdentifier("ph.settings.restore")
 
             if let error = store.errorMessage, !isPaywallPresented {
                 Text(error)

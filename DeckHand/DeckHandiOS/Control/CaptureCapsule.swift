@@ -22,7 +22,7 @@ struct CaptureCapsule: View {
             Button {
                 onFullScreen()
             } label: {
-                Label("Full Screen", systemImage: "rectangle.dashed")
+                Label("Full screen", systemImage: "rectangle.dashed")
             }
             Button {
                 onRegion()
@@ -38,7 +38,7 @@ struct CaptureCapsule: View {
             Button {
                 onOCR()
             } label: {
-                Label("Recognize Text", systemImage: "text.viewfinder")
+                Label("Read text", systemImage: "text.viewfinder")
             }
         } label: {
             // UX-009: the pixel capture glyph; the dot wave while the Mac works.
@@ -53,6 +53,6 @@ struct CaptureCapsule: View {
         }
         .disabled(isBusy)
         .accessibilityLabel("Capture")
-        .accessibilityHint("Tap for your default capture. Touch and hold for full screen, region, window or text.")
+        .accessibilityHint("Takes your default capture. Touch and hold for full screen, region, window or read text.")
     }
 }
