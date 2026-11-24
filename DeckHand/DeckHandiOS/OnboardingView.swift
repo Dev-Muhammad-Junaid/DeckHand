@@ -6,8 +6,10 @@
 //  one step on the Mac. Every page has its own dot-art scene on the navy
 //  plate, glyph bullets, a dot-matrix step counter and Back / Continue.
 //  Two columns (scene left, text right) when `LayoutMetrics` says so: iPad
-//  landscape, large Stage Manager windows and iPhone landscape. Content
-//  scrolls, so nothing clips at AX sizes or in landscape.
+//  landscape, large Stage Manager windows and iPhone landscape; on an open
+//  iPhone Duo, the scene on one pane and the text on the other. Content
+//  scrolls, so nothing clips at AX sizes or in landscape; at AX sizes the
+//  buttons scroll after the text. Body copy is leading-aligned.
 //  Spec: `Product/Design/06-Pixel-Identity.md` §9, `04-Interaction-Model.md` §5.
 //
 
@@ -21,6 +23,8 @@ struct OnboardingView: View {
     @State private var page = 0
     /// +1 going forward, -1 going back: picks the text's slide direction.
     @State private var direction = 1
+    /// The iPhone Duo's hinge (iOS 27.1+), for the two-pane layout.
+    @State private var hingeStatus: DuoHingeStatus?
 
     private let pages = OnboardingPage.all
     private var isLast: Bool { page == pages.count - 1 }
@@ -29,17 +33,26 @@ struct OnboardingView: View {
         GeometryReader { proxy in
             let metrics = LayoutMetrics(width: proxy.size.width, height: proxy.size.height)
             let twoColumns = metrics.usesTwoColumnPages
-            VStack(spacing: 0) {
-                topBar(metrics: metrics)
-                if twoColumns {
-                    twoColumnPage(metrics: metrics, size: proxy.size)
+            let crease = DuoPoseMachine.band(for: DuoCrease.input(proxy: proxy, hingeStatus: hingeStatus))
+            Group {
+                if let crease {
+                    // iPhone Duo open: nothing on the crease (VQ-067).
+                    duoPage(band: crease, size: proxy.size, metrics: metrics)
                 } else {
-                    singleColumnPage(metrics: metrics, size: proxy.size)
+                    VStack(spacing: 0) {
+                        topBar(metrics: metrics)
+                        if twoColumns {
+                            twoColumnPage(metrics: metrics, size: proxy.size)
+                        } else {
+                            singleColumnPage(metrics: metrics, size: proxy.size)
+                        }
+                    }
                 }
             }
             .contentShape(Rectangle())
             .simultaneousGesture(swipe)
         }
+        .duoHingeStatus($hingeStatus)
         .background(PixelHandTheme.brandBackground().ignoresSafeArea())
         .foregroundStyle(.white)
         .pixelOnNavy()
@@ -49,38 +62,91 @@ struct OnboardingView: View {
     // MARK: - Layouts
 
     /// Phones in portrait, iPad portrait and Split View: scene, text and
-    /// bullets scroll; dots and buttons stay pinned at the bottom.
+    /// bullets scroll; dots and buttons stay pinned at the bottom. At
+    /// accessibility sizes the dots and buttons scroll after the text, so
+    /// the text never runs under them (VQ-064, `07-Polish-Spec.md` §6).
+    /// Body copy and bullets are leading-aligned under a leading-aligned
+    /// title; only the scene is centred (VQ-019, §5.8).
     private func singleColumnPage(metrics: LayoutMetrics, size: CGSize) -> some View {
         let isRoomy = metrics.widthClass != .compact
         let nominal: CGFloat = isRoomy ? 340 : 248
         // Keeps the scene from pushing the title off a short screen.
         let scene = min(nominal, max(168, (size.height * 0.34).rounded()))
+        let textWidth: CGFloat = isRoomy ? 520 : 340
+        let controlsScroll = typeSize.isAccessibilitySize
         return VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: isRoomy ? 40 : 28) {
                     sceneView(size: scene)
-                    VStack(spacing: isRoomy ? 28 : 20) {
-                        text(alignment: .center, maxWidth: isRoomy ? 520 : 340, roomy: isRoomy)
-                        bullets(alignment: .center)
+                    VStack(alignment: .leading, spacing: isRoomy ? 28 : 20) {
+                        text(alignment: .leading, maxWidth: textWidth, roomy: isRoomy)
+                        bullets(alignment: .leading)
                     }
+                    .frame(maxWidth: textWidth, alignment: .leading)
                     .modifier(PageTextTransition(page: page, direction: direction, reduceMotion: reduceMotion))
+                    if controlsScroll {
+                        controls(roomy: isRoomy)
+                    }
                 }
                 .padding(.horizontal, isRoomy ? 48 : 24)
                 .padding(.vertical, 16)
                 .frame(maxWidth: .infinity)
-                .frame(minHeight: max(0, size.height - bottomReserve(roomy: isRoomy) - 44), alignment: .center)
+                .frame(minHeight: max(0, size.height - (controlsScroll ? 0 : bottomReserve(roomy: isRoomy)) - 44), alignment: .center)
             }
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize)
 
-            VStack(spacing: isRoomy ? 24 : 16) {
-                PageDots(count: pages.count, current: page)
-                buttons(maxWidth: 420)
+            if !controlsScroll {
+                controls(roomy: isRoomy)
+                    .padding(.horizontal, isRoomy ? 48 : 24)
+                    .padding(.top, 12)
+                    .padding(.bottom, isRoomy ? 24 : 8)
             }
-            .padding(.horizontal, isRoomy ? 48 : 24)
-            .padding(.top, 12)
-            .padding(.bottom, isRoomy ? 24 : 8)
         }
+    }
+
+    private func controls(roomy: Bool) -> some View {
+        VStack(spacing: roomy ? 24 : 16) {
+            PageDots(count: pages.count, current: page)
+            buttons(maxWidth: 420)
+        }
+    }
+
+    /// iPhone Duo open: the scene on the first pane, the text, dots and
+    /// buttons on the second, each pane meeting the crease band (which
+    /// holds the 20 pt clear on each side) and never crossing it.
+    private func duoPage(band: DuoCreaseBand, size: CGSize, metrics: LayoutMetrics) -> some View {
+        let panes = DuoPanes(width: Double(size.width), height: Double(size.height), band: band)
+        let first = panes.first
+        let second = panes.second
+        let scene = min(248, max(160, CGFloat(min(first.width, first.height)) - 48))
+        return ZStack(alignment: .topLeading) {
+            sceneView(size: scene)
+                .frame(width: CGFloat(first.width), height: CGFloat(first.height))
+                .offset(x: CGFloat(first.x), y: CGFloat(first.y))
+            VStack(spacing: 0) {
+                topBar(metrics: panes.secondMetrics)
+                ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 20) {
+                        text(alignment: .leading, maxWidth: 400, roomy: false)
+                        bullets(alignment: .leading)
+                    }
+                    .modifier(PageTextTransition(page: page, direction: direction, reduceMotion: reduceMotion))
+                    PageDots(count: pages.count, current: page)
+                    buttons(maxWidth: 400)
+                }
+                .padding(panes.pose == .book ? .trailing : .horizontal, CGFloat(DuoPanes.outerMargin))
+                .padding(.vertical, 16)
+                .frame(minHeight: max(0, CGFloat(second.height) - 48), alignment: .center)
+                }
+                .scrollIndicators(.hidden)
+                .scrollBounceBehavior(.basedOnSize)
+            }
+            .frame(width: CGFloat(second.width), height: CGFloat(second.height))
+            .offset(x: CGFloat(second.x), y: CGFloat(second.y))
+        }
+        .frame(width: size.width, height: size.height, alignment: .topLeading)
     }
 
     /// iPad landscape and iPhone landscape: scene left, a left-aligned text
@@ -156,6 +222,11 @@ struct OnboardingView: View {
                 .transition(reduceMotion ? .opacity : .pixelDissolve)
         }
         .frame(width: size, height: size)
+        .background {
+            if pages[page].scene != .mark {
+                OnboardingSceneGlow(size: size)
+            }
+        }
     }
 
     private func text(alignment: TextAlignment, maxWidth: CGFloat, roomy: Bool) -> some View {
