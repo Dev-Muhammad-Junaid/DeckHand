@@ -17,6 +17,7 @@ final class SharingHandler: DomainHandler {
 
         case let .setClipboard(text, paste):
             MacClipboardSync.shared.setClipboard(text, paste: paste, from: connection.id)
+            MenuBarActivity.shared.noteReceive() // UX Mac lane: the menu-bar hand's receive beam
 
         case .macClipboard:
             break // Mac → remote only

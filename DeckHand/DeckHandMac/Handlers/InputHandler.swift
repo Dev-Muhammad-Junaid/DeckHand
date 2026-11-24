@@ -17,6 +17,7 @@ final class InputHandler: DomainHandler {
     private let injector = InputInjector.shared
 
     func handle(_ message: InputMessage, from connection: LoomConnectionHandle) async {
+        MenuBarActivity.shared.noteInput() // UX Mac lane: the menu-bar hand's "being controlled" state
         switch message {
         case let .mouseDelta(dx, dy):
             injector.moveCursor(dx: dx, dy: dy)
