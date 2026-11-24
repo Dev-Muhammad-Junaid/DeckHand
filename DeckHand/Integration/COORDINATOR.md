@@ -1,5 +1,7 @@
 # Coordinator state (read and update on every coordinator tick)
 
+> **Lanes paused until build 15 is green** (primary session, 2026-11-24). Merge Sharing, Duo and PiP when they're ready, but start no new lanes. Wait for "Mac build results (build 15)" and "Owner testing (build 15)" in `STATUS.md`, route their bugs to one fix session, then resume the queue (UX-013 + UX-014, then the review page).
+
 > **Mac builds:** build 7 was built on the Mac (2026-11-20, results in `STATUS.md`). Build 15 is queued (build 8 plus the UX lanes, Ask, Multi-Mac and Intents). Mac builds are now run from the primary session or the owner's Mac session.
 
 ## Needs the owner
