@@ -1,6 +1,6 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Mac builds:** build 7 was built on the Mac (2026-11-20, results in `STATUS.md`). Build 13 is queued (build 8 plus seven UX lanes). Mac builds are now run from the primary session or the owner's Mac session.
+> **Mac builds:** build 7 was built on the Mac (2026-11-20, results in `STATUS.md`). Build 14 is queued (build 8 plus ten UX lanes). Mac builds are now run from the primary session or the owner's Mac session.
 
 ## Needs the owner
 
@@ -24,9 +24,6 @@ weekly usage limit is close).
 | --- | --- | --- | --- |
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac) — **archived since 2026-11-18; start a new Mac session** | session_01H5HwATvLJkqCFPruLyBsX8 (archived) | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
-| Lane: UX motion (UX-017 transitions, UX-018 loading/empty/focus) | session_01H5HwAS9odHmRDuhj5Gj7Lf | claude/pixelhand-lane-ux-motion | `LANE-ux-motion.md` ends `Lane: READY TO MERGE` |
-| Lane: UX Mac (UX-012 Mac panel + pairing window, UX-019 icon/launch/menu-bar hand) | session_01H5HwASNDVvgmPU1fmMghos | claude/pixelhand-lane-ux-mac | `LANE-ux-mac.md` ends `Lane: READY TO MERGE` |
-| Lane: UX suggest (UX-021, on-device AI with deterministic fallback) | session_01H5HwAVNA7A1QA2hA7ePWM7 | claude/pixelhand-lane-ux-suggest | `LANE-ux-suggest.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -135,3 +132,9 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   hand, UX-021 suggest a deck (on-device AI), then UX-013 a11y, UX-014 copy
   and shim removal, App Intents/widgets, multi-Mac, sharing, Duo, PiP.
   Started UX motion, UX Mac and UX suggest.
+- 2026-11-24 ~01:00 UTC: merged UX motion, UX Mac and UX suggest, all
+  clean. Applied UX Mac's `UILaunchScreen` plist keys. Core 702 tests and
+  the type check are green. Queued build 14. Next: UX-013 accessibility
+  pass and UX-014 copy + shim removal, App Intents/widgets/Control Center,
+  UX-022 Ask, then multi-Mac (UX-030), sharing (UX-031), Duo (UX-040) and
+  PiP (UX-041).

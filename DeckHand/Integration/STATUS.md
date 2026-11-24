@@ -827,3 +827,44 @@ Mac should check:
    - the free tier lock on Deck.
 
 Status: READY FOR MAC BUILD (build 13)
+
+## Build 14 queued (2026-11-24)
+
+If build 13 hasn't been built, build this one instead. It is build 13 plus
+three lanes:
+
+- **UX motion** (`LANE-ux-motion.md`): UX-017 pixel-dissolve surface
+  switches use a stitchable Metal shader, fade under Reduce Motion, and
+  the scanline and power-on transitions are in. UX-018 replaces spinners
+  with `DotWave`, adds `PHEmptyState` for empty lists, and adds
+  `.phosphorFocus` on iPad. **There's a new `.metal` file, so run
+  `xcodegen generate` first.**
+- **UX Mac** (`LANE-ux-mac.md`):
+  - UX-012: a restyled Mac menu-bar panel and a "Pair a device" window
+    with QR dots, a dot-matrix code and a countdown beam.
+  - UX-019: menu-bar hand states (starting, ready, waiting, connected,
+    active, locked) and the iOS launch screen. The coordinator applied
+    the lane's `UILaunchScreen` keys to the iOS Info.plist.
+- **UX suggest** (`LANE-ux-suggest.md`): UX-021, the first AI feature.
+  Deck suggestions come from the front app's menus. A deterministic
+  ranker (Core) runs everywhere, Apple Intelligence (Foundation Models)
+  reorders them on-device when available, and "Keep all" or tap-to-keep
+  both work with undo. Pro-gated.
+
+Protocol is still **12**. Linux: Core **702 tests pass** and the type check
+is clean. The apps were not compiled here.
+
+Mac should check:
+1. `cd DeckHand && xcodegen generate`, then build both apps. Fix compile
+   errors from each handoff's "Compile risks" list (ten UX lanes since
+   build 8) and record the fixes here.
+2. `swift test --package-path DeckHand/Core` (expect 702) and `DeckHandTests`.
+3. The new handoffs' checks:
+   - menu-bar hand states and the pairing window countdown;
+   - delete and reinstall the iOS app, then cold launch to check the
+     launch screen;
+   - surface switches with Reduce Motion on and off;
+   - deck suggestions for Safari, Xcode and Finder, on a device with
+     Apple Intelligence and one without.
+
+Status: READY FOR MAC BUILD (build 14)
