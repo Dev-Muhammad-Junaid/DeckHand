@@ -49,5 +49,30 @@
     <!-- Screen Recording usage (ScreenCaptureKit) — required on macOS 14+/26 Tahoe -->
     <key>NSScreenCaptureUsageDescription</key>
     <string>Pixel Hand captures your Mac screen so your iPad can preview it on demand.</string>
+    <key>NSServices</key>
+    <array>
+        <dict>
+            <key>NSMenuItem</key>
+            <dict>
+                <key>default</key>
+                <string>Send to iPhone or iPad with Pixel Hand</string>
+            </dict>
+            <key>NSMessage</key>
+            <string>sendToDevice</string>
+            <key>NSPortName</key>
+            <string>Pixel Hand</string>
+            <key>NSSendFileTypes</key>
+            <array>
+                <string>public.item</string>
+            </array>
+            <key>NSSendTypes</key>
+            <array>
+                <string>public.utf8-plain-text</string>
+                <string>public.url</string>
+            </array>
+            <key>NSRequiredContext</key>
+            <dict/>
+        </dict>
+    </array>
 </dict>
 </plist>

@@ -63,6 +63,14 @@
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Pixel Hand needs permission to save screenshots of your Mac directly to your Photos library.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
-    <string>Pixel Hand needs permission to save screenshots of your Mac directly to your Photos library.</string>
+    <string>Pixel Hand saves screenshots and photos your Mac sends you to your Photos library.</string>
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>audio</string>
+    </array>
+    <key>UIFileSharingEnabled</key>
+    <true/>
+    <key>LSSupportsOpeningDocumentsInPlace</key>
+    <true/>
 </dict>
 </plist>
