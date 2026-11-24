@@ -454,3 +454,15 @@ enum MenuCommandPresser {
     @MainActor static func press(bundleID: String, path: [String], launcher: AppLauncher) async -> Result { .pressed }
     static func outcome(_ result: Result, path: [String]) -> ActionOutcome { .completed }
 }
+
+// MARK: Multi-Mac (MacSwitcher)
+extension LoomPeerSnapshot {
+    public var isSameICloudDevice: Bool { false }
+}
+extension LoomConnectionHandle {
+    public nonisolated var peer: LoomPeerSnapshot { fatalError("stub") }
+}
+extension PeerCompatibility {
+    /// `Shared/PeerCompatibility+Loom.swift` on Apple platforms.
+    init(advertisement: LoomPeerAdvertisement) { fatalError("stub") }
+}

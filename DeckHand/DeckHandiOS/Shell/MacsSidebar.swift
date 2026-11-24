@@ -2,12 +2,12 @@
 //  MacsSidebar.swift
 //  DeckHandiOS – Shell
 //
-//  The Macs sidebar on wide windows (UX-007; the list itself grows in
-//  UX-030 / 1.3): "Macs" in Geist, a glyph button that collapses the
-//  sidebar, then the connected Mac's card (ring, live pixel) and the other
-//  paired Macs dimmed, from `PairedMacsStore`. Tapping another Mac opens My
-//  Macs, which says switching arrives in 1.3. 232 pt including its 24 pt
-//  leading margin (`07-Polish-Spec.md` §1). Board: `v2PadLand` `.side`.
+//  The Macs sidebar on wide windows (UX-007 built the list; UX-030 makes it
+//  the switcher): "Macs" in Geist, a glyph button that collapses the
+//  sidebar, then every Mac as a card with its live glance (`MacCard`), in
+//  the same order as My Macs and ⌘1–⌘4. Tap a Mac to switch to it; the
+//  canvas slides. 232 pt including its 24 pt leading margin
+//  (`07-Polish-Spec.md` §1). Board: `v2PadLand` `.side`.
 //
 
 import SwiftUI
@@ -19,9 +19,7 @@ struct MacsSidebar: View {
     let onCollapse: () -> Void
     let onOpenMacs: () -> Void
 
-    private var otherMacs: [PairedDevice] {
-        PairedMacsStore.shared.macs.filter { $0.kind == .mac && $0.name != currentMacName }
-    }
+    private let switcher = MacSwitcher.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: PixelHandTheme.Space.md) {
@@ -42,18 +40,28 @@ struct MacsSidebar: View {
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: PixelHandTheme.Space.md) {
-                    MacCardPlaceholder(name: currentMacName, subtitle: currentSubtitle, isLive: isLive, isFocused: true)
-                        .padding(4)
-                    ForEach(otherMacs) { mac in
-                        Button(action: onOpenMacs) {
-                            MacCardPlaceholder(name: mac.name, subtitle: "Paired", isLive: false, isFocused: false)
+                    ForEach(switcher.listings) { listing in
+                        Button {
+                            pick(listing)
+                        } label: {
+                            MacCard(listing: listing, activeSubtitle: currentSubtitle)
                                 .padding(4)
                                 .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityHint("Shows My Macs.")
+                        .buttonStyle(PressableButtonStyle())
+                        .accessibilityHint(listing.isActive ? "Shows My Macs." : "Switches to \(listing.name).")
+                    }
+
+                    if let notice = switcher.notice {
+                        Text(notice)
+                            .font(.caption)
+                            .foregroundStyle(PixelHandTheme.warning)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, PixelHandTheme.Space.xs)
+                            .transition(.opacity)
                     }
                 }
+                .animation(.easeOut(duration: 0.22), value: switcher.notice)
             }
             .scrollBounceBehavior(.basedOnSize)
         }
@@ -63,6 +71,15 @@ struct MacsSidebar: View {
         .frame(maxHeight: .infinity, alignment: .top)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Macs")
+    }
+
+    private func pick(_ listing: MacListing) {
+        if listing.isActive {
+            onOpenMacs()
+        } else {
+            GestureHaptic.selection.trigger()
+            switcher.request(listing.deviceID)
+        }
     }
 }
 

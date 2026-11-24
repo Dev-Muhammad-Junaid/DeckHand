@@ -33,6 +33,7 @@ struct SettingsView: View {
                     SettingsAppearanceSection()
                     SettingsConnectionSection()
                     SettingsPairingSection()
+                    SettingsMultiMacSection() // Multi-Mac lane
                     SettingsSubscriptionSection()
                     SettingsPrivacySection()
                     SettingsAboutSection()

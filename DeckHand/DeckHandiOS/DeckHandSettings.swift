@@ -49,6 +49,11 @@ final class DeckHandSettings: ObservableObject {
         static let pencilHoverPointer = "settings.pencilHoverPointer"
         static let clipboardSync = "settings.clipboardSync"
         static let pasteRightAway = "settings.pasteRightAway"
+        // MARK: Multi-Mac (lane)
+        static let swipeBetweenMacs = MultiMacSettingsKey.swipeBetweenMacs
+        static let reconnectAutomatically = MultiMacSettingsKey.reconnectAutomatically
+        // The per-Mac state itself (surface, deck page, mirror, glance) is
+        // `MacSwitcher`'s `MacMemoryBook` under `MultiMacSettingsKey.macMemory`.
     }
 
     private let defaults: UserDefaults
@@ -178,6 +183,18 @@ final class DeckHandSettings: ObservableObject {
         didSet { DeckHandDiagnostics.setEnabled(shareCrashReports) }
     }
 
+    // MARK: Multi-Mac (lane)
+    /// Three fingers sideways on the trackpad switch Macs (2+ in reach)
+    /// instead of Spaces.
+    @Published var swipeBetweenMacs: Bool {
+        didSet { defaults.set(swipeBetweenMacs, forKey: Key.swipeBetweenMacs) }
+    }
+
+    /// Reconnect to the last Mac at launch and after a drop.
+    @Published var reconnectAutomatically: Bool {
+        didSet { defaults.set(reconnectAutomatically, forKey: Key.reconnectAutomatically) }
+    }
+
     // ── First run ───────────────────────────────────────────────────
     @Published var hasCompletedOnboarding: Bool {
         didSet { defaults.set(hasCompletedOnboarding, forKey: Key.hasCompletedOnboarding) }
@@ -227,6 +244,10 @@ final class DeckHandSettings: ObservableObject {
         pencilHoverPointer = defaults.object(forKey: Key.pencilHoverPointer) as? Bool ?? true
         clipboardSync = defaults.bool(forKey: Key.clipboardSync)
         pasteRightAway = defaults.object(forKey: Key.pasteRightAway) as? Bool ?? true
+
+        // MARK: Multi-Mac (lane)
+        swipeBetweenMacs = defaults.object(forKey: Key.swipeBetweenMacs) as? Bool ?? true
+        reconnectAutomatically = defaults.object(forKey: Key.reconnectAutomatically) as? Bool ?? true
 
         GestureHaptic.strength = hapticStrength
     }
