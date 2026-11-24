@@ -78,12 +78,14 @@ struct ActionLibrarySheet: View {
                                 }
                             }
                             .accessibilityLabel("Open \(app.displayName)")
+                            .accessibilityHint("Adds a key")
                         }
                     }
                 }
             }
             .searchable(text: $query, prompt: "Search actions and apps")
-            .navigationTitle("Add Key")
+            .navigationTitle("Add key")
+            .accessibilityIdentifier("ph.deck.actionLibrary")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

@@ -17,6 +17,7 @@ struct IconButton: View {
     let action: () -> Void
 
     @State private var isPressed = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button(action: action) {
@@ -26,7 +27,7 @@ struct IconButton: View {
                 .foregroundStyle(Color.primary.opacity(0.75))
                 .frame(width: 38, height: 38)
                 .contentShape(Rectangle())
-                .scaleEffect(isPressed ? 0.88 : 1.0)
+                .scaleEffect(isPressed && !reduceMotion ? 0.88 : 1.0)
                 .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isPressed)
         }
         .buttonStyle(.plain)

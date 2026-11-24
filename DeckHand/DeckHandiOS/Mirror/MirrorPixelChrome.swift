@@ -45,6 +45,7 @@ struct MirrorCursorBadgeView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(badge.spoken)
         .accessibilityAddTraits(.isButton)
+        .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.badge)
     }
 
     private var arrowAngle: Angle {
@@ -92,6 +93,7 @@ struct MirrorToolButton: View {
         .opacity(isEnabled ? 1 : 0.32)
         .accessibilityLabel(label)
         .accessibilityAddTraits(isOn ? .isSelected : [])
+        .phosphorFocusable(cornerRadius: PixelHandTheme.ControlHeight.hit / 2)
     }
 }
 
@@ -101,6 +103,8 @@ struct MirrorToolButton: View {
 struct MirrorSpaceControls: View {
     let strip: MirrorSpaceStrip
     let onSwitch: (SpaceDirection) -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 0) {
@@ -120,7 +124,7 @@ struct MirrorSpaceControls: View {
                     })
                 )
                 .accessibilityLabel(strip.accessibilitySummary ?? "")
-                .animation(.easeInOut(duration: 0.2), value: strip)
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: strip)
             }
             MirrorToolButton(
                 glyph: PixelGlyphs.spaceRight,

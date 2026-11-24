@@ -35,6 +35,20 @@ struct MirrorPane: View {
                 Color.black
                 MirrorPicture(session: session)
                     .mirrorScanline(on: scanKey)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(session.mirrorShowsVideo || session.mirrorImage != nil ? "Screen of \(macName)" : "Connecting to the screen of \(macName)")
+                    .accessibilityAddTraits(.isImage)
+                    .accessibilityActions {
+                        // Live Text on the JPEG stream; the HEVC layer has no still to read.
+                        if !session.mirrorShowsVideo, let image = session.mirrorImage {
+                            Button("Read text on screen") {
+                                Task {
+                                    let result = await TextReader.read(image)
+                                    AccessibilityNotification.Announcement(result.text ?? "No text found").post()
+                                }
+                            }
+                        }
+                    }
             }
             .clipShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous))
             .overlay(
@@ -62,7 +76,8 @@ struct MirrorPane: View {
         // UX-041: Pro and the PiP setting.
         .mirrorPiPSync(session: session)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Live screen of \(macName)")
+        .accessibilityLabel("Screen of \(macName)")
+        .accessibilityIdentifier("ph.mirror")
     }
 
     // MARK: Data
@@ -176,6 +191,7 @@ struct MirrorPane: View {
                     isOn: settings.mirrorFollowsCursor && !windowActive,
                     action: { isPickerPresented = true }
                 )
+                .accessibilityIdentifier("ph.mirror.displayPicker")
             }
             if !windowActive {
                 MirrorSpaceControls(strip: strip) { direction in
@@ -189,12 +205,14 @@ struct MirrorPane: View {
                 isOn: settings.mirrorPlaysMacAudio,
                 action: { settings.mirrorPlaysMacAudio.toggle() }
             )
+            .accessibilityIdentifier("ph.mirror.sound")
             MirrorPiPToolButton(session: session)
             MirrorToolButton(
                 glyph: PixelGlyphs.close,
                 label: "Stop the live screen",
                 action: { session.toggleMirror(settings: settings) }
             )
+            .accessibilityIdentifier("ph.mirror.close")
         }
         .padding(.horizontal, 2)
         .phGlass(in: Capsule(), interactive: true)

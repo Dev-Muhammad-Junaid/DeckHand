@@ -163,7 +163,7 @@ struct MirrorDisplayPickerSheet: View {
                             RestingDotGrid(pitch: 9, dot: 1.6)
                                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             VStack(spacing: 4) {
-                                DotMatrixText("\(display.number)", pitch: 3, glows: selected, stepsWithType: false)
+                                DotMatrixText("\(display.number)", pitch: 3, label: "Display \(display.number)", glows: selected, stepsWithType: false)
                                     .foregroundStyle(selected ? PixelHandTheme.Brand.phosphor : PixelHandTheme.Brand.stripDim)
                                 if display.hasCursor {
                                     PHGlyph(glyph: PixelGlyphs.pointer, pitch: 1.6, accent: PixelHandTheme.Brand.phosphor)
@@ -182,6 +182,7 @@ struct MirrorDisplayPickerSheet: View {
                     .offset(x: offsetX + display.x * scale, y: display.y * scale)
                     .accessibilityLabel("\(display.name), display \(display.number)\(display.hasCursor ? ", has the pointer" : "")")
                     .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
+                    .phosphorFocusable(cornerRadius: 8)
                 }
             }
         }
@@ -220,5 +221,6 @@ struct MirrorDisplayPickerSheet: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
+        .accessibilityIdentifier("ph.mirror.displayRow")
     }
 }

@@ -137,6 +137,8 @@ struct QRDotsView: View {
         .environment(\.colorScheme, .light)
         .accessibilityElement()
         .accessibilityLabel("Pairing QR code")
+        .accessibilityAddTraits(.isImage)
+        .accessibilityIdentifier("ph.mac.pairingQRCode")
         .accessibilityHint("Scan it with the camera in Pixel Hand on your iPhone or iPad.")
     }
 }

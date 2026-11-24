@@ -36,11 +36,11 @@ struct SettingsMirrorSection: View {
 
             Toggle("Remember size and position", isOn: $settings.rememberMirrorLayout)
 
-            Toggle("Follow cursor between displays", isOn: $settings.mirrorFollowsCursor)
+            Toggle("Follow the cursor between displays", isOn: $settings.mirrorFollowsCursor)
 
             Toggle("Efficient video (HEVC)", isOn: $settings.mirrorPrefersHEVC)
 
-            Toggle("Play the Mac's sound", isOn: $settings.mirrorPlaysMacAudio)
+            Toggle("Play the Mac’s sound", isOn: $settings.mirrorPlaysMacAudio)
 
             if MirrorPiPController.isSupported {
                 Toggle("Keep watching in Picture in Picture", isOn: $settings.mirrorPiPAutoStart)

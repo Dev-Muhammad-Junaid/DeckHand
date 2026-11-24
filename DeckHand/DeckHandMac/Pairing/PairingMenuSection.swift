@@ -41,10 +41,13 @@ struct PairingMenuSection: View {
                     .buttonStyle(.macPrimary)
                     .disabled(authManager.pairingDisplay.isLockedOut)
                     .help("Show a code to scan or type on an iPhone or iPad. A paired device connects without asking.")
+                    .accessibilityIdentifier("ph.mac.pairDevice")
                 if case .code = authManager.pairingDisplay {
                     Button("Show code") { PairDeviceWindow.shared.open(authManager) }
                         .buttonStyle(.macSecondary)
                         .help("Bring the Pair a device window forward")
+                        .accessibilityLabel("Show pairing code")
+                        .accessibilityIdentifier("ph.mac.showCode")
                 }
                 Spacer(minLength: 0)
             }
@@ -101,6 +104,7 @@ private struct PairingStatusLine: View {
                             .foregroundStyle(PixelHandTheme.warning)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    .accessibilityElement(children: .combine)
                 }
 
             case .paired:
@@ -146,21 +150,27 @@ private struct PairedDeviceRow: View {
                 Button("Cancel") { isConfirming = false }
                     .buttonStyle(.macQuiet)
                     .keyboardShortcut(.cancelAction)
+                    .accessibilityLabel("Keep \(device.name)")
+                    .accessibilityIdentifier("ph.mac.cancelForget")
                 Button("Forget") {
                     authManager.forget(device.ref)
                     isConfirming = false
                 }
                 .buttonStyle(.macDestructive)
                 .help(isConnected ? "Unpair and disconnect now. It must be allowed or paired again." : "Unpair. It must be allowed or paired again.")
+                .accessibilityLabel("Confirm forget \(device.name)")
+                .accessibilityIdentifier("ph.mac.confirmForget")
             } else {
                 Button("Forget…") { isConfirming = true }
                     .buttonStyle(.macSecondary)
                     .help("Unpair \(device.name)")
                     .accessibilityLabel("Forget \(device.name)")
+                    .accessibilityIdentifier("ph.mac.forget")
             }
         }
         .padding(.horizontal, PixelHandTheme.Space.lg)
         .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ph.mac.pairedDeviceRow")
     }
 }
 

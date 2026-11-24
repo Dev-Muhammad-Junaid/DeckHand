@@ -28,7 +28,7 @@ struct TextFieldAction: Identifiable {
                 .init(id: "paste",     symbol: "doc.on.clipboard",     label: "Paste",  keys: ["cmd", "v"],          isPrimary: false),
                 .init(id: "undo",      symbol: "arrow.uturn.backward", label: "Undo",   keys: ["cmd", "z"],          isPrimary: false),
                 .init(id: "redo",      symbol: "arrow.uturn.forward",  label: "Redo",   keys: ["cmd", "shift", "z"], isPrimary: false),
-                .init(id: "selectAll", symbol: "selection.pin.in.out", label: "All",    keys: ["cmd", "a"],          isPrimary: false),
+                .init(id: "selectAll", symbol: "selection.pin.in.out", label: "Select all", keys: ["cmd", "a"],          isPrimary: false),
                 .init(id: "left",      symbol: "arrow.left",           label: "Left",   keys: ["left"],              isPrimary: false),
                 .init(id: "right",     symbol: "arrow.right",          label: "Right",  keys: ["right"],             isPrimary: false),
                 .init(id: "delete",    symbol: "delete.left",          label: "Delete", keys: ["delete"],            isPrimary: false),
@@ -37,8 +37,8 @@ struct TextFieldAction: Identifiable {
 
         case .numeric:
             return [
-                .init(id: "dec",    symbol: "minus",                label: "Dec",    keys: ["down"],     isPrimary: false),
-                .init(id: "inc",    symbol: "plus",                 label: "Inc",    keys: ["up"],       isPrimary: false),
+                .init(id: "dec",    symbol: "minus",                label: "Decrease", keys: ["down"],     isPrimary: false),
+                .init(id: "inc",    symbol: "plus",                 label: "Increase", keys: ["up"],       isPrimary: false),
                 .init(id: "paste",  symbol: "doc.on.clipboard",     label: "Paste",  keys: ["cmd", "v"], isPrimary: false),
                 .init(id: "undo",   symbol: "arrow.uturn.backward", label: "Undo",   keys: ["cmd", "z"], isPrimary: false),
                 .init(id: "delete", symbol: "delete.left",          label: "Delete", keys: ["delete"],   isPrimary: false),
@@ -63,6 +63,7 @@ struct TextFieldChip: View {
     let onTap: () -> Void
 
     @State private var isPressed = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button(action: onTap) {
@@ -83,7 +84,7 @@ struct TextFieldChip: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(background)
             )
-            .scaleEffect(isPressed ? 0.93 : 1.0)
+            .scaleEffect(isPressed && !reduceMotion ? 0.93 : 1.0)
             .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isPressed)
         }
         .buttonStyle(.plain)
@@ -99,6 +100,6 @@ struct TextFieldChip: View {
     }
 
     private var background: Color {
-        action.isPrimary ? DeckHandTheme.accent : DeckHandTheme.subtleWellFill(colorScheme)
+        action.isPrimary ? PixelHandTheme.accent : PixelHandTheme.color(PaletteTokens.fill, for: colorScheme)
     }
 }

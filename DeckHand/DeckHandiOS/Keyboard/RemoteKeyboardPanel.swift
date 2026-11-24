@@ -36,10 +36,10 @@ struct RemoteKeyboardPanel: View {
     private static let keys: [KeyButton] = [
         KeyButton(key: .escape, symbol: "escape", label: "Escape"),
         KeyButton(key: .tab, symbol: "arrow.right.to.line", label: "Tab"),
-        KeyButton(key: .left, symbol: "arrow.left", label: "Left"),
-        KeyButton(key: .down, symbol: "arrow.down", label: "Down"),
-        KeyButton(key: .up, symbol: "arrow.up", label: "Up"),
-        KeyButton(key: .right, symbol: "arrow.right", label: "Right"),
+        KeyButton(key: .left, symbol: "arrow.left", label: "Left arrow"),
+        KeyButton(key: .down, symbol: "arrow.down", label: "Down arrow"),
+        KeyButton(key: .up, symbol: "arrow.up", label: "Up arrow"),
+        KeyButton(key: .right, symbol: "arrow.right", label: "Right arrow"),
         KeyButton(key: .delete, symbol: "delete.left", label: "Delete"),
         KeyButton(key: .return, symbol: "return", label: "Return"),
     ]
@@ -73,8 +73,8 @@ struct RemoteKeyboardPanel: View {
             .frame(height: 40)
             .padding(.horizontal, 10)
             .background(
-                RoundedRectangle(cornerRadius: DeckHandTheme.Radius.md, style: .continuous)
-                    .fill(DeckHandTheme.subtleWellFill(colorScheme))
+                RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous)
+                    .fill(PixelHandTheme.color(PaletteTokens.fill, for: colorScheme))
             )
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -92,12 +92,15 @@ struct RemoteKeyboardPanel: View {
                                 .foregroundStyle(isOn ? Color.white : Color.primary.opacity(0.85))
                                 .background(
                                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .fill(isOn ? DeckHandTheme.accent : DeckHandTheme.subtleWellFill(colorScheme))
+                                        .fill(isOn ? PixelHandTheme.accent : PixelHandTheme.color(PaletteTokens.fill, for: colorScheme))
                                 )
                         }
                         .buttonStyle(.plain)
+                        .phosphorFocusable(cornerRadius: 8)
                         .accessibilityLabel(item.label)
                         .accessibilityAddTraits(isOn ? .isSelected : [])
+                        .accessibilityHint("Holds for the next key")
+                        .accessibilityIdentifier("ph.keyboard.modifier")
                     }
 
                     Divider().frame(height: 28)
@@ -117,11 +120,13 @@ struct RemoteKeyboardPanel: View {
                                 .foregroundStyle(key == .return ? Color.white : Color.primary.opacity(0.85))
                                 .background(
                                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .fill(key == .return ? DeckHandTheme.accent : DeckHandTheme.subtleWellFill(colorScheme))
+                                        .fill(key == .return ? PixelHandTheme.accent : PixelHandTheme.color(PaletteTokens.fill, for: colorScheme))
                                 )
                         }
                         .buttonStyle(.plain)
+                        .phosphorFocusable(cornerRadius: 8)
                         .accessibilityLabel(item.label)
+                        .accessibilityIdentifier("ph.keyboard.key")
                     }
                 }
                 .padding(.vertical, 2)

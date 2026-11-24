@@ -249,6 +249,7 @@ struct MirrorThumbnailView: View {
             frameStack
                 .contentShape(Rectangle())
                 .onTapGesture { toggleSize() }
+                .accessibilityAction(named: "Shrink or restore") { toggleSize() }
 
             HStack {
                 spaceChevron(direction: .previous, state: previousChevron, symbol: "chevron.left.circle.fill", label: "Previous desktop")
@@ -281,7 +282,9 @@ struct MirrorThumbnailView: View {
                     .pixelOnNavy()
             }
             .buttonStyle(.plain)
+            .phosphorFocusable(cornerRadius: 12)
             .accessibilityLabel("Close live mirror")
+            .accessibilityIdentifier("ph.mirror.close")
         }
         .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
         .offset(x: liveOrigin.x, y: liveOrigin.y)
@@ -448,6 +451,7 @@ struct MirrorThumbnailView: View {
             .disabled(state == .dimmed)
             .opacity(state == .dimmed ? 0.3 : 1)
             .animation(.easeInOut(duration: 0.2), value: state)
+            .phosphorFocusable(cornerRadius: 14)
             .accessibilityLabel(label)
         }
     }

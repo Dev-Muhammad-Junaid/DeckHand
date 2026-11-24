@@ -75,7 +75,7 @@ struct StreamDeckGridView: View {
                 // frontmost app changes, surfacing that app's top shortcuts
                 // inline alongside global macros and media transport.
                 if searchText.isEmpty && showsQuickActions {
-                    SectionHeader(title: "QUICK ACTIONS")
+                    SectionHeader(title: "Quick actions")
                     QuickActionsBar(
                         sender: sender,
                         colorScheme: colorScheme,
@@ -91,7 +91,7 @@ struct StreamDeckGridView: View {
 
                 // ── Pinned Apps ─────────────────────────────────
                 if !pinnedApps.isEmpty && searchText.isEmpty {
-                    SectionHeader(title: "PINNED APPS")
+                    SectionHeader(title: "Pinned apps")
                     LazyVGrid(columns: columns, spacing: 20) {
                         ForEach(pinnedApps) { app in
                             AppButton(app: app,
@@ -109,7 +109,7 @@ struct StreamDeckGridView: View {
 
                 // ── All Apps ────────────────────────────────────
                 if !filteredApps.isEmpty {
-                    SectionHeader(title: searchText.isEmpty ? "ALL APPS" : "RESULTS")
+                    SectionHeader(title: searchText.isEmpty ? "All apps" : "Results")
                     LazyVGrid(columns: columns, spacing: 20) {
                         ForEach(filteredApps) { app in
                             AppButton(app: app,
@@ -283,11 +283,13 @@ private struct SectionHeader: View {
 
     var body: some View {
         Text(title)
-            .font(.system(size: 11, weight: .semibold))
+            .textCase(.uppercase)
+            .font(.caption2.weight(.semibold))
             .foregroundStyle(Color.secondary.opacity(0.7))
             .padding(.horizontal, 24)
             .padding(.top, 12)
             .padding(.bottom, 10)
+            .accessibilityAddTraits(.isHeader)
     }
 }
 
@@ -303,6 +305,7 @@ private struct AppButton: View {
     let onHide: () -> Void
 
     @State private var isPressed = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button(action: onTap) {
@@ -310,20 +313,24 @@ private struct AppButton: View {
                 appIcon
                     .frame(width: 52, height: 52)
                     .overlay(activeRing)
+                    .accessibilityHidden(true)
 
                 Text(app.displayName)
-                    .font(.system(size: 11, weight: isActive ? .semibold : .medium, design: .rounded))
+                    .font(.system(.caption2, design: .rounded, weight: isActive ? .semibold : .medium))
                     .foregroundStyle(isActive ? Color.primary : Color.secondary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity)
-            .scaleEffect(isPressed ? 0.88 : 1.0)
+            .scaleEffect(isPressed && !reduceMotion ? 0.88 : 1.0)
             .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isPressed)
             .animation(.easeInOut(duration: 0.2), value: isActive)
         }
         .buttonStyle(.plain)
+        .accessibilityValue(isActive ? "Frontmost on the Mac" : (isPinned ? "Pinned" : ""))
+        .accessibilityIdentifier("ph.apps.app")
+        .phosphorFocusable(cornerRadius: 14)
         .requiresPro(.decks) // Store lane
         .simultaneousGesture(
             DragGesture(minimumDistance: 0)
@@ -334,13 +341,13 @@ private struct AppButton: View {
             Button {
                 onPin()
             } label: {
-                Label(isPinned ? "Unpin from Deck" : "Pin to Deck",
+                Label(isPinned ? "Unpin from deck" : "Pin to deck",
                       systemImage: isPinned ? "pin.slash" : "pin")
             }
             Button(role: .destructive) {
                 onHide()
             } label: {
-                Label("Hide App", systemImage: "eye.slash")
+                Label("Hide app", systemImage: "eye.slash")
             }
         }
     }
@@ -349,8 +356,8 @@ private struct AppButton: View {
     private var activeRing: some View {
         if isActive {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(DeckHandTheme.accent, lineWidth: 2.5)
-                .shadow(color: DeckHandTheme.accent.opacity(0.55), radius: 6)
+                .strokeBorder(PixelHandTheme.accent, lineWidth: 2.5)
+                .shadow(color: PixelHandTheme.accent.opacity(0.55), radius: 6)
                 .padding(-3)
         }
     }
@@ -365,8 +372,8 @@ private struct AppButton: View {
                 .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
         } else {
             // Fallback SF Symbol
-            RoundedRectangle(cornerRadius: DeckHandTheme.Radius.sm, style: .continuous)
-                .fill(DeckHandTheme.subtleWellFill(colorScheme))
+            RoundedRectangle(cornerRadius: PixelHandTheme.Radius.kbd + 4, style: .continuous)
+                .fill(PixelHandTheme.color(PaletteTokens.fill, for: colorScheme))
                 .frame(width: 52, height: 52)
                 .overlay(
                     Image(systemName: "app")
@@ -395,6 +402,7 @@ private struct SearchField: View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
 
             TextField(prompt, text: $text)
                 .textFieldStyle(.plain)

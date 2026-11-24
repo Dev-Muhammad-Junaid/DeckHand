@@ -24,7 +24,7 @@ struct SettingsAppearanceSection: View {
         } header: {
             SettingsSectionHeader("Appearance", glyph: PixelGlyphs.screen)
         } footer: {
-            Text("Applies to the control screens. The device picker stays dark to match the app icon.")
+            Text("Applies to the control screens. The Mac picker stays dark to match the app icon.")
         }
     }
 }

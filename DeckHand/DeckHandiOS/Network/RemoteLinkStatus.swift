@@ -31,7 +31,7 @@ struct RemoteLinkBadge: View {
             Label(LinkKind.wired.displayName, systemImage: LinkKind.wired.systemImage)
                 .labelStyle(.titleAndIcon)
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(DeckHandTheme.accent)
+                .foregroundStyle(PixelHandTheme.accent)
                 .accessibilityLabel("Connected by cable")
         case .tunnel:
             Label(LinkKind.tunnel.displayName, systemImage: LinkKind.tunnel.systemImage)

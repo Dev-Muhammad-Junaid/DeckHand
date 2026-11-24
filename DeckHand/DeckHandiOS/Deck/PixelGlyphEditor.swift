@@ -53,7 +53,7 @@ struct PixelGlyphEditor: View {
             HStack(spacing: PixelHandTheme.Space.sm) {
                 toolButton("Undo", systemImage: "arrow.uturn.backward") { undo() }
                     .disabled(!history.canUndo)
-                toolButton("Mirror", systemImage: "arrow.left.and.right.righttriangle.left.righttriangle.right") { change { $0.mirrored } }
+                toolButton("Flip horizontally", systemImage: "arrow.left.and.right.righttriangle.left.righttriangle.right") { change { $0.mirrored } }
                 Menu {
                     Button("Up", systemImage: "arrow.up") { change { $0.shifted(dx: 0, dy: -1) } }
                     Button("Down", systemImage: "arrow.down") { change { $0.shifted(dx: 0, dy: 1) } }
@@ -71,7 +71,7 @@ struct PixelGlyphEditor: View {
                     toolLabel("Start from", systemImage: "square.grid.3x3", isOn: false)
                 }
                 .accessibilityLabel("Start from a glyph")
-                toolButton("Clear", systemImage: "trash") { change { $0.cleared } }
+                toolButton("Clear drawing", systemImage: "trash") { change { $0.cleared } }
                     .disabled(glyph.litCount == 0)
             }
             if glyph.hasThickStroke {
@@ -169,6 +169,7 @@ struct PixelGlyphEditor: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
+        .phosphorFocusable(cornerRadius: 18)
     }
 
     private func toolLabel(_ title: String, systemImage: String, isOn: Bool) -> some View {

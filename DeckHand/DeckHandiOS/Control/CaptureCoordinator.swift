@@ -138,7 +138,7 @@ final class CaptureCoordinator {
             self.isScreenshotPresented = false
             self.isRegionCropPresented = false
             self.screenshotIntent = .fullScreen
-            self.screenshotErrorMessage = "The Mac didn't respond in time. Make sure Screen Recording is allowed in System Settings > Privacy & Security > Screen Recording."
+            self.screenshotErrorMessage = "The Mac didn’t respond in time. Make sure Screen Recording is allowed in System Settings › Privacy & Security › Screen Recording."
         }
     }
 
@@ -235,7 +235,7 @@ final class CaptureCoordinator {
             // Data arrived but was not a valid image
             isScreenshotPresented = false
             isRegionCropPresented = false
-            screenshotErrorMessage = "Received invalid image data from Mac."
+            screenshotErrorMessage = "The Mac sent an image that couldn’t be read."
             screenshotIntent = .fullScreen
             return
         }

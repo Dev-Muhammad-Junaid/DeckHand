@@ -53,7 +53,9 @@ struct LayoutPresetPicker: View {
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .phosphorFocusable(cornerRadius: 20)
         .accessibilityLabel(preset.spokenTitle)
+        .accessibilityIdentifier("ph.header.layout")
         .accessibilityAddTraits(isOn ? [.isSelected, .isButton] : .isButton)
         .accessibilityShowsLargeContentViewer {
             Label { Text(preset.title) } icon: { PHGlyph(glyph: preset.glyph, pitch: PixelPitch.chip) }

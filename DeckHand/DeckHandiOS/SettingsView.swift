@@ -47,6 +47,7 @@ struct SettingsView: View {
                 .listRowInsets(EdgeInsets())
             }
             .phSettingsList()
+            .accessibilityIdentifier("ph.settings")
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .modifier(OpaqueSettingsBar())
@@ -61,6 +62,7 @@ struct SettingsView: View {
                     Button("Done") { dismiss() }
                         .fontWeight(.semibold)
                         .tint(PixelHandTheme.accent)
+                        .accessibilityIdentifier("ph.settings.done")
                 }
             }
         }

@@ -57,6 +57,7 @@ struct ShellHeader: View {
                 action: onMacs
             )
             .accessibilityHint("Shows My Macs.")
+            .accessibilityIdentifier("ph.header.macPill")
             .offset(x: swipeOffset)
             .simultaneousGesture(pillSwipe)
             .layoutPriority(1)
@@ -87,6 +88,7 @@ struct ShellHeader: View {
                     isOn: isMirrorActive,
                     action: onToggleMirror
                 )
+                .accessibilityIdentifier("ph.header.screen")
                 .requiresPro(.mirror)
             }
             captureMenu
@@ -153,6 +155,8 @@ struct ShellHeader: View {
         .disabled(isCaptureBusy)
         .accessibilityLabel("Capture")
         .accessibilityHint("Takes a screenshot. Touch and hold for more options.")
+        .accessibilityIdentifier("ph.header.capture")
+        .phosphorFocusable(cornerRadius: PixelHandTheme.ControlHeight.standard / 2)
         .requiresPro(.capture)
     }
 
@@ -176,5 +180,7 @@ struct ShellHeader: View {
                 .contentShape(Circle())
         }
         .accessibilityLabel("More")
+        .accessibilityIdentifier("ph.header.more")
+        .phosphorFocusable(cornerRadius: PixelHandTheme.ControlHeight.standard / 2)
     }
 }

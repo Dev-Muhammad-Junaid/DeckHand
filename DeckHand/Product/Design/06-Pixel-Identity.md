@@ -22,7 +22,12 @@ are allowed to draw.
 and the Ask glyph.
 
 **Stroke rule.**
-1. Strokes are exactly one dot wide.
+1. Strokes are exactly one dot wide. Two named exceptions keep a two-dot
+   edge on purpose (UX-014 decision): `desktop` (Show Desktop's windows
+   pushed aside) and `laptop` (the Mac's screen sitting on its base). At
+   pitch 2–2.6 the doubled edge is what makes each shape read; a one-dot
+   redraw turns them into a plain rectangle. No other glyph may break the
+   rule, and the Core test fails if either one is redrawn.
 2. Corners are a single dot; no rounded corners made of extra dots.
 3. Diagonals step at 45° only (one dot across, one dot down).
 4. At most **one lit accent dot** per glyph, marking where the action happens:

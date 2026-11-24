@@ -59,6 +59,9 @@ struct InboxPanel: View {
                         InboxRow(item: item)
                             .contentShape(Rectangle())
                             .onTapGesture { open(item) }
+                            .accessibilityAddTraits(.isButton)
+                            .accessibilityHint(item.link != nil ? "Opens the link" : (item.text != nil ? "Copies the text" : "Opens the share sheet"))
+                            .accessibilityIdentifier("ph.inbox.row")
                             .contextMenu { menu(for: item) }
                             .swipeActions {
                                 Button("Delete", role: .destructive) { center.deleteInboxItem(item.id) }
@@ -71,6 +74,7 @@ struct InboxPanel: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+        .accessibilityIdentifier("ph.inbox")
         .sheet(item: Binding(get: { shareURL.map(ShareTarget.init) }, set: { shareURL = $0?.url })) { target in
             ShareSheet(items: [target.url])
         }
@@ -83,7 +87,7 @@ struct InboxPanel: View {
     @ViewBuilder
     private func menu(for item: TransferInboxItem) -> some View {
         if let link = item.link {
-            Button { openURL(link); center.markSeen(item.id) } label: { Label("Open Link", systemImage: "safari") }
+            Button { openURL(link); center.markSeen(item.id) } label: { Label("Open link", systemImage: "safari") }
         }
         if let text = item.text {
             Button { UIPasteboard.general.string = text; center.markSeen(item.id) } label: { Label("Copy", systemImage: "doc.on.doc") }

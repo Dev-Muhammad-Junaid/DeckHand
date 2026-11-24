@@ -21,7 +21,7 @@ struct SettingsConnectionSection: View {
                 LabeledContent {
                     Label(link.displayName, systemImage: link.systemImage)
                         .labelStyle(.titleAndIcon)
-                        .foregroundStyle(link == .wired ? AnyShapeStyle(DeckHandTheme.accent) : AnyShapeStyle(.secondary))
+                        .foregroundStyle(link == .wired ? AnyShapeStyle(PixelHandTheme.accent) : AnyShapeStyle(.secondary))
                 } label: {
                     Text("Link")
                 }
@@ -52,7 +52,7 @@ struct SettingsConnectionSection: View {
                 }
             }
         } header: {
-            Text("Remote Access")
+            Text("Remote access")
         } footer: {
             Text("Reach a paired Mac over Tailscale or another VPN when it isn’t on the same Wi-Fi. A Mac on the VPN tells this device its address while you’re connected at home; you can also add a host name or IP address yourself. Only paired Macs can be reached this way.")
         }
@@ -82,8 +82,9 @@ private struct RemoteAccessMacRow: View {
         let count = hostsStore.hosts(for: mac.ref).count
         HStack(spacing: 12) {
             Image(systemName: mac.kind.systemImage)
-                .foregroundStyle(DeckHandTheme.accent)
+                .foregroundStyle(PixelHandTheme.accent)
                 .frame(width: 24)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(mac.name)
                 Text(count == 0 ? "No saved addresses" : count == 1 ? "1 address" : "\(count) addresses")
@@ -134,10 +135,13 @@ struct RemoteAccessMacView: View {
                     .keyboardType(.URL)
                     .submitLabel(.done)
                     .onSubmit(add)
-                Button("Add Address", action: add)
+                    .accessibilityLabel("Address")
+                    .accessibilityIdentifier("ph.settings.remoteAddressField")
+                Button("Add address", action: add)
                     .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .accessibilityIdentifier("ph.settings.addAddress")
             } header: {
-                Text("Add an Address")
+                Text("Add an address")
             } footer: {
                 Text(draftError ?? "A Tailscale IP or MagicDNS name, or the Mac’s address on another VPN. Host only: no http://, port or path.")
                     .foregroundStyle(draftError == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
@@ -148,12 +152,13 @@ struct RemoteAccessMacView: View {
                     test()
                 } label: {
                     HStack {
-                        Text("Test Connection")
+                        Text("Test connection")
                         Spacer()
                         if isTesting { DotWave(pitch: 3, label: "Testing") }
                     }
                 }
                 .disabled(hosts.isEmpty || isTesting)
+                .accessibilityIdentifier("ph.settings.testConnection")
             } footer: {
                 Text("Checks whether \(mac.name) answers at each address. Turn the VPN on for both devices and keep Pixel Hand open on the Mac.")
             }
@@ -173,7 +178,7 @@ struct RemoteAccessMacView: View {
                     Text("·")
                     Label(label(for: verdict), systemImage: icon(for: verdict))
                         .labelStyle(.titleAndIcon)
-                        .foregroundStyle(verdict == .reachable ? AnyShapeStyle(DeckHandTheme.accent) : AnyShapeStyle(.orange))
+                        .foregroundStyle(verdict == .reachable ? AnyShapeStyle(PixelHandTheme.accent) : AnyShapeStyle(.orange))
                 }
             }
             .font(.footnote)

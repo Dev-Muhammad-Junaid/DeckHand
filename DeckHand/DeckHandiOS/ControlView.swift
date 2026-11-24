@@ -22,6 +22,7 @@ struct ControlView: View {
     let onDisconnect: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var settings: DeckHandSettings
     @State private var selectedTab: Tab = .trackpad
     @State private var isSettingsPresented = false
@@ -104,7 +105,7 @@ struct ControlView: View {
     private var classicLayout: some View {
         NavigationStack {
             ZStack {
-                DeckHandTheme.canvasBackground(colorScheme).ignoresSafeArea()
+                PixelHandTheme.color(PaletteTokens.canvas, for: colorScheme).ignoresSafeArea()
 
                 if let sender = session.sender {
                     VStack(spacing: 0) {
@@ -135,7 +136,7 @@ struct ControlView: View {
                         tabSwitcher
                             .padding(.horizontal, 16)
                             .padding(.vertical, 14)
-                        Divider().overlay(DeckHandTheme.navDivider(colorScheme))
+                        Divider().overlay(PixelHandTheme.color(PaletteTokens.hairline, for: colorScheme))
 
                         Group {
                             switch selectedTab {
@@ -158,7 +159,7 @@ struct ControlView: View {
                     }
                 } else {
                     DeckHandLoadingStateView(
-                        title: "Initializing…",
+                        title: "Connecting…",
                         verticalPadding: 48
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -176,7 +177,7 @@ struct ControlView: View {
                         // The mirror lane's wrapper: picture, pointer,
                         // display picker, badge and stats.
                         MirrorOverlay(session: session, containerSize: proxy.size)
-                        .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                        .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.9)))
                         .frame(
                             maxWidth: .infinity,
                             maxHeight: .infinity,
@@ -185,7 +186,7 @@ struct ControlView: View {
                     }
                 }
             }
-            .animation(.snappy(duration: 0.2), value: session.isMirrorActive)
+            .animation(reduceMotion ? .easeInOut(duration: 0.2) : .snappy(duration: 0.2), value: session.isMirrorActive)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ControlToolbar(

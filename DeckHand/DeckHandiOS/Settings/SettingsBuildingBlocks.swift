@@ -250,6 +250,7 @@ struct SettingsVersionLine: View {
             label: VersionLine.spoken(version: version, build: build)
         )
         .foregroundStyle(PixelHandTheme.ink3)
+        .accessibilityIdentifier("ph.settings.version")
         .frame(maxWidth: .infinity)
         .padding(.vertical, PixelHandTheme.Space.xl)
     }

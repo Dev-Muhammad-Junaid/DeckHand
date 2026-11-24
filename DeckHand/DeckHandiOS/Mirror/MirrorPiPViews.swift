@@ -67,6 +67,7 @@ struct MirrorPiPToolButton: View {
                 isEnabled: session.mirrorPiPCanStart,
                 action: { session.toggleMirrorPiP() }
             )
+            .accessibilityIdentifier("ph.mirror.pictureInPicture")
             .requiresPro(.mirror)
         }
     }

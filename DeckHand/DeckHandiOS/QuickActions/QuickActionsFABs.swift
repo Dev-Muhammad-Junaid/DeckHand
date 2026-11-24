@@ -24,7 +24,7 @@ struct KeyboardFAB: View {
         FABButton(
             systemImage: "keyboard",
             isActive: isActive,
-            tint: DeckHandTheme.FAB.keyboardTint,
+            tint: PixelHandTheme.accent,
             accessibilityLabel: isActive ? "Hide text edit actions"
                                          : "Show text edit actions",
             onTap: onTap
@@ -45,7 +45,7 @@ struct NumericFAB: View {
         FABButton(
             systemImage: "textformat.123",
             isActive: isActive,
-            tint: DeckHandTheme.FAB.numericTint,
+            tint: PixelHandTheme.success,
             accessibilityLabel: isActive ? "Hide number keys"
                                          : "Show number keys",
             onTap: onTap

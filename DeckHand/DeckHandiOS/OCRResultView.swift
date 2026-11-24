@@ -71,16 +71,16 @@ struct OCRResultView: View {
             case .empty:
                 PHEmptyState(
                     glyph: PixelGlyphs.readText,
-                    title: "No Text Found",
+                    title: "No text found",
                     message: "Try a region around the words, or a sharper capture quality in Settings."
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             case let .failed(message):
                 PHEmptyState(
                     glyph: PixelGlyphs.readText,
-                    title: "Couldn’t Read Text",
+                    title: "Couldn’t read text",
                     message: message,
-                    primaryTitle: "Try Again",
+                    primaryTitle: "Try again",
                     primaryAction: onRetry
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

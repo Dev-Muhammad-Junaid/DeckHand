@@ -42,9 +42,9 @@ struct PixelGlyphTests {
 
     /// Ported cell for cell from the board. Two board glyphs draw two-dot
     /// edges on purpose (Show Desktop's pushed-aside windows, the Mac's
-    /// screen sitting on its base). They're listed here so any *new*
-    /// violation fails; the design review decides whether to redraw them
-    /// (`LANE-design-foundation.md`, follow-ups).
+    /// screen sitting on its base). Decided in UX-014: both stay as drawn
+    /// (`06-Pixel-Identity.md`, stroke rule 1). They're listed here so any
+    /// *new* violation fails.
     static let boardStrokeExceptions: Set<String> = ["desktop", "laptop"]
 
     @Test("Outline glyphs keep one-dot strokes: no 2 × 2 block unless solid")

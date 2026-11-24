@@ -59,5 +59,5 @@ struct PageTextTransition: ViewModifier {
         PageDots(count: 5, current: 1)
     }
     .padding(24)
-    .background(DeckHandTheme.brandBackground())
+    .background(PixelHandTheme.brandBackground())
 }

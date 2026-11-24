@@ -65,7 +65,7 @@ struct PaywallView: View {
                 .frame(maxWidth: .infinity)
             }
             .scrollBounceBehavior(.basedOnSize)
-            .background(DeckHandTheme.brandBackground().ignoresSafeArea())
+            .background(PixelHandTheme.brandBackground().ignoresSafeArea())
             .foregroundStyle(.white)
             .pixelOnNavy()
             .navigationBarTitleDisplayMode(.inline)
@@ -83,6 +83,7 @@ struct PaywallView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Close")
+                    .accessibilityIdentifier("ph.paywall.close")
                 }
             }
         }
@@ -157,6 +158,7 @@ struct PaywallView: View {
                     }
                 }
                 .buttonStyle(.ph(.secondary, size: .small))
+                .accessibilityIdentifier("ph.paywall.switchMac")
             } else {
                 Text(SubscriptionCopy.switchMacWait(until: request.switchAllowedAt.formatted(date: .abbreviated, time: .omitted)))
                     .font(.footnote)
@@ -237,6 +239,7 @@ struct PaywallView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
+                .accessibilityIdentifier("ph.paywall.plan")
             }
         }
     }
@@ -256,6 +259,7 @@ struct PaywallView: View {
         .buttonStyle(.ph(.primary, fullWidth: true))
         .shadow(color: PixelHandTheme.Brand.cobalt.opacity(0.45), radius: 16, y: 6)
         .disabled(store.isWorking)
+        .accessibilityIdentifier("ph.paywall.subscribe")
     }
 
     @ViewBuilder
@@ -307,6 +311,7 @@ struct PaywallView: View {
             Task { await store.restore() }
         }
         .disabled(store.isWorking)
+        .accessibilityIdentifier("ph.paywall.restore")
         Link("Terms of Use", destination: SubscriptionCopy.termsOfUseURL)
         Link("Privacy Policy", destination: SubscriptionCopy.privacyPolicyURL)
     }
@@ -319,8 +324,10 @@ struct PaywallView: View {
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(PixelHandTheme.Brand.mint)
             }
+            .accessibilityElement(children: .combine)
             Button("Done") { finish() }
                 .buttonStyle(.ph(.secondary, size: .regular))
+                .accessibilityIdentifier("ph.paywall.done")
         }
         .frame(maxWidth: .infinity)
     }

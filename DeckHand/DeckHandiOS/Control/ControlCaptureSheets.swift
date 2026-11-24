@@ -122,8 +122,9 @@ struct CaptureLoadingView: View {
                     .foregroundStyle(PixelHandTheme.Brand.phosphor)
                     .accessibilityHidden(true)
                 VStack(spacing: PixelHandTheme.Space.md) {
-                    DotWave(label: title.capitalized)
-                    DotMatrixText(title, pitch: 1.8, label: title.capitalized)
+                    DotWave(label: String(title.prefix(1)) + title.dropFirst().lowercased())
+                        .accessibilityHidden(true)
+                    DotMatrixText(title, pitch: 1.8, label: String(title.prefix(1)) + title.dropFirst().lowercased())
                         .foregroundStyle(PixelHandTheme.Brand.phosphor)
                 }
                 Spacer()

@@ -61,6 +61,7 @@ struct PairingCodeEntryView: View {
                             Button("Pair") { submit(validCode) }
                                 .buttonStyle(.ph(.primary, fullWidth: true))
                                 .disabled(validCode == nil)
+                                .accessibilityIdentifier("ph.pairing.pair")
                         }
                         Button {
                             isScanning = true
@@ -71,6 +72,7 @@ struct PairingCodeEntryView: View {
                             }
                         }
                         .buttonStyle(.ph(.secondary, size: .regular, fullWidth: true))
+                        .accessibilityIdentifier("ph.pairing.scanQR")
                     }
                 }
                 .padding(.horizontal, PixelHandTheme.Space.xl)
@@ -79,7 +81,7 @@ struct PairingCodeEntryView: View {
                 .frame(maxWidth: .infinity)
             }
             .scrollBounceBehavior(.basedOnSize)
-            .background(DeckHandTheme.brandBackground().ignoresSafeArea())
+            .background(PixelHandTheme.brandBackground().ignoresSafeArea())
             .foregroundStyle(.white)
             .pixelOnNavy()
             .navigationTitle("Pair with \(macName)")
@@ -123,6 +125,9 @@ struct PairingCodeEntryView: View {
             .textContentType(.oneTimeCode)
             .focused($isFieldFocused)
             .accessibilityLabel("Pairing code")
+            // Read digit by digit ("1 2 3, 4 5 6 7"), not as one number.
+            .accessibilityValue(text.map { $0.isNumber ? String($0) : "," }.joined(separator: " "))
+            .accessibilityIdentifier("ph.pairing.codeField")
             .onChange(of: text) { _, newValue in
                 // Keep it to what a code can be.
                 if newValue.count > PairingCode.maxInputLength {

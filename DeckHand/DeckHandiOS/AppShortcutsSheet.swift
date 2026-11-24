@@ -17,6 +17,7 @@ struct AppShortcutsSheet: View {
 
     @ObservedObject private var store = ShortcutStore.shared
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var editing: AppShortcutBinding?
     @State private var isAdding = false
@@ -73,7 +74,7 @@ struct AppShortcutsSheet: View {
         if !uncategorized.isEmpty {
             result.append(Section(
                 id: "",
-                title: "My Shortcuts",
+                title: "My shortcuts",
                 bindings: uncategorized,
                 collapsible: false
             ))
@@ -111,7 +112,7 @@ struct AppShortcutsSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                DeckHandTheme.canvasBackground(colorScheme).ignoresSafeArea()
+                PixelHandTheme.color(PaletteTokens.canvas, for: colorScheme).ignoresSafeArea()
 
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
@@ -135,21 +136,22 @@ struct AppShortcutsSheet: View {
                 if let banner = importBanner {
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.circle.fill")
+                            .accessibilityHidden(true)
                         Text(banner)
-                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                            .font(.system(.footnote, design: .rounded, weight: .medium))
                         Spacer()
                     }
-                    .foregroundStyle(DeckHandTheme.accent)
+                    .foregroundStyle(PixelHandTheme.accent)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 10)
-                    .background(DeckHandTheme.subtleWellFill(colorScheme))
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .background(PixelHandTheme.color(PaletteTokens.fill, for: colorScheme))
+                    .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
                 }
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Done", action: onDismiss)
-                        .font(.system(size: 15, weight: .medium, design: .rounded))
+                        .font(.system(.subheadline, design: .rounded, weight: .medium))
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -176,6 +178,7 @@ struct AppShortcutsSheet: View {
                         Image(systemName: "ellipsis.circle.fill")
                             .font(.system(size: 20))
                     }
+                    .accessibilityLabel("Shortcut options")
                 }
                 // UX-018: the dot wave instead of a spinner, beside the menu
                 // (a menu label in a toolbar can't host an animated view).
@@ -240,7 +243,7 @@ struct AppShortcutsSheet: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 6)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
             }
         }
     }
@@ -249,12 +252,12 @@ struct AppShortcutsSheet: View {
     private func sectionHeader(_ section: Section, expanded: Bool) -> some View {
         HStack(spacing: 8) {
             Text(section.title.uppercased())
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .font(.system(.caption2, design: .rounded, weight: .semibold))
                 .foregroundStyle(Color.secondary.opacity(0.85))
                 .tracking(0.5)
 
             Text("\(section.bindings.count)")
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .font(.system(.caption2, design: .rounded, weight: .semibold))
                 .foregroundStyle(Color.secondary)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
@@ -269,10 +272,14 @@ struct AppShortcutsSheet: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Color.secondary)
                     .rotationEffect(.degrees(expanded ? 0 : -90))
-                    .animation(.easeInOut(duration: 0.2), value: expanded)
+                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: expanded)
             }
         }
         .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(section.title), \(section.bindings.count)")
+        .accessibilityValue(section.collapsible ? (expanded ? "Expanded" : "Collapsed") : "")
+        .accessibilityAddTraits(section.collapsible ? [.isHeader, .isButton] : .isHeader)
         .onTapGesture {
             guard section.collapsible else { return }
             GestureHaptic.light.trigger()
@@ -291,10 +298,10 @@ struct AppShortcutsSheet: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(app.displayName)
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .font(.system(.headline, design: .rounded))
                     .foregroundStyle(Color.primary)
                 Text(bindings.isEmpty ? "No shortcuts yet" : "\(bindings.count) shortcut\(bindings.count == 1 ? "" : "s")")
-                    .font(.system(size: 12, design: .rounded))
+                    .font(.system(.caption, design: .rounded))
                     .foregroundStyle(Color.secondary)
             }
             Spacer()
@@ -307,7 +314,7 @@ struct AppShortcutsSheet: View {
             Image(uiImage: img).resizable().scaledToFit()
         } else {
             RoundedRectangle(cornerRadius: 10)
-                .fill(DeckHandTheme.subtleWellFill(colorScheme))
+                .fill(PixelHandTheme.color(PaletteTokens.fill, for: colorScheme))
                 .overlay(Image(systemName: "app").foregroundStyle(.secondary))
         }
     }
@@ -321,7 +328,7 @@ struct AppShortcutsSheet: View {
                     isAdding = true
                 } label: {
                     Label("Add", systemImage: "plus")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .font(.system(.footnote, design: .rounded, weight: .medium))
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .background(
@@ -333,14 +340,14 @@ struct AppShortcutsSheet: View {
                     importFromApp()
                 } label: {
                     Label("Import from app", systemImage: "square.and.arrow.down")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .font(.system(.footnote, design: .rounded, weight: .medium))
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .background(
-                            Capsule().fill(DeckHandTheme.accent.opacity(0.15))
-                                .overlay(Capsule().strokeBorder(DeckHandTheme.accent.opacity(0.3), lineWidth: 1))
+                            Capsule().fill(PixelHandTheme.accent.opacity(0.15))
+                                .overlay(Capsule().strokeBorder(PixelHandTheme.accent.opacity(0.3), lineWidth: 1))
                         )
-                        .foregroundStyle(DeckHandTheme.accent)
+                        .foregroundStyle(PixelHandTheme.accent)
                 }
                 .disabled(isImporting)
             }
@@ -352,8 +359,8 @@ struct AppShortcutsSheet: View {
                 Button("Restore built-in shortcuts") {
                     store.restoreCurated(for: app.bundleID)
                 }
-                .font(.system(size: 12, design: .rounded))
-                .foregroundStyle(DeckHandTheme.accent)
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(PixelHandTheme.accent)
             }
         }
         .frame(maxWidth: .infinity)
@@ -410,6 +417,7 @@ private struct ShortcutCard: View {
     let onDelete: () -> Void
 
     @State private var isPressed = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var label: String {
         useShortName ? binding.shortDisplayName : binding.displayName
@@ -421,18 +429,19 @@ private struct ShortcutCard: View {
                 Image(systemName: binding.sfSymbol)
                     .font(.system(size: 15, weight: .regular))
                     .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(DeckHandTheme.accent)
+                    .foregroundStyle(PixelHandTheme.accent)
                     .frame(width: 22, height: 22)
+                    .accessibilityHidden(true)
 
                 Text(label)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(.system(.footnote, design: .rounded, weight: .medium))
                     .foregroundStyle(Color.primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text(binding.keyGlyphs)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(.system(.caption, design: .rounded, weight: .semibold))
                     .foregroundStyle(Color.secondary)
                     .lineLimit(1)
                     .padding(.horizontal, 7)
@@ -447,16 +456,18 @@ private struct ShortcutCard: View {
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(DeckHandTheme.subtleWellFill(colorScheme))
+                    .fill(PixelHandTheme.color(PaletteTokens.fill, for: colorScheme))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
                     )
             )
-            .scaleEffect(isPressed ? 0.96 : 1.0)
+            .scaleEffect(isPressed && !reduceMotion ? 0.96 : 1.0)
             .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isPressed)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("ph.apps.shortcut")
+        .phosphorFocusable(cornerRadius: 12)
         .simultaneousGesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { _ in isPressed = true }
@@ -550,7 +561,7 @@ struct ShortcutEditor: View {
                 Section("Preview") {
                     HStack {
                         Image(systemName: sfSymbol.isEmpty ? "keyboard" : sfSymbol)
-                            .foregroundStyle(DeckHandTheme.accent)
+                            .foregroundStyle(PixelHandTheme.accent)
                         Text(previewBinding.displayName)
                             .font(.system(.body, design: .rounded))
                         Spacer()
@@ -560,7 +571,7 @@ struct ShortcutEditor: View {
                     }
                 }
             }
-            .navigationTitle(existing == nil ? "New Shortcut" : "Edit Shortcut")
+            .navigationTitle(existing == nil ? "New shortcut" : "Edit shortcut")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

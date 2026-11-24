@@ -49,6 +49,7 @@ struct ContextStrip: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(ContextStripPlan.accessibilityLabel(mode: mode, appName: frontApp?.displayName))
+        .accessibilityIdentifier("ph.strip")
     }
 
     // MARK: Standard and large bands
@@ -126,6 +127,8 @@ struct ContextStrip: View {
                 )
             }
             .disabled(menuItems.isEmpty)
+            .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.chip)
+            .accessibilityIdentifier("ph.strip.actions")
             Spacer(minLength: 0)
         }
         .padding(.horizontal, margin)
@@ -232,7 +235,7 @@ private struct StripChip: View {
                 if let frontApp { onOpenAppSheet(frontApp) }
             }
         case .proUpsell:
-            ContextChip(title: "App chips · Pro", kind: .suggestion) {}
+            ContextChip(title: "App chips · Pro", kind: .suggestion, accessibilityTitle: "App chips, Pro") {}
                 .requiresPro(.decks)
         case .idle:
             HStack(spacing: PixelHandTheme.Space.sm) {
@@ -339,6 +342,7 @@ private struct FoldedDockChip: View {
                 Image(systemName: "chevron.up")
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(PixelHandTheme.ink2)
+                    .accessibilityHidden(true)
             }
             .padding(.leading, 6)
             .padding(.trailing, 10)
@@ -350,6 +354,7 @@ private struct FoldedDockChip: View {
             )
         }
         .menuOrder(.fixed)
+        .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.chip)
         .accessibilityLabel(frontApp.map { "\($0.displayName), switch app" } ?? "Switch app")
     }
 }

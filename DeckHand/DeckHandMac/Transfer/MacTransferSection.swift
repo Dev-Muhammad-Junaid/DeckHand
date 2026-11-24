@@ -32,6 +32,8 @@ struct MacTransferSection: View {
                             .buttonStyle(.plain)
                             .font(.caption)
                             .foregroundStyle(PixelHandTheme.ink2)
+                            .accessibilityLabel("Clear finished transfers")
+                            .accessibilityIdentifier("ph.mac.clearTransfers")
                     }
                 }
                 .padding(.horizontal, PixelHandTheme.Space.lg)
@@ -47,6 +49,8 @@ struct MacTransferSection: View {
                 }
             }
             .padding(.vertical, PixelHandTheme.Space.md)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("ph.mac.transferSection")
         }
         Color.clear.frame(height: 0)
             .onAppear { service.refreshTargets() } // pairing may have changed
@@ -69,6 +73,7 @@ private struct MacSendTargetRow: View {
             Image(systemName: "iphone.and.arrow.forward")
                 .foregroundStyle(isTargeted ? PixelHandTheme.accent : PixelHandTheme.ink2)
                 .frame(width: 22)
+                .accessibilityHidden(true)
             Text(isTargeted ? "Drop to send to \(name)" : name)
                 .font(.body.weight(.medium))
                 .lineLimit(1)
@@ -80,9 +85,12 @@ private struct MacSendTargetRow: View {
             .menuStyle(.borderlessButton)
             .fixedSize()
             .accessibilityLabel("Send to \(name)")
+            .accessibilityIdentifier("ph.mac.sendMenu")
         }
         .padding(.horizontal, PixelHandTheme.Space.lg)
         .padding(.vertical, PixelHandTheme.Space.xs)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ph.mac.sendTargetRow")
         .background(
             RoundedRectangle(cornerRadius: PixelHandTheme.Radius.kbd, style: .continuous)
                 .strokeBorder(isTargeted ? PixelHandTheme.accent : .clear, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
@@ -140,15 +148,21 @@ struct MacTransferPromptRow: View {
             HStack(spacing: PixelHandTheme.Space.sm) {
                 Button(TransferCopy.accept) { MacTransferService.shared.answer(prompt.id, accept: true) }
                     .keyboardShortcut(.defaultAction)
+                    .accessibilityIdentifier("ph.mac.acceptTransfer")
                 Button(TransferCopy.decline) { MacTransferService.shared.answer(prompt.id, accept: false) }
+                    .accessibilityIdentifier("ph.mac.declineTransfer")
                 if prompt.canAlwaysAccept {
                     Spacer()
                     Button(TransferCopy.alwaysFromDevice) { MacTransferService.shared.answer(prompt.id, accept: true, always: true) }
                         .buttonStyle(.link)
                         .font(.caption)
+                        .accessibilityLabel("Accept, and always accept from this device")
+                        .accessibilityIdentifier("ph.mac.alwaysAcceptTransfer")
                 }
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ph.mac.transferPrompt")
         .padding(PixelHandTheme.Space.md)
         .background(
             RoundedRectangle(cornerRadius: PixelHandTheme.Radius.kbd, style: .continuous)
@@ -172,6 +186,7 @@ private struct MacTransferRowView: View {
                     .font(.callout.weight(.medium))
                     .lineLimit(1)
                     .truncationMode(.middle)
+                    .accessibilityValue(row.caption)
                 Spacer()
                 if row.isActive {
                     Button {
@@ -185,11 +200,14 @@ private struct MacTransferRowView: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(PixelHandTheme.ink3)
-                    .accessibilityLabel("Cancel")
+                    .accessibilityLabel("Cancel \(row.name)")
+                    .accessibilityIdentifier("ph.mac.cancelTransfer")
                 } else if let url = row.savedURL {
-                    Button("Show") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+                    Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
                         .buttonStyle(.link)
                         .font(.caption)
+                        .accessibilityLabel("Show \(row.name) in Finder")
+                        .accessibilityIdentifier("ph.mac.showInFinder")
                 }
             }
             let phase = row.beam
@@ -205,10 +223,12 @@ private struct MacTransferRowView: View {
                 .font(.caption)
                 .foregroundStyle(PixelHandTheme.ink2)
                 .lineLimit(2)
+                .accessibilityHidden(true) // spoken as the name's value
         }
         .padding(.horizontal, PixelHandTheme.Space.lg)
-        .accessibilityElement(children: .combine)
-        .accessibilityValue(row.caption)
+        // Contain, not combine, so Cancel and Show in Finder stay separate buttons.
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ph.mac.transferRow")
     }
 }
 

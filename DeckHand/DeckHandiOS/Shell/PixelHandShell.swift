@@ -887,6 +887,8 @@ private struct FloatingScreenTile: ViewModifier {
     let session: ControlSessionModel
     let isShown: Bool
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func body(content: Content) -> some View {
         content
             .overlay {
@@ -895,12 +897,12 @@ private struct FloatingScreenTile: ViewModifier {
                 GeometryReader { proxy in
                     if isShown && session.isMirrorActive {
                         MirrorOverlay(session: session, containerSize: proxy.size)
-                            .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                            .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.9)))
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                     }
                 }
             }
-            .animation(.snappy(duration: 0.2), value: session.isMirrorActive)
+            .animation(reduceMotion ? .easeInOut(duration: 0.2) : .snappy(duration: 0.2), value: session.isMirrorActive)
     }
 }
 

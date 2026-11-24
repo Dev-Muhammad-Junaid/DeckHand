@@ -34,7 +34,7 @@ struct DeckHandMark: View {
         .rotationEffect(.degrees(-7))
         // The device sits on the dark brand canvas, so it gets a bloom in the
         // icon's tile color rather than a drop shadow.
-        .shadow(color: DeckHandTheme.Brand.cobalt.opacity(0.55), radius: size * 0.16)
+        .shadow(color: PixelHandTheme.Brand.cobalt.opacity(0.55), radius: size * 0.16)
         .scaleEffect(hasAppeared ? 1 : 0.94)
         .opacity(hasAppeared ? 1 : 0)
         .onAppear {
@@ -50,8 +50,8 @@ struct DeckHandMark: View {
             withAnimation(.spring(duration: 0.42, bounce: 0.18)) { hasAppeared = true }
             withAnimation(.easeOut(duration: 0.3).delay(0.35)) { raysLit = true }
         }
-        .accessibilityElement()
-        .accessibilityLabel("Pixel Hand")
+        // Decorative: every surface that shows the mark names the app in text.
+        .accessibilityHidden(true)
     }
 }
 
@@ -197,7 +197,7 @@ private enum MarkArtwork {
             layer.fill(
                 screenPath,
                 with: .radialGradient(
-                    Gradient(colors: [DeckHandTheme.Brand.screenHigh, DeckHandTheme.Brand.screen]),
+                    Gradient(colors: [PixelHandTheme.Brand.screenHigh, PixelHandTheme.Brand.screen]),
                     center: CGPoint(x: 0, y: screen.minY + screen.height * 0.35),
                     startRadius: 0,
                     endRadius: screen.width * 0.8
@@ -209,8 +209,8 @@ private enum MarkArtwork {
                 glow.addFilter(.blur(radius: 7))
                 forEachDot { rect, kind in
                     switch kind {
-                    case .edge: glow.fill(dotPath(rect), with: .color(DeckHandTheme.Brand.glow))
-                    case .mint: glow.fill(dotPath(rect.insetBy(dx: -3, dy: -3)), with: .color(DeckHandTheme.Brand.mint))
+                    case .edge: glow.fill(dotPath(rect), with: .color(PixelHandTheme.Brand.glow))
+                    case .mint: glow.fill(dotPath(rect.insetBy(dx: -3, dy: -3)), with: .color(PixelHandTheme.Brand.mint))
                     default: break
                     }
                 }
@@ -219,10 +219,10 @@ private enum MarkArtwork {
             forEachDot { rect, kind in
                 let path = dotPath(rect)
                 switch kind {
-                case .edge: layer.fill(path, with: .color(DeckHandTheme.Brand.phosphor))
-                case .fill: layer.fill(path, with: .color(DeckHandTheme.Brand.pixelViolet))
-                case .mint: layer.fill(path, with: .color(DeckHandTheme.Brand.mint))
-                case .off: layer.fill(path, with: .color(DeckHandTheme.Brand.dotOff))
+                case .edge: layer.fill(path, with: .color(PixelHandTheme.Brand.phosphor))
+                case .fill: layer.fill(path, with: .color(PixelHandTheme.Brand.pixelViolet))
+                case .mint: layer.fill(path, with: .color(PixelHandTheme.Brand.mint))
+                case .off: layer.fill(path, with: .color(PixelHandTheme.Brand.dotOff))
                 case .nearRay, .farRay: break // drawn by `drawRays`
                 }
             }
@@ -253,14 +253,14 @@ private enum MarkArtwork {
                 glow.addFilter(.blur(radius: 7))
                 forEachDot { rect, kind in
                     if kind == .nearRay || kind == .farRay {
-                        glow.fill(dotPath(rect), with: .color(DeckHandTheme.Brand.glow.opacity(kind == .nearRay ? 1 : 0.7)))
+                        glow.fill(dotPath(rect), with: .color(PixelHandTheme.Brand.glow.opacity(kind == .nearRay ? 1 : 0.7)))
                     }
                 }
             }
             forEachDot { rect, kind in
                 switch kind {
-                case .nearRay: layer.fill(dotPath(rect), with: .color(DeckHandTheme.Brand.ray))
-                case .farRay: layer.fill(dotPath(rect), with: .color(DeckHandTheme.Brand.ray.opacity(0.7)))
+                case .nearRay: layer.fill(dotPath(rect), with: .color(PixelHandTheme.Brand.ray))
+                case .farRay: layer.fill(dotPath(rect), with: .color(PixelHandTheme.Brand.ray.opacity(0.7)))
                 default: break
                 }
             }
@@ -270,7 +270,7 @@ private enum MarkArtwork {
 
 #Preview {
     ZStack {
-        DeckHandTheme.brandBackground()
+        PixelHandTheme.brandBackground()
         DeckHandMark(size: 172)
     }
     .ignoresSafeArea()

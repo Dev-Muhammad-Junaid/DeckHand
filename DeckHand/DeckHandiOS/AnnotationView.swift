@@ -55,6 +55,7 @@ struct AnnotationCanvas: View {
                     .scaledToFit()
                     .frame(width: proxy.size.width, height: proxy.size.height)
                     .accessibilityLabel("Capture being annotated")
+                    .accessibilityValue(strokes.count == 1 ? "1 mark" : "\(strokes.count) marks")
 
                 Canvas { context, _ in
                     context.clip(to: Path(fitted))
@@ -132,7 +133,7 @@ struct AnnotationToolbar: View {
                     widthButton(CGFloat(width))
                 }
                 Spacer(minLength: PixelHandTheme.Space.sm)
-                CaptureIconButton(glyph: CaptureGlyphs.undo, label: "Undo", isEnabled: canUndo, action: onUndo)
+                CaptureIconButton(glyph: CaptureGlyphs.undo, label: "Undo last mark", isEnabled: canUndo, action: onUndo)
                 CaptureIconButton(glyph: CaptureGlyphs.clear, label: "Clear all marks", isEnabled: canUndo, action: onClear)
             }
 
@@ -167,6 +168,7 @@ struct AnnotationToolbar: View {
         .buttonStyle(.plain)
         .accessibilityLabel("Pen width \(Int(width))")
         .accessibilityAddTraits(selected ? .isSelected : [])
+        .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.kbd)
     }
 
     private func inkButton(_ option: CaptureSheetChrome.Ink) -> some View {
@@ -194,6 +196,7 @@ struct AnnotationToolbar: View {
         .buttonStyle(.plain)
         .accessibilityLabel(option.label)
         .accessibilityAddTraits(selected ? .isSelected : [])
+        .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.kbd + 1)
     }
 }
 

@@ -132,7 +132,7 @@ private final class LocatorIndicatorView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    // The icon's tile and the glow around its lit dots (DeckHandTheme.Brand.cobalt / .glow).
+    // The icon's tile and the glow around its lit dots (PixelHandTheme.Brand.cobalt / .glow).
     private var cobalt: NSColor {
         NSColor(srgbRed: 0x3A / 255.0, green: 0x4C / 255.0, blue: 0xF2 / 255.0, alpha: 1.0)
     }

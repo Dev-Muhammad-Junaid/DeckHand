@@ -17,6 +17,7 @@ struct AppContextPill: View {
     let onTap: () -> Void
 
     @State private var isPressed = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button(action: onTap) {
@@ -30,7 +31,7 @@ struct AppContextPill: View {
             }
             .frame(minWidth: 52)
             .padding(.horizontal, 4)
-            .scaleEffect(isPressed ? 0.92 : 1.0)
+            .scaleEffect(isPressed && !reduceMotion ? 0.92 : 1.0)
             .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isPressed)
         }
         .buttonStyle(.plain)
@@ -50,7 +51,7 @@ struct AppContextPill: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         } else {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(DeckHandTheme.subtleWellFill(colorScheme))
+                .fill(PixelHandTheme.color(PaletteTokens.fill, for: colorScheme))
                 .overlay(
                     Image(systemName: "app")
                         .font(.system(size: 13, weight: .thin))

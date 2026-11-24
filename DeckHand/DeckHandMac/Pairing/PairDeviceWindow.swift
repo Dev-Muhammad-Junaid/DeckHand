@@ -52,7 +52,7 @@ final class PairDeviceWindow: NSObject, NSWindowDelegate {
         window.styleMask = [.titled, .closable]
         window.isReleasedWhenClosed = false
         window.delegate = self
-        window.setAccessibilityIdentifier("pair-device-window")
+        window.setAccessibilityIdentifier("ph.mac.pairDeviceWindow")
         return window
     }
 
@@ -152,12 +152,16 @@ struct PairDeviceView: View {
                 Button("New code") { authManager.showPairingCode() }
                     .buttonStyle(.macSecondary)
                     .help("Replace this code with a new one. The old code stops working.")
+                    .accessibilityLabel("Make a new code")
+                    .accessibilityIdentifier("ph.mac.newCode")
                 Button("Cancel") {
                     authManager.cancelPairingCode()
                     onClose()
                 }
                 .buttonStyle(.macSecondary)
                 .keyboardShortcut(.cancelAction)
+                .accessibilityLabel("Cancel pairing")
+                .accessibilityIdentifier("ph.mac.cancelPairing")
             }
             .padding(.top, PixelHandTheme.Space.xs)
 
@@ -189,6 +193,7 @@ struct PairDeviceView: View {
             Button("Close", action: onClose)
                 .buttonStyle(.macSecondary)
                 .keyboardShortcut(.cancelAction)
+                .accessibilityIdentifier("ph.mac.closePairing")
 
         case .none:
             title("The code has expired")
@@ -200,9 +205,12 @@ struct PairDeviceView: View {
                 Button("New code") { authManager.showPairingCode() }
                     .buttonStyle(.macPrimary)
                     .keyboardShortcut(.defaultAction)
+                    .accessibilityLabel("Make a new code")
+                    .accessibilityIdentifier("ph.mac.newCode")
                 Button("Close", action: onClose)
                     .buttonStyle(.macSecondary)
                     .keyboardShortcut(.cancelAction)
+                    .accessibilityIdentifier("ph.mac.closePairing")
             }
         }
     }
@@ -245,8 +253,9 @@ struct PairDeviceView: View {
         .contentTransition(.identity)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(PairingCodeDisplay.spoken(code))
+        .accessibilityIdentifier("ph.mac.pairingCode")
         .contextMenu {
-            Button("Copy Code") {
+            Button("Copy code") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(code.digits, forType: .string)
             }

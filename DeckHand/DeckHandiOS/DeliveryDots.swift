@@ -58,8 +58,8 @@ struct DeliveryDots: View {
     private var color: Color {
         switch state {
         case .idle, .sending, .sent: Self.sendingColor
-        case .confirmed: DeckHandTheme.success
-        case .failed: DeckHandTheme.danger
+        case .confirmed: PixelHandTheme.success
+        case .failed: PixelHandTheme.danger
         }
     }
 

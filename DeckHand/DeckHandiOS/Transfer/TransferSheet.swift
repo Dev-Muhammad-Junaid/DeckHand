@@ -44,6 +44,7 @@ struct TransferSheet: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                .accessibilityIdentifier("ph.transfer.tab")
                 .padding(.horizontal, PixelHandTheme.Space.lg)
                 .padding(.bottom, PixelHandTheme.Space.sm)
                 switch tab {
@@ -186,6 +187,7 @@ private struct SendPanel: View {
                     Image(systemName: item.systemImage)
                         .frame(width: 28)
                         .foregroundStyle(PixelHandTheme.accent)
+                        .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.title).font(.subheadline.weight(.medium)).lineLimit(1).truncationMode(.middle)
                         Text(item.subtitle).font(.caption).foregroundStyle(PixelHandTheme.ink2)
@@ -422,6 +424,8 @@ private struct MacDropCard: View {
         .disabled(!canSend && !isTargeted)
         .accessibilityLabel("Send to \(listing.name)")
         .accessibilityHint(canSend ? "" : "Pick something to send first.")
+        .accessibilityIdentifier("ph.transfer.macCard")
+        .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.chip + 4)
         .onDrop(of: [.fileURL, .image, .movie, .url, .plainText], isTargeted: $isTargeted) { providers in
             receive(providers)
             return true
@@ -538,6 +542,10 @@ struct TransferBeamRow: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Sending to \(macName)")
         .accessibilityValue(caption)
+        .onChange(of: phase) { _, newPhase in
+            // The receipt is announced, not only drawn.
+            if newPhase == .delivered || newPhase == .stopped { AccessibilityNotification.Announcement(caption).post() }
+        }
     }
 
     private var beamState: DotBeam.Phase {

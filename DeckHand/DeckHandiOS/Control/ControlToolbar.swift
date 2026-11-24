@@ -54,6 +54,7 @@ struct ControlToolbar: ToolbarContent {
                 Text("session \(connectionID.uuidString.prefix(8))")
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
             }
         }
         ToolbarItem(placement: .topBarTrailing) {
@@ -65,8 +66,8 @@ struct ControlToolbar: ToolbarContent {
                       ? "rectangle.fill.on.rectangle.fill"
                       : "rectangle.on.rectangle")
             }
-            .tint(isMirrorActive ? DeckHandTheme.mint : nil)
-            .accessibilityLabel(isMirrorActive ? "Stop live mirror" : "Start live mirror")
+            .tint(isMirrorActive ? PixelHandTheme.success : nil)
+            .accessibilityLabel(isMirrorActive ? "Hide the Mac’s screen" : "Show the Mac’s screen")
             .requiresPro(.mirror) // Store lane
         }
         ToolbarItem(placement: .topBarTrailing) {
@@ -108,7 +109,7 @@ struct ControlToolbar: ToolbarContent {
             Button(action: onDisconnect) {
                 Image(systemName: "minus.circle")
             }
-            .tint(DeckHandTheme.danger)
+            .tint(PixelHandTheme.danger)
             .accessibilityLabel("Disconnect")
         }
     }

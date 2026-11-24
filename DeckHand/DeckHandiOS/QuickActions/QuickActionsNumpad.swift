@@ -34,7 +34,7 @@ struct NumpadAction: Identifiable {
         .init(id: "0", label: "0", symbol: nil, keys: ["0"], isPrimary: false),
         .init(id: "dot", label: ".", symbol: nil, keys: ["."], isPrimary: false),
         .init(id: "minus", label: "−", symbol: "minus", keys: ["-"], isPrimary: false),
-        .init(id: "del", label: "Del", symbol: "delete.left", keys: ["delete"], isPrimary: false),
+        .init(id: "del", label: "Delete", symbol: "delete.left", keys: ["delete"], isPrimary: false),
         .init(id: "ret", label: "Enter", symbol: "return", keys: ["return"], isPrimary: true),
     ]
 }
@@ -45,6 +45,7 @@ struct NumpadChip: View {
     let onTap: () -> Void
 
     @State private var isPressed = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button(action: onTap) {
@@ -73,7 +74,7 @@ struct NumpadChip: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(background)
             )
-            .scaleEffect(isPressed ? 0.93 : 1.0)
+            .scaleEffect(isPressed && !reduceMotion ? 0.93 : 1.0)
             .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isPressed)
         }
         .buttonStyle(.plain)
@@ -89,6 +90,6 @@ struct NumpadChip: View {
     }
 
     private var background: Color {
-        key.isPrimary ? DeckHandTheme.accent : DeckHandTheme.subtleWellFill(colorScheme)
+        key.isPrimary ? PixelHandTheme.accent : PixelHandTheme.color(PaletteTokens.fill, for: colorScheme)
     }
 }

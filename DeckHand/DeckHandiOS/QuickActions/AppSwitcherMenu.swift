@@ -44,5 +44,6 @@ struct AppSwitcherMenu: View {
                 .contentShape(Rectangle())
         }
         .menuOrder(.fixed)
+        .accessibilityLabel("Switch app")
     }
 }

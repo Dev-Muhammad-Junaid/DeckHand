@@ -36,11 +36,12 @@ struct DialogInfoButton: View {
                 Image(systemName: "exclamationmark.bubble.fill")
                     .font(.system(size: 15, weight: .medium))
                     .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(DeckHandTheme.accent)
+                    .foregroundStyle(PixelHandTheme.accent)
                     .frame(width: 36, height: 36)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Dialog details")
             .popover(isPresented: $showingPopover, arrowEdge: .bottom) {
                 DialogInfoPopover(title: title, message: message, colorScheme: colorScheme)
                     .presentationCompactAdaptation(.popover)
@@ -83,6 +84,7 @@ struct DialogButtonChip: View {
     let onTap: @MainActor () async -> CommandDelivery
 
     @State private var isPressed = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var delivery = DeliveryTracker()
 
     var body: some View {
@@ -111,7 +113,7 @@ struct DialogButtonChip: View {
                     )
             )
             .deliveryDots(delivery.state)
-            .scaleEffect(isPressed ? 0.93 : 1.0)
+            .scaleEffect(isPressed && !reduceMotion ? 0.93 : 1.0)
             .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isPressed)
         }
         .buttonStyle(.plain)
@@ -129,13 +131,13 @@ struct DialogButtonChip: View {
     }
 
     private var background: Color {
-        if button.isDefault { return DeckHandTheme.accent }
+        if button.isDefault { return PixelHandTheme.accent }
         if button.isCancel  { return Color.clear }
-        return DeckHandTheme.subtleWellFill(colorScheme)
+        return PixelHandTheme.color(PaletteTokens.fill, for: colorScheme)
     }
 
     private var stroke: Color {
-        if button.isDefault { return DeckHandTheme.accent.opacity(0.8) }
+        if button.isDefault { return PixelHandTheme.accent.opacity(0.8) }
         if button.isCancel  { return Color.primary.opacity(0.14) }
         return Color.primary.opacity(0.08)
     }

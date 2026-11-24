@@ -25,11 +25,11 @@ struct CloudRecognitionRow: View {
                 Spacer(minLength: 8)
                 Text(status.badge)
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(status.isActive ? DeckHandTheme.Brand.mint : Color.secondary)
+                    .foregroundStyle(status.isActive ? PixelHandTheme.Brand.mint : Color.secondary)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
                     .background(
-                        Capsule().fill((status.isActive ? DeckHandTheme.Brand.mint : Color.secondary).opacity(0.14))
+                        Capsule().fill((status.isActive ? PixelHandTheme.Brand.mint : Color.secondary).opacity(0.14))
                     )
             }
             Text(status.detail)

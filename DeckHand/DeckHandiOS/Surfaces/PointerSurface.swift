@@ -166,6 +166,7 @@ struct PointerSurface: View {
         .accessibilityValue(caption.spoken)
         .accessibilityHint("Touch directly to move the pointer. Actions has clicks, scrolling and Mac gestures.")
         .accessibilityAddTraits(.allowsDirectInteraction)
+        .accessibilityIdentifier("ph.trackpad")
         .accessibilityAction(named: "Click") { click(.left) }
         .accessibilityAction(named: "Double-click") { doubleClick() }
         .accessibilityAction(named: "Right-click") { click(.right) }
@@ -199,12 +200,13 @@ struct PointerSurface: View {
     private var chromeLayer: some View {
         GlassCircleButton(
             glyph: PixelGlyphs.keyboard,
-            label: showKeyboard ? "Hide keyboard" : "Keyboard",
+            label: showKeyboard ? "Hide keyboard" : "Show keyboard",
             isOn: showKeyboard
         ) {
             GestureHaptic.selection.trigger()
             showKeyboard.toggle()
         }
+        .accessibilityIdentifier("ph.trackpad.keyboard")
         .mirrorTileKeepOut(.keyboard, owner: sender)
         .padding(PixelHandTheme.Space.md)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -343,6 +345,7 @@ struct ClickStrip: View {
         }
         .buttonStyle(ClickCellStyle())
         .accessibilityLabel(title)
+        .accessibilityIdentifier(title == "Click" ? "ph.trackpad.click" : "ph.trackpad.rightClick")
     }
 }
 

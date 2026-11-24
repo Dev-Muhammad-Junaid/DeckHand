@@ -103,7 +103,7 @@ struct WindowPickerView: View {
                     } else if windows.isEmpty {
                         PHEmptyState(
                             glyph: PixelGlyphs.screen,
-                            title: "No Windows",
+                            title: "No windows",
                             message: CaptureSheetChrome.emptyWindowsMessage(isMirror: purpose == .mirror),
                             primaryTitle: "Refresh",
                             primaryAction: onRefresh
@@ -131,6 +131,8 @@ struct WindowPickerView: View {
                     .buttonStyle(WindowCellButtonStyle())
                     .accessibilityLabel(window.title.isEmpty ? window.appName : "\(window.appName), \(window.title)")
                     .accessibilityHint(purpose == .mirror ? "Mirrors this window." : "Captures this window.")
+                    .accessibilityIdentifier("ph.capture.window")
+                    .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.key)
                 }
             }
             .padding(.horizontal, PixelHandTheme.Space.lg)
@@ -195,6 +197,8 @@ private struct WindowCell: View {
 // the scroll, depending on platform.
 
 private struct WindowCellButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .overlay(
@@ -202,7 +206,7 @@ private struct WindowCellButtonStyle: ButtonStyle {
                     .strokeBorder(PixelHandTheme.Brand.phosphor.opacity(configuration.isPressed ? 0.9 : 0), lineWidth: PixelHandTheme.Stroke.selection)
                     .shadow(color: PixelHandTheme.Brand.glow.opacity(configuration.isPressed ? 0.6 : 0), radius: 4)
             )
-            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1.0)
             .animation(.spring(response: 0.22, dampingFraction: 0.7),
                        value: configuration.isPressed)
     }

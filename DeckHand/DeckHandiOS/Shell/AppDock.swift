@@ -87,12 +87,16 @@ struct AppDock: View {
                     .contentShape(Circle())
             }
             .buttonStyle(ChipPressStyle())
-            .accessibilityLabel(isKeyboardShown ? "Hide keyboard" : "Keyboard")
+            .phosphorFocusable(cornerRadius: PixelHandTheme.ControlHeight.hit / 2)
+            .accessibilityLabel(isKeyboardShown ? "Hide keyboard" : "Show keyboard")
             .accessibilityAddTraits(isKeyboardShown ? .isSelected : [])
+            .accessibilityIdentifier("ph.dock.keyboard")
             .padding(.trailing, PixelHandTheme.Space.xs)
         }
         .frame(height: PixelHandTheme.ControlHeight.dock)
         .phGlass(in: Capsule())
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ph.dock")
     }
 }
 
@@ -136,6 +140,7 @@ private struct DockApp: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(ChipPressStyle())
+        .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.kbd + 4)
         .contextMenu {
             Button("Bring to front", action: onActivate)
             Button("Shortcuts", action: onShortcuts)
@@ -151,6 +156,7 @@ private struct DockApp: View {
         .accessibilityAction(named: "Shortcuts", onShortcuts)
         .accessibilityAction(named: "Hide", onHide)
         .accessibilityAction(named: "Quit", onQuit)
+        .accessibilityIdentifier("ph.dock.app")
         .accessibilityShowsLargeContentViewer {
             Label {
                 Text(app.displayName)

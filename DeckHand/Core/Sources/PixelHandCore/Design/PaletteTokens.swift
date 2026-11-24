@@ -133,9 +133,9 @@ public enum PaletteTokens {
 
     private static let inkLight: UInt32 = 0x121522
     private static let inkDark: UInt32 = 0xF4F6FF
-    private static let warningLight: UInt32 = 0xA35F00
+    private static let warningLight: UInt32 = 0x9E5C00
     private static let warningDark: UInt32 = 0xFFB547
-    private static let dangerLight: UInt32 = 0xD92D3F
+    private static let dangerLight: UInt32 = 0xC8283A
     private static let dangerDark: UInt32 = 0xFF4D5E
 
     // Semantic tokens (§1.2). Increase Contrast: hairline → 20 %, ink2 → 80 %.
