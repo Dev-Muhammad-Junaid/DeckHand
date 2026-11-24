@@ -24,6 +24,9 @@ weekly usage limit is close).
 | --- | --- | --- | --- |
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac) — **archived since 2026-11-18; start a new Mac session** | session_01H5HwATvLJkqCFPruLyBsX8 (archived) | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
+| Lane: Intents (App Intents, widgets, Control Center) | session_01H5HwAW3Skh6JSMju9YavzR | claude/pixelhand-lane-intents | `LANE-intents.md` ends `Lane: READY TO MERGE`; apply its YAML/entitlements |
+| Lane: Multi-Mac (UX-030, M1/M2) | session_01H5HwARqKdbGEy8CykunwYY | claude/pixelhand-lane-multimac | `LANE-multimac.md` ends `Lane: READY TO MERGE` |
+| Lane: Ask (UX-022, A1–A3) | session_01H5HwAW4RYKN9vYygVd8u1u | claude/pixelhand-lane-ask | `LANE-ask.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -138,3 +141,4 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   pass and UX-014 copy + shim removal, App Intents/widgets/Control Center,
   UX-022 Ask, then multi-Mac (UX-030), sharing (UX-031), Duo (UX-040) and
   PiP (UX-041).
+  Started Intents, Multi-Mac and Ask. Still queued: UX-013 a11y, UX-014 copy + shim removal, sharing (UX-031), Duo (UX-040), PiP (UX-041).
