@@ -27,8 +27,7 @@ enum OnDeviceDeckRanker {
     /// A reorderer when the on-device model can run now, else `nil`.
     static func makeIfAvailable() -> (any DeckSuggestionReordering)? {
         #if canImport(FoundationModels)
-        if #available(iOS 26.0, *) {
-            guard SystemLanguageModel.default.isAvailable else { return nil }
+        if #available(iOS 26.0, *), OnDeviceModel.isAvailable {
             return FoundationModelsDeckRanker()
         }
         #endif
@@ -47,7 +46,7 @@ struct DeckProposal {
 @available(iOS 26.0, *)
 struct FoundationModelsDeckRanker: DeckSuggestionReordering {
     func picks(appName: String, candidates: [String], limit: Int) async -> [Int]? {
-        guard SystemLanguageModel.default.isAvailable, !candidates.isEmpty else { return nil }
+        guard OnDeviceModel.isAvailable, !candidates.isEmpty else { return nil }
         let lines = Array(candidates.prefix(OnDeviceDeckRanker.maxCandidates))
         let prompt = """
         App: \(appName)
@@ -57,26 +56,17 @@ struct FoundationModelsDeckRanker: DeckSuggestionReordering {
 
         \(lines.joined(separator: "\n"))
         """
-        return await withTaskGroup(of: [Int]?.self) { group in
-            group.addTask {
-                let session = LanguageModelSession(
-                    instructions: "You choose keyboard shortcuts for a deck of keys. Answer only with numbers from the list you are given."
-                )
-                do {
-                    let response = try await session.respond(to: prompt, generating: DeckProposal.self)
-                    return Array(response.content.picks.prefix(limit))
-                } catch {
-                    DeckHandLog.app.info("On-device deck ranking failed: \(error.localizedDescription, privacy: .public)")
-                    return nil
-                }
-            }
-            group.addTask {
-                try? await Task.sleep(nanoseconds: UInt64(OnDeviceDeckRanker.timeout * 1_000_000_000))
+        return await OnDeviceModel.withDeadline(OnDeviceDeckRanker.timeout) {
+            let session = LanguageModelSession(
+                instructions: "You choose keyboard shortcuts for a deck of keys. Answer only with numbers from the list you are given."
+            )
+            do {
+                let response = try await session.respond(to: prompt, generating: DeckProposal.self)
+                return Array(response.content.picks.prefix(limit))
+            } catch {
+                DeckHandLog.app.info("On-device deck ranking failed: \(error.localizedDescription, privacy: .public)")
                 return nil
             }
-            let first = await group.next() ?? nil
-            group.cancelAll()
-            return first
         }
     }
 }
