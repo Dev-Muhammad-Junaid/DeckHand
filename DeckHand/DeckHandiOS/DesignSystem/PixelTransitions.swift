@@ -84,7 +84,7 @@ extension AnyTransition {
 /// edge on the incoming side. At rest the mask is a plain full rectangle and
 /// the shaders are off, so the view keeps its identity, state and hit
 /// testing.
-struct PixelDissolveModifier: ViewModifier, Animatable {
+struct PixelDissolveModifier: ViewModifier, @preconcurrency Animatable {
     var progress: Double
     let isOutgoing: Bool
     let cell: CGFloat
