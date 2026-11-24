@@ -1129,5 +1129,54 @@ Mac should check: the build 17 list above (Settings › Subscription ›
 "Unlock Pro for testing"), then the "Checks on the Mac" table in
 `LANE-ux-polish.md`. Install on Mac and iPad as soon as it builds.
 
-Status: READY FOR MAC BUILD (build 18)
+## Mac build results (build 18) — 2026-11-24
 
+Built from `f8eae4d`/`e811e7f` (build 18) on Xcode 27.2, Release, team
+`DD5AWPLT2V`, automatic signing with `-allowProvisioningUpdates`. Results
+are for `6170ef0`.
+
+**Build**
+- Mac app: **builds first time**, no fixes needed.
+- iOS app with `PixelHandWidgets.appex` and `PixelHandShare.appex`: builds
+  after 1 fix. `DeveloperUnlock.swift` (`AppTransaction.shared`,
+  `.environment`), the computed `entitlement` and the UX polish lane's
+  ternary transitions / `accessibilityActions` all compiled as written.
+
+**Fixes pushed** (on `claude/pixelhand-integration`)
+1. `6170ef0` `DeckHandiOS/Surfaces/PointerSurface.swift`: "unable to
+   type-check this expression in reasonable time" on `touchSurface` (eleven
+   `.accessibilityAction` modifiers, two of them with a ternary `named:`
+   choosing an overload). The two names are now typed `LocalizedStringKey`
+   locals and the `TrackpadInputLayer` is its own property. No behaviour
+   change; the VoiceOver actions and names are the same.
+
+**Tests**
+- `swift test --package-path DeckHand/Core`: **857 / 857 pass** (154
+  suites; up from 851, the 6 new `ContrastAuditTests`).
+- `swift test --scratch-path .build-local`, no `--skip`: **477 pass**
+  (377 + 42 + 15 + 13 + 10 + 9 + 6 + 5), 0 failed.
+- `DeckHandTests` (macOS): **8 / 8 pass**.
+
+**Install**
+- Mac: `/Applications/Pixel Hand.app` replaced (old copy quit first) and
+  launched with `open`; running.
+- iPad Air 11" (M3): **not installed yet.** `devicectl` lists it as
+  `unavailable` (error 4016) although it advertises `_remotepairing` on the
+  Wi-Fi; it isn't on USB. Retry once the iPad shows as available in Xcode
+  › Devices and Simulators (or over a USB data cable).
+
+**Checks done here:** none beyond the build and tests; the build 17 and
+UX polish checks need the iPad or VoiceOver hands-on.
+
+**Bugs found:** none by the build gate (the type-check timeout is fixed).
+
+**Hands-on checks for the owner (build 18)**
+- Settings › Subscription › **"Unlock Pro for testing"**: the switch shows
+  on this development build; on, every Pro feature unlocks (mirror, decks,
+  a second Mac, Ask, PiP, Sharing) and the widget shows Pro; off restores
+  the free plan.
+- The "Checks on the Mac" table in `LANE-ux-polish.md`: VoiceOver on iPhone
+  and the Mac panel, AX3 text sizes, Reduce Motion, light-mode danger and
+  warning colours.
+
+Status: BUILT (build 18) — green
