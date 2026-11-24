@@ -224,6 +224,10 @@ import Testing
         ("sharing.clipboardSync", .sharing(.clipboardSync(enabled: true))),
         ("sharing.setClipboard", .sharing(.setClipboard(text: "Copied on the iPad", paste: true))),
         ("sharing.macClipboard", .sharing(.macClipboard(text: "Copied on the Mac"))),
+        ("sharing.transferStatus.saved", .sharing(.transferStatus(transferID: UUID(uuidString: "6F1E2D3C-4B5A-4978-8695-A4B3C2D1E0F9")!, status: .saved(landing: .downloads)))),
+        ("sharing.transferStatus.refused", .sharing(.transferStatus(transferID: UUID(uuidString: "6F1E2D3C-4B5A-4978-8695-A4B3C2D1E0F9")!, status: .refused(reason: .macLocked)))),
+        ("sharing.transferStatus.awaiting", .sharing(.transferStatus(transferID: UUID(uuidString: "6F1E2D3C-4B5A-4978-8695-A4B3C2D1E0F9")!, status: .awaitingApproval))),
+        ("sharing.transferStatus.failed", .sharing(.transferStatus(transferID: UUID(uuidString: "6F1E2D3C-4B5A-4978-8695-A4B3C2D1E0F9")!, status: .failed(reason: .integrity)))),
         // diagnostics
         ("diagnostics.mirrorStats", .diagnostics(.mirrorStats(stats: MirrorHostStats(
             codec: .jpeg,
@@ -354,6 +358,7 @@ import Testing
             case .clipboardSync: "sharing.clipboardSync"
             case .setClipboard: "sharing.setClipboard"
             case .macClipboard: "sharing.macClipboard"
+            case .transferStatus: "sharing.transferStatus"
             }
         case let .diagnostics(m):
             switch m {
@@ -364,7 +369,7 @@ import Testing
     }
 
     /// Cases in protocol version 11. Bump with every added or removed case.
-    static let expectedCaseCount = 55
+    static let expectedCaseCount = 56
 
     /// The current version, for the hand-written JSON below.
     static let v = PixelHandProtocol.version

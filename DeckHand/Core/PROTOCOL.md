@@ -23,7 +23,7 @@ protocol version and exactly one domain key.
 | `capture` | `CaptureMessage.swift` | screenshots, window list | Mirror |
 | `pairing` | `PairingMessage.swift` | approval handshake; S4 pairing | Pairing |
 | `session` | `SessionMessage.swift` | ping/pong, keep-alive `tick`, `link`, `remoteHosts`, `hostStatus` | Network |
-| `sharing` | `SharingMessage.swift` | clipboard text sync (S10); files later | iOS interaction (S10) |
+| `sharing` | `SharingMessage.swift` | clipboard text sync (S10); transfer status (S1: refused why, saved where) | iOS interaction (S10), Sharing (S1) |
 | `diagnostics` | `DiagnosticsMessage.swift` | mirror stats both ways (S6), with audio fields (S17) | Mirror |
 
 - Bulk binary data never goes in the envelope. Mirror video and the
@@ -34,6 +34,13 @@ protocol version and exactly one domain key.
   `ProtocolFeature.binaryMirrorStream` in `HostStatus`. Adding a frame
   kind or changing a payload layout is a protocol change like any other:
   bump the version and add a history line.
+- Transfers (S1) use Loom's transfer engine (`LoomConnectionHandle.transferEngine`):
+  its own control stream and one data stream per transfer, chunked,
+  windowed, resumable from a contiguous offset and SHA-256 checked. The
+  offer's metadata carries a `TransferManifest` (`ph.kind`, `ph.m`;
+  `Transfer/TransferManifest.swift`); the receiver answers in
+  `sharing.transferStatus`. Changing the manifest keys or kinds is a
+  protocol change.
 - The Mac's sound (S17) rides a second stream, `PixelHandStream.audio`,
   which the Mac opens after `mirror.audio(enabled: true)`. Same header;
   `audioFormat` then `audioPacket` frames (payloads in
@@ -87,3 +94,4 @@ one case, one key, one decode line.
 | 10 | Remote access over a VPN (S15): `session.remoteHosts(hosts: [String])`, Mac → paired remote only, the Mac's own addresses on tunnel interfaces and Tailscale's ranges (at most 4), for reaching it when Bonjour can't. The remote re-validates each host (`RemoteHost.parse`) and keeps them only for a paired Mac. `session.link` reports `tunnel` for a Tailscale peer address too. Nothing a remote sends changed. |
 | 11 | The Mac's sound while mirroring (S17): `mirror.audio(enabled:)` (remote → Mac; off by default) and `mirror.audioError(message:)` (Mac → remote; the mirror carries on). Audio travels on its own Loom stream, `PixelHandStream.audio` (`pixelhand.audio`), in `BinaryFrameHeader` frames of the new kinds `audioFormat` (7) and `audioPacket` (8) (payloads in `Audio/MirrorAudio.swift`: AAC-LC, or 16-bit PCM when the Mac has no AAC encoder). `MirrorHostStats` and `MirrorClientStats` gain an optional `audio` (packets sent/dropped and data rate; packets received/lost/late, underruns, buffer depth, target and jitter). Lock gate: `audio(enabled: true)` follows `mirror.start` (refused off console). |
 | 12 | Deck 2 actions (D1): `Action` gains `menuCommand(bundleID:path:)` (press a menu item by its titles through AX), `macShortcut(name:)` (run a Shortcuts.app shortcut, ≤ 15 s) and `sequence(steps:)` (`SequenceStep` = `run(action:)` or `delay(milliseconds:)`; ≤ 20 steps, no nesting, refused while decoding). They run only through `deck.run`, answered with one receipt: `completed`/`failed` when known within 1.2 s, else `delivered`. `RemoteInputValidation` bounds every new string and number (`ActionValidation`); lock gate: `menuCommand` and `macShortcut` refused while locked, a `sequence` only when every step may run, re-checked per step. No message cases added or removed. |
+| 13 | Transfers (S1): `sharing.transferStatus(transferID:status:)`, both ways, from the receiver of a Loom transfer to its sender: `awaitingApproval`, `refused(reason:)` (`declined`, `macLocked`, `notPaired`, `needsPro`, `tooLarge`, `noSpace`, `unsupported`), `saved(landing:)` (`downloads`, `browser`, `clipboard`, `inbox`) or `failed(reason:)` (`integrity`, `writeFailed`, `interrupted`, `cancelled`). Files, photos, links and text travel through Loom's transfer engine with a `TransferManifest` in the offer metadata (`ph.kind` = `file`/`photo`/`link`/`text`, `ph.m` = `1`); caps and prompts in `TransferPolicy`. `RemoteInputValidation`: UUID and closed enums only, passed through; the offer's fields are checked by `TransferManifest.read`. Lock gate: `transferStatus` allowed; incoming transfers refused while locked or off console (`LockPolicy.allowsIncomingTransfer`). |

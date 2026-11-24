@@ -65,6 +65,15 @@ public enum RemoteInputValidation {
             // Mac → remote only; a remote has no business sending it.
             return nil
 
+        case .sharing(.transferStatus):
+            // S1: a UUID (decoded strictly, or the message fails) and closed
+            // enums; no free string or number. The Mac matches the id
+            // against transfers it offered to this connection and ignores
+            // any other. The offer's own strings and numbers (name, size,
+            // content type, kind) arrive through Loom's transfer engine and
+            // are checked by `TransferManifest.read` and `TransferPolicy`.
+            return message
+
         case let .apps(.launchApp(bundleID)):
             return isAcceptable(bundleID) ? message : nil
 
