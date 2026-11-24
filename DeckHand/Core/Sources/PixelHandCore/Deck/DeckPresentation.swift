@@ -262,6 +262,9 @@ public struct DeckShownKey: Sendable, Equatable, Identifiable {
         /// A button of the dialog open on the Mac (Context page only). Runs
         /// once; never stored.
         case dialog
+        /// A ghost key from the front app's menus ("Suggest a deck",
+        /// UX-021). Shown in the suggestions panel, stored only on Keep.
+        case suggested
     }
 
     /// Whether the editor can change this key.
