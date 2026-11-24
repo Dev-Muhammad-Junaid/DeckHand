@@ -49,6 +49,8 @@ struct MacsSidebar: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(PressableButtonStyle())
+                        .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.card + 4)
+                        .accessibilityIdentifier("ph.sidebar.mac")
                         .accessibilityHint(listing.isActive ? "Shows My Macs." : "Switches to \(listing.name).")
                     }
 
@@ -112,8 +114,10 @@ struct AskField: View {
         .buttonStyle(.plain)
         .phGlass(in: Capsule(), interactive: true)
         .keyboardShortcut("k", modifiers: .command)
+        .phosphorFocusable(cornerRadius: PixelHandTheme.ControlHeight.standard / 2)
         .accessibilityLabel("Ask")
         .accessibilityHint("Type what you want \(macName) to do")
+        .accessibilityIdentifier("ph.ask")
     }
 }
 
@@ -133,8 +137,10 @@ struct AskCircleButton: View {
         .buttonStyle(.plain)
         .phGlass(in: Circle(), interactive: true)
         .keyboardShortcut("k", modifiers: .command)
+        .phosphorFocusable(cornerRadius: size / 2)
         .accessibilityLabel("Ask")
         .accessibilityHint("Type what you want your Mac to do")
+        .accessibilityIdentifier("ph.ask")
         .accessibilityShowsLargeContentViewer {
             Label { Text("Ask") } icon: { PHGlyph(glyph: PixelGlyphs.ask, pitch: PixelPitch.tabBar) }
         }

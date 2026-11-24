@@ -103,7 +103,13 @@ struct DeckKey: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(title + (asksFirst ? ", asks first" : ""))
-        .accessibilityHint(chord.map { "Shortcut \($0)" } ?? "")
+        .accessibilityValue(chord ?? "")
+        .accessibilityActions {
+            if kind == .editing, let onRemove {
+                Button("Remove \(title)", action: onRemove)
+            }
+        }
+        .accessibilityIdentifier("ph.deck.key")
     }
 
     private var shape: RoundedRectangle {
@@ -170,7 +176,8 @@ struct DeckKeyRow: View {
         .buttonStyle(ChipPressStyle())
         .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.key)
         .accessibilityLabel(title)
-        .accessibilityHint(chord.map { "Shortcut \($0)" } ?? "")
+        .accessibilityValue(chord ?? "")
+        .accessibilityIdentifier("ph.deck.key")
     }
 }
 

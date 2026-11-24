@@ -43,6 +43,10 @@ struct AuthorizationOverlay: View {
             .padding(PixelHandTheme.Space.xxl)
             .frame(maxWidth: 480)
             .background(cardBackground)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(copy.title)
+            .accessibilityAddTraits(.isModal)
+            .accessibilityIdentifier("ph.authorization")
             .padding(.horizontal, PixelHandTheme.Space.xl)
             // Scrolls instead of clipping at AX sizes or in landscape.
             .frame(maxWidth: .infinity)
@@ -68,6 +72,8 @@ struct AuthorizationOverlay: View {
                         .font(.subheadline)
                         .foregroundStyle(PixelHandTheme.ink2)
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Pairing with \(peerName)")
             } else if let notice = pairing.notice {
                 Text(notice)
                     .font(.subheadline)
@@ -90,6 +96,8 @@ struct AuthorizationOverlay: View {
             }
             .buttonStyle(.ph(.tint, size: .regular))
             .disabled(pairing.liveMac == nil || pairing.isAwaitingCodeResult)
+            .accessibilityHint("Pairs this device with \(peerName) so it connects without asking next time")
+            .accessibilityIdentifier("ph.authorization.enterCode")
         }
     }
 
@@ -104,9 +112,11 @@ struct AuthorizationOverlay: View {
         if isTerminalState {
             Button("Dismiss", role: .cancel, action: onDisconnect)
                 .buttonStyle(.ph(.secondary, size: .regular))
+                .accessibilityIdentifier("ph.authorization.dismiss")
         } else {
             Button("Disconnect", role: .destructive, action: onDisconnect)
                 .buttonStyle(.ph(.destructive, size: .regular))
+                .accessibilityIdentifier("ph.authorization.disconnect")
         }
     }
 
@@ -154,10 +164,13 @@ struct AuthorizationOverlay: View {
                         .font(.body)
                         .foregroundStyle(PixelHandTheme.ink2)
                         .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
                         .contentTransition(.opacity)
                 }
             }
         }
+        // Title and message read as one status line.
+        .accessibilityElement(children: .combine)
     }
 
     private var copy: (title: String, message: String) {

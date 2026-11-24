@@ -62,7 +62,8 @@ struct MirrorPane: View {
         // UX-041: Pro and the PiP setting.
         .mirrorPiPSync(session: session)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Live screen of \(macName)")
+        .accessibilityLabel("Screen of \(macName)")
+        .accessibilityIdentifier("ph.mirror")
     }
 
     // MARK: Data
@@ -176,6 +177,7 @@ struct MirrorPane: View {
                     isOn: settings.mirrorFollowsCursor && !windowActive,
                     action: { isPickerPresented = true }
                 )
+                .accessibilityIdentifier("ph.mirror.displayPicker")
             }
             if !windowActive {
                 MirrorSpaceControls(strip: strip) { direction in
@@ -189,12 +191,14 @@ struct MirrorPane: View {
                 isOn: settings.mirrorPlaysMacAudio,
                 action: { settings.mirrorPlaysMacAudio.toggle() }
             )
+            .accessibilityIdentifier("ph.mirror.sound")
             MirrorPiPToolButton(session: session)
             MirrorToolButton(
                 glyph: PixelGlyphs.close,
                 label: "Stop the live screen",
                 action: { session.toggleMirror(settings: settings) }
             )
+            .accessibilityIdentifier("ph.mirror.close")
         }
         .padding(.horizontal, 2)
         .phGlass(in: Capsule(), interactive: true)

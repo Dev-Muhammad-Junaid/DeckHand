@@ -92,11 +92,11 @@ struct MacPill: View {
     private var accessibilityText: String {
         var parts = [name]
         switch status {
-        case .online: break
+        case .online: parts = ["\(name) focused"]
         case .offline: parts.append("offline")
         case .locked: parts.append("locked")
         }
-        if let subtitle { parts.append(subtitle) }
+        if let subtitle, subtitle.lowercased() != parts.last?.lowercased() { parts.append(subtitle) }
         return parts.joined(separator: ", ")
     }
 }

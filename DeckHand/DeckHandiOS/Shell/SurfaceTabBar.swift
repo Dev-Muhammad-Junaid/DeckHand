@@ -89,6 +89,7 @@ struct SurfaceTabBar: View {
         .phosphorFocusable(cornerRadius: 27)
         .accessibilityLabel(surface.title)
         .accessibilityAddTraits(isOn ? [.isSelected, .isButton] : .isButton)
+        .accessibilityIdentifier("ph.tab.\(surface.rawValue)")
         .accessibilityShowsLargeContentViewer {
             Label { Text(surface.title) } icon: { PHGlyph(glyph: surface.glyph, pitch: PixelPitch.tabBar) }
         }
@@ -104,7 +105,9 @@ struct SurfaceTabBar: View {
         .buttonStyle(.plain)
         .phGlass(in: Circle(), interactive: true)
         .keyboardShortcut("k", modifiers: .command)
+        .phosphorFocusable(cornerRadius: 31)
         .accessibilityLabel("Ask")
+        .accessibilityIdentifier("ph.tab.ask")
         .accessibilityHint("Type what you want your Mac to do")
         .accessibilityShowsLargeContentViewer {
             Label { Text("Ask") } icon: { PHGlyph(glyph: PixelGlyphs.ask, pitch: PixelPitch.tabBar) }

@@ -182,7 +182,7 @@ struct MirrorDisplayPicker: View {
                 }
                 if session.mirrorDisplays.count > 1, !windowActive {
                     Toggle(isOn: $settings.mirrorFollowsCursor) {
-                        Label("Follow Cursor", systemImage: "cursorarrow.motionlines")
+                        Label("Follow cursor", systemImage: "cursorarrow.motionlines")
                     }
                 }
             } label: {
@@ -200,6 +200,7 @@ struct MirrorDisplayPicker: View {
                     .contentShape(Rectangle())
             }
             .padding(6)
+            .accessibilityIdentifier("ph.mirror.displayPicker")
             .accessibilityLabel(window.map { "Mirrored window: \($0.longLabel)" } ?? "Mirrored display: \(selectedLabel)")
         }
     }
@@ -221,6 +222,8 @@ struct MirrorSpaceDots: View {
     /// Height the dots take under the tile: the 4 pt gap and the plate.
     static let footprint: CGFloat = 4 + PixelHandTheme.ControlHeight.badge
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         if !strip.dots.isEmpty {
             DesktopDots(
@@ -235,7 +238,7 @@ struct MirrorSpaceDots: View {
             .frame(height: PixelHandTheme.ControlHeight.badge)
             .background(PixelHandTheme.Brand.screen.opacity(0.84), in: RoundedRectangle(cornerRadius: PixelHandTheme.Radius.badge, style: .continuous))
             .pixelOnNavy()
-            .animation(.easeInOut(duration: 0.2), value: strip)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: strip)
             .allowsHitTesting(false)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(strip.accessibilitySummary ?? "")

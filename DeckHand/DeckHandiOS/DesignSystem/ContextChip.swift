@@ -51,7 +51,8 @@ struct ContextChip: View {
         .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.chip)
         .padding(kind == .defaultAction ? 4 : 0)
         .accessibilityLabel(accessibilityTitle ?? title)
-        .accessibilityHint(chord.map { "Shortcut \($0)" } ?? "")
+        .accessibilityValue(chord ?? "")
+        .accessibilityIdentifier("ph.strip.chip")
     }
 
     @ViewBuilder

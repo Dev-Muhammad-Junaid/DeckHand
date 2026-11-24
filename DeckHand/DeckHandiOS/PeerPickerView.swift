@@ -96,12 +96,14 @@ struct PeerPickerView: View {
         VStack {
             HStack(spacing: PixelHandTheme.Space.sm) {
                 Spacer()
-                GlassCircleButton(glyph: PixelGlyphs.region, label: "Pair with a QR code") {
+                GlassCircleButton(glyph: PixelGlyphs.region, label: "Scan pairing code") {
                     isScanningInvite = true
                 }
+                .accessibilityIdentifier("ph.connect.scanQR")
                 GlassCircleButton(glyph: PixelGlyphs.settings, label: "Settings") {
                     isSettingsPresented = true
                 }
+                .accessibilityIdentifier("ph.connect.settings")
             }
             Spacer()
         }
@@ -193,6 +195,9 @@ struct PeerPickerView: View {
                     .foregroundStyle(PixelHandTheme.Brand.phosphor)
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Searching for Macs")
+        .accessibilityIdentifier("ph.connect.searching")
         .padding(.top, PixelHandTheme.Space.md)
     }
 
@@ -205,11 +210,14 @@ struct PeerPickerView: View {
             Text("Pixel Hand couldn’t start its network connection.")
                 .font(.headline)
                 .foregroundStyle(.white)
+                .fixedSize(horizontal: false, vertical: true)
             Text(message)
                 .font(.footnote)
                 .foregroundStyle(.white.opacity(0.66))
+                .fixedSize(horizontal: false, vertical: true)
             Button("Try again", action: onRetryStart)
                 .buttonStyle(.ph(.primary, size: .regular))
+                .accessibilityIdentifier("ph.connect.retry")
         }
         .multilineTextAlignment(.center)
         .padding(.horizontal, 40)
@@ -267,7 +275,7 @@ struct PeerPickerView: View {
                 await MainActor.run {
                     DeckHandLog.connection.error("📡 Connect failed for \(peer.name, privacy: .public): \(error.localizedDescription, privacy: .public)")
                     connecting = nil
-                    showError("Connection failed: \(error.localizedDescription)")
+                    showError("Couldn’t connect to \(peer.name). Make sure Pixel Hand is open on the Mac, then try again.")
                 }
             }
         }
@@ -394,6 +402,9 @@ private struct PeerCard: View {
             .contentShape(shape)
         }
         .buttonStyle(PressableButtonStyle())
+        .accessibilityLabel(rowAccessibilityLabel)
+        .accessibilityValue(isConnecting ? "Connecting" : "")
+        .accessibilityIdentifier("ph.connect.macRow")
         .opacity(isDimmed ? 0.4 : 1)
         .disabled(isConnecting || isDimmed)
         .animation(.easeOut(duration: 0.22), value: isConnecting)
@@ -403,6 +414,19 @@ private struct PeerCard: View {
     private var statusLine: String {
         let place = peer.isNearby ? "Nearby" : "Remote"
         return isPaired ? "Paired · \(place)" : place
+    }
+
+    /// The whole card as one spoken line: "Studio, my Mac, paired, nearby".
+    private var rowAccessibilityLabel: String {
+        var parts = [peer.name]
+        if peer.isSameICloudDevice { parts.append("my Mac") }
+        if let updateMessage {
+            parts.append(updateMessage)
+        } else {
+            if isPaired { parts.append("paired") }
+            parts.append(peer.isNearby ? "nearby" : "remote")
+        }
+        return parts.joined(separator: ", ")
     }
 
     private var statusAccessibility: String {
