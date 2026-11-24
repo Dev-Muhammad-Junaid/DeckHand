@@ -169,7 +169,7 @@ swift test --scratch-path .build-local                            # full Loom su
 | 8 | Key changed | Reinstall the Mac app with a fresh Loom key (or delete its keychain item), keep the iPad's record: tapping the remote Mac → "answered with a different identity…". |
 | 9 | Validation | Add `http://x`, `100.1.1.1:22`, `fe80::1`, `127.0.0.1`, `256.1.1.1`: each shows its inline error and isn't saved. |
 | 10 | Forget prunes | Forget the Mac on the iPad: its saved addresses disappear and the overlay stops probing them (no "Remote" Mac in the list). |
-| 11 | SSH tunnel (optional) | `ssh -L 9849:127.0.0.1:9849 mac` style forwards arrive on the Mac from loopback: only a paired device is admitted. (Needs fixed ports; not wired in the UI.) |
+| 11 | SSH tunnel (optional) | `ssh -L 9849:127.0.0.1:9849 mac` style forwards arrive on the Mac from loopback. Since VQ-001 loopback counts as this same machine (simulators), so an unpaired device gets the Allow prompt a person at the Mac must answer. (Needs fixed ports; not wired in the UI.) |
 
 ## 6. Linux verification
 

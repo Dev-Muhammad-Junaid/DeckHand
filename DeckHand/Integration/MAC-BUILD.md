@@ -74,6 +74,16 @@ pass / fail / not tested.
 - Light and dark mode; iPhone and iPad layouts in both orientations.
 - Sentry toggle.
 
+## Simulators on the build Mac (VQ-001)
+An iOS simulator reaches the Mac app on the same machine over loopback.
+Since the QA flows lane, loopback counts as this same machine, not a
+remote path: an unpaired simulator gets the usual Allow prompt, and
+pairing by code works. Tunnels, Tailscale addresses and cellular are
+still remote (paired and pinned only). The trust log says
+"is on this Mac (loopback…)" for such a connection. Pair a simulator once
+(Pair a device on the Mac, Enter code on the simulator); after that it
+connects without a prompt.
+
 ## Report
 Append a dated "Mac build results" section to
 `DeckHand/Integration/STATUS.md`: build status, test counts, fixes pushed,
