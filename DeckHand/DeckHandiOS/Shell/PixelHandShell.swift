@@ -845,10 +845,10 @@ struct PixelHandShell: View {
                 clipboard: session.clipboard,
                 margin: margin,
                 // The dock carries the keyboard button wherever it shows.
-                keyboardInDock: !plan.foldsDockIntoStrip && CGFloat(plan.metrics.height) >= Self.foldedDockHeight
+                keyboardInDock: dockCarriesKeyboard(plan)
             )
         case .screen:
-            ScreenSurface(session: session, macName: peerName)
+            ScreenSurface(session: session, macName: peerName, keyboardInDock: dockCarriesKeyboard(plan))
                 .padding(.horizontal, margin)
                 .padding(.bottom, PixelHandTheme.Space.sm)
         case .deck:
@@ -856,6 +856,11 @@ struct PixelHandShell: View {
         }
         // (The strip and dock live in the shell's chrome, so the deck hides
         // its own Quick Actions bar and edit buttons.)
+    }
+
+    /// Whether the app dock shows (and so carries the keyboard button).
+    private func dockCarriesKeyboard(_ plan: CanvasPlan) -> Bool {
+        !plan.foldsDockIntoStrip && CGFloat(plan.metrics.height) >= Self.foldedDockHeight
     }
 
     // MARK: - Deck

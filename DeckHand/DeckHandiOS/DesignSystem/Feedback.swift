@@ -233,10 +233,22 @@ struct PHEmptyState: View {
     var primaryAction: (() -> Void)?
     var secondaryTitle: String?
     var secondaryAction: (() -> Void)?
+    /// Locks only the primary button behind Pro, so the lock sits on the
+    /// control it gates, not on the empty state (VQ-026).
+    var primaryRequires: ProFeature?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
+        // Scrolls when it can't fit (AX3+, short panes), so the message
+        // never truncates and the buttons never clip (VQ-066).
+        ViewThatFits(in: .vertical) {
+            content
+            ScrollView(showsIndicators: false) { content }
+        }
+    }
+
+    private var content: some View {
         VStack(spacing: PixelHandTheme.Space.lg) {
             PHGlyph(glyph: glyph, pitch: PixelPitch.emptyState, showsUnlit: true)
                 .foregroundStyle(PixelHandTheme.Brand.phosphor)
@@ -254,17 +266,32 @@ struct PHEmptyState: View {
                     .foregroundStyle(Color.white.opacity(0.72))
             }
             .multilineTextAlignment(.center)
-            HStack(spacing: PixelHandTheme.Space.sm) {
-                if let primaryTitle, let primaryAction {
-                    Button(primaryTitle, action: primaryAction).buttonStyle(.ph(.primary, size: .small))
-                }
-                if let secondaryTitle, let secondaryAction {
-                    Button(secondaryTitle, action: secondaryAction).buttonStyle(.ph(.secondary, size: .small))
-                }
+            .fixedSize(horizontal: false, vertical: true)
+            // Side by side, or stacked when the pane is too narrow, so a
+            // button is never clipped (VQ-045).
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: PixelHandTheme.Space.sm) { actions }
+                VStack(spacing: PixelHandTheme.Space.sm) { actions }
             }
         }
         .padding(PixelHandTheme.Space.xl)
         .pixelOnNavy()
+    }
+
+    @ViewBuilder
+    private var actions: some View {
+        if let primaryTitle, let primaryAction {
+            if let primaryRequires {
+                Button(primaryTitle, action: primaryAction)
+                    .buttonStyle(.ph(.primary, size: .small))
+                    .requiresPro(primaryRequires)
+            } else {
+                Button(primaryTitle, action: primaryAction).buttonStyle(.ph(.primary, size: .small))
+            }
+        }
+        if let secondaryTitle, let secondaryAction {
+            Button(secondaryTitle, action: secondaryAction).buttonStyle(.ph(.secondary, size: .small))
+        }
     }
 }
 
