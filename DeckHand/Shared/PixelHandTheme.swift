@@ -276,7 +276,7 @@ enum PixelHandFonts {
 
 extension Color {
     /// A fixed sRGB colour from a Core value.
-    init(_ rgb: RGBColor) {
+    init(_ rgb: PixelHandCore.RGBColor) {
         self.init(.sRGB, red: rgb.red, green: rgb.green, blue: rgb.blue, opacity: 1)
     }
 
