@@ -173,6 +173,12 @@ struct SettingsSectionHeader: View {
         self.glyph = glyph
     }
 
+    /// A section without a glyph of its own gets the Settings glyph, so
+    /// its header still matches the others.
+    init(_ title: String) {
+        self.init(title, glyph: PixelGlyphs.settings)
+    }
+
     var body: some View {
         HStack(spacing: PixelHandTheme.Space.sm) {
             PHGlyph(glyph: glyph, pitch: 1.6)
