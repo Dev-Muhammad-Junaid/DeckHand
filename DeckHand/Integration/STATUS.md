@@ -1182,4 +1182,29 @@ UX polish checks need the iPad or VoiceOver hands-on.
 
 (none reported yet)
 
+## Visual QA (build 18) — 2026-11-25
+
+Full findings: `Integration/VISUAL-QA-build18.md` (one line each, with a
+suggested fix and media ref). Gallery with every screen, screenshots and
+clips: https://claude.ai/artifact/EWnkLTGtb5bpXMHrGFJnzB (private).
+
+**69 findings: P1 12 · P2 36 · P3 21.** Layout 17, Behaviour 14, Wording 14,
+Visual identity 14, Accessibility 5, Responsiveness 3, Loading and
+animation 2.
+
+- Covered: iPhone 17 Pro (light, dark, AX3, landscape), iPad Pro 11" and
+  iPad mini (portrait, landscape), iPhone 17, iPhone Duo (onboarding only),
+  the Mac panel and pairing window, free plan.
+- Biggest blocker (VQ-001): build 18's Mac refuses every unpaired
+  simulator because loopback counts as a remote path, and pairing is
+  refused over it too, so no simulator can connect to a Mac on the same
+  machine. I paired three simulators once with a local, uncommitted Mac
+  build; everything else was captured against `/Applications/Pixel Hand.app`.
+- New `PixelHandUITests` target (12 walks, screenshot per step) for
+  re-checking each round of fixes; how to run it is in the findings file.
+- Not tested: widgets and Control Center, sharing, real multi-touch
+  gestures, a second Mac, running keys or Ask plans, Reduce Motion, iPhone
+  17 Pro Max (the test runner never started there). This Mac auto-locked
+  near the end, which stopped the last runs.
+
 Status: BUILT (build 18) — green
