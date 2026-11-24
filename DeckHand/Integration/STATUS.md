@@ -982,3 +982,52 @@ above.
 (One line per finding. The cloud coordinator turns these into fix sessions.)
 
 Status: BUILT (build 15) — green
+
+## Build 16 queued (2026-11-24)
+
+Build 15 is green and the owner is testing it. When the owner's findings
+are in, build 16: everything in build 15 plus the last three roadmap lanes.
+
+- **Duo** (`LANE-duo.md`, UX-040): two-pane layouts for the foldable
+  iPhone. In book pose the screen takes one pane and pointer + deck the
+  other, with nothing on the crease. In laptop pose the screen is on top
+  and the pointer below.
+- **PiP** (`LANE-pip.md`, UX-041): a picture-in-picture live Mac screen on
+  the Home Screen. The pointer is drawn into the frames, pause freezes the
+  picture, and the connection stays alive in the background. Pro-gated.
+- **Sharing** (`LANE-sharing.md`, UX-031, S1/S2): files, photos, links and
+  text go both ways on their own Loom stream, chunked, resumable and capped.
+  It adds a Send sheet, a Share extension, an Inbox, and a Finder
+  "Send to iPhone or iPad with Pixel Hand" service. Pro-gated. Protocol
+  version bumped (see `PROTOCOL.md`).
+
+The coordinator applied these project changes:
+- a new **`DeckHandShare` app-extension target** (`com.widgetsflow.pixelhand.share`,
+  App Group `group.com.widgetsflow.pixelhand`), embedded in the iOS app;
+- iOS Info.plist keys `UIBackgroundModes: [audio]` (PiP),
+  `UIFileSharingEnabled` and `LSSupportsOpeningDocumentsInPlace` (Inbox in
+  Files), plus new `NSPhotoLibraryAddUsageDescription` text;
+- Mac Info.plist `NSServices` (Finder › Services).
+
+xcodegen generates the Share extension's Info.plist and entitlements. Track
+them the way build 15 did for the widget's.
+
+Linux: Core **851 tests pass**, and the type check is clean. The apps were
+not compiled here.
+
+Mac should check:
+1. Run `cd DeckHand && xcodegen generate`, then build the Mac app, the iOS
+   app and both extensions. Fix compile errors with each handoff's
+   "Compile risks" list. If automatic signing doesn't register the
+   `com.widgetsflow.pixelhand.share` App ID, note it here.
+2. `swift test --package-path DeckHand/Core` (expect 851) and
+   `DeckHandTests`.
+3. These checks first:
+   - PiP: start it from the mirror and by going Home, with the pointer
+     visible, then 10 minutes in the background.
+   - Send a photo, a file and a link each way.
+   - Share from Photos and Safari.
+   - Finder › Services › Send to iPhone or iPad.
+   - Duo poses, if a Duo device or simulator is available.
+
+Status: READY FOR MAC BUILD (build 16)

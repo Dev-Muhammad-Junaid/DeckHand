@@ -30,9 +30,6 @@ weekly usage limit is close).
 | --- | --- | --- | --- |
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac) — **archived since 2026-11-18; start a new Mac session** | session_01H5HwATvLJkqCFPruLyBsX8 (archived) | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
-| Lane: Sharing (UX-031, S1/S2; Share extension) | session_01H5HwARrBy615DhnhVYHPPP | claude/pixelhand-lane-sharing | `LANE-sharing.md` ends `Lane: READY TO MERGE`; apply its YAML/entitlements |
-| Lane: Duo (UX-040 two-pane) | session_01H5HwATLrAihRH1fqtZ9UqG | claude/pixelhand-lane-duo | `LANE-duo.md` ends `Lane: READY TO MERGE` |
-| Lane: PiP (UX-041) | session_01H5HwAUo9FjZsYYk6jig6ED | claude/pixelhand-lane-pip | `LANE-pip.md` ends `Lane: READY TO MERGE`; apply `UIBackgroundModes` |
 
 ## Queue (start in order, max 3 running)
 
@@ -155,3 +152,10 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   shim removal, sharing between paired devices (UX-031), iPhone Duo panes
   (UX-040), PiP live screen (UX-041).
   Started Sharing, Duo and PiP. Last up after these: UX-013 a11y and UX-014 copy + shim removal (one lane), then the final review page.
+- 2026-11-24 ~11:25 UTC: build 15 was **green on the Mac** after 6 compile
+  fixes. It's installed on the owner's Mac and iPad. No owner findings yet.
+  Merged Duo, PiP and Sharing, all clean. Applied the Share extension
+  target and the iOS/Mac plist keys. Core 851 tests pass; type check clean.
+  Queued build 16. Lanes stay paused until the owner's build-15 findings
+  are in and routed to a fix session. Then the last lane (UX-013 + UX-014)
+  and the review page.
