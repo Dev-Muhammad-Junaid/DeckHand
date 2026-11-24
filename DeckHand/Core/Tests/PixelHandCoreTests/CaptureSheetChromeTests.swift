@@ -32,7 +32,7 @@ import Testing
         let window = CaptureSheetChrome.strip(kind: .window(appName: "Visual Studio Code — main.swift"), pixelWidth: 1440, pixelHeight: 900, annotated: false)
         #expect(window.items.first == "WINDOW")
         #expect(window.items[1].count <= CaptureSheetChrome.maxAppNameLength)
-        #expect(window.items[1] == "VISUAL STUDI")
+        #expect(window.items[1] == "VISUAL") // cut at a word, never mid-word
         #expect(window.spoken.hasPrefix("Window capture, Visual Studio Code"))
 
         let unnamed = CaptureSheetChrome.strip(kind: .window(appName: "日本"), pixelWidth: 0, pixelHeight: 0, annotated: false)
