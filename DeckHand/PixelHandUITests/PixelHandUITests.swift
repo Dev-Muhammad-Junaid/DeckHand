@@ -168,7 +168,8 @@ final class PixelHandUITests: XCTestCase {
                 snap("key-inspector")
                 dismissSheet()
             }
-            tapIfExists("ph.deck.edit")
+            // Edit mode ends with Done (its own identifier since build 18 QA).
+            tapIfExists("ph.deck.done")
         }
         let key = element("ph.deck.key")
         if key.exists, key.isHittable {
@@ -182,9 +183,11 @@ final class PixelHandUITests: XCTestCase {
         launch()
         guard connect() else { return }
         guard tapIfExists("ph.tab.screen") else { return }
-        snap("screen-empty")
+        // Choosing Screen starts the mirror (VQ-046); "Show screen" only
+        // shows after it was stopped, or in the free plan.
+        snap("screen-starting")
         let show = app.buttons["Show screen"].firstMatch
-        if show.waitForExistence(timeout: 2), show.isHittable { show.tap() }
+        if show.waitForExistence(timeout: 1), show.isHittable { show.tap() }
         snap("screen-0s")
         sleep(1)
         snap("screen-1s")

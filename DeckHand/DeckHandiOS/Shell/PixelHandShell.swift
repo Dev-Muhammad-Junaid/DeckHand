@@ -215,7 +215,7 @@ struct PixelHandShell: View {
                 canvas(centre: centre, plan: plan, margin: 0)
                 VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
                     header(showsMirrorToggle: false, horizontalPadding: 0)
-                    statusPills
+                    statusPills(offersKeyboard: false)
                     stripOnly(metrics: metrics, foldedDock: true, margin: 0)
                     if let sender = session.sender {
                         deck(sender: sender, columns: plan.deckColumnKeys, inset: 0)
@@ -226,7 +226,7 @@ struct PixelHandShell: View {
             } else {
                 VStack(spacing: PixelHandTheme.Space.xs) {
                     header()
-                    statusPills
+                    statusPills(offersKeyboard: false)
                         .padding(.horizontal, CGFloat(metrics.margin))
                     canvas(centre: centre, plan: plan)
                     stripOnly(metrics: metrics, foldedDock: true, margin: CGFloat(metrics.margin))
@@ -787,8 +787,12 @@ struct PixelHandShell: View {
 
     /// Host permission and lock warnings: the Mac reports what it can do, so
     /// a missing permission shows here instead of taps failing silently.
+    private var statusPills: some View { statusPills(offersKeyboard: true) }
+
+    /// `offersKeyboard`: the lock banner's Keyboard button opens the shell's
+    /// keyboard panel, so it shows only where that panel can (not the rail).
     @ViewBuilder
-    private var statusPills: some View {
+    private func statusPills(offersKeyboard: Bool) -> some View {
         VStack(spacing: PixelHandTheme.Space.sm) {
             if session.hostAccessibilityGranted == false {
                 StatusPill(
@@ -797,7 +801,14 @@ struct PixelHandShell: View {
                 )
             }
             if let lockText = session.macLockState.bannerText(macName: peerName) {
-                StatusPill(kind: .locked, message: lockText)
+                if offersKeyboard, session.macLockState == .screenLocked {
+                    StatusPill(kind: .locked, message: lockText, fixTitle: "Keyboard") {
+                        GestureHaptic.light.trigger()
+                        isKeyboardShown = true
+                    }
+                } else {
+                    StatusPill(kind: .locked, message: lockText)
+                }
             }
             if session.hostScreenRecordingGranted == false {
                 StatusPill(
