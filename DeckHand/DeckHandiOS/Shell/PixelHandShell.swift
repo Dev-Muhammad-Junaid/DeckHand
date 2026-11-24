@@ -5,8 +5,8 @@
 //  The Pixel Hand control surface (Option A "Dock & Canvas"): header,
 //  status pills, the canvas, the context strip, the app dock and the tab
 //  bar or layout presets. The shell reads its own size (never the device
-//  idiom) into a `CanvasPlan` (Core) and lays out one of five forms
-//  (UX-007 arrangements):
+//  idiom) into a `CanvasPlan` (Core) and lays out one of seven forms
+//  (UX-007 arrangements, UX-040 iPhone Duo):
 //
 //    single      compact: one surface; strip, dock and tab bar below
 //    rail        iPhone landscape: tab rail · pad · deck column with the
@@ -16,6 +16,14 @@
 //                pad | deck; strip, then the dock with Ask beside it
 //    columns     iPad landscape: Macs sidebar · centre (presets, Ask field,
 //                screen over pad, floating dock) · deck column (strip on top)
+//    book        iPhone Duo open (vertical crease): screen over pad and the
+//                dock | crease | header, strip, deck, tab bar
+//    laptop      iPhone Duo half-folded (horizontal crease): header and
+//                screen | crease | strip, pad or deck, tab bar
+//
+//  The crease comes from the system's division region on iOS 27.1, or is
+//  inferred from the window size on a phone (`DuoCrease`,
+//  `DuoPoseMachine`). Nothing is laid out in its 40 pt band.
 //
 //  The presets (Split, Screen, Pointer) are remembered per Mac and form;
 //  the screen/pad split, deck panel height, sidebar state and the selected
@@ -62,6 +70,9 @@ struct PixelHandShell: View {
     /// The dock's stable order (`AppDockPlan`), updated as apps launch and quit.
     @State private var dockOrder: [String] = []
     @ObservedObject private var shortcuts = ShortcutStore.shared
+    /// The hinge status (iOS 27.1+), and the pose machine fed each pass.
+    @State private var hingeStatus: DuoHingeStatus?
+    @State private var duoPose = DuoPoseMachine()
 
     /// Below this height the app dock folds into the strip's leading app
     /// chip (iPhone SE, Duo cover; `03-Layout-Strategy.md` Option A).
@@ -76,10 +87,12 @@ struct PixelHandShell: View {
 
     var body: some View {
         GeometryReader { proxy in
+            let crease = DuoPoseMachine.band(for: DuoCrease.input(proxy: proxy, hingeStatus: hingeStatus))
             let plan = CanvasPlan(
                 width: Double(proxy.size.width),
                 height: Double(proxy.size.height),
-                sidebarCollapsed: sidebarCollapsed
+                sidebarCollapsed: sidebarCollapsed,
+                crease: crease
             )
 
             ZStack {
@@ -94,11 +107,22 @@ struct PixelHandShell: View {
                     sideBySideLayout(plan: plan)
                 case .columns:
                     columnsLayout(plan: plan)
+                case .book, .laptop:
+                    if let panes = plan.duoPanes {
+                        duoLayout(plan: plan, panes: panes)
+                    }
                 }
             }
             .animation(PixelHandMotion.reduced(PixelHandMotion.spring, reduceMotion: reduceMotion), value: plan.form)
             .animation(PixelHandMotion.reduced(PixelHandMotion.spring, reduceMotion: reduceMotion), value: plan.showsSidebar)
+            .onChange(of: crease, initial: true) { _, _ in
+                let input = DuoCrease.input(proxy: proxy, hingeStatus: hingeStatus)
+                // A pane drag in flight belongs to the old panes: drop it
+                // when the device folds, unfolds or turns.
+                if duoPose.update(input) != nil { dragSize = nil }
+            }
         }
+        .duoHingeStatus($hingeStatus)
         .intentSurfaceRequests(selection: selection) // Intents lane: "Open Trackpad", "Start Mirror"
         .sheet(isPresented: $isAskPresented) {
             AskSheet(session: session, macName: peerName)
@@ -318,6 +342,139 @@ struct PixelHandShell: View {
     private func showSidebarAction(_ plan: CanvasPlan) -> (() -> Void)? {
         guard plan.canShowSidebar, !plan.showsSidebar else { return nil }
         return { sidebarCollapsed = false }
+    }
+
+    // MARK: - iPhone Duo (UX-040)
+
+    /// The two panes around the crease, each at its exact frame so nothing
+    /// lands in the band (`DuoPanes`). Each pane is a compact grid with the
+    /// 16 pt margin on the screen edge and none toward the crease (the
+    /// band holds the 20 pt clear on each side).
+    @ViewBuilder
+    private func duoLayout(plan: CanvasPlan, panes: DuoPanes) -> some View {
+        ZStack(alignment: .topLeading) {
+            Group {
+                if panes.pose == .book {
+                    bookLeadingPane(panes: panes)
+                } else {
+                    laptopTopPane(panes: panes)
+                }
+            }
+            .frame(width: CGFloat(panes.first.width), height: CGFloat(panes.first.height))
+            .offset(x: CGFloat(panes.first.x), y: CGFloat(panes.first.y))
+
+            Group {
+                if panes.pose == .book {
+                    bookTrailingPane(plan: plan, panes: panes)
+                } else {
+                    laptopBottomPane(plan: plan, panes: panes)
+                }
+            }
+            .frame(width: CGFloat(panes.second.width), height: CGFloat(panes.second.height))
+            .offset(x: CGFloat(panes.second.x), y: CGFloat(panes.second.y))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .animation(PixelHandMotion.reduced(PixelHandMotion.spring, reduceMotion: reduceMotion), value: isKeyboardShown)
+    }
+
+    /// Book, leading pane: the selected tab picks the lead. Screen docks
+    /// over the Pointer (handle between); Pointer fills the pane with the
+    /// floating tile over it alone. The keyboard panel and app dock sit at
+    /// the pane's foot.
+    @ViewBuilder
+    private func bookLeadingPane(panes: DuoPanes) -> some View {
+        let outer = CGFloat(DuoPanes.outerMargin)
+        VStack(spacing: PixelHandTheme.Space.md) {
+            Group {
+                switch DuoArrangement.bookLead(selected: selection.wrappedValue.rawValue) {
+                case .screenOverPointer:
+                    GeometryReader { proxy in
+                        screenOverPane(size: proxy.size) {
+                            pointerPane(margin: 0, keyboardInDock: true)
+                        }
+                    }
+                case .pointer:
+                    pointerPane(margin: 0, keyboardInDock: true)
+                        .floatingScreenTile(session: session)
+                }
+            }
+            .frame(maxHeight: .infinity)
+            keyboardPanel(margin: 0)
+            dock
+                .padding(.horizontal, -PixelHandTheme.Space.md)
+        }
+        .padding(.leading, outer)
+        .padding(.top, PixelHandTheme.Space.xs)
+        .padding(.bottom, PixelHandTheme.Space.sm)
+    }
+
+    /// Book, trailing pane: header, status, the strip (wraps on compact),
+    /// the deck at 4 a row, then the tab bar (Pointer, Screen) with Ask.
+    @ViewBuilder
+    private func bookTrailingPane(plan: CanvasPlan, panes: DuoPanes) -> some View {
+        let outer = CGFloat(DuoPanes.outerMargin)
+        VStack(alignment: .leading, spacing: PixelHandTheme.Space.md) {
+            header(horizontalPadding: 0)
+            statusPills
+            stripOnly(metrics: panes.secondMetrics, foldedDock: false, margin: 0)
+            if let sender = session.sender {
+                deck(sender: sender, columns: plan.deckColumnKeys, inset: 0)
+                    .frame(maxHeight: .infinity)
+            } else {
+                Spacer(minLength: 0)
+            }
+            SurfaceTabBar(
+                selection: selection,
+                tabs: DuoArrangement.bookTabs.compactMap(ControlSurface.init(rawValue:)),
+                onAsk: { isAskPresented = true }
+            )
+        }
+        .padding(.trailing, outer)
+        .padding(.bottom, PixelHandTheme.Space.sm)
+    }
+
+    /// Laptop, top pane: the header and the Mac's screen standing up above
+    /// the crease.
+    @ViewBuilder
+    private func laptopTopPane(panes: DuoPanes) -> some View {
+        let outer = CGFloat(DuoPanes.outerMargin)
+        VStack(spacing: PixelHandTheme.Space.xs) {
+            header(showsMirrorToggle: true, horizontalPadding: outer)
+            statusPills
+                .padding(.horizontal, outer)
+            dockedScreen
+                .padding(.horizontal, outer)
+                .frame(maxHeight: .infinity)
+        }
+    }
+
+    /// Laptop, bottom pane: keyboard panel, the strip (running apps folded
+    /// into its app chip), the Pointer or the Deck, and the tab bar.
+    @ViewBuilder
+    private func laptopBottomPane(plan: CanvasPlan, panes: DuoPanes) -> some View {
+        let outer = CGFloat(DuoPanes.outerMargin)
+        let showsDeck = DuoArrangement.laptopBottomShowsDeck(selected: selection.wrappedValue.rawValue)
+        VStack(spacing: PixelHandTheme.Space.sm) {
+            keyboardPanel(margin: outer)
+            stripOnly(metrics: panes.secondMetrics, foldedDock: true, margin: outer)
+            Group {
+                if showsDeck, let sender = session.sender {
+                    deck(sender: sender, columns: plan.deckColumnKeys, inset: outer)
+                } else {
+                    // The pad keeps its own keyboard circle: the dock is
+                    // folded into the strip here.
+                    pointerPane(margin: outer, keyboardInDock: false)
+                }
+            }
+            .frame(maxHeight: .infinity)
+            SurfaceTabBar(
+                selection: selection,
+                tabs: DuoArrangement.laptopTabs.compactMap(ControlSurface.init(rawValue:)),
+                onAsk: { isAskPresented = true }
+            )
+            .padding(.horizontal, outer)
+        }
+        .padding(.bottom, PixelHandTheme.Space.sm)
     }
 
     // MARK: - Presets
