@@ -1,14 +1,12 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Lanes paused until build 15 is green** (primary session, 2026-11-24). Merge Sharing, Duo and PiP when they're ready, but start no new lanes. Wait for "Mac build results (build 15)" and "Owner testing (build 15)" in `STATUS.md`, route their bugs to one fix session, then resume the queue (UX-013 + UX-014, then the review page).
+> **Pause lifted 2026-11-24 16:10 UTC:** builds 15 and 16 are green on the Mac. The last lane (UX polish: UX-013 + UX-014) is running with non-structural edits only, so owner bug-fix sessions can merge alongside it. Owner findings go under "Owner testing" in `STATUS.md`; the coordinator turns them into one fix session.
 
-> **Mac builds:** build 7 was built on the Mac (2026-11-20, results in `STATUS.md`). Build 15 is queued (build 8 plus the UX lanes, Ask, Multi-Mac and Intents). Mac builds are now run from the primary session or the owner's Mac session.
+> **Mac builds:** build 16 is green (2026-11-24). Build 17 (Unlock Pro for testing, from the primary session) is queued. The primary session or the owner's Mac session runs Mac builds.
 
 ## Needs the owner
 
-- **Developer portal (only if automatic signing doesn't do it):** App Group
-  `group.com.widgetsflow.pixelhand` on `com.widgetsflow.pixelhand` and the
-  new widget App ID `com.widgetsflow.pixelhand.widgets`.
+- **Developer portal:** nothing needed. Automatic signing registered the App Group and the widget and share App IDs (builds 15 and 16).
 
 - **App Store Connect:** done 2026-11-20 (see
   `DeckHand/AppStore/AppStoreConnectStatus.md`): app is Free; "Pixel Hand
@@ -30,6 +28,7 @@ weekly usage limit is close).
 | --- | --- | --- | --- |
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac) — **archived since 2026-11-18; start a new Mac session** | session_01H5HwATvLJkqCFPruLyBsX8 (archived) | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
+| Lane: UX polish (UX-013 a11y, UX-014 copy + shim removal; last lane) | session_01H5HwARmSU9uUn18QYaDFV7 | claude/pixelhand-lane-ux-polish | `LANE-ux-polish.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -159,3 +158,9 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   Queued build 16. Lanes stay paused until the owner's build-15 findings
   are in and routed to a fix session. Then the last lane (UX-013 + UX-014)
   and the review page.
+- 2026-11-24 16:10 UTC: builds 15 and 16 are green on the Mac. No owner
+  findings yet. The primary queued build 17 (Unlock Pro for testing). I
+  lifted the pause and started the last lane, UX polish. Couldn't message
+  the primary (it needs a trusted device), so this file is the update. After
+  UX polish merges and a Mac build is green: the review page, then
+  PROGRAMME COMPLETE.
