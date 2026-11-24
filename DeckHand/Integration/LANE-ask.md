@@ -86,7 +86,7 @@ the plan. There's no cloud, no Private Cloud Compute and no protocol change
   - any other plan goes on Home, or on the first custom page with room.
 
   A plan with a destructive step is saved with "Ask before running" on.
-- **Tests:** `AskPlannerTests.swift` adds 29 tests in 6 suites.
+- **Tests:** `AskPlannerTests.swift` adds 28 tests in 5 suites.
   `swift test --package-path DeckHand/Core` → **730 tests in 130 suites
   pass**. `Scripts/linux-typecheck/run.sh` → **Build complete**, now
   including every file in `DeckHandiOS/Assist/`.
