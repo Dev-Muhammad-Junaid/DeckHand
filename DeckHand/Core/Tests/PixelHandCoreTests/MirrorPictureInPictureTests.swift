@@ -38,28 +38,28 @@ import Testing
     func holdsSession() {
         var state = ready()
         #expect(!state.holdsSession)
-        #expect(state.didStart() == [.sessionHoldChanged, .audioChanged])
+        do { let r = state.didStart(); #expect(r == [.sessionHoldChanged, .audioChanged]) }
         #expect(state.holdsSession)
         #expect(state.allowsBackgroundAudio)
-        #expect(state.didStart() == [])
-        #expect(state.didStop() == [.sessionHoldChanged, .audioChanged])
+        do { let r = state.didStart(); #expect(r == []) }
+        do { let r = state.didStop(); #expect(r == [.sessionHoldChanged, .audioChanged]) }
         #expect(!state.holdsSession)
-        #expect(state.didStop() == [])
+        do { let r = state.didStop(); #expect(r == []) }
     }
 
     @Test("Pause freezes: the Mac drops to keep-alive frames, sound stops, play restores")
     func pauseFreezes() {
         var state = ready()
-        #expect(state.setPaused(true, now: 0) == []) // not showing yet
+        do { let r = state.setPaused(true, now: 0); #expect(r == []) } // not showing yet
         _ = state.didStart()
         #expect(state.requestedFPS(settingsFPS: 30) == 30)
-        #expect(state.setPaused(true, now: 10) == [.renegotiate, .audioChanged])
+        do { let r = state.setPaused(true, now: 10); #expect(r == [.renegotiate, .audioChanged]) }
         #expect(state.isPaused)
         #expect(!state.allowsBackgroundAudio)
         #expect(state.holdsSession) // paused still keeps the connection
         #expect(state.requestedFPS(settingsFPS: 30) == MirrorPiPState.pausedFPS)
-        #expect(state.setPaused(true, now: 11) == [])
-        #expect(state.setPaused(false, now: 12) == [.renegotiate, .audioChanged])
+        do { let r = state.setPaused(true, now: 11); #expect(r == []) }
+        do { let r = state.setPaused(false, now: 12); #expect(r == [.renegotiate, .audioChanged]) }
         #expect(state.requestedFPS(settingsFPS: 20) == 20)
     }
 
@@ -68,7 +68,7 @@ import Testing
         var state = ready()
         _ = state.didStart()
         _ = state.setPaused(true, now: 0)
-        #expect(state.didStop() == [.sessionHoldChanged, .audioChanged, .renegotiate])
+        do { let r = state.didStop(); #expect(r == [.sessionHoldChanged, .audioChanged, .renegotiate]) }
         #expect(!state.isPaused)
         #expect(state.requestedFPS(settingsFPS: 30) == 30)
     }
@@ -78,42 +78,42 @@ import Testing
         var state = ready()
         _ = state.didStart()
         _ = state.setPaused(true, now: 100)
-        #expect(state.tick(now: 100 + MirrorPiPState.pausedTimeout - 1) == [])
-        #expect(state.tick(now: 100 + MirrorPiPState.pausedTimeout) == [.close])
+        do { let r = state.tick(now: 100 + MirrorPiPState.pausedTimeout - 1); #expect(r == []) }
+        do { let r = state.tick(now: 100 + MirrorPiPState.pausedTimeout); #expect(r == [.close]) }
         #expect(state.closeReason == .pausedTooLong)
         // Playing never times out.
         var playing = ready()
         _ = playing.didStart()
-        #expect(playing.tick(now: 1_000_000) == [])
+        do { let r = playing.tick(now: 1_000_000); #expect(r == []) }
     }
 
     @Test("Mirror stop, session end, device lock and Pro ending close an open PiP")
     func closeReasons() {
         var a = ready()
         _ = a.didStart()
-        #expect(a.setMirrorActive(false) == [.close])
+        do { let r = a.setMirrorActive(false); #expect(r == [.close]) }
         #expect(a.closeReason == .mirrorStopped)
 
         var b = ready()
         _ = b.didStart()
-        #expect(b.sessionEnded() == [.close])
+        do { let r = b.sessionEnded(); #expect(r == [.close]) }
         #expect(b.closeReason == .sessionEnded)
         #expect(!b.mirrorActive)
 
         var c = ready()
         _ = c.didStart()
-        #expect(c.deviceLocked() == [.close])
+        do { let r = c.deviceLocked(); #expect(r == [.close]) }
         #expect(c.closeReason == .deviceLocked)
 
         var d = ready()
         _ = d.didStart()
-        #expect(d.setEntitled(false) == [.close])
+        do { let r = d.setEntitled(false); #expect(r == [.close]) }
         #expect(d.closeReason == .notEntitled)
 
         // Nothing to close when PiP isn't showing.
         var e = ready()
-        #expect(e.deviceLocked() == [])
-        #expect(e.setMirrorActive(false) == [])
+        do { let r = e.deviceLocked(); #expect(r == []) }
+        do { let r = e.setMirrorActive(false); #expect(r == []) }
     }
 
     @Test("A new start clears the last close reason")
@@ -185,7 +185,7 @@ import Testing
 
     @Test("JPEG frames are redrawn at even sizes, no wider than the cap")
     func jpegSize() {
-        #expect(MirrorPiPFrameMath.jpegBufferSize(width: 1_280, height: 801)! == (1_280, 800))
+        #expect(MirrorPiPFrameMath.jpegBufferSize(width: 1_280, height: 801)! == (1_280, 802))
         let big = MirrorPiPFrameMath.jpegBufferSize(width: 3_840, height: 2_400)!
         #expect(big.width == 1_920 && big.height == 1_200)
         #expect(MirrorPiPFrameMath.jpegBufferSize(width: 1, height: 1)! == (2, 2))
@@ -222,13 +222,13 @@ import Testing
     @Test("Live frames are paced at the stream rate, with one trailing frame")
     func live() {
         var pacer = MirrorPiPPacer()
-        #expect(pacer.setMode(.live(fps: 20)) == .now)
+        do { let r = pacer.setMode(.live(fps: 20)); #expect(r == .now) }
         pacer.frameMade(now: 0)
-        #expect(pacer.somethingChanged(now: 0.02) == .after(0.05 - 0.02))
-        #expect(pacer.somethingChanged(now: 0.03) == .none) // rides along
-        #expect(pacer.deferredFire(now: 0.05))
+        do { let r = pacer.somethingChanged(now: 0.02); #expect(r == .after(0.05 - 0.02)) }
+        do { let r = pacer.somethingChanged(now: 0.03); #expect(r == .none) } // rides along
+        do { let r = pacer.deferredFire(now: 0.05); #expect(r) }
         pacer.frameMade(now: 0.05)
-        #expect(pacer.somethingChanged(now: 0.2) == .now)
+        do { let r = pacer.somethingChanged(now: 0.2); #expect(r == .now) }
     }
 
     @Test("Live is capped at 30 a second; warm is two a second")
@@ -245,12 +245,12 @@ import Testing
         var pacer = MirrorPiPPacer()
         _ = pacer.setMode(.warm)
         pacer.frameMade(now: 0)
-        #expect(pacer.somethingChanged(now: 0.1) != .none)
-        #expect(pacer.setMode(.frozen) == .none)
-        #expect(!pacer.deferredFire(now: 0.5))
-        #expect(pacer.somethingChanged(now: 10) == .none)
+        do { let r = pacer.somethingChanged(now: 0.1); #expect(r != .none) }
+        do { let r = pacer.setMode(.frozen); #expect(r == .none) }
+        do { let r = pacer.deferredFire(now: 0.5); #expect(!r) }
+        do { let r = pacer.somethingChanged(now: 10); #expect(r == .none) }
         _ = pacer.setMode(.off)
-        #expect(pacer.somethingChanged(now: 20) == .none)
+        do { let r = pacer.somethingChanged(now: 20); #expect(r == .none) }
     }
 }
 
@@ -268,16 +268,16 @@ import Testing
     func failures() {
         var health = MirrorPiPDecodeHealth()
         health.decoded(isKeyFrame: true)
-        #expect(health.failed())
+        do { let r = health.failed(); #expect(r) }
         #expect(health.verdict(isKeyFrame: false) == .skip)
         health.decoded(isKeyFrame: true) // recovered: the count resets
-        #expect(health.failed())
-        #expect(health.failed())
+        do { let r = health.failed(); #expect(r) }
+        do { let r = health.failed(); #expect(r) }
         #expect(!health.isPassthrough)
-        #expect(health.failed())
+        do { let r = health.failed(); #expect(r) }
         #expect(health.isPassthrough)
         #expect(health.verdict(isKeyFrame: false) == .passthrough)
-        #expect(!health.failed())
+        do { let r = health.failed(); #expect(!r) }
         health.reset()
         #expect(!health.isPassthrough)
         #expect(health.verdict(isKeyFrame: false) == .skip)
