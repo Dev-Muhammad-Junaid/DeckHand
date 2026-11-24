@@ -46,6 +46,7 @@ files=(
   "$app/DeckHandiOS/Deck/DeckStore.swift"
   "$app/DeckHandiOS/Deck/DeckSurfaceModel.swift"
   "$app/DeckHandiOS/Deck/DeckSuggestionsModel.swift"
+  "$app"/DeckHandiOS/Assist/*.swift
   "$app/DeckHandiOS/ShortcutStore.swift"
   "$app/DeckHandiOS/Clipboard/RemoteClipboard.swift"
   "$app/DeckHandiOS/Mirror/MirrorStreamReceiver.swift"
