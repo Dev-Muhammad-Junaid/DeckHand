@@ -35,7 +35,7 @@ enum IntentRunOutcome: Sendable, Equatable {
         switch self {
         case .done: "Done."
         case .waitingForMac: "Pick your Mac in Pixel Hand. It runs as soon as it connects."
-        case let .needsPro(feature): "\(Self.featureName(feature)) is part of Pixel Hand Pro."
+        case let .needsPro(feature): Self.proMessage(feature)
         case .keyMissing: "That deck key isn't in your deck anymore."
         case .notDelivered: "Your Mac didn't confirm it. Check that Pixel Hand has Accessibility on the Mac."
         case let .connectedToOtherMac(name): "Pixel Hand is connected to \(name). Switch Macs and try again."
@@ -45,15 +45,15 @@ enum IntentRunOutcome: Sendable, Equatable {
         }
     }
 
-    private static func featureName(_ feature: ProFeature) -> String {
+    private static func proMessage(_ feature: ProFeature) -> String {
         switch feature {
-        case .decks: "Running deck keys"
-        case .mirror: "The live mirror"
-        case .capture: "Screenshots"
-        case .multipleMacs: "Controlling more than one Mac"
-        case .sharing: "Clipboard sharing"
-        case .ai: "Ask"
-        case .trackpad, .keyboard, .mediaKeys: "This"
+        case .decks: "Running deck keys is part of Pixel Hand Pro."
+        case .mirror: "The live mirror is part of Pixel Hand Pro."
+        case .capture: "Screenshots are part of Pixel Hand Pro."
+        case .multipleMacs: "Controlling more than one Mac is part of Pixel Hand Pro."
+        case .sharing: "Clipboard sharing is part of Pixel Hand Pro."
+        case .ai: "Ask is part of Pixel Hand Pro."
+        case .trackpad, .keyboard, .mediaKeys: "This needs Pixel Hand Pro."
         }
     }
 }
@@ -121,11 +121,10 @@ struct RunDeckKeyIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
+        // "Ask before running" keys ask here too (widgets never show them).
         if key.confirm {
-            try await requestConfirmation(
-                result: .result(dialog: "Run \(key.label) on your Mac?"),
-                confirmationActionName: .run
-            )
+            let confirmed = try await $key.requestConfirmation(for: key, dialog: "Run \(key.label) on your Mac?")
+            guard confirmed else { throw PixelHandIntentError(message: "Not run.") }
         }
         let outcome = await IntentDispatch.run(.runKey(keyID: key.id), on: mac)
         return .result(dialog: try outcome.dialogOrThrow())
