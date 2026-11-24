@@ -264,6 +264,18 @@ struct TransferOutboxTests {
         #expect(pruned == [first.id])
     }
 
+    @Test("An item's hash is kept for resumes, and the Mac list for the Share extension decodes")
+    func hashAndMacs() {
+        var box = TransferOutbox()
+        let one = item(target: mac)
+        box.add(one)
+        box.setHash("abc123", for: one.id)
+        #expect(TransferOutbox(storage: box.encoded()).items.first?.sha256 == "abc123")
+        let macs = [TransferMacEntry(deviceID: mac, name: "Studio")]
+        #expect(TransferMacEntry.decodeList(try? JSONEncoder().encode(macs)) == macs)
+        #expect(TransferMacEntry.decodeList(Data("x".utf8)).isEmpty)
+    }
+
     @Test("The outbox survives JSON storage")
     func storage() {
         var box = TransferOutbox()

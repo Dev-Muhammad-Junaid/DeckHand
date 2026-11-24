@@ -59,6 +59,11 @@ private struct MacSendTargetRow: View {
     let name: String
     @State private var isTargeted = false
 
+    init(connectionID: UUID, name: String) {
+        self.connectionID = connectionID
+        self.name = name
+    }
+
     var body: some View {
         HStack(spacing: PixelHandTheme.Space.md) {
             Image(systemName: "iphone.and.arrow.forward")

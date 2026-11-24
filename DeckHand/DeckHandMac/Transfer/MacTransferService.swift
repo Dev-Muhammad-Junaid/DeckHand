@@ -202,7 +202,12 @@ final class MacTransferService: ObservableObject {
             alwaysAcceptFromSender: alwaysAccepted.contains(senderKey),
             freeBytes: Self.freeBytes(at: Self.downloadsFolder)
         )
-        let decision = TransferPolicy.decide(manifest, context: context)
+        var decision = TransferPolicy.decide(manifest, context: context)
+        // A resume of something already accepted (its partial file is
+        // here) doesn't ask again.
+        if decision == .ask, (Self.fileSize(Self.partialURL(for: offer.id)) ?? 0) > 0 {
+            decision = .accept
+        }
         DeckHandLog.connection.info("Transfer: \(manifest.kind.rawValue, privacy: .public) of \(manifest.byteCount, privacy: .public) B offered; \(String(describing: decision), privacy: .public)")
         switch decision {
         case let .refuse(reason):

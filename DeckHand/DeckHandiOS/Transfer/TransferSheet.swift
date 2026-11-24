@@ -21,14 +21,19 @@
 import Photos
 import PhotosUI
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 struct TransferSheet: View {
     enum Tab: String, CaseIterable { case send = "Send", inbox = "Inbox" }
 
-    @State var tab: Tab = .send
+    @State private var tab: Tab
     @Environment(\.dismiss) private var dismiss
     private let center = TransferCenter.shared
+
+    init(tab: Tab = .send) {
+        _tab = State(initialValue: tab)
+    }
 
     var body: some View {
         NavigationStack {
@@ -395,6 +400,14 @@ private struct MacDropCard: View {
     let onDropExternal: ([StagedTransferItem]) -> Void
     @State private var isTargeted = false
 
+    init(listing: MacListing, canSend: Bool, onTap: @escaping () -> Void, onDropStaged: @escaping ([String]) -> Void, onDropExternal: @escaping ([StagedTransferItem]) -> Void) {
+        self.listing = listing
+        self.canSend = canSend
+        self.onTap = onTap
+        self.onDropStaged = onDropStaged
+        self.onDropExternal = onDropExternal
+    }
+
     var body: some View {
         Button(action: onTap) {
             MacCard(listing: listing)
@@ -471,6 +484,14 @@ struct TransferBeamRow: View {
     var onSwitch: (() -> Void)?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    init(phase: TransferBeamPhase, macName: String, caption: String, onCancel: (() -> Void)? = nil, onSwitch: (() -> Void)? = nil) {
+        self.phase = phase
+        self.macName = macName
+        self.caption = caption
+        self.onCancel = onCancel
+        self.onSwitch = onSwitch
+    }
 
     var body: some View {
         VStack(spacing: PixelHandTheme.Space.md) {

@@ -118,6 +118,19 @@ final class TransferCenter {
         connectedMac = (link.deviceID, macName)
         publishPairedMacs()
         drain()
+        // The Mac confirms pairing just after access; drain once it has.
+        if !isPaired() {
+            Task { [weak self] in
+                for _ in 0..<20 {
+                    try? await Task.sleep(for: .milliseconds(500))
+                    guard let self, self.link?.handle.id == connection.id else { return }
+                    if isPaired() {
+                        self.drain()
+                        return
+                    }
+                }
+            }
+        }
         for await transfer in connection.incomingTransfers {
             if Task.isCancelled { break }
             await received(transfer, link: link)
@@ -335,7 +348,12 @@ final class TransferCenter {
             alwaysAcceptFromSender: alwaysAccepted.contains(link.deviceID.uuidString),
             freeBytes: Self.freeBytes()
         )
-        switch TransferPolicy.decide(manifest, context: context) {
+        var decision = TransferPolicy.decide(manifest, context: context)
+        // A resume of something already accepted doesn't ask again.
+        if decision == .ask, (Self.fileSize(Self.partialURL(for: offer.id)) ?? 0) > 0 {
+            decision = .accept
+        }
+        switch decision {
         case let .refuse(reason):
             refuse(transfer, reason: reason)
             if reason == .needsPro {

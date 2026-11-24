@@ -14,6 +14,7 @@
 
 import Photos
 import SwiftUI
+import UIKit
 
 struct InboxPanel: View {
     private let center = TransferCenter.shared
@@ -168,14 +169,7 @@ private struct ShareTarget: Identifiable {
     var id: URL { url }
 }
 
-/// The system share sheet (Save to Files, AirDrop, other apps).
-struct ShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
-    }
-    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
-}
+// The share sheet is `ShareSheet` (ScreenshotPreviewView.swift).
 
 // MARK: - Prompts and notices
 
