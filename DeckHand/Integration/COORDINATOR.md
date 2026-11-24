@@ -1,5 +1,7 @@
 # Coordinator state (read and update on every coordinator tick)
 
+> **Lanes paused until build 15 is green** (primary session, 2026-11-24). Merge Sharing, Duo and PiP when they're ready, but start no new lanes. Wait for "Mac build results (build 15)" and "Owner testing (build 15)" in `STATUS.md`, route their bugs to one fix session, then resume the queue (UX-013 + UX-014, then the review page).
+
 > **Mac builds:** build 7 was built on the Mac (2026-11-20, results in `STATUS.md`). Build 15 is queued (build 8 plus the UX lanes, Ask, Multi-Mac and Intents). Mac builds are now run from the primary session or the owner's Mac session.
 
 ## Needs the owner
@@ -28,6 +30,9 @@ weekly usage limit is close).
 | --- | --- | --- | --- |
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac) — **archived since 2026-11-18; start a new Mac session** | session_01H5HwATvLJkqCFPruLyBsX8 (archived) | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
+| Lane: Sharing (UX-031, S1/S2; Share extension) | session_01H5HwARrBy615DhnhVYHPPP | claude/pixelhand-lane-sharing | `LANE-sharing.md` ends `Lane: READY TO MERGE`; apply its YAML/entitlements |
+| Lane: Duo (UX-040 two-pane) | session_01H5HwATLrAihRH1fqtZ9UqG | claude/pixelhand-lane-duo | `LANE-duo.md` ends `Lane: READY TO MERGE` |
+| Lane: PiP (UX-041) | session_01H5HwAUo9FjZsYYk6jig6ED | claude/pixelhand-lane-pip | `LANE-pip.md` ends `Lane: READY TO MERGE`; apply `UIBackgroundModes` |
 
 ## Queue (start in order, max 3 running)
 
@@ -149,3 +154,4 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   clean. Queued build 15. Remaining: UX-013 accessibility, UX-014 copy and
   shim removal, sharing between paired devices (UX-031), iPhone Duo panes
   (UX-040), PiP live screen (UX-041).
+  Started Sharing, Duo and PiP. Last up after these: UX-013 a11y and UX-014 copy + shim removal (one lane), then the final review page.
