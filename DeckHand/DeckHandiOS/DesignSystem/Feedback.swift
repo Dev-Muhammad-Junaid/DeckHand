@@ -281,6 +281,29 @@ extension View {
     func phosphorFocus(_ isFocused: Bool, cornerRadius: CGFloat) -> some View {
         modifier(PhosphorFocusModifier(isFocused: isFocused, cornerRadius: cornerRadius))
     }
+
+    /// For a control (button, chip, key, tab): tracks its own keyboard focus
+    /// and iPad pointer hover and draws the phosphor ring for either, with
+    /// the system focus and hover effects off so only one ring shows.
+    /// UX-018, `06-Pixel-Identity.md` §5.
+    func phosphorFocusable(cornerRadius: CGFloat) -> some View {
+        modifier(PhosphorFocusableModifier(cornerRadius: cornerRadius))
+    }
+}
+
+private struct PhosphorFocusableModifier: ViewModifier {
+    let cornerRadius: CGFloat
+    @FocusState private var isFocused: Bool
+    @State private var isHovered = false
+
+    func body(content: Content) -> some View {
+        content
+            .focused($isFocused)
+            .focusEffectDisabled()
+            .hoverEffectDisabled()
+            .onHover { isHovered = $0 }
+            .phosphorFocus(isFocused || isHovered, cornerRadius: cornerRadius)
+    }
 }
 
 private struct PHCardModifier: ViewModifier {
