@@ -1160,10 +1160,9 @@ are for `6170ef0`.
 **Install**
 - Mac: `/Applications/Pixel Hand.app` replaced (old copy quit first) and
   launched with `open`; running.
-- iPad Air 11" (M3): **not installed yet.** `devicectl` lists it as
-  `unavailable` (error 4016) although it advertises `_remotepairing` on the
-  Wi-Fi; it isn't on USB. Retry once the iPad shows as available in Xcode
-  › Devices and Simulators (or over a USB data cable).
+- iPad Air 11" (M3): installed with both extensions and launched. (It
+  first showed as `unavailable` to `devicectl`, error 4016, until it came
+  back on the network.)
 
 **Checks done here:** none beyond the build and tests; the build 17 and
 UX polish checks need the iPad or VoiceOver hands-on.
@@ -1178,5 +1177,9 @@ UX polish checks need the iPad or VoiceOver hands-on.
 - The "Checks on the Mac" table in `LANE-ux-polish.md`: VoiceOver on iPhone
   and the Mac panel, AX3 text sizes, Reduce Motion, light-mode danger and
   warning colours.
+
+## Owner testing (build 18)
+
+(none reported yet)
 
 Status: BUILT (build 18) — green
