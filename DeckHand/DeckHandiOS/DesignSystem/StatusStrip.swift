@@ -49,15 +49,24 @@ struct StatusStrip: View {
     var pitch: CGFloat = 2
     /// Spoken instead of the dot text, e.g. "Studio, display 1 of 2, 60 frames per second".
     var accessibilityText: String?
+    /// Fallbacks to try in turn, widest first (`MirrorPaneChrome
+    /// .stripCandidates`: name shortened, then dropped, then trailing
+    /// items). `nil` drops trailing items only.
+    var candidates: [[String]]?
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
-            ForEach((1...max(items.count, 1)).reversed(), id: \.self) { count in
-                row(Array(items.prefix(count)))
+            ForEach(Array(fallbacks.enumerated()), id: \.offset) { _, shown in
+                row(shown)
             }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText ?? items.joined(separator: ", "))
+    }
+
+    private var fallbacks: [[String]] {
+        if let candidates, !candidates.isEmpty { return candidates }
+        return (1...max(items.count, 1)).reversed().map { Array(items.prefix($0)) }
     }
 
     private var height: CGFloat {
