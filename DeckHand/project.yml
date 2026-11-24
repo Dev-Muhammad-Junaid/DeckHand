@@ -135,6 +135,7 @@ targets:
       - package: PixelHandCore
       - package: Sentry
         product: Sentry
+      - target: DeckHandWidgets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.widgetsflow.pixelhand
@@ -165,6 +166,8 @@ targets:
       SystemCapabilities:
         com.apple.iCloud:
           enabled: 1
+        com.apple.ApplicationGroups.iOS:
+          enabled: 1
     postBuildScripts:
       - name: Upload dSYMs to Sentry
         basedOnDependencyAnalysis: false
@@ -184,6 +187,56 @@ targets:
             || echo "warning: Sentry dSYM upload failed; crashes from this build won't be symbolicated"
     scheme:
       storeKitConfiguration: DeckHandiOS/Store/PixelHand.storekit
+
+  # ─────────────────────────────────────────────────────────────
+  # iOS widgets and Control Center controls (D6)
+  # ─────────────────────────────────────────────────────────────
+  DeckHandWidgets:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "17.4"
+    sources:
+      - path: DeckHandWidgets
+        type: group
+      # The intents, entities and App Group store, shared with the app.
+      - path: DeckHandiOS/Intents/Shared
+        type: group
+    dependencies:
+      - package: PixelHandCore
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+      - sdk: AppIntents.framework
+    info:
+      path: DeckHandWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Pixel Hand
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: DeckHandWidgets/DeckHandWidgets.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.widgetsflow.pixelhand
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.widgetsflow.pixelhand.widgets
+        PRODUCT_NAME: PixelHandWidgets
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: 1
+        TARGETED_DEVICE_FAMILY: "1,2"
+        IPHONEOS_DEPLOYMENT_TARGET: "17.4"
+        SWIFT_VERSION: 6.0
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: DD5AWPLT2V
+    attributes:
+      SystemCapabilities:
+        com.apple.ApplicationGroups.iOS:
+          enabled: 1
+    scheme: {}
 
   # ─────────────────────────────────────────────────────────────
   # App-side tests: what needs Loom or the Shared/ sources.

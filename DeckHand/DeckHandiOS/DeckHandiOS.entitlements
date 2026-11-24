@@ -13,6 +13,11 @@
 	<array>
 		<string>iCloud.com.widgetsflow.pixelhand</string>
 	</array>
-
+	<!-- App Intents lane: the widget extension reads the deck snapshot and
+	     queues intents here (PixelHandAppGroup). -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.widgetsflow.pixelhand</string>
+	</array>
 </dict>
 </plist>
