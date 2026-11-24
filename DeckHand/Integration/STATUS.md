@@ -1030,4 +1030,70 @@ Mac should check:
    - Finder › Services › Send to iPhone or iPad.
    - Duo poses, if a Duo device or simulator is available.
 
-Status: READY FOR MAC BUILD (build 16)
+## Mac build results (build 16) — 2026-11-24
+
+Built from `4240622` (build 16) on Xcode 27.2, Release, team `DD5AWPLT2V`,
+automatic signing with `-allowProvisioningUpdates`. Results are for
+`b80b02b`.
+
+**Build**
+- Mac app: **builds first time**, no fixes needed.
+- iOS app with the embedded `PixelHandWidgets.appex` and the new
+  `PixelHandShare.appex`: builds after 2 fixes. Automatic signing
+  registered the `com.widgetsflow.pixelhand.share` App ID; the appex is
+  signed `DD5AWPLT2V.com.widgetsflow.pixelhand.share`. Nothing to add in
+  the developer portal.
+- Development profiles again (fine for testing, not for upload).
+
+**Fixes pushed** (one commit each, on `claude/pixelhand-integration`)
+1. `5838b00` `DeckHandShare/ShareViewController.swift`: `copyFile` captured
+   the non-Sendable `NSItemProvider` in `loadFileRepresentation`'s
+   `@Sendable` completion (Swift 6 error). It now reads `suggestedName`
+   first and captures the string.
+2. `b20e334` `DeckHandiOS/Transfer/TransferCenter.swift`: `fileSize(_:)` is
+   `nonisolated`. It only reads file attributes, but it inherited the
+   class's `@MainActor`, so `StagedTransferItem.subtitle` couldn't call it.
+3. `b80b02b` Track `DeckHandShare/Info.plist` and
+   `DeckHandShare.entitlements` (xcodegen generates them), as was done for
+   the widget's in build 15.
+
+**Tests**
+- `swift test --package-path DeckHand/Core`: **851 / 851 pass** (153 suites).
+- `swift test --scratch-path .build-local`, no `--skip`: **477 pass**
+  (377 + 42 + 15 + 13 + 10 + 9 + 6 + 5), 0 failed. The advertising-restart
+  test passed in the full run.
+- `DeckHandTests` (macOS): **8 / 8 pass**.
+
+**Install**
+- Mac: `/Applications/Pixel Hand.app` replaced (old copy quit first) and
+  launched with `open`.
+- iPad Air 11" (M3): installed with both extensions. **Not launched: the
+  iPad was locked**, so open it by hand.
+
+**Checks done here**
+- Finder › Services: "Send to iPhone or iPad with Pixel Hand" is in the
+  built Info.plist (`NSServices`, `sendToDevice`, text, URLs and any file)
+  and in the system services list (`pbs`). Sending through it needs a
+  connected device; not exercised.
+- iPad Pro 11" (M5) simulator: launches and lists "Muhammad's MacBook Pro ·
+  Nearby" under "Choose a Mac", so build 7's port-38450 start failure stays
+  fixed. Connecting needs the owner's Allow on the Mac, so I stopped there.
+- Not done here: PiP, send each way, share from Photos/Safari (all need a
+  connected, allowed device), and Duo poses (the iPhone Duo simulator is
+  available, but the panes need a connection to be meaningful).
+
+**Bugs found:** none by the build gate.
+
+**Hands-on checks for the owner (build 16)**
+Grant Photos "add" access on the iPad if asked (new
+`NSPhotoLibraryAddUsageDescription`). Then:
+- PiP: start it from the mirror and by going Home, with the pointer
+  visible, then 10 minutes in the background.
+- Send a photo, a file and a link each way, and check the Inbox in Files.
+- Share from Photos and Safari through the Pixel Hand share sheet.
+- Finder › Services › Send to iPhone or iPad with Pixel Hand.
+- Duo: book and laptop poses on an iPhone Duo (simulator `iPhone Duo` is
+  installed here) once connected.
+- Pro gating: PiP and Sharing should ask for Pro on the free tier.
+
+Status: BUILT (build 16) — green
