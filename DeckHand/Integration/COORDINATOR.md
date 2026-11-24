@@ -28,7 +28,6 @@ weekly usage limit is close).
 | --- | --- | --- | --- |
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac) — **archived since 2026-11-18; start a new Mac session** | session_01H5HwATvLJkqCFPruLyBsX8 (archived) | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
-| Lane: UX polish (UX-013 a11y, UX-014 copy + shim removal; last lane) | session_01H5HwARmSU9uUn18QYaDFV7 | claude/pixelhand-lane-ux-polish | `LANE-ux-polish.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -167,4 +166,9 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
 - 2026-11-24 ~16:35 UTC: primary session merged UX polish (last queued lane)
   and queued build 18 (build 17 + UX polish). Every planned lane is merged.
   Remaining: green build 18, owner testing and fixes, release prep.
-
+- 2026-11-24 17:15 UTC: the primary merged UX polish (`7175fb7`) and queued
+  build 18 (`f8eae4d`: Unlock Pro for testing + UX polish). **Every lane is
+  merged.** No lanes are running. Linux Core tests and the type check are
+  green on the merged state. Waiting for "Mac build results (build 18)" and
+  owner findings. If build 18 is green with no open findings, publish the
+  review page and mark PROGRAMME COMPLETE.
