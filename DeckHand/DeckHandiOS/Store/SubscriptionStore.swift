@@ -29,8 +29,23 @@ import SwiftUI
 final class SubscriptionStore {
     static let shared = SubscriptionStore()
 
-    /// What this device may use. Starts from the cache, then StoreKit.
-    private(set) var entitlement: Entitlement
+    /// What this device may use. Starts from the cache, then StoreKit;
+    /// "Unlock Pro for testing" overrides it where that switch is offered.
+    var entitlement: Entitlement {
+        isDeveloperUnlockActive ? DeveloperUnlock.entitlement : storeEntitlement
+    }
+    /// What StoreKit says, before any testing override. The cache stores
+    /// this, never the override.
+    private(set) var storeEntitlement: Entitlement
+    /// Whether this build offers "Unlock Pro for testing" (development and
+    /// TestFlight builds; never App Store ones). See DeveloperUnlock.swift.
+    private(set) var isDeveloperUnlockAvailable = false
+    /// The switch's stored position. Only counts where it's offered.
+    private(set) var isDeveloperUnlocked: Bool
+    /// The override is on and allowed in this build.
+    var isDeveloperUnlockActive: Bool {
+        isDeveloperUnlockAvailable && isDeveloperUnlocked
+    }
     /// The App Store's products, by plan. Empty until loaded (or offline).
     private(set) var products: [SubscriptionPlan: Product] = [:]
     /// Whether this Apple Account can still take the free trial. Assumed
@@ -56,12 +71,14 @@ final class SubscriptionStore {
     private enum Key {
         static let cache = "store.entitlementCache"
         static let freeMac = "store.freeMac"
+        static let developerUnlock = "store.developerUnlock"
     }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         let cache = Self.decode(EntitlementCache.self, defaults.data(forKey: Key.cache))
-        entitlement = EntitlementCache.provisional(cache, now: Date())
+        storeEntitlement = EntitlementCache.provisional(cache, now: Date())
+        isDeveloperUnlocked = defaults.bool(forKey: Key.developerUnlock)
         freeMac = Self.decode(FreeMacChoice.self, defaults.data(forKey: Key.freeMac))
     }
 
@@ -80,6 +97,7 @@ final class SubscriptionStore {
             }
         }
         Task {
+            isDeveloperUnlockAvailable = await DeveloperUnlock.isAvailable()
             await finishUnfinished()
             await loadProducts()
             await refresh()
@@ -189,6 +207,15 @@ final class SubscriptionStore {
         }
     }
 
+    // MARK: - Testing
+
+    /// "Unlock Pro for testing". Ignored in builds that don't offer it.
+    func setDeveloperUnlocked(_ isOn: Bool) {
+        isDeveloperUnlocked = isOn
+        defaults.set(isOn, forKey: Key.developerUnlock)
+        DeckHandLog.app.info("Unlock Pro for testing: \(isOn ? "on" : "off", privacy: .public)")
+    }
+
     // MARK: - One Mac
 
     /// The picker's check before it dials a Mac. Returns `false` (and
@@ -261,7 +288,7 @@ final class SubscriptionStore {
     }
 
     private func apply(_ resolved: Entitlement) {
-        entitlement = resolved
+        storeEntitlement = resolved
         let current = Self.decode(EntitlementCache.self, defaults.data(forKey: Key.cache))
         let updated = EntitlementCache.updated(current, from: resolved)
         if updated != current {

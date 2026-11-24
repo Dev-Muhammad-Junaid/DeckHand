@@ -1097,3 +1097,23 @@ Grant Photos "add" access on the iPad if asked (new
 - Pro gating: PiP and Sharing should ask for Pro on the free tier.
 
 Status: BUILT (build 16) — green
+
+## Build 17 queued (2026-11-24, primary session)
+
+Build 16 plus one owner request: **Settings › Subscription › "Unlock Pro
+for testing"** (new `DeckHandiOS/Store/DeveloperUnlock.swift`; edits in
+`SubscriptionStore.swift` and `SettingsSubscriptionSection.swift`). Every
+Pro check already reads `SubscriptionStore.entitlement`, which now returns
+an "active" Pro entitlement while the switch is on.
+
+Mac should check:
+1. Build the iOS app (compile risks: `AppTransaction.shared` /
+   `.environment` under Swift 6, the computed `entitlement` on the
+   `@Observable` store, `@Bindable` uses of `store` still compiling).
+2. Install on the iPad, open Settings › Subscription: the switch shows;
+   turn it on and check Pro features unlock (mirror, decks, a second Mac,
+   Ask), the widget shows Pro, and turning it off restores the free plan.
+3. `DeckHandTests` and Core tests unchanged.
+
+Status: READY FOR MAC BUILD (build 17)
+

@@ -38,11 +38,19 @@ struct SettingsSubscriptionSection: View {
                         .frame(minWidth: 28)
                 }
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(row.title)
-                        .font(.headline)
-                    Text(row.detail)
-                        .font(.footnote)
-                        .foregroundStyle(row.needsPaymentAttention ? PixelHandTheme.warning : .secondary)
+                    if store.isDeveloperUnlockActive {
+                        Text("Pro unlocked for testing")
+                            .font(.headline)
+                        Text("Every Pro feature is on without a subscription. Turn this off below to see the free plan.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text(row.title)
+                            .font(.headline)
+                        Text(row.detail)
+                            .font(.footnote)
+                            .foregroundStyle(row.needsPaymentAttention ? PixelHandTheme.warning : .secondary)
+                    }
                 }
                 Spacer(minLength: 8)
                 if entitlements.isPro {
@@ -55,11 +63,13 @@ struct SettingsSubscriptionSection: View {
             .padding(.vertical, 2)
             .accessibilityElement(children: .combine)
 
-            if row.needsPaymentAttention {
+            if row.needsPaymentAttention, !store.isDeveloperUnlockActive {
                 Link("Update payment method", destination: Self.billingURL)
             }
 
-            if entitlements.isPro, entitlements.isSettled {
+            if store.isDeveloperUnlockActive {
+                // Nothing to buy or manage while testing.
+            } else if entitlements.isPro, entitlements.isSettled {
                 Button("Manage subscription") { isManagePresented = true }
             } else {
                 Button(store.isTrialEligible ? "Try Pixel Hand Pro free for 2 weeks" : "See Pixel Hand Pro") {
@@ -80,6 +90,20 @@ struct SettingsSubscriptionSection: View {
 
             if !entitlements.isPro, let freeMac = store.freeMac {
                 LabeledContent("Free plan's Mac", value: freeMac.name)
+            }
+
+            if store.isDeveloperUnlockAvailable {
+                Toggle(isOn: Binding(
+                    get: { store.isDeveloperUnlocked },
+                    set: { store.setDeveloperUnlocked($0) }
+                )) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Unlock Pro for testing")
+                        Text("Development and TestFlight builds only. App Store builds never show this.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
         } header: {
             Text("Subscription")

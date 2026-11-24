@@ -3,6 +3,16 @@
 Recorded by the coordinating session ("Deckhand project status review").
 Newest first. If a doc elsewhere disagrees, this file wins.
 
+## 2026-11-24 — "Unlock Pro for testing" switch
+The owner asked for a Settings switch that enables Pro without a
+subscription while the subscriptions aren't live. It sits in
+Settings › Subscription and is offered only in Debug, development-signed
+and TestFlight builds (`AppTransaction.environment != .production`); App
+Store downloads never show it and ignore a stored "on". Implementation:
+`DeckHand/DeckHandiOS/Store/DeveloperUnlock.swift`, `SubscriptionStore`
+(`entitlement` = override or StoreKit's `storeEntitlement`; only the
+StoreKit answer is cached).
+
 ## 2026-11-19 — Design direction approved, with more pixel identity
 The owner reviewed the design board
 (https://claude.ai/artifact/Aa8KTJubKeqahy3cmSjRTm, branch
