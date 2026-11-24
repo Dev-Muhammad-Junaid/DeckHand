@@ -42,6 +42,7 @@ struct PixelHandShell: View {
     @EnvironmentObject private var settings: DeckHandSettings
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.entitlements) private var entitlements
     @SceneStorage("pixelhand.shell.surface") private var surfaceRawValue = ControlSurface.pointer.rawValue
     /// The screen's share of the Split preset (0 = follow the picture).
@@ -647,16 +648,20 @@ struct PixelHandShell: View {
         let margin = margin ?? CGFloat(plan.metrics.margin)
         ZStack {
             if let sender = session.sender {
+                // UX-017: surfaces swap with the pixel dissolve (a fade
+                // under Reduce Motion).
                 surfaceView(centre, sender: sender, plan: plan, margin: margin)
                     .id(centre)
-                    .transition(.opacity)
+                    .transition(.pixelDissolve(reduceMotion: reduceMotion, isCompact: horizontalSizeClass == .compact))
             } else {
                 connectingSurface
                     .padding(.horizontal, margin)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .animation(PixelHandMotion.reduced(PixelHandMotion.standard, reduceMotion: reduceMotion), value: centre)
+        // Connecting → connected powers the surface on.
+        .powerOn(when: session.sender != nil)
+        .animation(PixelHandMotion.dissolve(reduceMotion: reduceMotion), value: centre)
         // The floating screen tile on Pointer and Deck (the Screen surface
         // docks it in its own pane).
         .floatingScreenTile(session: session, isShown: centre != .screen)
