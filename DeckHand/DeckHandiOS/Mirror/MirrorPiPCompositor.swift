@@ -82,6 +82,7 @@ final class MirrorPiPCompositor {
         if mode == .off {
             // Nothing can show it: let go of the decoder and buffers.
             tearDownDecoder()
+            health.reset()
             base = nil
             deferred?.cancel()
         }
@@ -105,13 +106,16 @@ final class MirrorPiPCompositor {
 
     // MARK: Inputs
 
-    /// An HEVC sample the inline mirror also got.
+    /// An HEVC sample the inline mirror also got. Decoded even while
+    /// frozen (paused), so the decoder's references stay whole; only the
+    /// frames aren't shown.
     func receive(sample: CMSampleBuffer, isKeyFrame: Bool) {
-        guard isRunning, pacer.mode != .frozen else { return }
+        guard isRunning else { return }
         switch health.verdict(isKeyFrame: isKeyFrame) {
         case .skip:
             return
         case .passthrough:
+            guard pacer.mode != .frozen else { return }
             onPassthrough?(sample)
         case .decode:
             decode(sample, isKeyFrame: isKeyFrame)
@@ -120,7 +124,7 @@ final class MirrorPiPCompositor {
 
     /// A JPEG frame.
     func receive(image: UIImage) {
-        guard isRunning, pacer.mode != .frozen, let cgImage = image.cgImage else { return }
+        guard isRunning, let cgImage = image.cgImage else { return }
         guard let size = MirrorPiPFrameMath.jpegBufferSize(width: Double(cgImage.width), height: Double(cgImage.height)),
               let buffer = Self.makeBuffer(width: size.width, height: size.height, pool: nil) else { return }
         CVPixelBufferLockBaseAddress(buffer, [])
