@@ -52,9 +52,9 @@ Rule zero, from the UX guidelines: **each colour has one job.**
 | `accentTint` | `#E6EAFF` | cobaltHigh @ 20 % | Selected fills, AI suggestion panels |
 | `success` | `#0B7A6C` | `#3DE0B0` | Connected, delivered, toggles on |
 | `successTint` | `#DCF6F1` | mint @ 14 % | Success pills |
-| `warning` | `#A35F00` | `#FFB547` | Needs a fix, pending, dialog waiting |
+| `warning` | `#9E5C00` | `#FFB547` | Needs a fix, pending, dialog waiting |
 | `warningTint` | `#FFF1DB` | warning @ 14 % | Status pill background |
-| `danger` | `#D92D3F` | `#FF4D5E` | Refused, failed, destructive |
+| `danger` | `#C8283A` | `#FF4D5E` | Refused, failed, destructive |
 | `dangerTint` | `#FDE7EA` | danger @ 16 % | Error banners |
 | `scrim` | navy @ 28 % | black @ 45 % | Behind sheets |
 

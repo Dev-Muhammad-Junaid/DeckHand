@@ -55,6 +55,7 @@ files=(
   "$app/DeckHandiOS/Mirror/MirrorStreamReceiver.swift"
   "$app/DeckHandiOS/Audio/MirrorAudioReceiver.swift"
   "$app/DeckHandiOS/Store/SubscriptionStore.swift"
+  "$app/DeckHandiOS/Store/DeveloperUnlock.swift"
   "$app/DeckHandiOS/Macs/MacSwitcher.swift"
   "$app/Shared/LoomConnectionHandle+ControlMessage.swift"
   "$@"
