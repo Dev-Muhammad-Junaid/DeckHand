@@ -233,3 +233,16 @@ private extension AppShortcutBinding {
         AppShortcutBinding(id: id, bundleID: bundleID, displayName: displayName, keys: keys, sfSymbol: sfSymbol, category: category)
     }
 }
+
+@Suite("Deck suggestion existing keys")
+struct DeckSuggestionExistingTests {
+    @Test("Existing keys are the app page's shown keys, or the curated presets without a page")
+    func existing() {
+        var document = DeckDocument.empty
+        let curated = CuratedShortcuts.bindings(for: "com.apple.Safari").map(\.id)
+        #expect(document.existingKeys(forApp: "com.apple.Safari").map(\.id) == curated)
+        let key = DeckSuggestion(binding: xcodeMenus[9], score: 0).key
+        document.keepSuggestions([key], forApp: xcode)
+        #expect(document.existingKeys(forApp: xcode).map(\.id).contains(key.id))
+    }
+}

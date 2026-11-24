@@ -314,3 +314,15 @@ extension DeckDocument {
         return added
     }
 }
+
+extension DeckDocument {
+    /// The keys suggestions for `bundleID` must not repeat: what its app
+    /// page shows (curated presets and stored keys), or the curated presets
+    /// alone when it has no page yet.
+    public func existingKeys(forApp bundleID: String) -> [DeckKey] {
+        if let page = appPage(for: bundleID) {
+            return shownKeys(on: page, frontBundleID: nil).map(\.key)
+        }
+        return CuratedShortcuts.bindings(for: bundleID).map(DeckKey.init(binding:))
+    }
+}
