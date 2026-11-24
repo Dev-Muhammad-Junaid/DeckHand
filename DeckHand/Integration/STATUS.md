@@ -1188,9 +1188,10 @@ Full findings: `Integration/VISUAL-QA-build18.md` (one line each, with a
 suggested fix and media ref). Gallery with every screen, screenshots and
 clips: https://claude.ai/artifact/EWnkLTGtb5bpXMHrGFJnzB (private).
 
-**69 findings: P1 12 · P2 36 · P3 21.** Layout 17, Behaviour 14, Wording 14,
-Visual identity 14, Accessibility 5, Responsiveness 3, Loading and
-animation 2.
+**82 findings: P1 13 · P2 43 · P3 26.** Layout 21, Visual identity 19,
+Wording 17, Behaviour 15, Accessibility 5, Responsiveness 3, Loading and
+animation 2. (The second pass, VQ-070 to VQ-082, covers widgets, the Lock
+Screen widget, Control Center and Stage Manager windows on the iPad.)
 
 - Covered: iPhone 17 Pro (light, dark, AX3, landscape), iPad Pro 11" and
   iPad mini (portrait, landscape), iPhone 17, iPhone Duo (onboarding only),
@@ -1202,9 +1203,13 @@ animation 2.
   build; everything else was captured against `/Applications/Pixel Hand.app`.
 - New `PixelHandUITests` target (12 walks, screenshot per step) for
   re-checking each round of fixes; how to run it is in the findings file.
-- Not tested: widgets and Control Center, sharing, real multi-touch
-  gestures, a second Mac, running keys or Ask plans, Reduce Motion, iPhone
-  17 Pro Max (the test runner never started there). This Mac auto-locked
-  near the end, which stopped the last runs.
+- Not tested: App Shortcuts and Siri, sharing, real multi-touch gestures,
+  a second Mac, running keys or Ask plans, Reduce Motion, iPhone 17 Pro
+  Max (the test runner never started there), the real iPad (unavailable
+  to Xcode). This Mac auto-locked near the end of the first pass, which
+  stopped the last runs.
+- From now on basic layout checks run on the iPad Pro 11" simulator only:
+  portrait, landscape, and a Stage Manager window dragged down to iPhone
+  width, instead of separate iPhone simulators.
 
 Status: BUILT (build 18) — green
