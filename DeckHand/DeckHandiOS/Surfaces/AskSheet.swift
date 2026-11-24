@@ -110,6 +110,7 @@ struct AskSheet: View {
             TextField("Tell \(macName) what to do", text: $model.request, axis: .vertical)
                 .lineLimit(1...4)
                 .focused($isFieldFocused)
+                .accessibilityIdentifier("ph.ask.field")
                 .submitLabel(.go)
                 .onSubmit(submit)
                 .font(.body)

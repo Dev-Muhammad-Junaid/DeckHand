@@ -107,6 +107,7 @@ struct SettingsSubscriptionSection: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                .accessibilityIdentifier("ph.settings.developerUnlock")
             }
         } header: {
             Text("Subscription")

@@ -188,6 +188,8 @@ targets:
             || echo "warning: Sentry dSYM upload failed; crashes from this build won't be symbolicated"
     scheme:
       storeKitConfiguration: DeckHandiOS/Store/PixelHand.storekit
+      testTargets:
+        - PixelHandUITests
 
   # ─────────────────────────────────────────────────────────────
   # iOS widgets and Control Center controls (D6)
@@ -328,3 +330,28 @@ targets:
         # Without this the bundle has no Info.plist and code signing refuses
         # to run, so the suite never gets a chance to execute.
         GENERATE_INFOPLIST_FILE: YES
+
+  # ─────────────────────────────────────────────────────────────
+  # Visual QA walk-through (XCUITest). Drives the iOS app through its
+  # `ph.<area>.<name>` accessibility identifiers and screenshots each
+  # step; see PixelHandUITests.swift for how to run it. Needs a Mac
+  # running the Pixel Hand host that allows the simulator.
+  # ─────────────────────────────────────────────────────────────
+  PixelHandUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.4"
+    sources:
+      - path: PixelHandUITests
+        type: group
+    dependencies:
+      - target: DeckHandiOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.widgetsflow.pixelhand.uitests
+        TEST_TARGET_NAME: DeckHandiOS
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: 6.0
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: DD5AWPLT2V
