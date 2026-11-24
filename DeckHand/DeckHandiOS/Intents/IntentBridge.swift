@@ -70,6 +70,7 @@ final class IntentBridge {
         let mac = RecentMac(id: macID, name: macName, lastConnected: Date())
         self.mac = mac
         WidgetSnapshotWriter.shared.recordMac(mac)
+        observeGlance(session, macID: macID)
         Task { [weak self] in
             guard let self, await self.waitForSender(session) else { return }
             guard self.session === session else { return }
@@ -82,8 +83,26 @@ final class IntentBridge {
 
     func detach(session: ControlSessionModel) {
         guard self.session === session else { return }
+        if let mac {
+            WidgetSnapshotWriter.shared.updateGlance(macID: mac.id, frontApp: nil, glance: .offline)
+        }
         self.session = nil
         mac = nil
+    }
+
+    /// Keeps the widget strip's `STUDIO · XCODE` current (VQ-072): the
+    /// front app while the session is up, LOCKED while the Mac is locked.
+    /// `@Observable`, so it re-arms after every change.
+    private func observeGlance(_ session: ControlSessionModel, macID: String) {
+        guard self.session === session else { return }
+        let (app, lock) = withObservationTracking {
+            (session.activeAppName, session.macLockState)
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.observeGlance(session, macID: macID)
+            }
+        }
+        WidgetSnapshotWriter.shared.updateGlance(macID: macID, frontApp: app, glance: lock.isLocked ? .locked : .live)
     }
 
     // MARK: - Running

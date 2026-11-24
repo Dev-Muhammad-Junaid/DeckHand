@@ -3,9 +3,14 @@
 //  DeckHandWidgets
 //
 //  The Lock Screen widget (D6). Circular: the first key (Mission Control
-//  on the free plan) as one button. Rectangular: the Mac's name in
-//  dot-matrix over three key buttons. Monochrome, so glyphs draw in the
-//  foreground style and the accent dot isn't coloured.
+//  on the free plan) as one button on the system's accessory disc.
+//  Rectangular: the Mac's name in dot-matrix over three key buttons.
+//  Monochrome, so glyphs draw in the foreground style and the accent dot
+//  isn't coloured.
+//
+//  The name shortens at word boundaries until it fits ("Muhammad's
+//  MacBook Pro" → "Muhammad's"), then falls back to the Mac glyph alone;
+//  it never runs past the widget's edges (VQ-074).
 //
 
 import AppIntents
@@ -35,26 +40,44 @@ struct DeckAccessoryView: View {
             default: circular
             }
         }
-        .containerBackground(for: .widget) { AccessoryWidgetBackground() }
+        .containerBackground(for: .widget) { Color.clear }
     }
 
     private var circular: some View {
         let button = WidgetButton.buttons(for: snapshot, count: 1).first ?? .system(.missionControl)
-        return WidgetIntentButton(button: button) {
-            WidgetGlyphView(glyph: button.glyph, side: 26, accent: nil)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .contentShape(Circle())
-                .widgetAccentable()
+        return ZStack {
+            // The container background doesn't draw on the Lock Screen's
+            // circular slot, so the disc is part of the view (VQ-075): it
+            // sits with the system's circular widgets instead of reading as
+            // a stray icon.
+            AccessoryWidgetBackground()
+            WidgetIntentButton(button: button) {
+                WidgetGlyphView(glyph: button.glyph, side: 27, accent: nil)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Circle())
+                    .widgetAccentable()
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(button.label)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(button.label)
     }
 
     private var rectangular: some View {
         let buttons = WidgetButton.buttons(for: snapshot, count: 3)
+        let mac = snapshot.currentMac
         return VStack(alignment: .leading, spacing: 4) {
-            WidgetDotText(snapshot.currentMac?.name ?? "PIXEL HAND", pitch: 1.4)
-                .widgetAccentable()
+            ViewThatFits(in: .horizontal) {
+                ForEach(StatusStripText.candidates(name: mac?.name ?? "Pixel Hand", details: []), id: \.self) { line in
+                    WidgetDotText(line, pitch: 1.4)
+                }
+                // Not even the first word fits: the Mac glyph alone.
+                WidgetGlyphView(glyph: .pixel(name: PixelGlyphs.mac.name), side: 9 * 1.4, accent: nil)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .clipped()
+            .widgetAccentable()
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(mac?.name ?? "Pixel Hand")
             HStack(spacing: 6) {
                 ForEach(buttons) { button in
                     WidgetIntentButton(button: button) {
@@ -64,10 +87,12 @@ struct DeckAccessoryView: View {
                             .contentShape(RoundedRectangle(cornerRadius: 8))
                     }
                     .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity)
                     .accessibilityLabel(button.label)
                 }
             }
+            .frame(maxWidth: .infinity)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
 }

@@ -173,3 +173,71 @@ struct WidgetStripDetailTests {
         #expect(RecentMac.recording(mac, in: []).first?.frontApp == "Pages")
     }
 }
+
+@Suite("Widget labels and Control Center symbols")
+struct ControlSymbolTemplateTests {
+    @Test("Free Mac keys have one-word widget labels of at most 7 letters")
+    func widgetLabels() {
+        for command in SystemCommand.allCases {
+            #expect(!command.widgetLabel.contains(" "), "\(command)")
+            #expect(command.widgetLabel.count <= 7, "\(command)")
+        }
+    }
+
+    @Test("Every system command's control symbol is one the extension ships")
+    func symbolsShipped() {
+        let shipped = Set(ControlSymbolTemplate.symbols.map(\.name))
+        for command in SystemCommand.allCases {
+            #expect(shipped.contains(command.controlSymbolName), "\(command): \(command.controlSymbolName)")
+        }
+        #expect(shipped.contains(ControlSymbolTemplate.handName))
+        #expect(shipped.count == ControlSymbolTemplate.symbols.count)
+    }
+
+    @Test("A template has the guides, three identical small variants and one shape per dot")
+    func templateShape() {
+        for symbol in ControlSymbolTemplate.symbols {
+            let svg = ControlSymbolTemplate.svg(symbol)
+            for id in ["Notes", "Guides", "Symbols", "Baseline-S", "Capline-S", "Baseline-M", "Capline-M", "Baseline-L", "Capline-L",
+                       "Ultralight-S", "Regular-S", "Black-S", "left-margin-Regular-S", "right-margin-Regular-S"] {
+                #expect(svg.contains("id=\"\(id)\""), "\(symbol.name) lacks \(id)")
+            }
+            #expect(svg.contains("Template v.3.0"))
+            let paths = svg.components(separatedBy: "<path d=\"").dropFirst().map { $0.prefix { $0 != "\"" } }
+            #expect(paths.count == 3)
+            #expect(Set(paths).count == 1, "\(symbol.name): variants differ")
+            #expect(paths.first.map { $0.filter { $0 == "Z" }.count } == symbol.dots.count)
+            #expect(!symbol.dots.isEmpty)
+        }
+    }
+
+    @Test("Dots sit between the cap line's neighbourhood and the margins")
+    func geometry() {
+        let symbol = ControlSymbolTemplate.symbols.first { $0.name == "ph.deck" }!
+        let path = ControlSymbolTemplate.dotsPath(symbol.dots, pitch: 84.0 / 9, top: -77.2)
+        let numbers = path.split(whereSeparator: { "MLCZ ".contains($0) }).compactMap { Double($0) }
+        let xs = stride(from: 0, to: numbers.count, by: 2).map { numbers[$0] }
+        let ys = stride(from: 1, to: numbers.count, by: 2).map { numbers[$0] }
+        #expect(xs.allSatisfy { $0 >= 0 && $0 <= 84 })
+        #expect(ys.allSatisfy { $0 >= -77.2 && $0 <= 6.8 })
+        #expect(ControlSymbolTemplate.format(1.5) == "1.5")
+        #expect(ControlSymbolTemplate.format(2) == "2")
+        #expect(ControlSymbolTemplate.format(-0.0001) == "0")
+    }
+}
+
+@Suite("Free Mac keys for the Deck Key control")
+struct FreeMacKeyTests {
+    @Test("Eight unique choices that resolve by ID and run free commands")
+    func choices() {
+        #expect(FreeMacKey.choices.count == 8)
+        #expect(Set(FreeMacKey.choices.map(\.id)).count == 8)
+        for choice in FreeMacKey.choices {
+            #expect(FreeMacKey.choice(id: choice.id) == choice)
+            #expect(choice.command.isAllowed(by: Entitlement(status: .unknown, evaluatedAt: Date(timeIntervalSince1970: 0))), "\(choice.label) needs Pro")
+        }
+        #expect(FreeMacKey.choice(id: "6F0C3C5E-1D2B-4A1F-9F0E-2B7A0C1D2E3F") == nil)
+        #expect(FreeMacKey.choice(id: "") == nil)
+        #expect(FreeMacKey.choice(id: "mac.system.nope") == nil)
+    }
+}

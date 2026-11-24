@@ -162,7 +162,26 @@ public enum SystemCommand: String, Codable, Sendable, CaseIterable, Hashable {
         }
     }
 
-    /// An SF Symbol for places that only take symbols (Control Center).
+    /// The one-word label a widget key shows (VQ-073), so every free key
+    /// fits a small widget's key at one fixed size.
+    public var widgetLabel: String {
+        switch self {
+        case .missionControl: "Mission"
+        case .appExpose: "Windows"
+        case .showDesktop: "Desktop"
+        case .launchpad: "Apps"
+        case .locateCursor: "Pointer"
+        case .lockScreen: "Lock"
+        }
+    }
+
+    /// The custom symbol in the widget extension's asset catalog, drawn
+    /// from the glyph (`ControlSymbolTemplate`, VQ-076).
+    public var controlSymbolName: String {
+        ControlSymbolTemplate.symbolName(glyph: glyphName)
+    }
+
+    /// An SF Symbol for places that only take system symbols.
     public var symbolName: String {
         switch self {
         case .missionControl: "rectangle.3.group"

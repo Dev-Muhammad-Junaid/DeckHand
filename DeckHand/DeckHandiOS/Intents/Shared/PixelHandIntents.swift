@@ -126,7 +126,16 @@ struct RunDeckKeyIntent: AppIntent {
             let confirmed = try await $key.requestConfirmation(for: key, dialog: "Run \(key.label) on your Mac?")
             guard confirmed else { throw PixelHandIntentError(message: "Not run.") }
         }
-        let outcome = await IntentDispatch.run(.runKey(keyID: key.id), on: mac)
+        // The Deck Key control before a key was chosen: open the deck, where
+        // keys are added, instead of glowing and doing nothing (VQ-078).
+        if key.id.isEmpty {
+            _ = await IntentDispatch.run(.open(.deck))
+            return .result(dialog: "Choose a key for this control: touch and hold it in Control Center.")
+        }
+        // A free Mac key chosen for the Deck Key control while the deck was
+        // empty runs its own command; it needs no deck and no Pro.
+        let command = FreeMacKey.choice(id: key.id)?.command ?? .runKey(keyID: key.id)
+        let outcome = await IntentDispatch.run(command, on: mac)
         return .result(dialog: try outcome.dialogOrThrow())
     }
 }

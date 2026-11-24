@@ -34,6 +34,11 @@ struct DeckKeyEntity: AppEntity, Identifiable, Hashable, Sendable {
         self.init(id: key.id, label: key.label, pageTitle: key.pageTitle, confirm: key.confirm)
     }
 
+    /// A free Mac key offered when the deck has none (VQ-078).
+    init(_ choice: FreeMacKey.Choice) {
+        self.init(id: choice.id, label: choice.label, pageTitle: FreeMacKey.groupTitle, confirm: false)
+    }
+
     var displayRepresentation: DisplayRepresentation {
         DisplayRepresentation(title: "\(label)", subtitle: "\(pageTitle)")
     }
@@ -44,11 +49,20 @@ struct DeckKeyQuery: EntityStringQuery {
 
     func entities(for identifiers: [DeckKeyEntity.ID]) async throws -> [DeckKeyEntity] {
         let snapshot = PixelHandAppGroup.readSnapshot()
-        return identifiers.compactMap { snapshot.key(id: $0).map(DeckKeyEntity.init) }
+        return identifiers.compactMap { id in
+            if let choice = FreeMacKey.choice(id: id) { return DeckKeyEntity(choice) }
+            return snapshot.key(id: id).map(DeckKeyEntity.init)
+        }
     }
 
     func entities(matching string: String) async throws -> [DeckKeyEntity] {
-        PixelHandAppGroup.readSnapshot().keys(matching: string).map(DeckKeyEntity.init)
+        let snapshot = PixelHandAppGroup.readSnapshot()
+        let keys = snapshot.keys(matching: string).map(DeckKeyEntity.init)
+        guard snapshot.allKeys.isEmpty else { return keys }
+        let needle = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        return FreeMacKey.choices
+            .filter { needle.isEmpty || $0.label.localizedStandardContains(needle) }
+            .map(DeckKeyEntity.init)
     }
 
     func suggestedEntities() async throws -> [DeckKeyEntity] {
@@ -56,6 +70,9 @@ struct DeckKeyQuery: EntityStringQuery {
         // The widget's keys first (the ones the user reaches for), then the rest.
         let first = snapshot.widgetKeys.map(\.id)
         let ordered = snapshot.widgetKeys + snapshot.allKeys.filter { !first.contains($0.id) }
+        // An empty deck offers the free Mac keys the widget shows, rather
+        // than a Choose sheet that says "No options available" (VQ-078).
+        guard !ordered.isEmpty else { return FreeMacKey.choices.map(DeckKeyEntity.init) }
         return ordered.map(DeckKeyEntity.init)
     }
 }
