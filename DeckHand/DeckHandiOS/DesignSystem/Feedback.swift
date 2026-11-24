@@ -80,10 +80,13 @@ struct StatusPill: View {
 struct PHToast: View {
     let message: String
     var isFailure = false
+    /// Overrides the pixel: `.off` while disconnected (a disconnected state
+    /// never shows a lit mint dot, 04 §7, VQ-028).
+    var pixel: StatusPixel.Kind?
 
     var body: some View {
         HStack(spacing: PixelHandTheme.Space.sm) {
-            StatusPixel(state: isFailure ? .needsYou : .live, size: 8)
+            StatusPixel(state: pixel ?? (isFailure ? .needsYou : .live), size: 8)
             Text(message)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(PixelHandTheme.ink)

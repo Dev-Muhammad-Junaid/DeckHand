@@ -52,6 +52,39 @@ final class PairedMacsStore {
     /// Mac reaches the approval step.
     var pendingInvite: PairingInvite?
 
+    /// A code typed while not connected to its Mac (from the picker, or
+    /// after the Mac dropped or refused the request): sent once a session
+    /// with that Mac reaches the approval step (VQ-003, VQ-037). Unlike a
+    /// QR invite it carries no key, so it goes to the Mac with that Loom
+    /// device ID; the Mac still checks the code against what it shows.
+    struct PendingCode: Equatable {
+        var code: PairingCode
+        var macDeviceID: UUID
+        var macName: String
+    }
+
+    var pendingCode: PendingCode?
+
+    /// The Loom device ID of the Mac the last session was with, kept after
+    /// it ends so the code sheet can reconnect to it.
+    private(set) var lastMacDeviceID: UUID?
+
+    /// Whether a code can go out right now on a live session with
+    /// `deviceID` (or with any Mac when `deviceID` is `nil`).
+    func canSendNow(to deviceID: UUID?) -> Bool {
+        guard liveSend != nil, let liveMac else { return false }
+        return deviceID == nil || liveMac.deviceID == deviceID
+    }
+
+    /// Keeps `code` for `macDeviceID`; the next session with that Mac sends
+    /// it. Shows "Pairing…" meanwhile.
+    func holdForNextConnection(_ code: PairingCode, macDeviceID: UUID, macName: String) {
+        pendingCode = PendingCode(code: code, macDeviceID: macDeviceID, macName: macName)
+        lastCodeResult = nil
+        notice = nil
+        isAwaitingCodeResult = true
+    }
+
     @ObservationIgnored private var book: RemotePairingBook
     private let fileURL: URL?
 
@@ -82,7 +115,8 @@ final class PairedMacsStore {
         liveMac = nil
         livePaired = false
         lastCodeResult = nil
-        isAwaitingCodeResult = false
+        // A held code (`pendingCode`) keeps "Pairing…" up until it is sent.
+        isAwaitingCodeResult = pendingCode != nil
         notice = nil
         liveSend = send
         return token
@@ -92,6 +126,7 @@ final class PairedMacsStore {
     func identified(mac: TrustCandidate?, token: UUID) {
         guard token == liveToken else { return }
         liveMac = mac
+        if let mac { lastMacDeviceID = mac.deviceID }
     }
 
     func endSession(token: UUID) {
@@ -99,7 +134,7 @@ final class PairedMacsStore {
         liveToken = nil
         liveMac = nil
         livePaired = false
-        isAwaitingCodeResult = false
+        isAwaitingCodeResult = pendingCode != nil
         liveSend = nil
     }
 

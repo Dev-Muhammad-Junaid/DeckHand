@@ -17,6 +17,9 @@ import UIKit
 /// A sheet with the camera, a frame, and what to do if the camera is off.
 struct PairingQRScannerSheet: View {
     let onInvite: (PairingInvite) -> Void
+    /// "Enter code instead" (VQ-003): the sheet closes and the caller shows
+    /// the code entry. `nil` hides the button (opened from code entry).
+    var onTypeCode: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
     @State private var access = AVCaptureDevice.authorizationStatus(for: .video)
 
@@ -49,12 +52,21 @@ struct PairingQRScannerSheet: View {
                     Text("Point at the code on your Mac")
                         .phText(.display)
                         .foregroundStyle(.white)
-                    Text("Menu bar › Pixel Hand › Pair a Device…")
+                    Text("Menu bar › Pixel Hand › Pair a device")
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.72))
+                    if let onTypeCode {
+                        Button("Enter code instead") {
+                            dismiss()
+                            onTypeCode()
+                        }
+                        .buttonStyle(.ph(.secondary, size: .regular))
+                        .padding(.top, PixelHandTheme.Space.xs)
+                        .accessibilityIdentifier("ph.pairing.typeInstead")
+                    }
                 }
                 .multilineTextAlignment(.center)
-                .accessibilityElement(children: .combine)
+                .accessibilityElement(children: .contain)
                 .padding(.horizontal, PixelHandTheme.Space.xl)
                 .padding(.vertical, PixelHandTheme.Space.lg)
                 .frame(maxWidth: .infinity)

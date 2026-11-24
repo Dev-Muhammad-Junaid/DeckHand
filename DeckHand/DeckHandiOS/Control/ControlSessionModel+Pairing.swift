@@ -104,6 +104,8 @@ extension ControlSessionModel {
         if status != "pending" {
             hasReceivedAuthStatus = true
         }
+        // `pairing.refused` already said why; its `denied` adds nothing.
+        if state == .denied, ApprovalStatusCopy.isRefusal(lastAuthStatus) { return }
         // A forgotten session stays forgotten until the connection ends.
         guard lastAuthStatus != ApprovalStatusCopy.forgottenStatus else { return }
         lastAuthStatus = status
@@ -115,6 +117,17 @@ extension ControlSessionModel {
             Task { await sender.requestAppList() }
         }
         sendPendingInviteIfReady()
+    }
+
+    /// Why the Mac refused (protocol 14). Arrives just before the plain
+    /// `denied`, which then changes nothing (VQ-002).
+    func handleRefused(_ reason: AuthRefusal) {
+        let status = ApprovalStatusCopy.status(for: reason)
+        DeckHandLog.connection.info("🔑 The Mac refused: \(reason.rawValue, privacy: .public)")
+        hasReceivedAuthStatus = true
+        guard lastAuthStatus != ApprovalStatusCopy.forgottenStatus else { return }
+        lastAuthStatus = status
+        onAuthStatusChanged(status)
     }
 
     func handleCodeResult(_ result: PairingCodeResult) {
@@ -149,9 +162,19 @@ extension ControlSessionModel {
     /// (pending or granted), so the code reaches its pairing logic.
     func sendPendingInviteIfReady() {
         let store = PairedMacsStore.shared
-        guard let invite = store.pendingInvite,
-              let mac = pairingMac,
+        guard let mac = pairingMac,
               lastAuthStatus == "pending" || lastAuthStatus == "granted" else { return }
+        // A typed code held for this Mac (VQ-003, VQ-037).
+        if let held = store.pendingCode {
+            store.pendingCode = nil
+            if held.macDeviceID == mac.deviceID {
+                DeckHandLog.connection.info("🔐 Sending a held pairing code")
+                Task { await store.submit(held.code) }
+                return
+            }
+            DeckHandLog.connection.info("🔐 Dropping a held code for another Mac")
+        }
+        guard let invite = store.pendingInvite else { return }
         store.pendingInvite = nil
         guard invite.macDeviceID == mac.deviceID else {
             DeckHandLog.connection.info("🔐 Dropping a QR invite for another Mac")

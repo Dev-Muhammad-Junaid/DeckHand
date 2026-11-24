@@ -26,7 +26,7 @@
 //    PH_QA_FREE=1      run with "Unlock Pro for testing" off (free plan).
 //    PH_QA_TAG=<tag>   suffix for the output folder (e.g. "dark", "ax3").
 //    PH_QA_PAIRCODE_FILE=<path>  a file the QA script fills with the Mac's
-//                      pairing code (from its "Pair…" window). When the
+//                      pairing code (from its "Pair a device" window). When the
 //                      approval card offers "Enter pairing code", the walk
 //                      pairs with it, so later runs connect without asking.
 //
@@ -89,7 +89,7 @@ final class PixelHandUITests: XCTestCase {
         snap("picker-early")
         sleep(4)
         snap("picker-settled")
-        if tapIfExists("ph.connect.scanQR") {
+        if tapIfExists("ph.connect.pair") {
             sleep(2)
             snap("pairing-sheet")
             dismissSheet()

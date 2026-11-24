@@ -117,6 +117,17 @@ public struct MacSwitchMachine: Equatable, Sendable {
         return true
     }
 
+    /// The person cancelled the dial in flight ("Connecting to Studio…" ›
+    /// Cancel). The Mac it was leaving stays focused; a late connection is
+    /// discarded. Returns whether there was a dial to cancel.
+    @discardableResult
+    public mutating func cancelDial() -> Bool {
+        guard case let .dialing(_, from, _) = phase else { return false }
+        attempts += 1
+        phase = from.map { .active($0) } ?? .idle
+        return true
+    }
+
     /// A connection made outside a switch (the picker) became the focused
     /// Mac. Supersedes any dial in flight.
     public mutating func adopted(_ deviceID: UUID) {
@@ -145,8 +156,11 @@ public enum MacReconnectPolicy {
 
     /// The Mac to dial at launch, or `nil`: the Mac used last, when it is
     /// in reach and connects without a prompt (paired, or the person's own
-    /// iCloud Mac), and the free plan allows it. Never twice per launch,
-    /// never before onboarding, never over a running session.
+    /// iCloud Mac), and the free plan allows it. With no Mac used last (a
+    /// fresh install that paired during onboarding, VQ-058), the one Mac in
+    /// reach that connects without a prompt; none when there are several,
+    /// so the person picks. Never twice per launch, never before
+    /// onboarding, never over a running session.
     public static func launchTarget(
         isEnabled: Bool,
         hasCompletedOnboarding: Bool,
@@ -156,10 +170,16 @@ public enum MacReconnectPolicy {
         listings: [MacListing],
         isLockedByFreePlan: (UUID) -> Bool
     ) -> UUID? {
-        guard isEnabled, hasCompletedOnboarding, !alreadyTried, !hasSession, let lastActiveDeviceID,
-              let mac = listings.first(where: { $0.deviceID == lastActiveDeviceID }),
-              mac.isReachable, mac.isPaired || mac.isOwnICloud,
-              !isLockedByFreePlan(lastActiveDeviceID)
+        guard isEnabled, hasCompletedOnboarding, !alreadyTried, !hasSession else { return nil }
+        func connectsWithoutPrompt(_ mac: MacListing) -> Bool {
+            mac.isReachable && (mac.isPaired || mac.isOwnICloud) && !isLockedByFreePlan(mac.deviceID)
+        }
+        guard let lastActiveDeviceID else {
+            let candidates = listings.filter(connectsWithoutPrompt)
+            return candidates.count == 1 ? candidates[0].deviceID : nil
+        }
+        guard let mac = listings.first(where: { $0.deviceID == lastActiveDeviceID }),
+              connectsWithoutPrompt(mac)
         else { return nil }
         return lastActiveDeviceID
     }

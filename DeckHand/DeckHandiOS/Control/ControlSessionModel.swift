@@ -323,6 +323,9 @@ final class ControlSessionModel {
         case let .pairing(.codeResult(result)):
             handleCodeResult(result)
 
+        case let .pairing(.refused(reason)):
+            handleRefused(reason)
+
         case let .pairing(.pairedStatus(paired)):
             handlePairedStatus(paired)
 

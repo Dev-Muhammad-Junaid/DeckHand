@@ -191,3 +191,24 @@ public enum ApprovalStatusCopy {
         return minutes == 1 ? "1 minute" : "\(minutes) minutes"
     }
 }
+
+/// What the remote shows while a session isn't live (VQ-027): while it
+/// reconnects on its own, only the reconnect state (the pad greys out, a
+/// toast with an unlit pixel); the card that needs a tap only once the
+/// retries give up, or for a verdict.
+public enum ConnectionLossPresentation {
+    public enum Mode: Equatable, Sendable {
+        /// Live: nothing over the controls.
+        case none
+        /// Reconnecting automatically: controls dimmed, toast only.
+        case reconnecting
+        /// The approval or disconnect card.
+        case card
+    }
+
+    public static func mode(status: String, isReconnecting: Bool) -> Mode {
+        if status == "granted" { return .none }
+        if status == "host_disconnected", isReconnecting { return .reconnecting }
+        return .card
+    }
+}

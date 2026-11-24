@@ -117,3 +117,18 @@ import Testing
         #expect(!(ApprovalStatusCopy.showsLiveIndicator(status: "host_disconnected")))
     }
 }
+
+@Suite("Connection loss: one message at a time (VQ-027)")
+struct ConnectionLossPresentationTests {
+    @Test("While reconnecting only the reconnect state shows; the card comes when retries stop")
+    func modes() {
+        #expect(ConnectionLossPresentation.mode(status: "host_disconnected", isReconnecting: true) == .reconnecting)
+        #expect(ConnectionLossPresentation.mode(status: "host_disconnected", isReconnecting: false) == .card)
+        #expect(ConnectionLossPresentation.mode(status: "granted", isReconnecting: false) == .none)
+        #expect(ConnectionLossPresentation.mode(status: "granted", isReconnecting: true) == .none)
+        // Verdicts always explain themselves on the card.
+        for status in ["pending", "denied", ApprovalStatusCopy.declinedStatus, ApprovalStatusCopy.forgottenStatus, ApprovalStatusCopy.timedOutStatus] {
+            #expect(ConnectionLossPresentation.mode(status: status, isReconnecting: true) == .card, "\(status)")
+        }
+    }
+}
