@@ -18,6 +18,8 @@ extension ControlSessionModel {
             clipboard.receivedFromMac(text, syncEnabled: interactionSettings?.clipboardSync ?? false)
         case .clipboardSync, .setClipboard:
             break // remote → Mac only
+        case let .transferStatus(transferID, status):
+            TransferCenter.shared.receivedStatus(status, for: transferID) // Sharing lane (S1)
         }
     }
 

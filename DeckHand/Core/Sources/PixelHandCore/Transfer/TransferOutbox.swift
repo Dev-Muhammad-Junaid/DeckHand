@@ -44,6 +44,9 @@ public struct TransferOutboxItem: Codable, Equatable, Sendable, Identifiable, Ha
     public var createdAt: Date
     public var attempts: Int
     public var state: State
+    /// The file's SHA-256 (lowercase hex), worked out once before the first
+    /// offer and reused for every resume.
+    public var sha256: String?
 
     public init(
         id: UUID = UUID(),
@@ -55,7 +58,8 @@ public struct TransferOutboxItem: Codable, Equatable, Sendable, Identifiable, Ha
         targetName: String?,
         createdAt: Date,
         attempts: Int = 0,
-        state: State = .queued
+        state: State = .queued,
+        sha256: String? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -67,6 +71,7 @@ public struct TransferOutboxItem: Codable, Equatable, Sendable, Identifiable, Ha
         self.createdAt = createdAt
         self.attempts = attempts
         self.state = state
+        self.sha256 = sha256
     }
 
     public var manifest: TransferManifest {
@@ -154,6 +159,11 @@ public struct TransferOutbox: Codable, Equatable, Sendable {
         }
     }
 
+    /// Records the file's hash for later offers.
+    public mutating func setHash(_ sha256: String, for id: UUID) {
+        update(id) { $0.sha256 = sha256 }
+    }
+
     /// Saved, refused or cancelled: the item is done.
     public mutating func remove(_ id: UUID) {
         items.removeAll { $0.id == id }
@@ -190,4 +200,24 @@ public enum TransferResume {
 
     /// Partial files older than this are deleted.
     public static let maxPartialAge: TimeInterval = 3 * 24 * 60 * 60
+}
+
+/// S2: a paired Mac as the Share extension lists it. The app writes the
+/// list to the App Group (`macs.json`) whenever it connects; the extension
+/// only reads it.
+public struct TransferMacEntry: Codable, Equatable, Sendable, Identifiable, Hashable {
+    public let deviceID: UUID
+    public let name: String
+    public var id: UUID { deviceID }
+
+    public init(deviceID: UUID, name: String) {
+        self.deviceID = deviceID
+        self.name = name
+    }
+
+    /// The list as stored; empty when missing or unreadable.
+    public static func decodeList(_ data: Data?) -> [TransferMacEntry] {
+        guard let data, let list = try? JSONDecoder().decode([TransferMacEntry].self, from: data) else { return [] }
+        return list
+    }
 }

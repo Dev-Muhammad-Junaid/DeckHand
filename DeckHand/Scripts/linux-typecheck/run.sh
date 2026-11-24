@@ -50,6 +50,8 @@ files=(
   "$app"/DeckHandiOS/Assist/*.swift
   "$app/DeckHandiOS/ShortcutStore.swift"
   "$app/DeckHandiOS/Clipboard/RemoteClipboard.swift"
+  "$app/DeckHandiOS/Transfer/TransferCenter.swift"
+  "$app/DeckHandiOS/Transfer/TransferSharedContainer.swift"
   "$app/DeckHandiOS/Mirror/MirrorStreamReceiver.swift"
   "$app/DeckHandiOS/Audio/MirrorAudioReceiver.swift"
   "$app/DeckHandiOS/Store/SubscriptionStore.swift"

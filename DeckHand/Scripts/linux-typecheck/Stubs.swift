@@ -567,3 +567,6 @@ struct SHA256 {
     func finalize() -> SHA256Digest { SHA256Digest() }
     static func hash(data: Data) -> SHA256Digest { SHA256Digest() }
 }
+extension FileManager {
+    func containerURL(forSecurityApplicationGroupIdentifier groupIdentifier: String) -> URL? { nil }
+}
