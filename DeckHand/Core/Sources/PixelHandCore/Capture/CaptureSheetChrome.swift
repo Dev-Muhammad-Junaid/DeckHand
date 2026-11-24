@@ -30,6 +30,11 @@ public enum CaptureStep: Equatable, Sendable {
 public struct CaptureStrip: Equatable, Sendable {
     public let items: [String]
     public let spoken: String
+
+    public init(items: [String], spoken: String) {
+        self.items = items
+        self.spoken = spoken
+    }
 }
 
 public enum CaptureSheetChrome {
