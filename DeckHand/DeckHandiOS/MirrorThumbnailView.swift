@@ -44,6 +44,9 @@ struct MirrorThumbnailView: View {
     /// Drawn exactly over the live picture (the Mac's pointer, S3). Moves
     /// with the picture during a Space slide.
     var cursorLayer: AnyView = AnyView(EmptyView())
+    /// Drawn under the live picture, same frame (UX-041: PiP's layer,
+    /// which must be in the window for PiP to be possible).
+    var pictureBackground: AnyView = AnyView(EmptyView())
     /// Top-left corner chrome (the display picker).
     var topLeadingAccessory: AnyView = AnyView(EmptyView())
     /// Bottom-edge chrome (the cursor badge, the stats line).
@@ -365,11 +368,13 @@ struct MirrorThumbnailView: View {
             videoLayer
                 .aspectRatio(1 / frameAspect, contentMode: .fit)
                 .allowsHitTesting(false)
+                .background { pictureBackground }
                 .overlay { cursorLayer }
         } else if let image {
             Image(uiImage: image)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
+                .background { pictureBackground }
                 .overlay { cursorLayer }
         } else {
             ZStack {

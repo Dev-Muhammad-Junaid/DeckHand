@@ -37,6 +37,7 @@ final class DeckHandSettings: ObservableObject {
         static let showMirrorStats = "settings.showMirrorStats"
         static let mirrorPrefersHEVC = "settings.mirrorPrefersHEVC"
         static let mirrorPlaysMacAudio = "settings.mirrorPlaysMacAudio"
+        static let mirrorPiPAutoStart = "settings.mirrorPiPAutoStart"
         static let screenshotQuality = "settings.screenshotQuality"
         static let defaultCapture = "settings.defaultCapture"
         static let autoSaveToPhotos = "settings.autoSaveToPhotos"
@@ -157,6 +158,12 @@ final class DeckHandSettings: ObservableObject {
         didSet { defaults.set(mirrorPlaysMacAudio, forKey: Key.mirrorPlaysMacAudio) }
     }
 
+    /// Leaving the app with the mirror open keeps it in Picture in Picture
+    /// (UX-041). Off until the person turns it on.
+    @Published var mirrorPiPAutoStart: Bool {
+        didSet { defaults.set(mirrorPiPAutoStart, forKey: Key.mirrorPiPAutoStart) }
+    }
+
     // ── Screenshots ─────────────────────────────────────────────────
     @Published var screenshotQuality: CaptureQuality {
         didSet { defaults.set(screenshotQuality.rawValue, forKey: Key.screenshotQuality) }
@@ -225,6 +232,7 @@ final class DeckHandSettings: ObservableObject {
         showMirrorStats = defaults.bool(forKey: Key.showMirrorStats)
         mirrorPrefersHEVC = defaults.object(forKey: Key.mirrorPrefersHEVC) as? Bool ?? true
         mirrorPlaysMacAudio = defaults.bool(forKey: Key.mirrorPlaysMacAudio)
+        mirrorPiPAutoStart = defaults.bool(forKey: Key.mirrorPiPAutoStart)
 
         screenshotQuality = (defaults.string(forKey: Key.screenshotQuality)
             .flatMap(CaptureQuality.init(rawValue:))) ?? .standard

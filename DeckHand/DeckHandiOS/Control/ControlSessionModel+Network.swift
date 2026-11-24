@@ -136,6 +136,11 @@ extension ControlSessionModel {
     }
 
     func setForeground(_ foreground: Bool) {
+        // PiP lane hook (UX-041): while Picture in Picture shows the
+        // mirror, the session counts as in front, so ticks and the
+        // heartbeat keep the connection alive in the background. PiP calls
+        // this again when it starts or stops.
+        let foreground = foreground || mirrorPiPHoldsSession
         switch keepAlive.setForeground(foreground) {
         case .none:
             break

@@ -105,6 +105,15 @@ final class ControlSessionModel {
     /// S17: plays the Mac's sound (own stream, MirrorAudioReceiver). Logic
     /// in ControlSessionModel+Audio.swift.
     @ObservationIgnored let mirrorAudio = MirrorAudioPlayer()
+    /// UX-041: Picture in Picture (its controller and layer), the frames it
+    /// shows (pointer drawn in), its state, and whether the system would
+    /// start it now. Logic in Mirror/ControlSessionModel+PiP.swift.
+    @ObservationIgnored let mirrorPiP = MirrorPiPController()
+    @ObservationIgnored let mirrorPiPCompositor = MirrorPiPCompositor()
+    var mirrorPiPState = MirrorPiPState()
+    var mirrorPiPPossible = false
+    /// The app is in the background (the inline layer can't decode there).
+    @ObservationIgnored var mirrorAppInBackground = false
 
     // MARK: Pairing
     // Approval status, the resync poll, pairing codes and "Forget" (S4).
