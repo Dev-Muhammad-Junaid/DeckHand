@@ -243,11 +243,13 @@ struct MirrorPicture: View {
             MirrorVideoLayerView(renderer: session.mirrorVideoRenderer)
                 .aspectRatio(Self.aspect(session), contentMode: .fit)
                 .allowsHitTesting(false)
+                .background { MirrorPiPBackground(session: session) } // UX-041
                 .overlay { MirrorCursorLayer(session: session) }
         } else if let image = session.mirrorImage {
             Image(uiImage: image)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
+                .background { MirrorPiPBackground(session: session) } // UX-041
                 .overlay { MirrorCursorLayer(session: session) }
         } else {
             ZStack {

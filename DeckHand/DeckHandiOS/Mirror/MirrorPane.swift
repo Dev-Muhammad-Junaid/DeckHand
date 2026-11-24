@@ -7,7 +7,8 @@
 //  (`STUDIO · D1/2 · DESK 2/3 · 60 FPS`), the cursor badge top-trailing
 //  (`ON 2 →`, only while the pointer is on another display), the S6 stats
 //  strip under it when turned on, and the glass toolbar at the bottom:
-//  display picker (`1/2`), ‹ desktop dots ›, sound, stop.
+//  display picker (`1/2`), ‹ desktop dots ›, sound, Picture in Picture
+//  (UX-041), stop.
 //
 //  Everything the floating tile does still runs here: the binary stream
 //  (JPEG or HEVC with its watchdog, in `ControlSessionModel+Mirror`), the
@@ -58,6 +59,8 @@ struct MirrorPane: View {
         .onChange(of: settings.mirrorPlaysMacAudio) {
             session.syncMirrorAudio()
         }
+        // UX-041: Pro and the PiP setting.
+        .mirrorPiPSync(session: session)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Live screen of \(macName)")
     }
@@ -186,6 +189,7 @@ struct MirrorPane: View {
                 isOn: settings.mirrorPlaysMacAudio,
                 action: { settings.mirrorPlaysMacAudio.toggle() }
             )
+            MirrorPiPToolButton(session: session)
             MirrorToolButton(
                 glyph: PixelGlyphs.close,
                 label: "Stop the live screen",

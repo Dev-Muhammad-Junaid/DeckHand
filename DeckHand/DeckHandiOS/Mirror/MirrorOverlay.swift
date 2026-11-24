@@ -18,7 +18,9 @@
 //    and keeps clear of the areas the surface reserves (`MirrorTileKeepOut`);
 //  - S14: "Window…" in the picker (mirror one window), "Pointer outside
 //    the window" while a window is mirrored, and the notice when a
-//    mirrored window ends and the mirror goes back to its display.
+//    mirrored window ends and the mirror goes back to its display;
+//  - UX-041: "Picture in Picture" in the picker, and PiP's layer under
+//    the picture.
 //
 
 import SwiftUI
@@ -60,6 +62,7 @@ struct MirrorOverlay: View {
                 settings.mirrorLayout = layout
             },
             cursorLayer: AnyView(MirrorCursorLayer(session: session)),
+            pictureBackground: AnyView(MirrorPiPBackground(session: session)),
             topLeadingAccessory: AnyView(MirrorDisplayPicker(session: session)),
             bottomAccessory: AnyView(MirrorBottomChrome(session: session)),
             belowAccessory: AnyView(MirrorSpaceDots(strip: strip)),
@@ -81,6 +84,8 @@ struct MirrorOverlay: View {
         .onChange(of: settings.mirrorPlaysMacAudio) {
             session.syncMirrorAudio()
         }
+        // UX-041: Pro and the PiP setting.
+        .mirrorPiPSync(session: session)
     }
 }
 
@@ -163,6 +168,18 @@ struct MirrorDisplayPicker: View {
                     Label("Window…", systemImage: "macwindow")
                 }
                 .disabled(!session.canMirrorWindow)
+                if session.mirrorPiPSupported {
+                    // UX-041: the tile's PiP button.
+                    Button {
+                        session.toggleMirrorPiP()
+                    } label: {
+                        Label(
+                            session.mirrorPiPState.isActive ? "Close Picture in Picture" : "Picture in Picture",
+                            systemImage: session.mirrorPiPState.isActive ? "pip.exit" : "pip.enter"
+                        )
+                    }
+                    .disabled(!session.mirrorPiPCanStart)
+                }
                 if session.mirrorDisplays.count > 1, !windowActive {
                     Toggle(isOn: $settings.mirrorFollowsCursor) {
                         Label("Follow Cursor", systemImage: "cursorarrow.motionlines")
