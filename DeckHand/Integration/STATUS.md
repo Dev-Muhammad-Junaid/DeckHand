@@ -868,3 +868,49 @@ Mac should check:
      Apple Intelligence and one without.
 
 Status: READY FOR MAC BUILD (build 14)
+
+## Build 15 queued (2026-11-24)
+
+If build 14 hasn't been built, build this one instead. It is build 14 plus
+three roadmap lanes:
+
+- **Ask** (`LANE-ask.md`, UX-022): the Ask tab and ⌘K. A typed or spoken
+  request becomes an editable plan of `Action` steps that you can Run or
+  Save as key. Destructive and remote-typing steps ask for confirmation.
+  The planner uses Apple Intelligence (Foundation Models) on-device first,
+  with a deterministic parser as the fallback. Every plan still goes through
+  validation and the locked-Mac gate. Pro-gated.
+- **Multi-Mac** (`LANE-multimac.md`, UX-030, M1/M2): several paired Macs
+  with fast switching (pill swipe, ⌘1–4, three-finger switch), per-Mac
+  state and quick reconnect. My Macs cards and the iPad sidebar show live
+  state. The free tier still allows one Mac.
+- **Intents** (`LANE-intents.md`): App Intents and App Shortcuts (Siri,
+  Spotlight, the Shortcuts app), Deck widgets (small, medium and lock
+  screen) and Control Center controls (iOS 18+).
+
+The coordinator applied Intents' project changes (§2): a new
+**`DeckHandWidgets` app-extension target** (bundle ID
+`com.widgetsflow.pixelhand.widgets`), embedded in the iOS app; the **App
+Group `group.com.widgetsflow.pixelhand`** on both the app and the
+extension; and the iOS entitlements file. Automatic signing should
+register the App Group and the widget App ID on the first build. If it
+doesn't, add them in the developer portal (see "Needs the owner").
+
+Protocol is still **12**. Linux: Core **781 tests pass**, type check
+clean. The apps were not compiled here.
+
+Mac should check:
+1. `cd DeckHand && xcodegen generate`, then build the Mac app, the iOS
+   app and the widget extension. Fix compile errors from each handoff's
+   "Compile risks" list and record the fixes here.
+2. `swift test --package-path DeckHand/Core` (expect 781) and
+   `DeckHandTests`.
+3. Work through the check tables in the three handoffs. Do these first:
+   - Ask with and without Apple Intelligence
+   - switching between two Macs
+   - adding the Deck widget and running a key from it
+   - a Siri phrase
+   - the Control Center control
+   - the free tier on a second Mac
+
+Status: READY FOR MAC BUILD (build 15)

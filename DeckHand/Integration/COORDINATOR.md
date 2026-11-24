@@ -1,8 +1,12 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Mac builds:** build 7 was built on the Mac (2026-11-20, results in `STATUS.md`). Build 14 is queued (build 8 plus ten UX lanes). Mac builds are now run from the primary session or the owner's Mac session.
+> **Mac builds:** build 7 was built on the Mac (2026-11-20, results in `STATUS.md`). Build 15 is queued (build 8 plus the UX lanes, Ask, Multi-Mac and Intents). Mac builds are now run from the primary session or the owner's Mac session.
 
 ## Needs the owner
+
+- **Developer portal (only if automatic signing doesn't do it):** App Group
+  `group.com.widgetsflow.pixelhand` on `com.widgetsflow.pixelhand` and the
+  new widget App ID `com.widgetsflow.pixelhand.widgets`.
 
 - **App Store Connect:** done 2026-11-20 (see
   `DeckHand/AppStore/AppStoreConnectStatus.md`): app is Free; "Pixel Hand
@@ -24,9 +28,6 @@ weekly usage limit is close).
 | --- | --- | --- | --- |
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac) — **archived since 2026-11-18; start a new Mac session** | session_01H5HwATvLJkqCFPruLyBsX8 (archived) | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
-| Lane: Intents (App Intents, widgets, Control Center) | session_01H5HwAW3Skh6JSMju9YavzR | claude/pixelhand-lane-intents | `LANE-intents.md` ends `Lane: READY TO MERGE`; apply its YAML/entitlements |
-| Lane: Multi-Mac (UX-030, M1/M2) | session_01H5HwARqKdbGEy8CykunwYY | claude/pixelhand-lane-multimac | `LANE-multimac.md` ends `Lane: READY TO MERGE` |
-| Lane: Ask (UX-022, A1–A3) | session_01H5HwAW4RYKN9vYygVd8u1u | claude/pixelhand-lane-ask | `LANE-ask.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -142,3 +143,9 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   UX-022 Ask, then multi-Mac (UX-030), sharing (UX-031), Duo (UX-040) and
   PiP (UX-041).
   Started Intents, Multi-Mac and Ask. Still queued: UX-013 a11y, UX-014 copy + shim removal, sharing (UX-031), Duo (UX-040), PiP (UX-041).
+- 2026-11-24 ~10:20 UTC: the 02:30 tick ran late. Merged Ask, Multi-Mac
+  and Intents, all clean. Applied the widget extension target, the App
+  Group capability and the entitlement. Core 781 tests pass; type check
+  clean. Queued build 15. Remaining: UX-013 accessibility, UX-014 copy and
+  shim removal, sharing between paired devices (UX-031), iPhone Duo panes
+  (UX-040), PiP live screen (UX-041).
