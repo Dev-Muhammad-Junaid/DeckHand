@@ -7,8 +7,8 @@ import SwiftUI
 
 /// Shared progress + copy for in-app loading states (control shell, apps
 /// grid, window list, text recognition, screenshot capture). Waiting on the
-/// Mac is the remote talking to it, so progress is a small dot scan rather
-/// than a spinner.
+/// Mac is the remote talking to it, so progress is the dot wave rather than
+/// a spinner.
 struct DeckHandLoadingStateView: View {
     let title: String
     var subtitle: String?
@@ -18,8 +18,11 @@ struct DeckHandLoadingStateView: View {
 
     var body: some View {
         VStack(spacing: subtitle == nil ? 14 : 10) {
-            DotScan(columns: 11, rows: 3, pitch: 7, plateCornerRadius: 10, platePadding: 8)
-                // The title says what's happening.
+            // UX-018: the dot wave on a navy plate. The title says what's
+            // happening.
+            DotWave(pitch: 7)
+                .padding(10)
+                .background(PixelHandTheme.Brand.screen, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .accessibilityHidden(true)
             Text(title)
                 .font(DeckHandTheme.TypeStyle.loadingTitle)

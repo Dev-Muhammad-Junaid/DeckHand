@@ -33,6 +33,19 @@ struct AppDock: View {
             ScrollViewReader { reader in
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: PixelHandTheme.Space.sm) {
+                        // UX-018: never an empty capsule. The dot wave until
+                        // the Mac's app list arrives, then a quiet line.
+                        if !entries.contains(where: { apps[$0.bundleID] != nil }) {
+                            Group {
+                                if apps.isEmpty {
+                                    DotWave(pitch: 3, label: "Loading apps")
+                                } else {
+                                    DotMatrixText("NO APPS OPEN", pitch: 1.4, label: "No apps open", glows: false)
+                                        .foregroundStyle(PixelHandTheme.ink3)
+                                }
+                            }
+                            .frame(height: PixelHandTheme.ControlHeight.hit)
+                        }
                         ForEach(entries) { entry in
                             if let app = apps[entry.bundleID] {
                                 DockApp(
