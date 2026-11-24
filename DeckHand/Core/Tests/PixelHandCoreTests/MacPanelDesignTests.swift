@@ -160,3 +160,21 @@ struct PairingCodeDisplayTests {
         return ""
     }
 }
+
+@Suite("Mac panel copy")
+struct MacPanelCopyTests {
+    @Test("The header line says what the Mac is doing, plainly")
+    func header() {
+        func line(running: Bool = true, failed: Bool = false, connected: Int = 0, pending: Int = 0, locked: Bool = false) -> String {
+            MacPanelCopy.headerStatus(isRunning: running, failedToStart: failed, connected: connected, pending: pending, isLocked: locked)
+        }
+        #expect(line(running: false) == "Starting…")
+        #expect(line(running: false, failed: true) == "Failed to start")
+        #expect(line() == "Ready for a device")
+        #expect(line(connected: 1) == "1 device connected · ready")
+        #expect(line(connected: 2) == "2 devices connected · ready")
+        #expect(line(connected: 1, pending: 1) == "1 device asking · 1 device connected · ready")
+        #expect(line(connected: 1, locked: true) == "1 device connected · locked")
+        #expect(line(locked: true) == "Locked")
+    }
+}
