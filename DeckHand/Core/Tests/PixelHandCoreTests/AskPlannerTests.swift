@@ -281,6 +281,11 @@ struct AskPlanTests {
     @Test("step summaries read plainly")
     func summaries() {
         #expect(AskStep.typeText("hello").summary() == "Type “hello”")
+        // VQ-049: Return never breaks the quote across lines.
+        #expect(AskStep.typeText("apple.com\n").summary() == "Type “apple.com” then Return")
+        #expect(AskStep.typeText("a\nb").summary() == "Type “a ↩ b”")
+        #expect(AskStep.typeText("\n").summary() == "Press Return")
+        #expect(!AskStep.typeText("x\r\n").summary().contains("\n"))
         #expect(AskStep.delay(milliseconds: 1_500).summary() == "Wait 1.5 s")
         #expect(AskStep.delay(milliseconds: 2_000).summary() == "Wait 2 s")
         #expect(AskStep.action(.launchApp(bundleID: safari)).summary { $0 == safari ? "Safari" : nil } == "Open Safari")

@@ -35,8 +35,18 @@ public enum AskStep: Codable, Sendable, Equatable, Hashable {
         case let .action(action):
             return action.summary(appName: appName)
         case let .typeText(text):
-            let shown = text.count > 60 ? String(text.prefix(57)) + "…" : text
-            return "Type “\(shown)”"
+            // One line: a trailing Return reads "then Return" and inner line
+            // breaks show as ↩, never a quote broken across lines (VQ-049).
+            var body = text
+            var endsWithReturn = false
+            while let last = body.last, last.isNewline {
+                body.removeLast()
+                endsWithReturn = true
+            }
+            body = body.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).joined(separator: " ↩ ")
+            let shown = body.count > 60 ? String(body.prefix(57)) + "…" : body
+            if shown.isEmpty { return endsWithReturn ? "Press Return" : "Type “”" }
+            return endsWithReturn ? "Type “\(shown)” then Return" : "Type “\(shown)”"
         case let .delay(ms):
             let seconds = Double(ms) / 1000
             let text = seconds == seconds.rounded() ? String(Int(seconds)) : String(format: "%.1f", seconds)

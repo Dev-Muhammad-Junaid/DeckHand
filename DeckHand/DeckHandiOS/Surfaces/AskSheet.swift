@@ -97,17 +97,20 @@ struct AskSheet: View {
         HStack(spacing: PixelHandTheme.Space.sm) {
             PHGlyph(glyph: PixelGlyphs.ask, pitch: PixelPitch.header)
                 .foregroundStyle(PixelHandTheme.ink)
-            Text("Ask \(macName)")
+            // "Ask", never a truncated "Ask Muhammad’s Mac…" (VQ-050);
+            // VoiceOver still hears which Mac.
+            Text("Ask")
                 .font(.headline)
                 .foregroundStyle(PixelHandTheme.ink)
                 .lineLimit(1)
         }
         .accessibilityElement(children: .combine)
+        .accessibilityLabel("Ask \(macName)")
     }
 
     private var field: some View {
         HStack(spacing: PixelHandTheme.Space.sm) {
-            TextField("Tell \(macName) what to do", text: $model.request, axis: .vertical)
+            TextField("What should your Mac do?", text: $model.request, axis: .vertical)
                 .lineLimit(1...4)
                 .focused($isFieldFocused)
                 .accessibilityIdentifier("ph.ask.field")
