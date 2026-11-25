@@ -18,6 +18,9 @@ struct RemoteKeyboardPanel: View {
 
     @EnvironmentObject private var settings: DeckHandSettings
     @State private var latched: [KeyModifier] = []
+    /// A Return held back while the person confirms the app (VQ-036).
+    @State private var heldReturn: (() -> Void)?
+    private let target = TypingTarget.shared
 
     private struct KeyButton: Identifiable {
         let key: RemoteKey
@@ -44,6 +47,47 @@ struct RemoteKeyboardPanel: View {
         KeyButton(key: .return, symbol: "return", label: "Return"),
     ]
 
+    /// "Typing into Messages": where keys go, always in view (VQ-036).
+    private var targetLine: some View {
+        HStack(spacing: PixelHandTheme.Space.xs) {
+            PHGlyph(glyph: PixelGlyphs.keyboard, pitch: CGFloat(PixelPitch.badge), stepsWithType: true)
+                .foregroundStyle(.secondary)
+            Text(TypingTargetGuard.caption(frontApp: target.frontApp))
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("ph.keyboard.target")
+        .alert(
+            "Send Return to \(target.frontApp ?? "the Mac")?",
+            isPresented: Binding(get: { heldReturn != nil }, set: { if !$0 { heldReturn = nil } })
+        ) {
+            Button("Send") {
+                target.guardrail.confirmed(target.frontApp)
+                heldReturn?()
+                heldReturn = nil
+            }
+            Button("Cancel", role: .cancel) { heldReturn = nil }
+        } message: {
+            Text("\(target.frontApp ?? "Another app") is in front on the Mac now, not \(target.guardrail.acknowledgedApp ?? "the app you were typing into"). Return might send or submit something there.")
+        }
+    }
+
+    /// Sends now, or holds a Return that would land in an app the person
+    /// hasn't typed into (the front app changed under them).
+    private func guardReturn(if isReturn: Bool, send: @escaping () -> Void) {
+        if isReturn, target.guardrail.shouldConfirmReturn(frontApp: target.frontApp) {
+            heldReturn = send
+            return
+        }
+        if !isReturn { target.guardrail.typed(into: target.frontApp) }
+        send()
+    }
+
     private static let modifiers: [ModifierButton] = [
         ModifierButton(modifier: .command, glyph: "⌘", label: "Command"),
         ModifierButton(modifier: .option, glyph: "⌥", label: "Option"),
@@ -53,16 +97,22 @@ struct RemoteKeyboardPanel: View {
 
     var body: some View {
         VStack(spacing: 8) {
+            targetLine
+
             LiveTypingField(
                 placeholder: "Type here: it goes straight to the Mac",
                 latchedModifiers: latched,
                 onEdit: { edit in
                     onActivity()
-                    Task { await sender.sendTypingEdit(edit) }
+                    guardReturn(if: edit.insert.contains("\n")) {
+                        Task { await sender.sendTypingEdit(edit) }
+                    }
                 },
                 onKey: { key, modifiers in
                     onActivity()
-                    Task { await sender.sendKey(key, modifiers: modifiers) }
+                    guardReturn(if: key == .return) {
+                        Task { await sender.sendKey(key, modifiers: modifiers) }
+                    }
                 },
                 onChord: { keys in
                     onActivity()
@@ -112,7 +162,9 @@ struct RemoteKeyboardPanel: View {
                             let modifiers = latched
                             latched = []
                             GestureHaptic.light.trigger()
-                            Task { await sender.sendKey(key, modifiers: modifiers) }
+                            guardReturn(if: key == .return) {
+                                Task { await sender.sendKey(key, modifiers: modifiers) }
+                            }
                         } label: {
                             Image(systemName: item.symbol)
                                 .font(.system(size: 14, weight: key == .return ? .semibold : .medium))
