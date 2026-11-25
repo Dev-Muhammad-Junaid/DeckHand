@@ -197,3 +197,8 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
 
   Added `SettingsDiagnosticsSection` to Settings with a glyph header. Core has 916 tests, all passing; the type check passes. **Build 19 queued** (`6e8f18e`), with protocol 14 (8-digit codes, `pairing.refused`).
 - 2026-11-25 01:10 UTC: `OWNER-REVIEW-visual-qa-build18.md` (OR-01 to OR-16) had arrived just before the QA lanes started, and they covered only part of it. Started three owner-review lanes for the rest: or-ios-chrome, or-canvas and or-mac-panel. OR-16 is parked under Needs the owner. After these merge: build 20, then the visual QA re-run, then the review page.
+- 2026-11-25 ~02:05 UTC: primary session merged or-ios-chrome, or-canvas
+  (resolved MacsSidebar/PixelHandShell conflicts; kept 24 pt padding) and
+  or-mac-panel; queued build 20. Started the build 19 fix session
+  (branch `claude/pixelhand-lane-build19-fixes`); merge it as build 21.
+

@@ -1369,4 +1369,32 @@ Release, team `DD5AWPLT2V`, `-allowProvisioningUpdates`.
 
 (none reported yet)
 
-Status: BUILT (build 19) — 5 bugs
+
+Status after build 19: BUILT — 5 bugs (a fix session is on them; see build 21).
+
+## Build 20 queued (2026-11-25, primary session)
+
+Build 19 plus the three owner-review lanes (`OWNER-REVIEW-visual-qa-build18.md`):
+
+- **or-ios-chrome** (`LANE-or-ios-chrome.md`): one fixed sidebar toggle
+  (OR-05), fades instead of slides, dock dot removed, labels without
+  ellipses, glyph rule lint, Pointer arrangement from Trackpad, VQ-069 Mac
+  reconnect, VQ-079.
+- **or-canvas** (`LANE-or-canvas.md`): narrower sidebar (176 pt) with
+  compact Mac cards (OR-04), collapsible right column with a Deck | Ask
+  switch and Ask in the column (OR-06), Ask paywall card removed (OR-03).
+- **or-mac-panel** (`LANE-or-mac-panel.md`): Mac panel QR tile, pairing
+  digits, ellipses, Transfers tab (OR-10 to OR-13).
+
+Merge note: `MacsSidebar.swift` keeps or-ios-chrome's 24 pt leading
+padding (`SidebarTogglePlacement.sidebarLeadingPadding`) so the toggle
+doesn't move; or-canvas planned 16 pt. Check the compact Mac cards still
+fit the 176 pt sidebar without truncating badly.
+
+Mac should check: build all targets; Core, Loom and app tests; run the
+`PixelHandUITests` walks on the iPad Pro 11" simulator (portrait,
+landscape, Stage Manager at iPhone width) and re-check OR-03 to OR-06 and
+OR-10 to OR-13 against each lane's table; install on Mac and iPad.
+
+Status: READY FOR MAC BUILD (build 20)
+
