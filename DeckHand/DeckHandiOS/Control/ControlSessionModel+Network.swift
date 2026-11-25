@@ -167,10 +167,16 @@ extension ControlSessionModel {
         let connection = connection
         return Task { [weak self] in
             for await snapshot in connection.networkPathUpdates {
-                let local = LinkJudge.judge(LinkObservation(snapshot: snapshot, addressOwners: InterfaceAddressTable.current()))
+                let observation = LinkObservation(snapshot: snapshot, addressOwners: InterfaceAddressTable.current())
+                let local = LinkJudge.judge(observation)
                 guard let self else { return }
                 self.keepAlive.setLocalLink(local)
                 self.publishLink()
+                // VQ-069: keep a paired Mac's LAN address for when Bonjour
+                // is quiet on the next launch.
+                if let mac = self.pairingMac {
+                    LastLANStore.shared.sessionRan(overHost: observation.remoteHost, link: local, mac: mac.ref)
+                }
             }
         }
     }

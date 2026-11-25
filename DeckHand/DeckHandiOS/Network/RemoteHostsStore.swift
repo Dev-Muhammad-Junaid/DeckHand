@@ -66,12 +66,15 @@ final class RemoteHostsStore {
         }
     }
 
-    /// What Loom's overlay directory probes: hosts of Macs still paired.
-    /// Also drops the hosts of forgotten Macs from disk.
+    /// What Loom's overlay directory probes: hosts of Macs still paired,
+    /// then their last LAN addresses for when Bonjour is quiet (VQ-069,
+    /// `LastLANStore`). Also drops the hosts of forgotten Macs from disk.
     func currentSeeds() -> [LoomOverlaySeed] {
         let paired = pairedMacs
         if book.prune(pairedMacs: paired) { changed() }
-        return book.seeds(pairedMacs: paired).map { LoomOverlaySeed(host: $0.value) }
+        let vpn = book.seeds(pairedMacs: paired)
+        let lan = LastLANStore.shared.currentSeeds().filter { !vpn.contains($0) }
+        return (vpn + lan).map { LoomOverlaySeed(host: $0.value) }
     }
 
     // MARK: - Loom

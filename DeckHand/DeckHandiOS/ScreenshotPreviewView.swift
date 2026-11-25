@@ -331,7 +331,7 @@ struct ScreenshotPreviewView: View {
         if let toast {
             PHToast(message: toast.message, isFailure: toast.failed)
                 .padding(.bottom, 132)
-                .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .bottom)))
+                .transition(.opacity) // Glyph rule: status rows fade, never slide.
                 .allowsHitTesting(false)
         }
     }

@@ -298,7 +298,7 @@ struct PixelHandShell: View {
                     onCollapse: { sidebarCollapsed = true },
                     onOpenMacs: { isMyMacsPresented = true }
                 )
-                .transition(.move(edge: .leading).combined(with: .opacity))
+                .transition(.opacity) // Glyph rule: panels fade, never slide.
             }
 
             // Centre column.
@@ -673,7 +673,7 @@ struct PixelHandShell: View {
         if isKeyboardShown, let sender = session.sender {
             RemoteKeyboardPanel(sender: sender, clipboard: session.clipboard, colorScheme: colorScheme)
                 .padding(.horizontal, margin)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .transition(.opacity) // Glyph rule: panels fade, never slide.
         }
     }
 

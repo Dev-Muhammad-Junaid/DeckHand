@@ -14,8 +14,10 @@
 //  controls. The classic layout is a DEBUG-only item.
 //
 //  On iPad (UX-007) the header also carries the layout presets, and on
-//  wide windows the Ask field (⌘K) between them and capture, and the
-//  sidebar button while the Macs sidebar is hidden. In the iPhone
+//  wide windows the Ask field (⌘K) between them and capture. While the Macs
+//  sidebar is hidden, its show button leads the row, before the Mac pill:
+//  the same spot the hide button takes in the sidebar's title row, so the
+//  button never jumps (OR-05, `SidebarTogglePlacement`). In the iPhone
 //  landscape rail it sits on top of the deck column without padding or the
 //  screen button (the rail has the Screen tab).
 //
@@ -47,7 +49,8 @@ struct ShellHeader: View {
     var presets: Binding<LayoutPreset>?
     /// Wide: Ask as a field in the header (a circle when the row is tight).
     var onAsk: (() -> Void)?
-    /// Wide, sidebar hidden: the button that shows it again.
+    /// Wide, sidebar hidden: the button that shows it again. It leads the
+    /// row and never folds into More (OR-05).
     var onShowSidebar: (() -> Void)?
     var showsMirrorToggle = true
     var horizontalPadding: CGFloat = PixelHandTheme.Space.lg
@@ -68,12 +71,13 @@ struct ShellHeader: View {
 
     /// The optional circles beside the pill (More is always there).
     private var circleCount: Int {
-        (showsMirrorToggle ? 1 : 0) + 1 /* capture */ + 1 /* send */ + (onShowSidebar == nil ? 0 : 1)
+        (showsMirrorToggle ? 1 : 0) + 1 /* capture */ + 1 /* send */
     }
 
     /// Room the presets and the Ask circle take in the row.
     private var reservedWidth: Double {
         (presets == nil ? 0 : 168) + (onAsk == nil ? 0 : 52) + (linkBadge == nil ? 0 : 72)
+            + (onShowSidebar == nil ? 0 : SidebarTogglePlacement.buttonSide + 8)
     }
 
     /// Which circles stay in the row; the rest fold into More (VQ-032,
@@ -92,6 +96,9 @@ struct ShellHeader: View {
     var body: some View {
         let fit = self.actions
         HStack(spacing: PixelHandTheme.Space.sm) {
+            if let onShowSidebar {
+                SidebarToggleButton(sidebarShown: false, action: onShowSidebar)
+            }
             MacPill(
                 name: peerName,
                 subtitle: subtitle,
@@ -141,9 +148,6 @@ struct ShellHeader: View {
             }
             if fit == .full {
                 TransferHeaderButton() // Sharing lane: Send and Inbox (S2)
-                if let onShowSidebar {
-                    GlassCircleButton(glyph: PixelGlyphs.sidebar, label: "Show the Macs sidebar", action: onShowSidebar)
-                }
             }
             moreMenu(folded: fit)
         }
@@ -275,11 +279,6 @@ struct ShellHeader: View {
                             Label("Send and Inbox", systemImage: "paperplane")
                         }
                     }
-                    if let onShowSidebar {
-                        Button(action: onShowSidebar) {
-                            Label("Show Macs", systemImage: "sidebar.leading")
-                        }
-                    }
                     if let onAsk {
                         Button(action: onAsk) {
                             Label("Ask", systemImage: "text.magnifyingglass")
@@ -335,6 +334,27 @@ struct ShellHeader: View {
                 Label("\(SubscriptionCopy.title(feature)) · Pro", systemImage: "lock")
             }
         }
+    }
+}
+
+/// The Macs sidebar's show/hide button (OR-05). The header leads with it
+/// while the sidebar is hidden; `MacsSidebar` leads its title row with it
+/// while the sidebar shows. Same size, same row height, same leading inset,
+/// so it stays in one spot. Lit (accent) while the sidebar shows: state by
+/// colour only.
+struct SidebarToggleButton: View {
+    let sidebarShown: Bool
+    let action: () -> Void
+
+    var body: some View {
+        GlassCircleButton(
+            glyph: PixelGlyphs.sidebar,
+            label: SidebarTogglePlacement.label(sidebarShown: sidebarShown),
+            size: CGFloat(SidebarTogglePlacement.buttonSide),
+            isOn: sidebarShown,
+            action: action
+        )
+        .accessibilityIdentifier("ph.header.sidebar")
     }
 }
 

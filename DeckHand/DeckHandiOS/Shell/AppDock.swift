@@ -125,7 +125,8 @@ struct AppDock: View {
     }
 }
 
-/// One app: 36 pt icon, running dot under it, 44 pt target.
+/// One app: 36 pt icon, 44 pt target. The front app shows by its accent
+/// ring only; no dot under it (owner's glyph rule).
 private struct DockApp: View {
     let app: InstalledAppInfo
     let entry: AppDockEntry
@@ -141,26 +142,23 @@ private struct DockApp: View {
             GestureHaptic.medium.trigger()
             onActivate()
         } label: {
-            VStack(spacing: 4) {
-                AppIconTile(app: app, side: iconSide)
-                    .overlay {
-                        if entry.isFront {
-                            // 2 pt of canvas, then a 2 pt accent ring.
-                            RoundedRectangle(cornerRadius: PixelHandTheme.Radius.kbd + 4, style: .continuous)
-                                .strokeBorder(PixelHandTheme.accent, lineWidth: PixelHandTheme.Stroke.selection)
-                                .padding(-4)
-                        }
+            AppIconTile(app: app, side: iconSide)
+                .overlay {
+                    if entry.isFront {
+                        // 2 pt of canvas, then a 2 pt accent ring.
+                        RoundedRectangle(cornerRadius: PixelHandTheme.Radius.kbd + 4, style: .continuous)
+                            .strokeBorder(PixelHandTheme.accent, lineWidth: PixelHandTheme.Stroke.selection)
+                            .padding(-4)
                     }
-                    .overlay(alignment: .topTrailing) {
-                        if entry.hasDialog {
-                            StatusPixel(state: .needsYou, size: 8)
-                                .padding(2)
-                                .background(PixelHandTheme.canvas, in: RoundedRectangle(cornerRadius: 3, style: .continuous))
-                                .offset(x: 5, y: -5)
-                        }
+                }
+                .overlay(alignment: .topTrailing) {
+                    if entry.hasDialog {
+                        StatusPixel(state: .needsYou, size: 8)
+                            .padding(2)
+                            .background(PixelHandTheme.canvas, in: RoundedRectangle(cornerRadius: 3, style: .continuous))
+                            .offset(x: 5, y: -5)
                     }
-                runningDot
-            }
+                }
             .frame(minWidth: PixelHandTheme.ControlHeight.hit, minHeight: PixelHandTheme.ControlHeight.hit)
             .contentShape(Rectangle())
         }
@@ -189,13 +187,6 @@ private struct DockApp: View {
                 AppIconTile(app: app, side: iconSide)
             }
         }
-    }
-
-    private var runningDot: some View {
-        RoundedRectangle(cornerRadius: 1, style: .continuous)
-            .fill(entry.isFront ? PixelHandTheme.Brand.mint : PixelHandTheme.ink3)
-            .frame(width: 4, height: 4)
-            .shadow(color: entry.isFront ? PixelHandTheme.Brand.mint.opacity(0.9) : .clear, radius: entry.isFront ? 2.5 : 0)
     }
 
     private var accessibilityText: String {

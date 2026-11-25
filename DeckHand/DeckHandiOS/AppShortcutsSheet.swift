@@ -145,7 +145,7 @@ struct AppShortcutsSheet: View {
                     .padding(.horizontal, 20)
                     .padding(.vertical, 10)
                     .background(PixelHandTheme.color(PaletteTokens.fill, for: colorScheme))
-                    .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
+                    .transition(.opacity) // Glyph rule: status rows fade, never slide.
                 }
             }
             .toolbar {
@@ -243,7 +243,7 @@ struct AppShortcutsSheet: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 6)
-                .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+                .transition(.opacity) // Glyph rule: panels fade, never slide.
             }
         }
     }
