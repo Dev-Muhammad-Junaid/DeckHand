@@ -41,38 +41,27 @@ struct SettingsPointerSection: View {
                 .labelsHidden()
             }
 
-            Toggle("Natural scrolling", isOn: $settings.naturalScrolling)
+            SettingsToggle(
+                "Natural scrolling",
+                glyph: PixelGlyphs.click,
+                subtitle: "Content moves with your fingers.",
+                isOn: $settings.naturalScrolling
+            )
 
-            Toggle(isOn: $showsClickStrip) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Click strip")
-                    Text(TrackpadInputCopy.clickStripCaption)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
+            SettingsToggle("Click strip", glyph: PixelGlyphs.click, subtitle: TrackpadInputCopy.clickStripCaption, isOn: $showsClickStrip)
 
-            Toggle(isOn: $settings.trackpadGestures) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Mac gestures")
-                    Text(TrackpadInputCopy.gesturesCaption)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
+            SettingsToggle("Mac gestures", glyph: PixelGlyphs.missionControl, subtitle: TrackpadInputCopy.gesturesCaption, isOn: $settings.trackpadGestures)
 
             if UIDevice.current.userInterfaceIdiom == .pad {
-                Toggle(isOn: $settings.pencilHoverPointer) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Apple Pencil hover moves the pointer")
-                        Text(TrackpadInputCopy.pencilCaption)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
+                SettingsToggle(
+                    "Apple Pencil hover moves the pointer",
+                    glyph: PixelGlyphs.pointer,
+                    subtitle: TrackpadInputCopy.pencilCaption,
+                    isOn: $settings.pencilHoverPointer
+                )
             }
 
-            SettingBlock("Send rate", caption: "How often touches are sent to the Mac.") {
+            SettingBlock("Send rate", caption: "How often touches are sent to the Mac. Try 60 Hz if the pointer feels erratic on a busy network.") {
                 Picker("Send rate", selection: $settings.inputSendRate) {
                     ForEach(InputSendRate.allCases) { option in
                         Text(option.label).tag(option)
@@ -82,17 +71,17 @@ struct SettingsPointerSection: View {
                 .labelsHidden()
             }
         } header: {
-            Text("Pointer and gestures")
+            SettingsSectionHeader("Pointer and gestures", glyph: PixelGlyphs.pointer)
         } footer: {
-            Text("Natural scrolling moves the content with your fingers. 120 Hz matches ProMotion so no touch is discarded; 60 Hz halves the packets if the pointer feels erratic on a busy network. \(TrackpadInputCopy.dragFooter)")
+            Text(TrackpadInputCopy.dragFooter)
         }
 
         Section {
-            Toggle("Share clipboard", isOn: $settings.clipboardSync)
+            SettingsToggle("Share clipboard", glyph: PixelGlyphs.paste, isOn: $settings.clipboardSync)
                 .requiresPro(.sharing) // Store lane
-            Toggle("Paste on the Mac right away", isOn: $settings.pasteRightAway)
+            SettingsToggle("Paste on the Mac right away", glyph: PixelGlyphs.type, isOn: $settings.pasteRightAway)
         } header: {
-            Text("Clipboard")
+            SettingsSectionHeader("Clipboard", glyph: PixelGlyphs.paste)
         } footer: {
             Text(TrackpadInputCopy.clipboardFooter)
         }

@@ -99,7 +99,9 @@ unless `solid` (rule 1); names unique. A snapshot test renders all 40 at pitch
 ## 2. Dot-matrix type
 
 **Font.** 5 × 7 cells, 1-cell tracking (6-cell advance), uppercase A–Z,
-0–9 and `· : / % - + < >`. Lowercase is uppercased. Same dot rule as glyphs
+0–9 and `· : / % - . + < > ' ’ , & ( ) ? !`. Lowercase is uppercased,
+accented letters draw without the accent, and typographic dashes and quotes
+draw as their plain forms (VQ-071). Same dot rule as glyphs
 (80 % dot, 32 % radius).
 
 **Use it for:** status words (LIVE, LOCKED, DIALOG), counters (01/03,

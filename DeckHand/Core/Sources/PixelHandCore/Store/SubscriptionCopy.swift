@@ -164,7 +164,7 @@ public enum SubscriptionCopy {
         case let .trial(plan, endsOn, willRenew):
             let end = endsOn.map(formatDate)
             let detail: String = switch (end, willRenew) {
-            case let (end?, false?): "Trial ends \(end). It won't renew."
+            case let (end?, false?): "Trial ends \(end). It won’t renew."
             case let (end?, _): "Free until \(end), then \(price(plan))."
             case (nil, _): "Free trial, then \(price(plan))."
             }
@@ -172,7 +172,7 @@ public enum SubscriptionCopy {
         case let .active(plan, periodEnds, willRenew, renewsTo, familyShared):
             let end = periodEnds.map(formatDate)
             var detail: String = switch (end, willRenew) {
-            case let (end?, false?): "Ends \(end). It won't renew."
+            case let (end?, false?): "Ends \(end). It won’t renew."
             case let (end?, _):
                 if let renewsTo { "Switches to \(renewsTo.title.lowercased()) on \(end)." } else { "Renews \(end) at \(price(plan))." }
             case (nil, _): "\(plan.title) plan."
@@ -183,20 +183,20 @@ public enum SubscriptionCopy {
             let by = until.map { " by \(formatDate($0))" } ?? ""
             return StatusRow(
                 title: productName,
-                detail: "Apple couldn't renew your subscription. Update your payment method\(by) to keep Pro.",
+                detail: "Apple couldn’t renew your subscription. Update your payment method\(by) to keep Pro.",
                 needsPaymentAttention: true
             )
         case .billingRetry:
             return StatusRow(
                 title: productName,
-                detail: "Apple couldn't renew your subscription. Update your payment method to keep Pro.",
+                detail: "Apple couldn’t renew your subscription. Update your payment method to keep Pro.",
                 needsPaymentAttention: true
             )
         case let .expired(on):
-            let detail = on.map { "Pro ended \(formatDate($0)). You're on the free plan." } ?? "Pro has ended. You're on the free plan."
+            let detail = on.map { "Pro ended \(formatDate($0)). You’re on the free plan." } ?? "Pro has ended. You’re on the free plan."
             return StatusRow(title: "Free plan", detail: detail)
         case .revoked:
-            return StatusRow(title: "Free plan", detail: "Your Pro purchase was refunded, so you're on the free plan.")
+            return StatusRow(title: "Free plan", detail: "Your Pro purchase was refunded, so you’re on the free plan.")
         }
     }
 

@@ -57,7 +57,7 @@ struct SettingsDiagnosticsSection: View {
 
             exportRow
         } header: {
-            Text("Diagnostics")
+            SettingsSectionHeader("Diagnostics", glyph: PixelGlyphs.console)
         } footer: {
             Text("Export logs makes a text file of the last hour of Pixel Hand’s log to send with a problem report. It has device and Mac names, no screen contents and no typed text.")
         }

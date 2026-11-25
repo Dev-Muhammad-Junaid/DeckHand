@@ -135,7 +135,7 @@ struct VersionLineTests {
     func drawable() {
         let line = VersionLine.text(version: "1.2b(3)", build: "52_x")
         #expect(line.allSatisfy { DotMatrixFont.pattern(for: $0) != nil })
-        #expect(line == "PIXEL HAND 1.2B3 - 52X")
+        #expect(line == "PIXEL HAND 1.2B(3) - 52X")
     }
 
     @Test("Pixel Hand's own Mac panel never becomes the front app (VQ-063)")

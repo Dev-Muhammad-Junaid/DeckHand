@@ -13,26 +13,22 @@ struct SettingsMultiMacSection: View {
 
     var body: some View {
         Section {
-            Toggle(isOn: $settings.swipeBetweenMacs) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Swipe between Macs")
-                    Text("Three fingers left or right on the trackpad switch Macs when another one is in reach. Off, they switch Spaces on the Mac.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Toggle(isOn: $settings.reconnectAutomatically) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Reconnect automatically")
-                    Text("Connects to the Mac you used last when Pixel Hand opens, if it’s paired and in reach, and tries again when a connection drops.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
+            SettingsToggle(
+                "Swipe between Macs",
+                glyph: PixelGlyphs.spaceRight,
+                subtitle: "Three fingers left or right switch Macs. Off, they switch Spaces.",
+                isOn: $settings.swipeBetweenMacs
+            )
+            SettingsToggle(
+                "Reconnect automatically",
+                glyph: PixelGlyphs.wifi,
+                subtitle: "To the Mac you used last, when it’s in reach.",
+                isOn: $settings.reconnectAutomatically
+            )
         } header: {
-            Text("Several Macs")
+            SettingsSectionHeader("Several Macs", glyph: PixelGlyphs.displays)
         } footer: {
-            Text("Switch Macs from the Mac pill (tap for My Macs, swipe for the next one), the iPad sidebar, or ⌘1–⌘4 and ⌘` on a keyboard. Each Mac keeps its own surface, deck page and mirror settings.")
+            Text("Switch Macs from the Mac pill, the iPad sidebar, or ⌘1–⌘4 on a keyboard.")
         }
     }
 }

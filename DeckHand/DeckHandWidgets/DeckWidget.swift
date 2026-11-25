@@ -8,7 +8,8 @@
 //  keys yet, shows the free Mac keys (Mission Control, Show Desktop,
 //  Play/Pause, Lock Screen, …), which work without Pro.
 //
-//  The status strip names the last Mac in dot-matrix (`STUDIO · DECK`).
+//  The status strip names the last Mac and what it's doing in dot-matrix
+//  (`STUDIO · XCODE`, `STUDIO · LOCKED`), shortened at word boundaries.
 //  Pressing a key opens Pixel Hand and runs it there (`openAppWhenRun`):
 //  the Mac connection lives in the app.
 //
@@ -57,6 +58,19 @@ enum WidgetButton: Identifiable, Hashable {
         switch self {
         case let .key(key): key.label
         case let .system(option): option.command.title
+        case .media(.playPause): "Play"
+        case .media(.next): "Next"
+        case .media(.previous): "Back"
+        }
+    }
+
+    /// The word drawn under the glyph (VQ-073): one short word for the
+    /// free keys, so every key in a widget draws its label at one size.
+    /// `label` stays the spoken name.
+    var shortLabel: String {
+        switch self {
+        case let .key(key): key.label
+        case let .system(option): option.command.widgetLabel
         case .media(.playPause): "Play"
         case .media(.next): "Next"
         case .media(.previous): "Back"
@@ -152,23 +166,40 @@ struct DeckWidgetView: View {
         .containerBackground(for: .widget) { WidgetPalette.surface }
     }
 
+    /// `STUDIO · XCODE` (`06-Pixel-Identity.md` §3): the Mac's name, then
+    /// what it's doing (the front app, LOCKED or OFFLINE). Too long, it
+    /// drops the detail only after the name has shortened word by word,
+    /// and never cuts a word (VQ-070, VQ-072); when nothing fits, the live
+    /// pixel stands alone.
     private var statusStrip: some View {
-        let mac = snapshot.currentMac?.name ?? "PIXEL HAND"
-        let suffix = snapshot.isPro && !snapshot.widgetKeys.isEmpty ? "DECK" : "MAC"
+        let mac = snapshot.currentMac
+        let lines = StatusStripText.candidates(name: mac?.name ?? "Pixel Hand", details: mac?.stripDetails ?? [])
         return HStack(spacing: 5) {
             Circle()
-                .fill(snapshot.currentMac == nil ? WidgetPalette.stripDim : WidgetPalette.mint)
+                .fill(mac?.isLive == true ? WidgetPalette.mint : WidgetPalette.stripDim)
                 .frame(width: 4, height: 4)
             ViewThatFits(in: .horizontal) {
-                WidgetDotText("\(mac) · \(suffix)", pitch: 1.6)
-                WidgetDotText(mac, pitch: 1.6)
-                WidgetDotText(String(mac.prefix(6)), pitch: 1.6)
+                ForEach(lines, id: \.self) { line in
+                    WidgetDotText(line, pitch: 1.6)
+                }
+                Color.clear.frame(width: 0, height: CGFloat(DotMatrixFont.rows) * 1.6)
             }
-            .foregroundStyle(WidgetPalette.phosphor)
+            .foregroundStyle(mac?.glance == .offline ? WidgetPalette.stripDim : WidgetPalette.phosphor)
             Spacer(minLength: 0)
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(snapshot.currentMac.map { "Pixel Hand, \($0.name)" } ?? "Pixel Hand")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(stripAccessibilityLabel)
+    }
+
+    private var stripAccessibilityLabel: String {
+        guard let mac = snapshot.currentMac else { return "Pixel Hand" }
+        switch mac.glance {
+        case .locked: return "Pixel Hand, \(mac.name), locked"
+        case .offline: return "Pixel Hand, \(mac.name), not connected"
+        case .live, nil:
+            if let app = mac.stripDetails.first { return "Pixel Hand, \(mac.name), \(app) in front" }
+            return "Pixel Hand, \(mac.name)"
+        }
     }
 }
 
@@ -179,11 +210,14 @@ struct DeckWidgetKeyFace: View {
         VStack(spacing: 4) {
             WidgetGlyphView(glyph: button.glyph, side: 22)
                 .foregroundStyle(WidgetPalette.glyphColor(tint: button.tint))
-            Text(button.label)
+            // One fixed size for every key (VQ-073): free keys have short
+            // labels; a long deck-key label ends in an ellipsis instead of
+            // shrinking below its neighbours.
+            Text(button.shortLabel)
                 .font(.system(size: 10, weight: .medium, design: .rounded))
                 .foregroundStyle(WidgetPalette.phosphor.opacity(0.82))
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .truncationMode(.tail)
         }
         .padding(.horizontal, 4)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

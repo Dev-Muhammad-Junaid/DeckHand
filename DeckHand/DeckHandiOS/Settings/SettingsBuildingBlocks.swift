@@ -26,21 +26,60 @@ import SwiftUI
 /// segmented pickers read straight through the title in dark mode. A
 /// visible bar background, plus a hard scroll edge on iOS 26, keeps the
 /// title on a solid surface in both appearances.
+///
+/// The bar is painted with the list's own `canvas` colour, so the next
+/// section's header never ghosts through under "Settings" while scrolling
+/// (VQ-017).
 struct OpaqueSettingsBar: ViewModifier {
     func body(content: Content) -> some View {
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
             content
+                .toolbarBackground(PixelHandTheme.canvas, for: .navigationBar)
                 .toolbarBackground(.visible, for: .navigationBar)
                 .scrollEdgeEffectStyle(.hard, for: .top)
         } else {
             content
+                .toolbarBackground(PixelHandTheme.canvas, for: .navigationBar)
                 .toolbarBackground(.visible, for: .navigationBar)
         }
         #else
         content
+            .toolbarBackground(PixelHandTheme.canvas, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
         #endif
+    }
+}
+
+/// Settings on iPad fills a page sheet instead of a small centred form
+/// sheet with two thirds of the screen empty (VQ-016). iPhone sheets are
+/// full height already.
+struct SettingsSheetSizing: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content
+                .presentationSizing(.page)
+        } else {
+            content
+                .presentationDetents([.large])
+        }
+    }
+}
+
+/// The sheet's Done button: semibold cobalt text, never a pale tinted
+/// glass fill that reads as disabled (VQ-010). Not a
+/// `.confirmationAction`, which iOS 26 draws as prominent glass.
+struct SettingsDoneButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text("Done")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(PixelHandTheme.accent)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("ph.settings.done")
     }
 }
 
@@ -105,14 +144,15 @@ extension View {
             .listRowSeparatorTint(PixelHandTheme.hairline)
     }
 
-    /// The Settings list's container: canvas behind grouped sections,
-    /// accent tint for pickers and sliders, success for switches.
+    /// The Settings list's container: canvas behind grouped sections, and
+    /// cobalt, the one action colour, for switches, pickers and sliders
+    /// alike (VQ-009).
     func phSettingsList() -> some View {
         self
             .scrollContentBackground(.hidden)
             .background(PixelHandTheme.canvas)
             .tint(PixelHandTheme.accent)
-            .toggleStyle(SwitchToggleStyle(tint: PixelHandTheme.success))
+            .toggleStyle(SwitchToggleStyle(tint: PixelHandTheme.accent))
             .listSectionSpacing(PixelHandTheme.Space.xl)
             .environment(\.defaultMinListRowHeight, PixelHandTheme.ControlHeight.primary)
     }
@@ -120,30 +160,59 @@ extension View {
 
 // MARK: - Headers, icons, rows
 
-/// A section header: small semibold `ink2` title, optional glyph at pitch
-/// 1.6. One line in each section file: `header: { SettingsSectionHeader("Live mirror", glyph: PixelGlyphs.screen) }`.
+/// A section header: small semibold `ink2` title in caps with its glyph
+/// at pitch 1.6. Every Settings section uses it, with a glyph, so all
+/// headers look the same (VQ-011):
+/// `header: { SettingsSectionHeader("Live mirror", glyph: PixelGlyphs.screen) }`.
 struct SettingsSectionHeader: View {
     let title: String
-    var glyph: GlyphBitmap?
+    let glyph: GlyphBitmap
 
-    init(_ title: String, glyph: GlyphBitmap? = nil) {
+    init(_ title: String, glyph: GlyphBitmap) {
         self.title = title
         self.glyph = glyph
     }
 
+    /// A section without a glyph of its own gets the Settings glyph, so
+    /// its header still matches the others.
+    init(_ title: String) {
+        self.init(title, glyph: PixelGlyphs.settings)
+    }
+
     var body: some View {
         HStack(spacing: PixelHandTheme.Space.sm) {
-            if let glyph {
-                PHGlyph(glyph: glyph, pitch: 1.6)
-                    .foregroundStyle(PixelHandTheme.ink2)
-                    .accessibilityHidden(true)
-            }
+            PHGlyph(glyph: glyph, pitch: 1.6)
+                .foregroundStyle(PixelHandTheme.ink2)
+                .accessibilityHidden(true)
             Text(title)
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(PixelHandTheme.ink2)
                 .textCase(.uppercase)
         }
         .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// A switch row with its glyph tile, title and an optional one-line
+/// subtitle, so every switch in Settings has the same shape as the other
+/// rows (VQ-011).
+struct SettingsToggle: View {
+    let title: String
+    let glyph: GlyphBitmap
+    var subtitle: String?
+    @Binding var isOn: Bool
+
+    init(_ title: String, glyph: GlyphBitmap, subtitle: String? = nil, isOn: Binding<Bool>) {
+        self.title = title
+        self.glyph = glyph
+        self.subtitle = subtitle
+        _isOn = isOn
+    }
+
+    var body: some View {
+        Toggle(isOn: $isOn) {
+            SettingsRow(title, glyph: glyph, subtitle: subtitle)
+        }
     }
 }
 
