@@ -25,7 +25,7 @@ struct SettingsCaptureSection: View {
                         Text(option.label).tag(option)
                     }
                 }
-                .pickerStyle(.segmented)
+                .settingsChoicePickerStyle()
                 .labelsHidden()
             }
 

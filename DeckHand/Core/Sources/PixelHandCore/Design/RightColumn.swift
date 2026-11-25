@@ -29,6 +29,22 @@ public enum RightColumnMode: String, Sendable, Hashable, CaseIterable, Codable {
         case .ask: "Ask"
         }
     }
+
+    /// Whether the Deck | Ask switch shows its words next to the glyphs.
+    /// At the Huge band (AX3–AX5) it read "De… | Ask" in the column
+    /// (build 23, VQ-087): the segments then show glyphs only, and the
+    /// Large Content Viewer and VoiceOver give the word.
+    public static func switchShowsTitles(band: TypeBand) -> Bool {
+        band != .huge
+    }
+}
+
+/// The Ask field's placeholder. At the Huge band the full sentence was cut
+/// to "What shou…" in the right column (build 23, VQ-087).
+public enum AskFieldCopy {
+    public static func placeholder(band: TypeBand) -> String {
+        band == .huge ? "Ask your Mac" : "What should your Mac do?"
+    }
 }
 
 /// One arrangement the person can be in: the canvas form plus its layout

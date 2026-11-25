@@ -226,9 +226,15 @@ struct AppIconTile: View {
 }
 
 /// Fades the last `width` points of a scrolling row, so a row that runs on
-/// reads as "more this way" (board `.fade-r`).
+/// reads as "more this way" (board `.fade-r`). Build 23 (VQ-034, VQ-088):
+/// 16–24 pt fades went unseen at a mid-label cut, so rows use
+/// `overflowWidth`, about one key, with the same trailing padding so a row
+/// that fits shows no fade at all.
 struct TrailingFade: View {
-    var width: CGFloat = 24
+    /// The fade every scrolling row uses (and its trailing padding).
+    static let overflowWidth: CGFloat = 48
+
+    var width: CGFloat = overflowWidth
 
     var body: some View {
         HStack(spacing: 0) {

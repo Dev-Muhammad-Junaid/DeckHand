@@ -21,6 +21,8 @@ struct RightColumnSwitch: View {
     let canCollapse: Bool
     let onCollapse: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     var body: some View {
         HStack(spacing: PixelHandTheme.Space.sm) {
             HStack(spacing: 2) {
@@ -53,10 +55,14 @@ struct RightColumnSwitch: View {
             mode = item
         } label: {
             HStack(spacing: PixelHandTheme.Space.xs) {
-                PHGlyph(glyph: item == .deck ? PixelGlyphs.deck : PixelGlyphs.ask, pitch: PixelPitch.chip)
-                Text(item.title)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
+                PHGlyph(glyph: item == .deck ? PixelGlyphs.deck : PixelGlyphs.ask, pitch: PixelPitch.chip, stepsWithType: true)
+                // VQ-087: glyphs only at AX3+ ("De… | Ask"); the Large
+                // Content Viewer shows the word.
+                if RightColumnMode.switchShowsTitles(band: typeSize.typeBand) {
+                    Text(item.title)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                }
             }
             .foregroundStyle(isSelected ? Color.white : PixelHandTheme.ink2)
             .padding(.horizontal, PixelHandTheme.Space.md)
@@ -68,6 +74,9 @@ struct RightColumnSwitch: View {
         }
         .buttonStyle(.plain)
         .phosphorFocusable(cornerRadius: 16)
+        .accessibilityShowsLargeContentViewer {
+            Text(item.title)
+        }
         .accessibilityLabel(item.title)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
         .accessibilityIdentifier(item == .deck ? "ph.column.deck" : "ph.column.ask")

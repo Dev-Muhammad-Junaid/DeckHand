@@ -37,7 +37,7 @@ struct SettingsPointerSection: View {
                         Text(option.label).tag(option)
                     }
                 }
-                .pickerStyle(.segmented)
+                .settingsChoicePickerStyle()
                 .labelsHidden()
             }
 
@@ -67,7 +67,7 @@ struct SettingsPointerSection: View {
                         Text(option.label).tag(option)
                     }
                 }
-                .pickerStyle(.segmented)
+                .settingsChoicePickerStyle()
                 .labelsHidden()
             }
         } header: {

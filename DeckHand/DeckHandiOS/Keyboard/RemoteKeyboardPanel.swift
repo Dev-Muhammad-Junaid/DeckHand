@@ -195,11 +195,13 @@ struct RemoteKeyboardPanel: View {
                     }
                 }
                 .padding(.vertical, 2)
-                .padding(.trailing, PixelHandTheme.Space.lg)
+                .padding(.trailing, TrailingFade.overflowWidth)
             }
+            .frame(maxWidth: .infinity)
             // The row runs past the edge on a phone: fade it so it reads
-            // as "more this way" (VQ-034).
-            .mask { TrailingFade(width: PixelHandTheme.Space.lg) }
+            // as "more this way" (VQ-034; build 23: a key wide, it was
+            // 16 pt and went unseen).
+            .mask { TrailingFade() }
 
             ClipboardRow(sender: sender, clipboard: clipboard, colorScheme: colorScheme, onActivity: onActivity)
         }

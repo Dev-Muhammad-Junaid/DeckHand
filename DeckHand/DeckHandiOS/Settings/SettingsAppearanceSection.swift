@@ -18,7 +18,7 @@ struct SettingsAppearanceSection: View {
                         Text(option.label).tag(option)
                     }
                 }
-                .pickerStyle(.segmented)
+                .settingsChoicePickerStyle()
                 .labelsHidden()
             }
         } header: {

@@ -292,3 +292,27 @@ import Testing
         #expect(!strip.items.contains { $0.contains("FPS") })
     }
 }
+
+@Suite("Build 23 accessibility sizes: column switch, Ask placeholder, Settings pickers")
+struct Build23AccessibilityPlanTests {
+    @Test("VQ-087: the Deck | Ask switch drops its words only at the Huge band")
+    func columnSwitch() {
+        #expect(RightColumnMode.switchShowsTitles(band: .standard))
+        #expect(RightColumnMode.switchShowsTitles(band: .large))
+        #expect(!RightColumnMode.switchShowsTitles(band: .huge))
+    }
+
+    @Test("VQ-087: the Ask placeholder is short at the Huge band")
+    func askPlaceholder() {
+        #expect(AskFieldCopy.placeholder(band: .standard) == "What should your Mac do?")
+        #expect(AskFieldCopy.placeholder(band: .huge) == "Ask your Mac")
+        #expect(AskFieldCopy.placeholder(band: .huge).count < AskFieldCopy.placeholder(band: .standard).count)
+    }
+
+    @Test("VQ-089: Settings' segmented pickers become menus at the Huge band")
+    func settingsPickers() {
+        #expect(!SettingsPickerPlan.usesMenu(band: .standard))
+        #expect(!SettingsPickerPlan.usesMenu(band: .large))
+        #expect(SettingsPickerPlan.usesMenu(band: .huge))
+    }
+}
