@@ -200,6 +200,13 @@ struct TrackpadInputLayer: View {
     var onGestureChanged: (TrackpadGestureKind?) -> Void = { _ in }
     /// A three- or four-finger gesture reached the Mac.
     var onSystemGesture: (MultiFingerGesture) -> Void = { _ in }
+    /// OR-16: multiplies the pointer sensitivity (the mirror picture passes
+    /// 1 / zoom, `PicturePointerMapping`). The Pointer surface leaves it at 1.
+    var sensitivityScale: Float = 1
+    /// OR-16: set on the mirror picture. Two fingers are arbitrated
+    /// (`TwoFingerArbiter`): pinch zooms and pans the picture through these,
+    /// two fingers still scroll the Mac, a two-finger tap right-clicks.
+    var picture: PictureGestureHandlers?
 
     @EnvironmentObject private var settings: DeckHandSettings
 
@@ -210,11 +217,12 @@ struct TrackpadInputLayer: View {
             }
             MultiTouchTrackpad(
                 callbacks: callbacks,
-                sensitivity: settings.pointerSensitivity,
+                sensitivity: settings.pointerSensitivity * sensitivityScale,
                 scrollMode: scrollMode,
                 naturalScrolling: settings.naturalScrolling,
                 systemGestures: settings.trackpadGestures,
-                pencilHover: settings.pencilHoverPointer
+                pencilHover: settings.pencilHoverPointer,
+                arbitratesTwoFingers: picture != nil
             )
         }
     }
@@ -225,6 +233,7 @@ struct TrackpadInputLayer: View {
         let gestureMap = self.$gestureMap
         let onGestureChanged = self.onGestureChanged
         let onSystemGesture = self.onSystemGesture
+        let picture = self.picture
         return TrackpadCallbacks(
             onCursorDelta: { dx, dy in
                 Task { await sender.sendMouseDelta(dx: dx, dy: dy) }
@@ -272,9 +281,29 @@ struct TrackpadInputLayer: View {
             onGestureChanged: onGestureChanged,
             onTouchesChanged: { points in
                 dots.setTouches(points)
+            },
+            onPictureZoom: { scale, anchor, pan in
+                picture?.onZoom(scale, anchor, pan)
+            },
+            onPictureZoomEnded: {
+                picture?.onZoomEnded()
+            },
+            onTwoFingerTap: { pos in
+                gestureMap.wrappedValue.forget()
+                Task { await sender.sendClick(.right) }
+                dots.pulse(at: pos, filled: true)
             }
         )
     }
+}
+
+/// OR-16: what the mirror picture does with a pinch while it works as a
+/// trackpad (`TrackpadInputLayer.picture`).
+struct PictureGestureHandlers {
+    /// Zoom by `scale` (relative) around `anchor`, pan by `pan`; points in
+    /// the input layer's coordinates.
+    var onZoom: (_ scale: CGFloat, _ anchor: CGPoint, _ pan: CGSize) -> Void
+    var onZoomEnded: () -> Void = { }
 }
 
 // MARK: - Gesture Indicator Overlay
