@@ -204,6 +204,7 @@ extension ControlSessionModel {
     /// A pong: one round-trip sample for the away policy.
     func notePong(seq: UInt64) {
         guard let smoothed = roundTrips.pongReceived(seq: seq, at: ProcessInfo.processInfo.systemUptime) else { return }
+        ConnectionDiagnostics.shared.roundTripMs = Int((smoothed * 1_000).rounded())
         if awayQuality.noteRoundTrip(smoothed) { awayChanged() }
     }
 

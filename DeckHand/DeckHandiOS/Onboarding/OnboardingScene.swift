@@ -462,7 +462,7 @@ private struct PairingScene: View {
                 PHGlyph(glyph: PixelGlyphs.iPhone, pitch: glyphPitch, showsUnlit: true)
             }
             .foregroundStyle(Color(red: 0.81, green: 0.88, blue: 1))
-            DotMatrixText("4821 0937", pitch: large ? 3 : 2.2, label: "Example pairing code", stepsWithType: false)
+            DotMatrixText("4821 0934", pitch: large ? 3 : 2.2, label: "Example pairing code", stepsWithType: false)
                 .foregroundStyle(PixelHandTheme.Brand.phosphor)
                 .accessibilityHidden(true)
                 .opacity(max(0, (progress - 0.5) / 0.5))

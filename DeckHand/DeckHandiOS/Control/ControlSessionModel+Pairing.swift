@@ -46,6 +46,7 @@ extension ControlSessionModel {
                 guard let self, !Task.isCancelled else { return }
                 self.pairingMac = mac
                 store.identified(mac: mac, token: token)
+                ConnectionDiagnostics.shared.macName = mac?.name
                 if mac == nil {
                     DeckHandLog.connection.error("🔐 The Mac's identity key wasn't verified; pairing is off for this session")
                 }
@@ -76,6 +77,7 @@ extension ControlSessionModel {
     }
 
     func stopPairing() {
+        ConnectionDiagnostics.shared.sessionEnded()
         pairingTasks.forEach { $0.cancel() }
         pairingTasks = []
         if let token = pairingSessionToken {
@@ -124,6 +126,7 @@ extension ControlSessionModel {
     func handleRefused(_ reason: AuthRefusal) {
         let status = ApprovalStatusCopy.status(for: reason)
         DeckHandLog.connection.info("🔑 The Mac refused: \(reason.rawValue, privacy: .public)")
+        ConnectionDiagnostics.shared.record("The Mac refused the request: \(reason.rawValue)")
         hasReceivedAuthStatus = true
         guard lastAuthStatus != ApprovalStatusCopy.forgottenStatus else { return }
         lastAuthStatus = status

@@ -407,6 +407,7 @@ final class MacSwitcher {
     }
 
     private func show(_ message: String) {
+        ConnectionDiagnostics.shared.record(message)
         notice = message
         noticeTask?.cancel()
         noticeTask = Task { @MainActor [weak self] in

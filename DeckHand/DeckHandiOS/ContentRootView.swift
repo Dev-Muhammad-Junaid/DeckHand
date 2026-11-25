@@ -289,6 +289,7 @@ struct ContentRootView: View {
         for await event in handle.events {
             if case let .disconnected(reason) = event {
                 DeckHandLog.connection.info("iPad handle disconnected for \(peerName, privacy: .public) conn=\(handle.id, privacy: .public) reason=\(reason ?? "nil", privacy: .public) — leaving ControlView")
+                ConnectionDiagnostics.shared.record("Disconnected from \(peerName)" + (reason.map { ": \($0)" } ?? ""))
                 // A Mac switched away from closes after the new one is on
                 // screen; its end isn't news.
                 guard activeConnection?.handle.id == handle.id else { break }
