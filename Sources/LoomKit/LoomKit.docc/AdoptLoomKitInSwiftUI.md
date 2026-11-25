@@ -38,6 +38,8 @@ struct ExampleApp: App {
 
 With `autostart` left at its default value of `true`, LoomKit starts the shared runtime when the scene appears and stops it when the scene goes away.
 
+If you pass `autostart: false` and call ``LoomContext/start()`` yourself, for example from a Retry button, you can call it again at any time. A call made while a start is in flight waits for that start rather than beginning a second one, and cancelling the calling task doesn't cancel the start. Advertising and nearby discovery begin before the CloudKit account check, so nearby peers appear even when that check is slow.
+
 > Important: Your app's Info.plist must include `NSBonjourServices` (containing your service type, e.g. `_example._tcp`) and `NSLocalNetworkUsageDescription`. Without these keys, discovery fails silently with error `-65555 (NoAuth)`. See the Loom documentation article "Configure Local Network Access" for the full setup and an Info.plist snippet.
 
 Apps that own their trust model can pass ``LoomContainerConfiguration/trustProvider`` into the container configuration. LoomKit uses that provider instead of its local or CloudKit-backed defaults while keeping the same SwiftUI container, context, query, and connection-handle surfaces.

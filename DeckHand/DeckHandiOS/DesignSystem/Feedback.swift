@@ -23,32 +23,92 @@ struct StatusPill: View {
     var fixTitle: String?
     var onFix: (() -> Void)?
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+    /// The banner's width, for `StatusBannerPlan`.
+    @State private var width: CGFloat?
+
+    /// Build 22: at AX3 the Keyboard button beside the message squeezed it
+    /// until "Muhammad’s" broke mid-word, and the taller banner drew over
+    /// the header. Stacked, the button sits under the message, which gets
+    /// the full width; the banner always takes its full height and grows
+    /// downward.
+    private var arrangement: StatusBannerPlan.Arrangement {
+        StatusBannerPlan.arrangement(
+            width: width.map(Double.init),
+            band: typeSize.typeBand,
+            hasFix: fixTitle != nil && onFix != nil
+        )
+    }
+
     var body: some View {
-        HStack(alignment: .center, spacing: PixelHandTheme.Space.md) {
-            PHGlyph(glyph: glyph, pitch: PixelPitch.chip, accent: tint)
-                .foregroundStyle(tint)
-            (titleText + Text(message).foregroundColor(tint))
-                .font(.subheadline.weight(.medium))
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            if let fixTitle, let onFix {
-                Button(fixTitle, action: onFix)
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(PixelHandTheme.ink)
-                    .padding(.horizontal, PixelHandTheme.Space.md)
-                    .frame(minHeight: 32)
-                    .background(PixelHandTheme.raised, in: Capsule())
-                    .frame(minHeight: PixelHandTheme.ControlHeight.hit)
-                    .contentShape(Rectangle())
-                    .buttonStyle(.plain)
+        Group {
+            if arrangement == .stacked {
+                VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
+                    HStack(alignment: .top, spacing: PixelHandTheme.Space.md) {
+                        glyphView
+                        messageText
+                    }
+                    fixButton
+                }
+                .padding(.vertical, PixelHandTheme.Space.xs)
+            } else {
+                HStack(alignment: .center, spacing: PixelHandTheme.Space.md) {
+                    glyphView
+                    messageText
+                    fixButton
+                }
             }
         }
         .padding(.leading, 14)
         .padding(.trailing, PixelHandTheme.Space.md)
         .padding(.vertical, PixelHandTheme.Space.xs)
         .frame(minHeight: PixelHandTheme.ControlHeight.standard)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(background, in: RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous))
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        // Never squeezed by the canvas below it: its own height, so it
+        // can't spill up over the header.
+        .fixedSize(horizontal: false, vertical: true)
         .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("ph.status.\(kindID)")
+    }
+
+    /// `ph.status.locked`, `.warning`, `.info`: for the UI walks.
+    private var kindID: String {
+        switch kind {
+        case .warning: "warning"
+        case .info: "info"
+        case .locked: "locked"
+        }
+    }
+
+    private var glyphView: some View {
+        PHGlyph(glyph: glyph, pitch: PixelPitch.chip, accent: tint)
+            .foregroundStyle(tint)
+    }
+
+    private var messageText: some View {
+        (titleText + Text(message).foregroundColor(tint))
+            .font(.subheadline.weight(.medium))
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
+    }
+
+    @ViewBuilder
+    private var fixButton: some View {
+        if let fixTitle, let onFix {
+            Button(fixTitle, action: onFix)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(PixelHandTheme.ink)
+                .padding(.horizontal, PixelHandTheme.Space.md)
+                .frame(minHeight: 32)
+                .background(PixelHandTheme.raised, in: Capsule())
+                .frame(minHeight: PixelHandTheme.ControlHeight.hit)
+                .contentShape(Rectangle())
+                .buttonStyle(.plain)
+                .fixedSize()
+        }
     }
 
     private var titleText: Text {

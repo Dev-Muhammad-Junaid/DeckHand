@@ -107,6 +107,7 @@ final class PixelHandUITests: XCTestCase {
         launch()
         guard connect() else { return }
         snap("pointer")
+        checkBannerBelowHeader()
         tapIfExists("ph.trackpad.click")
         snap("after-click-strip")
         if tapIfExists("ph.dock.keyboard") || tapIfExists("ph.trackpad.keyboard") {
@@ -437,7 +438,50 @@ final class PixelHandUITests: XCTestCase {
         sleep(1)
     }
 
+    /// Build 22 (P2): Try again while the first start is still pending
+    /// (no iCloud account: the account check takes about 45 s) must not
+    /// break discovery. Taps Try again on the "Can’t find your Mac?" card,
+    /// twice, then expects the Mac in the list. Records `stuck-searching`
+    /// if it never shows. Best on a fresh simulator with no iCloud account.
+    func test17_TryAgainDuringSlowStart() {
+        launch()
+        let pill = element("ph.header.macPill")
+        if pill.waitForExistence(timeout: 6) {
+            // Reconnected to a paired Mac by itself: the picker never showed.
+            snap("skipped-already-connected")
+            return
+        }
+        acceptSystemAlerts(timeout: 1)
+        let checks = element("ph.connect.checks")
+        let row = element("ph.connect.macRow")
+        if checks.waitForExistence(timeout: 20) {
+            snap("checks")
+            tapIfExists("ph.connect.tryAgain")
+            sleep(1)
+            snap("after-try-again")
+            // A second Try again, if the card came back, joins the same start.
+            if checks.waitForExistence(timeout: 15) { tapIfExists("ph.connect.tryAgain") }
+        }
+        if row.waitForExistence(timeout: 75) {
+            snap("mac-listed")
+        } else {
+            snap(element("ph.connect.retry").exists ? "start-failed" : "stuck-searching")
+        }
+    }
+
     // MARK: - Helpers
+
+    /// Build 22 (P2): the lock banner sits under the header and never
+    /// draws over the Mac pill. Records `banner-overlaps-header` if it does.
+    private func checkBannerBelowHeader() {
+        let banner = element("ph.status.locked")
+        let pill = element("ph.header.macPill")
+        guard banner.waitForExistence(timeout: 1), pill.exists else { return }
+        snap("lock-banner")
+        if banner.frame.minY < pill.frame.maxY - 1 {
+            snap("banner-overlaps-header")
+        }
+    }
 
     /// The mirror's toolbar fades after 3 s. Off, a tap on the picture
     /// brings it back; on (OR-16), a tap where the toolbar sits does.

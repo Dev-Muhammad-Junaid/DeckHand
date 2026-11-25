@@ -99,6 +99,7 @@ actor LoomStore {
     private let dismissedConnectionBroadcaster = LoomAsyncBroadcaster<LoomConnectionDismissal>()
 
     private var isRunning = false
+    private var startTask: Task<Void, Error>?
     private var isRemoteHosting = false
     private var lastErrorMessage: String?
     private var listeningPorts: [LoomTransportKind: UInt16] = [:]
@@ -166,11 +167,27 @@ actor LoomStore {
         dismissedConnectionBroadcaster.makeStream()
     }
 
+    /// Starts the runtime once. Concurrent callers join the start in flight
+    /// rather than racing it; the start runs in its own task, so cancelling
+    /// one caller neither cancels it nor fails the others.
     func start() async throws {
         guard !isRunning else {
             return
         }
+        if let startTask {
+            try await startTask.value
+            return
+        }
 
+        let task = Task {
+            try await self.performStart()
+        }
+        startTask = task
+        defer { startTask = nil }
+        try await task.value
+    }
+
+    private func performStart() async throws {
         if let hostClient {
             do {
                 ensureHostObserversStarted()
@@ -185,13 +202,6 @@ actor LoomStore {
         do {
             try validateConfiguration()
             lastErrorMessage = nil
-
-            if let cloudKitManager {
-                await cloudKitManager.initialize()
-            }
-            if let peerManager {
-                await peerManager.setup()
-            }
 
             let discovery = await MainActor.run {
                 node.makeDiscovery(localDeviceID: deviceID)
@@ -264,6 +274,15 @@ actor LoomStore {
                         overlayDirectory.discoveredPeers
                     }
                 )
+            }
+            // CloudKit comes after advertising and discovery: its account
+            // check can take tens of seconds (no account signed in, no
+            // network), and nearby peers shouldn't wait for it.
+            if let cloudKitManager {
+                await cloudKitManager.initialize()
+            }
+            if let peerManager {
+                await peerManager.setup()
             }
             await refreshCloudPeers()
             try await publishCurrentPeer()

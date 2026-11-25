@@ -89,6 +89,87 @@ import Testing
         #expect(ShellHeaderPlan.pillNameCandidates("", lines: 2) == [[""]])
     }
 
+    @Test("AX3 pill: whole-word tail candidates, and a two-line fallback that keeps the first word (build 22)")
+    func pillNameLayoutHuge() {
+        let name = "Muhammad’s MacBook Pro"
+        let layout = ShellHeaderPlan.pillNameLayout(name, lines: 2)
+        #expect(layout.candidates == [
+            [name],
+            ["Muhammad’s MacBook", "Pro"],
+            ["Muhammad’s", "MacBook Pro"],
+            ["Muhammad’s", "MacBook…"],
+        ])
+        // Never one line: build 22 showed "Muhamma…" on a single line.
+        #expect(layout.fallback == ["Muhammad’s", "MacBook Pro"])
+        #expect(ShellHeaderPlan.pillNameMinimumScale < 1)
+        #expect(ShellHeaderPlan.pillNameMinimumScale >= 0.5)
+        // Every line starts at a word of the name; the only addition is a
+        // trailing "…" after a whole word.
+        let words = Set(name.split(separator: " ").map(String.init))
+        for candidate in layout.candidates + [layout.fallback] {
+            #expect(candidate.count <= 2)
+            for line in candidate {
+                let bare = line.hasSuffix("…") ? String(line.dropLast()) : line
+                #expect(bare.split(separator: " ").allSatisfy { words.contains(String($0)) })
+                #expect(!line.hasSuffix("-"))
+            }
+        }
+    }
+
+    @Test("Pill layout for long and short names")
+    func pillNameLayoutNames() {
+        let long = ShellHeaderPlan.pillNameLayout("Jean-Luc’s Big Studio Mac", lines: 2)
+        #expect(Array(long.candidates.suffix(2)) == [
+            ["Jean-Luc’s", "Big Studio…"],
+            ["Jean-Luc’s", "Big…"],
+        ])
+        #expect(long.fallback == ["Jean-Luc’s", "Big Studio Mac"])
+        let two = ShellHeaderPlan.pillNameLayout("Office iMac", lines: 2)
+        #expect(two.candidates == [["Office iMac"], ["Office", "iMac"]])
+        #expect(two.fallback == ["Office", "iMac"])
+        let one = ShellHeaderPlan.pillNameLayout("Studio", lines: 2)
+        #expect(one.candidates == [["Studio"]])
+        #expect(one.fallback == ["Studio"])
+        // Standard and Large bands: one line, as before.
+        let standard = ShellHeaderPlan.pillNameLayout("Muhammad’s MacBook Pro", lines: 1)
+        #expect(standard.candidates == [["Muhammad’s MacBook Pro"]])
+        #expect(standard.fallback == ["Muhammad’s MacBook Pro"])
+    }
+
+    // MARK: Status banner
+
+    @Test("The AX3 lock banner puts Keyboard under the message (build 22)")
+    func bannerStacksAtLargeBands() {
+        // iPhone 17 Pro portrait banner: 402 minus 16 pt margins.
+        #expect(StatusBannerPlan.arrangement(width: 370, band: .huge, hasFix: true) == .stacked)
+        #expect(StatusBannerPlan.arrangement(width: 1000, band: .huge, hasFix: true) == .stacked)
+        #expect(StatusBannerPlan.arrangement(width: 370, band: .large, hasFix: true) == .stacked)
+        #expect(StatusBannerPlan.arrangement(width: nil, band: .huge, hasFix: true) == .stacked)
+        #expect(StatusBannerPlan.arrangement(width: 370, band: .standard, hasFix: true) == .inline)
+    }
+
+    @Test("A banner without a fix button stays one row")
+    func bannerWithoutFix() {
+        for band in TypeBand.allCases {
+            #expect(StatusBannerPlan.arrangement(width: 200, band: band, hasFix: false) == .inline)
+        }
+    }
+
+    @Test("A narrow window stacks the banner before the message gets too thin")
+    func bannerNarrowWindow() {
+        // Stage Manager at iPhone width, and the iPhone landscape column.
+        #expect(StatusBannerPlan.arrangement(width: 288, band: .standard, hasFix: true) == .stacked)
+        #expect(StatusBannerPlan.arrangement(width: 300, band: .standard, hasFix: true) == .stacked)
+        #expect(StatusBannerPlan.arrangement(width: 343, band: .standard, hasFix: true) == .inline)
+        #expect(StatusBannerPlan.arrangement(width: nil, band: .standard, hasFix: true) == .inline)
+        // Inline always leaves the message its minimum.
+        for width in stride(from: 200.0, through: 1200, by: 5) {
+            if StatusBannerPlan.arrangement(width: width, band: .standard, hasFix: true) == .inline {
+                #expect(width - StatusBannerPlan.chromeWidth - StatusBannerPlan.fixSlot >= StatusBannerPlan.inlineMinimumMessageWidth)
+            }
+        }
+    }
+
     // MARK: Deck header
 
     @Test("The iPad deck columns get two header rows (VQ-024)")

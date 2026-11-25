@@ -6,8 +6,8 @@
 //  the Mac's name and the front app (or approval state), on glass, 44 pt.
 //  Offline shows a grey pixel; locked shows the lock glyph. At AX1+ the
 //  second line drops before the name truncates; at AX3+ the name gets two
-//  lines, broken between words, never hyphenated. Names truncate at the
-//  tail.
+//  lines, broken between words, never hyphenated, and the first word
+//  shrinks rather than cut (build 22). Names truncate at the tail.
 //  Spec: `02-Design-System.md` §7, board `.macpill`.
 //
 
@@ -70,25 +70,36 @@ struct MacPill: View {
     /// The name, breaking only between words (build 19: at AX3 a wrapped
     /// `Text` hyphenated it, "Muham- / mad’s Mac…"). Each line is its own
     /// one-line `Text`, which never hyphenates; `ViewThatFits` picks the
-    /// first word split whose lines fit, and the last split truncates at
-    /// the tail, so the first word stays ("Muhammad’s Mac…", never
-    /// "Mu…k Pro"; VQ-032, VQ-081).
+    /// first whole-word layout that fits (`ShellHeaderPlan.pillNameLayout`):
+    /// the word splits, then the tail ones ("Muhammad’s / MacBook…").
+    /// Build 22: when none fits, the fallback still has two lines, and its
+    /// first word shrinks before it truncates, so the pill never reads
+    /// "Muhamma…" on one line.
     @ViewBuilder
     private var nameText: some View {
-        let candidates = ShellHeaderPlan.pillNameCandidates(name, lines: nameLines)
-        if candidates.count == 1 {
-            nameLine(candidates[0].first ?? name)
+        let layout = ShellHeaderPlan.pillNameLayout(name, lines: nameLines)
+        if layout.candidates.count == 1, layout.fallback == layout.candidates[0] {
+            nameLine(layout.fallback.first ?? name)
         } else {
             ViewThatFits(in: .horizontal) {
-                ForEach(candidates.indices, id: \.self) { index in
-                    VStack(alignment: .leading, spacing: 0) {
-                        ForEach(candidates[index].indices, id: \.self) { line in
-                            nameLine(candidates[index][line])
-                        }
-                    }
+                ForEach(layout.candidates.indices, id: \.self) { index in
+                    nameStack(layout.candidates[index])
                 }
+                nameStack(layout.fallback, minimumScale: ShellHeaderPlan.pillNameMinimumScale)
             }
         }
+    }
+
+    private func nameStack(_ lines: [String], minimumScale: Double = 1) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(lines.indices, id: \.self) { line in
+                nameLine(lines[line])
+                    .minimumScaleFactor(CGFloat(minimumScale))
+            }
+        }
+        // Its full height, even in a tight header (build 22: the second
+        // line was lost and the first cut).
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private func nameLine(_ text: String) -> some View {

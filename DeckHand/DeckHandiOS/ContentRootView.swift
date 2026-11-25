@@ -14,6 +14,7 @@
 //
 
 import LoomKit
+import PixelHandCore
 import SwiftUI
 import UIKit
 
@@ -34,11 +35,12 @@ struct ContentRootView: View {
     /// than a person could click (the user's own iCloud Macs) skips the
     /// check rather than adding a pause.
     @State private var pendingSince = Date()
-    /// Why `LoomContext.start()` failed, if it did. Without it the picker
-    /// said "Looking for your Mac" forever although discovery never ran.
-    @State private var loomStartError: String?
-    /// Bumped by Retry to run the start task again.
-    @State private var loomStartAttempt = 0
+    /// `LoomContext.start()`, single-flight (build 22): launch and every
+    /// Try again go through it, so a Try again during a slow first start
+    /// joins that start instead of racing it ("Already advertising
+    /// service", then `CancellationError`). Its failure message replaces
+    /// "Searching" in the picker, with Retry.
+    @State private var startGate = NetworkStartGate()
     /// The edge the next Mac slides in from; `nil` fades (first connect,
     /// reconnect).
     @State private var slideEdge: Edge?
@@ -120,8 +122,8 @@ struct ContentRootView: View {
                 }
             } else {
                 PeerPickerView(
-                    startError: loomStartError,
-                    onRetryStart: { loomStartAttempt += 1 }
+                    startError: startGate.failureMessage,
+                    onRetryStart: { requestLoomStart() }
                 ) { handle, peerName in
                     switcher.adoptFromPicker(handle, name: peerName)
                     slideEdge = nil
@@ -133,20 +135,39 @@ struct ContentRootView: View {
             }
         }
         .animation(.easeInOut(duration: 0.28), value: activeConnection != nil)
-        .task(id: loomStartAttempt) {
-            do {
-                DeckHandLog.app.info("Starting LoomContext (attempt \(loomStartAttempt + 1))")
-                withAnimation(.easeInOut(duration: 0.22)) { loomStartError = nil }
-                try await loomContext.start()
-                switcher.start(context: loomContext)
-                switcher.update(peers: peers)
-                DeckHandLog.app.info("LoomContext started")
-            } catch {
-                DeckHandLog.app.fault("LoomContext start failed: \(error.localizedDescription, privacy: .public)")
-                withAnimation(.easeInOut(duration: 0.22)) {
-                    loomStartError = error.localizedDescription
+        .task { requestLoomStart() }
+    }
+
+    /// Launch and Try again. Starts Loom at most once at a time: the start
+    /// runs in its own task, so neither a second request nor this view's
+    /// task ending cancels it; a request while it runs only waits, and one
+    /// once it's running refreshes discovery.
+    private func requestLoomStart() {
+        let action = withAnimation(.easeInOut(duration: 0.22)) { startGate.request() }
+        switch action {
+        case let .start(attempt):
+            DeckHandLog.app.info("Starting LoomContext (attempt \(attempt, privacy: .public))")
+            let context = loomContext
+            Task { @MainActor in
+                do {
+                    try await context.start()
+                    guard startGate.finished(attempt: attempt, error: nil) else { return }
+                    switcher.start(context: context)
+                    switcher.update(peers: peers)
+                    DeckHandLog.app.info("LoomContext started")
+                } catch {
+                    DeckHandLog.app.fault("LoomContext start failed: \(error.localizedDescription, privacy: .public)")
+                    _ = withAnimation(.easeInOut(duration: 0.22)) {
+                        startGate.finished(attempt: attempt, error: error.localizedDescription)
+                    }
                 }
             }
+        case let .join(attempt):
+            DeckHandLog.app.info("Try again: LoomContext start (attempt \(attempt, privacy: .public)) is still running; waiting for it")
+        case .refresh:
+            DeckHandLog.app.info("Try again: LoomContext is running; refreshing peers")
+            let context = loomContext
+            Task { await context.refreshPeers() }
         }
     }
 
