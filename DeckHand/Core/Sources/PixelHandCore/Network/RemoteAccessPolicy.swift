@@ -13,9 +13,11 @@
 //  identity against the pin once more (key and Loom device ID).
 //
 //  Mac side (`admission`): a connection that arrives over a remote path
-//  (a tunnel interface, an overlay address, cellular, or loopback from an
-//  SSH port forward) is admitted only if it is already paired. No Allow
-//  prompt and no pairing code from outside the local network.
+//  (a tunnel interface, an overlay address, or cellular) is admitted only
+//  if it is already paired. No Allow prompt and no pairing code from
+//  outside the local network. Loopback is this same machine (a simulator,
+//  VQ-001) and counts as local: the prompt and the code still need a
+//  person at the Mac.
 //
 
 import Foundation
@@ -127,22 +129,49 @@ public enum RemoteAccessPolicy {
 
     // MARK: - Mac: admission
 
-    /// Whether a connection's path is a remote one: anything that isn't a
-    /// local network the Allow prompt was designed for.
-    public static func isRemotePath(link: LinkKind, remoteHost: String?) -> Bool {
-        if RemoteHost.isOverlayAddress(remoteHost) { return true }
-        // Loopback on the Mac means an SSH port forward or another relay.
-        if LinkJudge.isLoopback(remoteHost) { return true }
+    /// Where a connection came from, as far as admission cares.
+    public enum PathClass: Equatable, Sendable {
+        /// The same machine: loopback (`127.0.0.0/8`, `::1`, or an
+        /// IPv4-mapped loopback). A simulator on this Mac, or a process
+        /// running here. Treated like the local network: the Allow prompt
+        /// and the pairing code still need a person at the Mac.
+        case sameMachine
+        /// The local network (Wi-Fi, Ethernet, the USB cable, AWDL), link-
+        /// local addresses included.
+        case localNetwork
+        /// Anything else: a tunnel interface, an overlay (Tailscale)
+        /// address, or cellular. Only a paired device is admitted, pinned.
+        case remote
+    }
+
+    /// Classifies a connection's path. Overlay addresses win over
+    /// everything (a Tailscale peer is remote whatever the interface says);
+    /// then loopback is the same machine; then tunnels and cellular are
+    /// remote; everything else is the local network.
+    public static func pathClass(link: LinkKind, remoteHost: String?) -> PathClass {
+        if RemoteHost.isOverlayAddress(remoteHost) { return .remote }
+        if LinkJudge.isLoopback(remoteHost) { return .sameMachine }
         switch link {
-        case .tunnel, .cellular:
-            return true
         case .loopback:
-            // Only an SSH port forward (or another local relay) brings a
-            // remote's connection in over loopback.
-            return true
+            // The path says loopback but the address wasn't reported (or
+            // isn't a loopback literal): only trust it when no other address
+            // contradicts it.
+            if let remoteHost, !remoteHost.isEmpty, !LinkJudge.isLoopback(remoteHost) {
+                return LinkJudge.isLinkLocal(remoteHost) ? .localNetwork : .remote
+            }
+            return .sameMachine
+        case .tunnel, .cellular:
+            return .remote
         case .wired, .ethernet, .wifi, .peerToPeer, .other, .unknown:
-            return false
+            return .localNetwork
         }
+    }
+
+    /// Whether a connection's path is a remote one: anything that isn't the
+    /// local network or this same machine (VQ-001: a simulator on the Mac
+    /// reaches it over loopback and must be able to pair).
+    public static func isRemotePath(link: LinkKind, remoteHost: String?) -> Bool {
+        pathClass(link: link, remoteHost: remoteHost) == .remote
     }
 
     /// The Mac's decision for a connection, given the pairing decision and

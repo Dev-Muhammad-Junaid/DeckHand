@@ -30,7 +30,7 @@ struct AuthorizationOverlay: View {
 
             VStack(spacing: PixelHandTheme.Space.xl) {
                 statusContent
-                if status == "pending" {
+                if status == "pending" || ApprovalStatusCopy.offersPairing(status) {
                     pairingPrompt
                 }
                 disconnectButton
@@ -53,7 +53,9 @@ struct AuthorizationOverlay: View {
             .modifier(ScrollsWhenTall())
         }
         .sheet(isPresented: $isEnteringCode) {
-            PairingCodeEntryView(macName: peerName)
+            // After a refusal the session is over; the sheet reconnects to
+            // this Mac and sends the code (VQ-003).
+            PairingCodeEntryView(macName: peerName, macDeviceID: pairing.liveMac?.deviceID ?? pairing.lastMacDeviceID)
         }
     }
 
@@ -94,8 +96,8 @@ struct AuthorizationOverlay: View {
                     Text("Enter pairing code")
                 }
             }
-            .buttonStyle(.ph(.tint, size: .regular))
-            .disabled(pairing.liveMac == nil || pairing.isAwaitingCodeResult)
+            .buttonStyle(.ph(isTerminalState ? .primary : .tint, size: .regular))
+            .disabled((pairing.liveMac == nil && pairing.lastMacDeviceID == nil) || pairing.isAwaitingCodeResult)
             .accessibilityHint("Pairs this device with \(peerName) so it connects without asking next time")
             .accessibilityIdentifier("ph.authorization.enterCode")
         }

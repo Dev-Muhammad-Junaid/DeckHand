@@ -248,6 +248,29 @@ final class MacSwitcher {
         dial(peer, target: target, attempt: attempt)
     }
 
+    /// Connects to `deviceID` so a typed pairing code can go out
+    /// (`PairedMacsStore.pendingCode`): from the picker, or after the Mac
+    /// refused or dropped the request (VQ-003, VQ-037). A session with that
+    /// Mac that already ended is closed first so this is a fresh dial.
+    func connectForPairing(_ deviceID: UUID) {
+        redialTask?.cancel()
+        reconnectingDeviceID = nil
+        if machine.focusedDeviceID == deviceID {
+            machine.ended(deviceID)
+        }
+        request(deviceID)
+    }
+
+    /// Stops a dial in flight or an automatic reconnect (the toast's
+    /// Cancel, VQ-058).
+    func cancelDial() {
+        redialTask?.cancel()
+        machine.cancelDial()
+        reconnectingDeviceID = nil
+        // Don't dial the last Mac again at this launch.
+        triedLaunchReconnect = true
+    }
+
     /// ⌘1–⌘4.
     func switchToSlot(_ slot: Int) {
         guard let mac = MacRoster.mac(inSlot: slot, of: listings) else { return }
@@ -384,6 +407,7 @@ final class MacSwitcher {
     }
 
     private func show(_ message: String) {
+        ConnectionDiagnostics.shared.record(message)
         notice = message
         noticeTask?.cancel()
         noticeTask = Task { @MainActor [weak self] in

@@ -394,15 +394,51 @@ struct RemoteAdmissionTests {
         method: .code, pairedAt: t0, lastSeenAt: t0
     )
 
-    @Test("Tunnels, overlay addresses, cellular and loopback are remote paths")
+    @Test("Tunnels, overlay addresses and cellular are remote paths")
     func remotePaths() {
         #expect(RemoteAccessPolicy.isRemotePath(link: .tunnel, remoteHost: "10.8.0.2"))
         #expect(RemoteAccessPolicy.isRemotePath(link: .wifi, remoteHost: "100.101.1.2"))
         #expect(RemoteAccessPolicy.isRemotePath(link: .unknown, remoteHost: "fd7a:115c:a1e0::9"))
         #expect(RemoteAccessPolicy.isRemotePath(link: .cellular, remoteHost: nil))
-        #expect(RemoteAccessPolicy.isRemotePath(link: .loopback, remoteHost: "127.0.0.1"))
-        #expect(RemoteAccessPolicy.isRemotePath(link: .unknown, remoteHost: "::1"))
-        #expect(RemoteAccessPolicy.isRemotePath(link: .unknown, remoteHost: "127.0.0.1"))
+        #expect(RemoteAccessPolicy.isRemotePath(link: .cellular, remoteHost: "203.0.113.9"))
+        #expect(RemoteAccessPolicy.isRemotePath(link: .tunnel, remoteHost: "fe80::1%utun3"))
+        #expect(RemoteAccessPolicy.isRemotePath(link: .tunnel, remoteHost: nil))
+        // An overlay address wins even over a loopback-looking link.
+        #expect(RemoteAccessPolicy.isRemotePath(link: .loopback, remoteHost: "100.64.0.1"))
+        // A loopback link that reports a routable peer isn't trusted as local.
+        #expect(RemoteAccessPolicy.isRemotePath(link: .loopback, remoteHost: "203.0.113.9"))
+    }
+
+    @Test("Loopback is the same machine, not a remote path (VQ-001: simulators)")
+    func loopbackIsSameMachine() {
+        for host in ["127.0.0.1", "127.0.0.53", "::1", "[::1]", "::ffff:127.0.0.1", "localhost", "0:0:0:0:0:0:0:1"] {
+            #expect(RemoteAccessPolicy.pathClass(link: .loopback, remoteHost: host) == .sameMachine, "\(host)")
+            #expect(RemoteAccessPolicy.pathClass(link: .unknown, remoteHost: host) == .sameMachine, "\(host)")
+            #expect(!RemoteAccessPolicy.isRemotePath(link: .loopback, remoteHost: host), "\(host)")
+        }
+        #expect(RemoteAccessPolicy.pathClass(link: .loopback, remoteHost: nil) == .sameMachine)
+        // Not loopback: these only look close.
+        #expect(!LinkJudge.isLoopback("128.0.0.1"))
+        #expect(!LinkJudge.isLoopback("::2"))
+        #expect(!LinkJudge.isLoopback("::ffff:10.0.0.1"))
+    }
+
+    @Test("Link-local addresses on a local link are the local network")
+    func linkLocalIsLocal() {
+        #expect(RemoteAccessPolicy.pathClass(link: .wired, remoteHost: "fe80::1%en7") == .localNetwork)
+        #expect(RemoteAccessPolicy.pathClass(link: .wifi, remoteHost: "169.254.10.2") == .localNetwork)
+        #expect(RemoteAccessPolicy.pathClass(link: .peerToPeer, remoteHost: "fe80::2%awdl0") == .localNetwork)
+        #expect(RemoteAccessPolicy.pathClass(link: .loopback, remoteHost: "fe80::3%en0") == .localNetwork)
+    }
+
+    @Test("An unpaired simulator over loopback gets the usual prompt and code, not a refusal")
+    func simulatorCanPair() {
+        let ask = PairingAdmission.askUser(device.ref)
+        let remote = RemoteAccessPolicy.isRemotePath(link: .loopback, remoteHost: "127.0.0.1")
+        #expect(RemoteAccessPolicy.admission(ask, isRemotePath: remote) == ask)
+        // The same unpaired device over a tunnel is still refused.
+        let tunnel = RemoteAccessPolicy.isRemotePath(link: .tunnel, remoteHost: "10.8.0.2")
+        #expect(RemoteAccessPolicy.admission(ask, isRemotePath: tunnel) == .refuse)
     }
 
     @Test("LAN links are not remote paths")

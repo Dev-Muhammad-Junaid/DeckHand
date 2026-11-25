@@ -97,7 +97,9 @@ struct ContentRootView: View {
                     .opacity(authStatus == "granted" || showsSwitchGrace ? 1 : 0.38)
                     .disabled(authStatus != "granted")
 
-                    if (authStatus != "granted" && !showsSwitchGrace) || isShowingApproval {
+                    // While reconnecting on its own, only the toast says so;
+                    // the card comes once the retries give up (VQ-027).
+                    if (lossMode == .card && !showsSwitchGrace) || isShowingApproval {
                         AuthorizationOverlay(
                             status: authStatus,
                             peerName: connection.peerName
@@ -145,6 +147,13 @@ struct ContentRootView: View {
         }
     }
 
+    private var lossMode: ConnectionLossPresentation.Mode {
+        ConnectionLossPresentation.mode(
+            status: authStatus,
+            isReconnecting: switcher.reconnectingDeviceID != nil && switcher.reconnectingDeviceID == activeConnection?.handle.peer.deviceID
+        )
+    }
+
     private var showsSwitchGrace: Bool {
         isSwitchGrace && authStatus == "pending"
     }
@@ -159,6 +168,9 @@ struct ContentRootView: View {
 
     /// "Connecting to Laptop…", "Reconnecting to Studio…", or why a switch
     /// couldn't start. Sheets and the sidebar show the same notice inline.
+    /// Sits below the shell's header so it never covers the Mac pill
+    /// (VQ-028); the pixel is unlit while no Mac is talking; a dial or a
+    /// reconnect can be cancelled (VQ-058).
     @ViewBuilder
     private var switchToast: some View {
         let listings = switcher.listings
@@ -167,19 +179,32 @@ struct ContentRootView: View {
         Group {
             if let notice = switcher.notice {
                 PHToast(message: notice, isFailure: true)
+                    .allowsHitTesting(false)
             } else if let reconnecting {
-                PHToast(message: "Reconnecting to \(reconnecting.name)…")
+                cancellableToast("Reconnecting to \(reconnecting.name)…")
             } else if let dialing {
-                PHToast(message: "Connecting to \(dialing.name)…")
+                cancellableToast("Connecting to \(dialing.name)…")
             }
         }
         .padding(.horizontal, PixelHandTheme.Space.xl)
-        .padding(.top, PixelHandTheme.Space.sm)
-        .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
-        .animation(.easeOut(duration: 0.22), value: switcher.notice)
-        .animation(.easeOut(duration: 0.22), value: dialing?.deviceID)
-        .animation(.easeOut(duration: 0.22), value: reconnecting?.deviceID)
-        .allowsHitTesting(false)
+        .padding(.top, activeConnection == nil ? PixelHandTheme.Space.sm : Self.headerClearance)
+        .transition(.opacity)
+        .animation(.easeOut(duration: 0.2), value: switcher.notice)
+        .animation(.easeOut(duration: 0.2), value: dialing?.deviceID)
+        .animation(.easeOut(duration: 0.2), value: reconnecting?.deviceID)
+    }
+
+    /// Room for the shell's header row above the toast.
+    private static let headerClearance: CGFloat = PixelHandTheme.ControlHeight.standard + PixelHandTheme.Space.xl
+
+    private func cancellableToast(_ message: String) -> some View {
+        HStack(spacing: PixelHandTheme.Space.sm) {
+            PHToast(message: message, pixel: .off)
+                .accessibilityIdentifier("ph.connect.toast")
+            Button("Cancel") { switcher.cancelDial() }
+                .buttonStyle(.ph(.secondary, size: .regular))
+                .accessibilityIdentifier("ph.connect.cancel")
+        }
     }
 
     // MARK: - Lifecycle
@@ -264,6 +289,7 @@ struct ContentRootView: View {
         for await event in handle.events {
             if case let .disconnected(reason) = event {
                 DeckHandLog.connection.info("iPad handle disconnected for \(peerName, privacy: .public) conn=\(handle.id, privacy: .public) reason=\(reason ?? "nil", privacy: .public) — leaving ControlView")
+                ConnectionDiagnostics.shared.record("Disconnected from \(peerName)" + (reason.map { ": \($0)" } ?? ""))
                 // A Mac switched away from closes after the new one is on
                 // screen; its end isn't news.
                 guard activeConnection?.handle.id == handle.id else { break }

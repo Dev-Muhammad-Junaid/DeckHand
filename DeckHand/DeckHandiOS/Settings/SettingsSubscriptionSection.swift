@@ -72,11 +72,20 @@ struct SettingsSubscriptionSection: View {
             } else if entitlements.isPro, entitlements.isSettled {
                 Button("Manage subscription") { isManagePresented = true }
                     .accessibilityIdentifier("ph.settings.manageSubscription")
+                    .manageSubscriptionsSheet(isPresented: $isManagePresented)
             } else {
                 Button(store.isTrialEligible ? "Try Pixel Hand Pro free for 2 weeks" : "See Pixel Hand Pro") {
                     isPaywallPresented = true
                 }
                 .accessibilityIdentifier("ph.settings.subscribe")
+                // On the row itself, not the Section: a Section passes its
+                // modifiers to every row, so the sheet was attached several
+                // times and Settings closed instead of showing the paywall
+                // (VQ-055). The paywall opens at once and loads prices
+                // itself.
+                .sheet(isPresented: $isPaywallPresented) {
+                    PaywallView(reason: .settings)
+                }
             }
 
             Button("Restore Purchases") {
@@ -114,10 +123,6 @@ struct SettingsSubscriptionSection: View {
         } footer: {
             Text("The free plan includes the trackpad, keyboard and media keys with one Mac. Pro adds chips and decks, the live mirror, capture and text recognition, clipboard sharing and all your Macs. Family Sharing is supported.")
         }
-        .sheet(isPresented: $isPaywallPresented) {
-            PaywallView(reason: .settings)
-        }
-        .manageSubscriptionsSheet(isPresented: $isManagePresented)
         .onChange(of: isManagePresented) { _, isPresented in
             if !isPresented { Task { await store.refresh() } }
         }

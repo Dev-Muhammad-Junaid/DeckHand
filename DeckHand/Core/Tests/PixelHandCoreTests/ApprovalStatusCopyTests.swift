@@ -31,16 +31,56 @@ import Testing
 
     @Test func timeoutCopySaysItTimedOut() {
         let copy = ApprovalStatusCopy.overlay(status: ApprovalStatusCopy.timedOutStatus, peerName: "Studio Mac")
-        #expect(copy.title == "Request Timed Out")
+        #expect(copy.title == "Request timed out")
         #expect(copy.message.contains("45 seconds"))
         #expect(copy.message.contains("Studio Mac"))
         #expect(!copy.message.contains("declined"))
     }
 
-    @Test func denialCopyStillSaysDeclined() {
+    @Test("A plain denied (older Mac) doesn't claim a person declined")
+    func plainDenialIsNeutral() {
         let copy = ApprovalStatusCopy.overlay(status: "denied", peerName: "Studio Mac")
-        #expect(copy.title == "Access Denied")
-        #expect(copy.message.contains("declined"))
+        #expect(copy.title == "Not allowed")
+        #expect(!copy.message.contains("declined"))
+        #expect(!copy.message.contains("Deny"))
+    }
+
+    @Test("Only a person's Deny is worded as one (VQ-002)")
+    func refusalReasonsHaveTheirOwnCopy() {
+        let declined = ApprovalStatusCopy.overlay(status: ApprovalStatusCopy.status(for: .declined), peerName: "Studio")
+        #expect(declined.message.contains("clicked Deny"))
+        for reason in AuthRefusal.allCases where reason != .declined {
+            let status = ApprovalStatusCopy.status(for: reason)
+            let copy = ApprovalStatusCopy.overlay(status: status, peerName: "Studio")
+            #expect(!copy.message.contains("Deny"), "\(reason)")
+            #expect(!copy.message.contains("declined"), "\(reason)")
+            #expect(copy.title != "Unknown state", "\(reason)")
+            #expect(ApprovalStatusCopy.isTerminal(status), "\(reason)")
+            #expect(ApprovalStatusCopy.isFinalVerdict(status), "\(reason)")
+            #expect(ApprovalStatusCopy.isRefusal(status), "\(reason)")
+        }
+        let pairFirst = ApprovalStatusCopy.overlay(status: ApprovalStatusCopy.pairFirstStatus, peerName: "Studio")
+        #expect(pairFirst.title == "Pair Studio first")
+    }
+
+    @Test("Titles are sentence case")
+    func sentenceCaseTitles() {
+        let statuses = ["pending", "granted", "host_disconnected", "denied", ApprovalStatusCopy.forgottenStatus]
+            + AuthRefusal.allCases.map(ApprovalStatusCopy.status(for:))
+        for status in statuses {
+            let words = ApprovalStatusCopy.overlay(status: status, peerName: "studio").title.split(separator: " ").dropFirst()
+            #expect(words.allSatisfy { $0.first?.isLowercase ?? true }, "\(status)")
+        }
+    }
+
+    @Test("The refusal card offers pairing only where a code helps (VQ-003)")
+    func pairingOffer() {
+        #expect(ApprovalStatusCopy.offersPairing("denied"))
+        #expect(ApprovalStatusCopy.offersPairing(ApprovalStatusCopy.declinedStatus))
+        #expect(ApprovalStatusCopy.offersPairing(ApprovalStatusCopy.timedOutStatus))
+        #expect(!ApprovalStatusCopy.offersPairing(ApprovalStatusCopy.pairFirstStatus))
+        #expect(!ApprovalStatusCopy.offersPairing(ApprovalStatusCopy.unverifiedStatus))
+        #expect(!ApprovalStatusCopy.offersPairing("host_disconnected"))
     }
 
     @Test func timeoutIsTerminalAndFinal() {
@@ -75,5 +115,20 @@ import Testing
         #expect(!(ApprovalStatusCopy.showsLiveIndicator(status: "pending")))
         #expect(!(ApprovalStatusCopy.showsLiveIndicator(status: "denied")))
         #expect(!(ApprovalStatusCopy.showsLiveIndicator(status: "host_disconnected")))
+    }
+}
+
+@Suite("Connection loss: one message at a time (VQ-027)")
+struct ConnectionLossPresentationTests {
+    @Test("While reconnecting only the reconnect state shows; the card comes when retries stop")
+    func modes() {
+        #expect(ConnectionLossPresentation.mode(status: "host_disconnected", isReconnecting: true) == .reconnecting)
+        #expect(ConnectionLossPresentation.mode(status: "host_disconnected", isReconnecting: false) == .card)
+        #expect(ConnectionLossPresentation.mode(status: "granted", isReconnecting: false) == .none)
+        #expect(ConnectionLossPresentation.mode(status: "granted", isReconnecting: true) == .none)
+        // Verdicts always explain themselves on the card.
+        for status in ["pending", "denied", ApprovalStatusCopy.declinedStatus, ApprovalStatusCopy.forgottenStatus, ApprovalStatusCopy.timedOutStatus] {
+            #expect(ConnectionLossPresentation.mode(status: status, isReconnecting: true) == .card, "\(status)")
+        }
     }
 }

@@ -66,7 +66,6 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
     /// consuming its messages immediately — buffered commands from the
     /// revoked device are dropped, not executed.
     var onConnectionRevoked: ((UUID) -> Void)?
-    private static let pendingRequestTimeout: Duration = .seconds(ApprovalStatusCopy.pendingRequestTimeout)
 
     init(store: PairedDeviceStore = .shared) {
         self.store = store
@@ -125,7 +124,11 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
             let identity = await handle.verifiedPeerIdentity()
             // S15 (network lane): over a VPN or tunnel only paired devices get in; no identity means refuse.
             let allowed = await RemoteAccessGate.allows(identity, handle: handle, store: store)
-            admit(connection, handle: handle, gate: gate, identity: allowed ? identity : nil)
+            admit(
+                connection, handle: handle, gate: gate,
+                identity: allowed ? identity : nil,
+                refusal: allowed ? .unverified : .notPairedRemote
+            )
         }
     }
 
@@ -136,7 +139,8 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
         _ connection: LoomConnectionSnapshot,
         handle: LoomConnectionHandle,
         gate: PreApprovalGate,
-        identity: LoomPeerIdentity?
+        identity: LoomPeerIdentity?,
+        refusal: AuthRefusal = .unverified
     ) {
         let admission = store.admission(for: identity)
         if let identity, let candidate = TrustCandidate(identity: identity) {
@@ -148,20 +152,14 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
         case .refuse:
             // Loom's handshake already requires a verified key
             // (DeckHandHandshakeTrustProvider); this is the second lock.
-            DeckHandLog.trust.error("🔑 Refusing \(connection.peerName, privacy: .public) conn=\(connection.id, privacy: .public): no verified identity key")
+            DeckHandLog.trust.error("🔑 Refusing \(connection.peerName, privacy: .public) conn=\(connection.id, privacy: .public): \(refusal.rawValue, privacy: .public)")
             gates.removeValue(forKey: connection.id)
             forgetConnection(connection.id)
-            Task {
-                try? await handle.send(.pairing(.authorizationStatus(state: .denied)))
-                try? await Task.sleep(nanoseconds: 100_000_000)
-                await handle.disconnect()
-            }
+            noteRefusal(of: connection, reason: refusal)
+            refuse(handle, reason: refusal)
             return
 
         case let .autoGrant(device):
-            if let candidate = identities[connection.id] {
-                store.noteSeen(candidate)
-            }
             DeckHandLog.trust.info("🔑 \(device.name, privacy: .public) is paired; connecting without a prompt conn=\(connection.id, privacy: .public)")
             grant(connection, handle: handle, gate: gate)
             return
@@ -177,11 +175,7 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
         if let existing = pendingConnections.first(where: { $0.peerID == connection.peerID && $0.id != connection.id }) {
             removePendingConnection(id: existing.id)
             if let oldHandle = pendingHandles.removeValue(forKey: existing.id) {
-                Task {
-                    try? await oldHandle.send(.pairing(.authorizationStatus(state: .denied)))
-                    try? await Task.sleep(nanoseconds: 100_000_000)
-                    await oldHandle.disconnect()
-                }
+                refuse(oldHandle, reason: .replaced)
             }
         }
         
@@ -204,6 +198,11 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
     /// whether it is paired.
     private func grant(_ connection: LoomConnectionSnapshot, handle: LoomConnectionHandle, gate: PreApprovalGate) {
         gates.removeValue(forKey: connection.id)
+        // Every connect of a paired device refreshes its name and "Last
+        // seen", not only the prompt-free ones (VQ-041).
+        if let candidate = identities[connection.id], store.isPaired(candidate.ref) {
+            store.noteSeen(candidate)
+        }
         authorizedDeviceIDs.insert(connection.peerID)
         liveHandles[connection.id] = handle
         livePeerIDs[connection.id] = connection.peerID
@@ -250,11 +249,7 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
         for stale in staleForPeer {
             removePendingConnection(id: stale.id)
             if let staleHandle = pendingHandles.removeValue(forKey: stale.id) {
-                Task {
-                    try? await staleHandle.send(.pairing(.authorizationStatus(state: .denied)))
-                    try? await Task.sleep(nanoseconds: 100_000_000)
-                    await staleHandle.disconnect()
-                }
+                refuse(staleHandle, reason: .replaced)
             }
         }
 
@@ -291,13 +286,26 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
         refreshPairingDisplay()
     }
 
+    /// When the code showing now expires, or `nil` when none is showing.
+    private var codeShowingUntil: Date? {
+        if case let .code(_, expiresAt, _) = codeWindow.display(now: Date()) { return expiresAt }
+        return nil
+    }
+
     /// Moves an expired code or an ended lockout on. The panel calls this
     /// on a timer while it is open.
     func refreshPairingDisplay() {
         let now = Date()
         codeWindow.refresh(now: now)
         let display = codeWindow.display(now: now)
-        if display != pairingDisplay { pairingDisplay = display }
+        if display != pairingDisplay {
+            pairingDisplay = display
+            // A code appeared or ended: requests waiting on it get a new
+            // deadline (VQ-037).
+            for id in pendingConnections.map(\.id) {
+                schedulePendingExpiry(for: id)
+            }
+        }
         if case .code = display {} else if pairingInvite != nil {
             pairingInvite = nil
         }
@@ -321,6 +329,7 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
         refreshPairingDisplay()
         DeckHandLog.trust.info("🔐 Pairing code from \(candidate.name, privacy: .public): \(String(describing: result), privacy: .public)")
         guard result == .accepted else { return result }
+        dismissRecentRefusal()
         do {
             try await trustProvider.grantTrust(to: identity)
             return .accepted
@@ -407,8 +416,12 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
         }
     }
 
-    /// Drops what the Mac knew about a connection that is gone.
+    /// Drops what the Mac knew about a connection that is gone. A paired
+    /// device's "Last seen" becomes now (VQ-041).
     private func forgetConnection(_ connectionID: UUID) {
+        if liveHandles[connectionID] != nil, let candidate = identities[connectionID], store.isPaired(candidate.ref) {
+            store.noteSeen(candidate)
+        }
         identities.removeValue(forKey: connectionID)
         rawIdentities.removeValue(forKey: connectionID)
         liveHandles.removeValue(forKey: connectionID)
@@ -429,6 +442,7 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
         forgetConnection(connection.id)
         if let handle = pendingHandles.removeValue(forKey: connection.id) {
             Task {
+                try? await handle.send(.pairing(.refused(reason: .declined)))
                 try? await handle.send(.pairing(.authorizationStatus(state: .denied)))
                 try? await Task.sleep(nanoseconds: 100_000_000) // allow packet to send
                 await loomContext.disconnect(connection)
@@ -509,23 +523,81 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
         UNUserNotificationCenter.current().add(request)
     }
 
+    /// Expires a request nobody answered: after 45 s, or once the pairing
+    /// code showing on the Mac ends, whichever is later
+    /// (`PendingRequestExpiry`, VQ-037). Rescheduled when a code appears or
+    /// ends.
     private func schedulePendingExpiry(for connectionID: UUID) {
         pendingExpiryTasks[connectionID]?.cancel()
-        pendingExpiryTasks[connectionID] = Task { [weak self] in
-            try? await Task.sleep(for: Self.pendingRequestTimeout)
-            await MainActor.run {
-                guard let self else { return }
-                guard self.pendingConnections.contains(where: { $0.id == connectionID }) else { return }
-                self.removePendingConnection(id: connectionID)
-                if let handle = self.pendingHandles.removeValue(forKey: connectionID) {
-                    Task {
-                        try? await handle.send(.pairing(.authorizationStatus(state: .denied)))
-                        try? await Task.sleep(nanoseconds: 100_000_000)
-                        await handle.disconnect()
-                    }
+        guard let requestedAt = pendingRequestedAt[connectionID] else { return }
+        switch PendingRequestExpiry.decide(requestedAt: requestedAt, codeShowingUntil: codeShowingUntil, now: Date()) {
+        case .expire:
+            expirePending(connectionID)
+        case let .checkAgain(at):
+            let wait = max(0.05, at.timeIntervalSinceNow)
+            pendingExpiryTasks[connectionID] = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(wait))
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    guard let self else { return }
+                    // Moves an expired code on first, so its end counts.
+                    self.refreshPairingDisplay()
+                    guard self.pendingConnections.contains(where: { $0.id == connectionID }) else { return }
+                    self.schedulePendingExpiry(for: connectionID)
                 }
             }
         }
+    }
+
+    private func expirePending(_ connectionID: UUID) {
+        guard let pending = pendingConnections.first(where: { $0.id == connectionID }) else { return }
+        DeckHandLog.trust.info("🔑 Request from \(pending.peerName, privacy: .public) conn=\(connectionID, privacy: .public) timed out")
+        removePendingConnection(id: connectionID)
+        noteRefusal(of: pending, reason: .timedOut)
+        if let handle = pendingHandles.removeValue(forKey: connectionID) {
+            refuse(handle, reason: .timedOut)
+        }
+    }
+
+    /// Tells the remote why (protocol 14), then `denied` for older remotes,
+    /// then closes the connection.
+    private func refuse(_ handle: LoomConnectionHandle, reason: AuthRefusal) {
+        Task {
+            try? await handle.send(.pairing(.refused(reason: reason)))
+            try? await handle.send(.pairing(.authorizationStatus(state: .denied)))
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            await handle.disconnect()
+        }
+    }
+
+    // MARK: - The panel's "a device was turned away" line (VQ-023)
+
+    /// The last request the Mac turned away by a rule or a timeout (not a
+    /// person's Deny), for the menu-bar panel. Cleared after a minute, or
+    /// when the person pairs a device or dismisses it.
+    struct RecentRefusal: Equatable {
+        var deviceName: String
+        var reason: AuthRefusal
+        var at: Date
+    }
+
+    @Published private(set) var recentRefusal: RecentRefusal?
+    private var recentRefusalTask: Task<Void, Never>?
+
+    private func noteRefusal(of connection: LoomConnectionSnapshot, reason: AuthRefusal) {
+        guard reason == .notPairedRemote || reason == .timedOut || reason == .unverified else { return }
+        recentRefusal = RecentRefusal(deviceName: connection.peerName, reason: reason, at: Date())
+        recentRefusalTask?.cancel()
+        recentRefusalTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(60))
+            guard !Task.isCancelled else { return }
+            await MainActor.run { self?.recentRefusal = nil }
+        }
+    }
+
+    func dismissRecentRefusal() {
+        recentRefusalTask?.cancel()
+        recentRefusal = nil
     }
 
     private func removePendingConnection(id: UUID) {
@@ -578,11 +650,7 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
                         // expiry.
                         self.removePendingConnection(id: pending.id)
                         if let handle = self.pendingHandles.removeValue(forKey: pending.id) {
-                            Task {
-                                try? await handle.send(.pairing(.authorizationStatus(state: .denied)))
-                                try? await Task.sleep(nanoseconds: 100_000_000)
-                                await handle.disconnect()
-                            }
+                            self.refuse(handle, reason: .declined)
                         }
                     }
                 }

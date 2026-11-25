@@ -77,7 +77,7 @@ struct SplitMix64: RandomNumberGenerator {
 
 @Suite struct PairingCodeTests {
 
-    @Test("Generated codes are seven digits with a valid check digit")
+    @Test("Generated codes are eight digits (seven random, one check) with a valid check digit")
     func generatedCodesAreValid() {
         var generator = SplitMix64(seed: 3)
         for _ in 0..<500 {
@@ -110,15 +110,15 @@ struct SplitMix64: RandomNumberGenerator {
 
     @Test("Spaces and dashes are ignored as people type them")
     func parseIgnoresSeparators() {
-        guard case let .valid(code) = PairingCode.parse("572-4125") else {
+        guard case let .valid(code) = PairingCode.parse("5724 1250") else {
             Issue.record("expected a valid code")
             return
         }
-        #expect(code.digits == "5724125")
-        #expect(PairingCode(" 572 4125 ") == code)
-        #expect(PairingCode("572\u{2013}4125") == code)
-        #expect(code.formatted == "572-4125")
-        #expect(code.description == "572-4125")
+        #expect(code.digits == "57241250")
+        #expect(PairingCode(" 5724 1250 ") == code)
+        #expect(PairingCode("5724\u{2013}1250") == code)
+        #expect(code.formatted == "5724 1250")
+        #expect(code.description == "5724 1250")
     }
 
     @Test("Partial, malformed and mistyped input are told apart")
@@ -126,17 +126,17 @@ struct SplitMix64: RandomNumberGenerator {
         #expect(PairingCode.parse("") == .incomplete(digitCount: 0))
         #expect(PairingCode.parse("572-41") == .incomplete(digitCount: 5))
         #expect(PairingCode.parse("572a412") == .malformed)
-        #expect(PairingCode.parse("57241254") == .malformed) // eight digits
+        #expect(PairingCode.parse("572412504") == .malformed) // nine digits
         #expect(PairingCode.parse("５７２４１２３") == .malformed)
-        #expect(PairingCode.parse("5724124") == .checkDigitMismatch)
-        #expect(PairingCode.parse(String(repeating: " ", count: 40) + "5724125") == .malformed) // over the input cap
-        #expect(PairingCode("5724124") == nil)
+        #expect(PairingCode.parse("57241251") == .checkDigitMismatch)
+        #expect(PairingCode.parse(String(repeating: " ", count: 40) + "57241250") == .malformed) // over the input cap
+        #expect(PairingCode("57241251") == nil)
     }
 
     @Test("Codes compare equal only when every digit matches")
     func constantTimeEquality() throws {
-        let a = try #require(PairingCode("5724125"))
-        let b = try #require(PairingCode("572-4125"))
+        let a = try #require(PairingCode("57241250"))
+        let b = try #require(PairingCode("5724 1250"))
         var generator = SplitMix64(seed: 5)
         let c = PairingCode.generate(using: &generator)
         #expect(a.constantTimeEquals(b))
@@ -151,7 +151,7 @@ struct SplitMix64: RandomNumberGenerator {
 
     @Test("An invite survives the QR payload round trip")
     func roundTrip() throws {
-        let code = try #require(PairingCode("5724125"))
+        let code = try #require(PairingCode("57241250"))
         let invite = try #require(PairingInvite(code: code, macDeviceID: mac, macIdentityKeyID: key))
         #expect(invite.payload.hasPrefix("pixelhand://pair?"))
         #expect(PairingInvite(payload: invite.payload) == invite)
@@ -159,19 +159,19 @@ struct SplitMix64: RandomNumberGenerator {
 
     @Test("Anything that isn't exactly a version-1 invite is refused")
     func refusesBadPayloads() throws {
-        let good = "pixelhand://pair?v=1&code=5724125&mac=\(mac.uuidString)&key=\(key)"
+        let good = "pixelhand://pair?v=1&code=57241250&mac=\(mac.uuidString)&key=\(key)"
         #expect(PairingInvite(payload: good) != nil)
         let bad = [
-            "https://pair?v=1&code=5724125&mac=\(mac.uuidString)&key=\(key)",    // wrong scheme
-            "pixelhand://other?v=1&code=5724125&mac=\(mac.uuidString)&key=\(key)", // wrong host
-            "pixelhand://pair?v=2&code=5724125&mac=\(mac.uuidString)&key=\(key)",  // future version
-            "pixelhand://pair?v=1&code=5724124&mac=\(mac.uuidString)&key=\(key)",  // bad check digit
-            "pixelhand://pair?v=1&code=5724125&mac=not-a-uuid&key=\(key)",
-            "pixelhand://pair?v=1&code=5724125&mac=\(mac.uuidString)&key=short",
-            "pixelhand://pair?v=1&code=5724125&mac=\(mac.uuidString)&key=\(key)&code=1111111", // duplicate
-            "pixelhand://pair?v=1&code=5724125&mac=\(mac.uuidString)&key=\(key)&extra=1",      // unknown item
-            "pixelhand://pair?v=1&code=5724125&mac=\(mac.uuidString)",                         // missing key
-            "pixelhand://pair/x?v=1&code=5724125&mac=\(mac.uuidString)&key=\(key)",            // path
+            "https://pair?v=1&code=57241250&mac=\(mac.uuidString)&key=\(key)",    // wrong scheme
+            "pixelhand://other?v=1&code=57241250&mac=\(mac.uuidString)&key=\(key)", // wrong host
+            "pixelhand://pair?v=2&code=57241250&mac=\(mac.uuidString)&key=\(key)",  // future version
+            "pixelhand://pair?v=1&code=57241251&mac=\(mac.uuidString)&key=\(key)",  // bad check digit
+            "pixelhand://pair?v=1&code=57241250&mac=not-a-uuid&key=\(key)",
+            "pixelhand://pair?v=1&code=57241250&mac=\(mac.uuidString)&key=short",
+            "pixelhand://pair?v=1&code=57241250&mac=\(mac.uuidString)&key=\(key)&code=1111111", // duplicate
+            "pixelhand://pair?v=1&code=57241250&mac=\(mac.uuidString)&key=\(key)&extra=1",      // unknown item
+            "pixelhand://pair?v=1&code=57241250&mac=\(mac.uuidString)",                         // missing key
+            "pixelhand://pair/x?v=1&code=57241250&mac=\(mac.uuidString)&key=\(key)",            // path
             good + String(repeating: "&", count: 600),                                          // oversize
             "",
         ]
@@ -182,8 +182,53 @@ struct SplitMix64: RandomNumberGenerator {
 
     @Test("An invite needs a well-formed key ID")
     func refusesBadKey() throws {
-        let code = try #require(PairingCode("5724125"))
+        let code = try #require(PairingCode("57241250"))
         #expect(PairingInvite(code: code, macDeviceID: mac, macIdentityKeyID: "") == nil)
         #expect(PairingInvite(code: code, macDeviceID: mac, macIdentityKeyID: key + " ") == nil)
+    }
+}
+
+@Suite("Pairing code: one format everywhere (VQ-005, VQ-029)")
+struct PairingCodeFormatTests {
+    @Test("Codes are two groups of four")
+    func twoGroupsOfFour() {
+        #expect(PairingCode.length == 8)
+        #expect(PairingCode("48210934")?.formatted == "4821 0934")
+        var generator = SplitMix64(seed: 9)
+        for _ in 0..<50 {
+            let text = PairingCode.generate(using: &generator).formatted
+            #expect(text.count == 9)
+            #expect(text.split(separator: " ").map(\.count) == [4, 4])
+        }
+    }
+
+    @Test("Typed input is grouped as it is typed and capped at the code's length")
+    func groupedAsTyped() {
+        #expect(PairingCode.grouped("") == "")
+        #expect(PairingCode.grouped("482") == "482")
+        #expect(PairingCode.grouped("4821") == "4821")
+        #expect(PairingCode.grouped("48210") == "4821 0")
+        #expect(PairingCode.grouped("4821-0934") == "4821 0934")
+        #expect(PairingCode.grouped("482109341234") == "4821 0934")
+        #expect(PairingCode.grouped("48 2a1x09") == "4821 09")
+        // Grouped text parses back to the same code.
+        #expect(PairingCode(PairingCode.grouped("48210934")) == PairingCode("48210934"))
+    }
+
+    @Test("Complete means every digit is there, right or wrong")
+    func completeness() {
+        #expect(!PairingCode.isComplete(""))
+        #expect(!PairingCode.isComplete("4821 093"))
+        #expect(PairingCode.isComplete("4821 0934"))
+        #expect(PairingCode.isComplete("4821 0935")) // complete, but a typo
+    }
+
+    @Test("The display groups match the formatted code; the check digit closes the last group")
+    func displayGroups() throws {
+        let code = try #require(PairingCode("48210934"))
+        let groups = PairingCodeDisplay.groups(code)
+        #expect(groups.map(\.text) == ["4821", "0934"])
+        #expect(groups.map(\.isCheck) == [false, true])
+        #expect(groups.map(\.text).joined(separator: " ") == code.formatted)
     }
 }

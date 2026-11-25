@@ -27,11 +27,22 @@ struct PeerPickerView: View {
 
     @State private var connecting: UUID?
     @State private var errorMessage: String?
-    @State private var isSettingsPresented = false
-    /// Pairing (S4): scanning a Mac's pairing QR code from here dials that
-    /// Mac and sends its code once the Mac answers.
-    @State private var isScanningInvite = false
+    /// The one sheet on screen: Settings, or pairing (S4: type the code, or
+    /// scan the Mac's QR code from there; this device connects to that Mac
+    /// and sends the code once the Mac answers).
+    @State private var sheet: PickerSheet?
+    /// A sheet asked for while another was still closing: shown once that
+    /// one is gone, so the tap isn't lost (VQ-020).
+    @State private var queuedSheet: PickerSheet?
+    @State private var isSheetClosing = false
+    /// No Mac after 10 s: show the three checks (04 §7, VQ-069).
+    @State private var showsChecks = false
     private let pairing = PairedMacsStore.shared
+
+    private enum PickerSheet: String, Identifiable {
+        case settings, pair
+        var id: String { rawValue }
+    }
 
     private enum Layout {
         /// Caps the content column so cards stay a readable width on a 13"
@@ -77,13 +88,32 @@ struct PeerPickerView: View {
             // welcome tour are all worth changing without a Mac in range.
             settingsButton
         }
-        .sheet(isPresented: $isSettingsPresented) {
-            SettingsView()
-        }
-        .sheet(isPresented: $isScanningInvite) {
-            PairingQRScannerSheet { invite in
-                connect(with: invite)
+        .sheet(item: $sheet, onDismiss: {
+            isSheetClosing = false
+            if let next = queuedSheet {
+                queuedSheet = nil
+                sheet = next
             }
+        }) { which in
+            switch which {
+            case .settings:
+                SettingsView()
+            case .pair:
+                PairingCodeEntryView(
+                    macName: pairTargets.count == 1 ? pairTargets[0].name : "your Mac",
+                    choices: pairTargets
+                )
+            }
+        }
+        .onChange(of: sheet) { old, new in
+            if old != nil, new == nil { isSheetClosing = true }
+        }
+        .task(id: peers.isEmpty) {
+            showsChecks = false
+            guard peers.isEmpty, startError == nil else { return }
+            try? await Task.sleep(for: .seconds(10))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.2)) { showsChecks = true }
         }
         // The picker is a branded surface, not a system one: it stays dark
         // regardless of the appearance preference, the same way the icon does.
@@ -96,12 +126,25 @@ struct PeerPickerView: View {
         VStack {
             HStack(spacing: PixelHandTheme.Space.sm) {
                 Spacer()
-                GlassCircleButton(glyph: PixelGlyphs.region, label: "Scan pairing code") {
-                    isScanningInvite = true
+                // Labelled, not a bare glyph (07 §5.6, VQ-007).
+                Button { present(.pair) } label: {
+                    HStack(spacing: PixelHandTheme.Space.sm) {
+                        PHGlyph(glyph: PixelGlyphs.lock, pitch: CGFloat(PixelPitch.chip), stepsWithType: true)
+                        Text("Pair")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .foregroundStyle(PixelHandTheme.ink)
+                    .padding(.horizontal, PixelHandTheme.Space.lg)
+                    .frame(height: PixelHandTheme.ControlHeight.standard)
+                    .contentShape(Capsule())
                 }
-                .accessibilityIdentifier("ph.connect.scanQR")
+                .buttonStyle(.plain)
+                .phGlass(in: Capsule(), interactive: true)
+                .phosphorFocusable(cornerRadius: PixelHandTheme.ControlHeight.standard / 2)
+                .accessibilityLabel("Pair with a code")
+                .accessibilityIdentifier("ph.connect.pair")
                 GlassCircleButton(glyph: PixelGlyphs.settings, label: "Settings") {
-                    isSettingsPresented = true
+                    present(.settings)
                 }
                 .accessibilityIdentifier("ph.connect.settings")
             }
@@ -147,7 +190,7 @@ struct PeerPickerView: View {
     }
 
     private var headerSubtitle: String {
-        if !peers.isEmpty { return "Your own Macs come first." }
+        if !peers.isEmpty { return "Pick the Mac to control. It needs Pixel Hand open." }
         return startError == nil
             ? "Open Pixel Hand on your Mac. Both need the same Wi-Fi or a cable."
             : "The network connection didn’t start."
@@ -190,15 +233,69 @@ struct PeerPickerView: View {
         VStack(spacing: PixelHandTheme.Space.lg) {
             DotScan()
             HStack(spacing: PixelHandTheme.Space.sm) {
-                StatusPixel(state: .needsYou)
+                // Unlit: searching isn't something the person must act on
+                // (amber means "needs you", VQ-044).
+                StatusPixel(state: .off)
                 DotMatrixText("SEARCHING", pitch: 1.6, label: "Searching")
                     .foregroundStyle(PixelHandTheme.Brand.phosphor)
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Searching for Macs")
+            .accessibilityIdentifier("ph.connect.searching")
+            if showsChecks {
+                checks
+                    .transition(.opacity)
+            }
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Searching for Macs")
-        .accessibilityIdentifier("ph.connect.searching")
         .padding(.top, PixelHandTheme.Space.md)
+    }
+
+    /// After 10 s with no Mac: the three things to check, and Try again
+    /// (04 §5.4 and §7, VQ-069).
+    private var checks: some View {
+        VStack(alignment: .leading, spacing: PixelHandTheme.Space.md) {
+            Text("Can’t find your Mac?")
+                .font(.headline)
+                .foregroundStyle(.white)
+                .accessibilityAddTraits(.isHeader)
+            checkRow("Your Mac and this \(thisDeviceKind) are on the same Wi-Fi, or joined by a cable.")
+            checkRow("Pixel Hand is open on the Mac (its hand is in the menu bar).")
+            checkRow("Local Network is on for Pixel Hand in Settings › Privacy & Security.")
+            HStack(spacing: PixelHandTheme.Space.md) {
+                Button("Try again") {
+                    showsChecks = false
+                    onRetryStart()
+                }
+                .buttonStyle(.ph(.primary, size: .regular))
+                .accessibilityIdentifier("ph.connect.tryAgain")
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+                .buttonStyle(.ph(.secondary, size: .regular))
+            }
+            .padding(.top, PixelHandTheme.Space.xs)
+        }
+        .padding(PixelHandTheme.Space.lg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous)
+                .fill(PixelHandTheme.Brand.screenGradient)
+        )
+        .padding(.horizontal, PixelHandTheme.Space.lg)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ph.connect.checks")
+    }
+
+    private func checkRow(_ text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: PixelHandTheme.Space.sm) {
+            StatusPixel(state: .off)
+            Text(text)
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.8))
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     /// Loom failed to start, so nothing is being searched. Say what went
@@ -233,15 +330,49 @@ struct PeerPickerView: View {
             .transition(.opacity.combined(with: .scale(scale: 0.96)))
     }
 
+    /// Not a repeat of the body sentence (VQ-044): a way to the checks
+    /// when a Mac is listed but not the one wanted.
+    @ViewBuilder
     private var footer: some View {
-        HStack(spacing: PixelHandTheme.Space.sm) {
-            PHGlyph(glyph: PixelGlyphs.wifi, pitch: CGFloat(PixelPitch.badge), stepsWithType: true)
-            Text("Same Wi-Fi, or a cable")
-                .font(.caption)
+        if !peers.isEmpty, !showsChecks {
+            Button {
+                withAnimation(.easeOut(duration: 0.2)) { showsChecks = true }
+            } label: {
+                HStack(spacing: PixelHandTheme.Space.sm) {
+                    PHGlyph(glyph: PixelGlyphs.wifi, pitch: CGFloat(PixelPitch.badge), stepsWithType: true)
+                    Text("Can’t find your Mac?")
+                        .font(.caption.weight(.semibold))
+                }
+                .foregroundStyle(.white.opacity(0.7))
+                .frame(minHeight: PixelHandTheme.ControlHeight.hit)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, PixelHandTheme.Space.sm)
+            .padding(.bottom, PixelHandTheme.Space.xl)
+            .accessibilityIdentifier("ph.connect.help")
+        } else if !peers.isEmpty, showsChecks {
+            checks
+                .padding(.top, PixelHandTheme.Space.sm)
+                .padding(.bottom, PixelHandTheme.Space.xl)
+        } else {
+            Color.clear.frame(height: PixelHandTheme.Space.xxl)
         }
-        .foregroundStyle(.white.opacity(0.5))
-        .padding(.top, PixelHandTheme.Space.lg)
-        .padding(.bottom, PixelHandTheme.Space.xxl)
+    }
+
+    /// Macs in reach that a typed code could be for.
+    private var pairTargets: [PairingCodeEntryView.Target] {
+        peers.filter(\.isNearby).map { .init(id: $0.deviceID, name: $0.name) }
+    }
+
+    /// Shows `next`, or queues it while another sheet is still closing
+    /// (a tap then used to be dropped, VQ-020).
+    private func present(_ next: PickerSheet) {
+        if sheet != nil || isSheetClosing {
+            queuedSheet = next
+            if sheet != nil { sheet = nil }
+        } else {
+            sheet = next
+        }
     }
 
     // MARK: - Actions
@@ -279,18 +410,6 @@ struct PeerPickerView: View {
                 }
             }
         }
-    }
-
-    /// A scanned pairing QR code: dial the Mac it names. The code goes out
-    /// once that Mac proves the key in the QR code and answers
-    /// (ControlSessionModel+Pairing).
-    private func connect(with invite: PairingInvite) {
-        guard let peer = peers.first(where: { $0.deviceID == invite.macDeviceID }) else {
-            showError("That Mac isn’t nearby. Make sure Pixel Hand is open on it and both devices are on the same Wi-Fi.")
-            return
-        }
-        pairing.pendingInvite = invite
-        connectTo(peer)
     }
 
     private func showError(_ message: String) {

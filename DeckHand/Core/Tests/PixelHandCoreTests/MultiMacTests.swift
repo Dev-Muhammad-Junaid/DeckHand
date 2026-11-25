@@ -240,6 +240,31 @@ struct MacSwitchMachineTests {
         #expect(machine.phase == .active(studio))
     }
 
+    @Test("Cancelling a dial keeps the Mac on screen and discards the late connection")
+    func cancelDial() {
+        var m = MacSwitchMachine()
+        guard case let .dial(_, first) = m.request(studio, isReachable: true, admission: .allowed) else {
+            Issue.record("expected a dial"); return
+        }
+        let cancelled = m.cancelDial()
+        #expect(cancelled)
+        #expect(m.phase == .idle)
+        let late = m.dialSucceeded(studio, attempt: first)
+        #expect(late == .discard)
+        let again = m.cancelDial()
+        #expect(!again)
+
+        m.adopted(studio)
+        guard case let .dial(_, second) = m.request(laptop, isReachable: true, admission: .allowed) else {
+            Issue.record("expected a dial"); return
+        }
+        let cancelledSwitch = m.cancelDial()
+        #expect(cancelledSwitch)
+        #expect(m.phase == .active(studio))
+        let lateSwitch = m.dialSucceeded(laptop, attempt: second)
+        #expect(lateSwitch == .discard)
+    }
+
     @Test("A newer request supersedes a dial; the late connection is discarded")
     func supersede() {
         var machine = MacSwitchMachine()
@@ -363,11 +388,34 @@ struct MacReconnectTests {
         #expect(target(studio) == studio)
         #expect(target(laptop) == nil) // would ask for approval
         #expect(target(mini) == nil) // not in reach
-        #expect(target(nil) == nil)
+        // Nothing used last: the one paired Mac in reach (VQ-058).
+        #expect(target(nil) == studio)
         #expect(target(studio, enabled: false) == nil)
         #expect(target(studio, onboarded: false) == nil)
         #expect(target(studio, tried: true) == nil)
         #expect(target(studio, session: true) == nil)
+    }
+
+    @Test("With no last Mac, only a single prompt-free Mac in reach is dialled (VQ-058)")
+    func noLastMac() {
+        func pick(_ listings: [MacListing], locked: Set<UUID> = []) -> UUID? {
+            MacReconnectPolicy.launchTarget(
+                isEnabled: true, hasCompletedOnboarding: true, alreadyTried: false, hasSession: false,
+                lastActiveDeviceID: nil, listings: listings, isLockedByFreePlan: { locked.contains($0) }
+            )
+        }
+        let both = [
+            MacListing(deviceID: studio, name: "Studio", isReachable: true, isPaired: true),
+            MacListing(deviceID: laptop, name: "Laptop", isReachable: true, isOwnICloud: true),
+        ]
+        #expect(pick(both) == nil) // two: the person picks
+        #expect(pick(both, locked: [laptop]) == studio)
+        #expect(pick([MacListing(deviceID: laptop, name: "Laptop", isReachable: true)]) == nil) // would prompt
+        #expect(pick([]) == nil)
+        #expect(MacReconnectPolicy.launchTarget(
+            isEnabled: true, hasCompletedOnboarding: false, alreadyTried: false, hasSession: false,
+            lastActiveDeviceID: nil, listings: both.prefix(1).map { $0 }, isLockedByFreePlan: { _ in false }
+        ) == nil)
     }
 
     @Test("Own iCloud Macs reconnect at launch without pairing")

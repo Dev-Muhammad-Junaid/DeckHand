@@ -144,7 +144,9 @@ public enum LinkJudge {
 
     public static func isLoopback(_ host: String?) -> Bool {
         guard let host else { return false }
-        let h = unscoped(host)
-        return h == "::1" || h.hasPrefix("127.") || h == "localhost"
+        var h = unscoped(host)
+        // IPv4-mapped IPv6 (`::ffff:127.0.0.1`) is still loopback.
+        if h.hasPrefix("::ffff:") { h = String(h.dropFirst(7)) }
+        return h == "::1" || h == "0:0:0:0:0:0:0:1" || h.hasPrefix("127.") || h == "localhost"
     }
 }

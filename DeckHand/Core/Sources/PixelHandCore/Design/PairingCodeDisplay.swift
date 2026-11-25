@@ -4,7 +4,7 @@
 //
 //  How the Mac's "Pair a device" window draws a code (`06-Pixel-Identity.md`
 //  §4 "Pairing code", board `v2PairMac`): dot-matrix numerals in groups of
-//  four with the check digit dimmer, a dot beam counting down the 5-minute
+//  four, all at full brightness (OR-11), a dot beam counting down the 5-minute
 //  window, and a QR code whose modules are dots except the finder squares.
 //
 
@@ -14,28 +14,27 @@ public enum PairingCodeDisplay {
     /// One drawn group of digits.
     public struct Group: Sendable, Hashable {
         public let text: String
-        /// The check digit's group is drawn dimmer.
+        /// This group ends with the check digit. Drawn at full brightness
+        /// like every other digit (OR-11: the person types it too, and a dim
+        /// digit read as a bug).
         public let isCheck: Bool
     }
 
-    /// `1234567` → `1234`, `56`, `7` (check). Groups of four from the
-    /// front; the check digit always stands alone so it can be dimmed.
+    /// `48210934` → `4821`, `0934`: groups of four from the front, the same
+    /// as `PairingCode.formatted`. The last group holds the check digit.
     public static func groups(_ code: PairingCode) -> [Group] {
         let digits = Array(code.digits)
-        guard let check = digits.last else { return [] }
-        let secret = digits.dropLast()
         var groups: [Group] = []
-        var index = secret.startIndex
-        while index < secret.endIndex {
-            let end = secret.index(index, offsetBy: 4, limitedBy: secret.endIndex) ?? secret.endIndex
-            groups.append(Group(text: String(secret[index..<end]), isCheck: false))
+        var index = 0
+        while index < digits.count {
+            let end = min(index + PairingCode.groupSize, digits.count)
+            groups.append(Group(text: String(digits[index..<end]), isCheck: end == digits.count))
             index = end
         }
-        groups.append(Group(text: String(check), isCheck: true))
         return groups
     }
 
-    /// VoiceOver reads the digits one by one: "1 2 3 4 5 6 7".
+    /// VoiceOver reads the digits one by one: "4 8 2 1 0 9 3 4".
     public static func spoken(_ code: PairingCode) -> String {
         "Pairing code " + code.digits.map(String.init).joined(separator: " ")
     }

@@ -55,6 +55,7 @@ struct ShellHeader: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.entitlements) private var entitlements
+    @EnvironmentObject private var settings: DeckHandSettings
     @State private var swipeOffset: CGFloat = 0
     /// The header's measured width, for `ShellHeaderPlan`.
     @State private var width: CGFloat = 0
@@ -194,12 +195,20 @@ struct ShellHeader: View {
         }
     }
 
+    /// Tap runs the default capture (Settings › Capture button); touch and
+    /// hold offers every mode, the default first and named as the tap's
+    /// (VQ-052).
     private var captureMenu: some View {
         Menu {
-            Button("Full screen", action: onFullScreen)
-            Button("Region", action: onRegion)
-            Button("Window", action: onWindow)
-            Button("Read text", action: onOCR)
+            Section("Tap takes \(settings.defaultCapture.label.lowercased())") {
+                captureButton(settings.defaultCapture)
+            }
+            Section {
+                ForEach(DefaultCapture.allCases.filter { $0 != settings.defaultCapture }) { mode in
+                    captureButton(mode)
+                }
+                Button("Read text", action: onOCR)
+            }
         } label: {
             Group {
                 if isCaptureBusy {
@@ -217,10 +226,21 @@ struct ShellHeader: View {
         }
         .disabled(isCaptureBusy)
         .accessibilityLabel("Capture")
-        .accessibilityHint("Takes a screenshot. Touch and hold for more options.")
+        .accessibilityValue(settings.defaultCapture.label)
+        .accessibilityHint("Captures \(settings.defaultCapture.label.lowercased()). Touch and hold for full screen, window, region or text.")
         .accessibilityIdentifier("ph.header.capture")
         .phosphorFocusable(cornerRadius: PixelHandTheme.ControlHeight.standard / 2)
         .requiresPro(.capture)
+    }
+
+    private func captureButton(_ mode: DefaultCapture) -> some View {
+        Button(mode.label) {
+            switch mode {
+            case .fullScreen: onFullScreen()
+            case .region: onRegion()
+            case .window: onWindow()
+            }
+        }
     }
 
     /// More: the circles that didn't fit, Settings, and Disconnect at the

@@ -4,9 +4,9 @@
 //
 //  The "Pair a device" window (UX-012, board `v2PairMac`): the QR code in
 //  dots with the pointer glyph at its centre, the code in dot-matrix
-//  numerals (groups of four, check digit dimmer) and a dot beam counting
+//  numerals (two groups of four, all at full brightness) and a dot beam counting
 //  down the 5-minute window. Opened from the menu-bar panel's "Pair a
-//  device…" and a pending request's "Pair…". Closing it cancels the code.
+//  device" and a pending request's "Pair". Closing it cancels the code.
 //  The code window itself is `DeviceAuthorizationManager`'s (S4).
 //
 
@@ -123,7 +123,8 @@ struct PairDeviceView: View {
     @ViewBuilder private var content: some View {
         switch authManager.pairingDisplay {
         case let .code(code, expiresAt, attemptsLeft):
-            title("Scan this with your iPhone or iPad")
+            // One line: "or iPad" used to wrap alone (VQ-022).
+            title("Scan with your iPhone or iPad", singleLine: true)
             Text("Or open Pixel Hand there, choose \(Self.macName) and type the code.")
                 .font(.body)
                 .foregroundStyle(PixelHandTheme.ink2)
@@ -133,7 +134,7 @@ struct PairDeviceView: View {
                 let remaining = expiresAt.timeIntervalSince(context.date)
                 HStack(spacing: PixelHandTheme.Space.sm) {
                     MacDotBeam(lit: PairingCodeDisplay.beamLitCells(remaining: remaining))
-                    Text("Code works for \(PairingCodeDisplay.countdown(remaining: remaining)) more, for one device")
+                    Text("Works once, for \(PairingCodeDisplay.countdown(remaining: remaining))")
                         .font(.callout)
                         .monospacedDigit()
                         .foregroundStyle(PixelHandTheme.ink2)
@@ -215,31 +216,32 @@ struct PairDeviceView: View {
         }
     }
 
-    private func title(_ text: String) -> some View {
-        Text(text)
+    @ViewBuilder
+    private func title(_ text: String, singleLine: Bool = false) -> some View {
+        let base = Text(text)
             .font(.phDisplay(.title2))
             .tracking(PixelHandTheme.TextRole.display.tracking)
             .foregroundStyle(PixelHandTheme.ink)
-            .fixedSize(horizontal: false, vertical: true)
             .accessibilityAddTraits(.isHeader)
+        if singleLine {
+            base
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        } else {
+            base.fixedSize(horizontal: false, vertical: true)
+        }
     }
 
-    /// The code in dot-matrix numerals on a navy plate: groups of four,
-    /// the check digit joined to the last group and dimmer.
+    /// The code in dot-matrix numerals on a navy plate: two groups of
+    /// four, every digit at full brightness (OR-11: the check digit is
+    /// typed too, and a dim one read as a bug), the same "4821 0934" the
+    /// iPhone and iPad show.
     private func codePlate(_ code: PairingCode) -> some View {
         let pitch: CGFloat = 3
         let groups = PairingCodeDisplay.groups(code)
-        let leading = groups.filter { !$0.isCheck }
-        let check = groups.first(where: \.isCheck)
         return HStack(spacing: pitch * 6) {
-            ForEach(Array(leading.enumerated()), id: \.offset) { index, group in
-                HStack(spacing: pitch) {
-                    MacDotText(group.text, pitch: pitch, glows: true)
-                    if index == leading.count - 1, let check {
-                        MacDotText(check.text, pitch: pitch)
-                            .opacity(0.45)
-                    }
-                }
+            ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
+                MacDotText(group.text, pitch: pitch, glows: true)
             }
         }
         .foregroundStyle(PixelHandTheme.Brand.phosphor)

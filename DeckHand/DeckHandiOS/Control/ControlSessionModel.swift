@@ -323,6 +323,9 @@ final class ControlSessionModel {
         case let .pairing(.codeResult(result)):
             handleCodeResult(result)
 
+        case let .pairing(.refused(reason)):
+            handleRefused(reason)
+
         case let .pairing(.pairedStatus(paired)):
             handlePairedStatus(paired)
 
@@ -334,6 +337,7 @@ final class ControlSessionModel {
                 activeAppName = name
                 activeBundleID = bundleID
             }
+            TypingTarget.shared.frontApp = name
 
         case let .capture(.screenshotData(requestID, data)):
             capture.handleScreenshotData(requestID: requestID, data: data)
