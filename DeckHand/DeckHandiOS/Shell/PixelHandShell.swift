@@ -298,7 +298,7 @@ struct PixelHandShell: View {
                         }
                     }
                 case .screen:
-                    dockedScreen
+                    dockedScreen(screenOnly: true)
                 case .pointer:
                     HStack(spacing: PixelHandTheme.Space.md) {
                         pointerPane(margin: 0, keyboardInDock: true)
@@ -486,7 +486,7 @@ struct PixelHandShell: View {
             header(showsMirrorToggle: true, horizontalPadding: outer)
             statusPills
                 .padding(.horizontal, outer)
-            dockedScreen
+            dockedScreen()
                 .padding(.horizontal, outer)
                 .frame(maxHeight: .infinity)
         }
@@ -658,7 +658,7 @@ struct PixelHandShell: View {
                 }
             }
         case .screen:
-            dockedScreen
+            dockedScreen(screenOnly: true)
         case .pointer:
             pointerPane(margin: 0, keyboardInDock: true)
                 .floatingScreenTile(session: session)
@@ -680,7 +680,7 @@ struct PixelHandShell: View {
             fraction: fraction
         ) {
             VStack(spacing: 0) {
-                dockedScreen
+                dockedScreen()
                     .frame(height: CGFloat(screen))
                 PaneDragHandle(
                     onDrag: { delta in dragSize = (dragSize ?? CGFloat(screen)) + delta },
@@ -706,8 +706,10 @@ struct PixelHandShell: View {
     }
 
     /// The Mac's screen as a pane (or its "Show screen" empty state).
-    private var dockedScreen: some View {
-        ScreenSurface(session: session, macName: peerName, includesTrackpad: false)
+    /// `screenOnly`: no pad beside it, so the pane offers pointer control
+    /// on the picture (OR-16).
+    private func dockedScreen(screenOnly: Bool = false) -> some View {
+        ScreenSurface(session: session, macName: peerName, includesTrackpad: false, screenOnly: screenOnly)
     }
 
     @ViewBuilder
@@ -1020,7 +1022,7 @@ struct PixelHandShell: View {
                 keyboardInDock: dockCarriesKeyboard(plan)
             )
         case .screen:
-            ScreenSurface(session: session, macName: peerName, keyboardInDock: dockCarriesKeyboard(plan))
+            ScreenSurface(session: session, macName: peerName, keyboardInDock: dockCarriesKeyboard(plan), screenOnly: true)
                 .padding(.horizontal, margin)
                 .padding(.bottom, PixelHandTheme.Space.sm)
         case .deck:

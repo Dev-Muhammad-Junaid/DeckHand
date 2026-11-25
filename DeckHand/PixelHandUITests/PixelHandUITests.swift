@@ -336,7 +336,73 @@ final class PixelHandUITests: XCTestCase {
         sleep(1)
     }
 
+    /// OR-16: pointer control on the picture. The screen-only arrangement
+    /// (iPad: the "Screen focus" preset; iPhone: the Screen tab in
+    /// landscape, where the pad doesn't fit), toggle on, drive a little,
+    /// pinch, toggle off. Captures both states.
+    func test14_PicturePointer() {
+        launch()
+        guard connect() else { return }
+        let screenFocus = app.buttons["Screen focus"].firstMatch
+        let usesPreset = screenFocus.waitForExistence(timeout: 3) && screenFocus.isHittable
+        if usesPreset {
+            screenFocus.tap()
+        } else {
+            XCUIDevice.shared.orientation = .landscapeLeft
+            sleep(2)
+            guard tapIfExists("ph.tab.screen") else {
+                XCUIDevice.shared.orientation = .portrait
+                return
+            }
+        }
+        sleep(4)
+        snap("screen-only")
+        revealMirrorToolbar()
+        if tapIfExists("ph.mirror.pointerControl") {
+            sleep(1)
+            snap("pointer-control-on")
+            let surface = element("ph.mirror.pointerSurface")
+            if surface.waitForExistence(timeout: 2) {
+                // A finger anywhere moves the pointer relative to where it is.
+                surface.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.6))
+                    .press(forDuration: 0.05, thenDragTo: surface.coordinate(withNormalizedOffset: CGVector(dx: 0.55, dy: 0.45)))
+                sleep(1)
+                snap("pointer-control-moved")
+                // Pinch still zooms the picture.
+                surface.pinch(withScale: 2, velocity: 1)
+                sleep(1)
+                snap("pointer-control-zoomed")
+            } else {
+                snap("missing-ph.mirror.pointerSurface")
+            }
+            revealMirrorToolbar()
+            if tapIfExists("ph.mirror.pointerControl") {
+                sleep(1)
+                snap("pointer-control-off")
+            }
+        }
+        // Leave the arrangement as the other walks expect it.
+        if usesPreset {
+            let split = app.buttons["Split: screen over trackpad"].firstMatch
+            if split.exists, split.isHittable { split.tap() }
+        } else {
+            XCUIDevice.shared.orientation = .portrait
+        }
+        sleep(1)
+    }
+
     // MARK: - Helpers
+
+    /// The mirror's toolbar fades after 3 s. Off, a tap on the picture
+    /// brings it back; on (OR-16), a tap where the toolbar sits does.
+    private func revealMirrorToolbar() {
+        let toggle = element("ph.mirror.pointerControl")
+        if toggle.exists, toggle.isHittable { return }
+        let pane = element("ph.mirror")
+        guard pane.exists else { return }
+        pane.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)).tap()
+        sleep(1)
+    }
 
     /// Opens Ask: the tab bar's Ask on compact windows, the Ask field or
     /// circle (`ph.ask`) on iPad, where it opens in the right column when

@@ -13,6 +13,9 @@
 //  - `GestureStroke` / `GestureClassifier`: three- and four-finger swipes
 //    and pinches, decided when the first finger lifts (S11).
 //  - `HoverPointerTracker`: Pencil hover moves the pointer (S12).
+//  - `TwoFingerArbiter` (OR-16, the mirror picture only): two fingers
+//    scroll the Mac, pinch (then slide) zooms and pans the picture, and a
+//    quick two-finger tap right-clicks.
 //
 
 import QuartzCore
@@ -57,6 +60,14 @@ struct TrackpadCallbacks {
     /// Every finger on the surface, in the view's coordinates, whenever one
     /// lands, moves or lifts. Drives the dot field; empty when all have lifted.
     var onTouchesChanged: ([CGPoint]) -> Void = { _ in }
+    /// OR-16, arbitrated surfaces only: a two-finger touch decided as a
+    /// pinch zooms the picture by `scale` (relative to the last call)
+    /// around `anchor`, and pans it by `pan`.
+    var onPictureZoom: (_ scale: CGFloat, _ anchor: CGPoint, _ pan: CGSize) -> Void = { _, _, _ in }
+    /// The pinch's fingers lifted.
+    var onPictureZoomEnded: () -> Void = { }
+    /// Arbitrated surfaces only: a quick two-finger tap (a right click).
+    var onTwoFingerTap: (CGPoint) -> Void = { _ in }
 }
 
 // MARK: - SwiftUI bridge
@@ -70,6 +81,9 @@ struct MultiTouchTrackpad: UIViewRepresentable {
     var systemGestures: Bool = true
     /// Apple Pencil hover moves the pointer (S12).
     var pencilHover: Bool = true
+    /// OR-16: two fingers go through `TwoFingerArbiter` (pinch zooms the
+    /// picture, two-finger tap right-clicks). Off on the Pointer surface.
+    var arbitratesTwoFingers: Bool = false
 
     func makeUIView(context: Context) -> TouchTrackingView {
         let view = TouchTrackingView()
@@ -95,6 +109,7 @@ struct MultiTouchTrackpad: UIViewRepresentable {
         view.naturalScrolling = naturalScrolling
         view.systemGestures = systemGestures
         view.pencilHover = pencilHover
+        view.arbitratesTwoFingers = arbitratesTwoFingers
     }
 }
 
@@ -110,6 +125,7 @@ final class TouchTrackingView: UIView {
     var pencilHover: Bool = true {
         didSet { hoverRecognizer.isEnabled = pencilHover }
     }
+    var arbitratesTwoFingers: Bool = false
 
     private var scrollSign: Float { naturalScrolling ? -1 : 1 }
 
@@ -134,6 +150,12 @@ final class TouchTrackingView: UIView {
     /// Once a stroke armed (three fingers), the rest of the touch sends
     /// no pointer motion, click or scroll.
     private var strokeOwnsTouch = false
+
+    // ── Two fingers on the picture (Core `TwoFingerArbiter`, OR-16) ─
+    private var twoFingers = TwoFingerArbiter()
+    /// Once a pinch started, the rest of the touch zooms and pans the
+    /// picture only: a finger left behind doesn't move the pointer.
+    private var pinchOwnsTouch = false
 
     /// `true` while a scroll gesture (1-finger scrollMode or 2-finger drag)
     /// is in flight. Drives `onScrollEnded` so the host can ship a phased
@@ -168,6 +190,8 @@ final class TouchTrackingView: UIView {
         dragTicker = nil
         stroke.cancel()
         hover.ended()
+        finishTwoFingers(twoFingers.cancel())
+        pinchOwnsTouch = false
     }
 
     // MARK: - Touches
@@ -188,6 +212,7 @@ final class TouchTrackingView: UIView {
             touchDownLocation = activeTouches[0].location(in: self)
             hasMoved = false
             strokeOwnsTouch = false
+            pinchOwnsTouch = false
             stroke.reset()
         }
         if count > 1 { hasMoved = true }
@@ -200,6 +225,20 @@ final class TouchTrackingView: UIView {
             if stroke.isArmed, !strokeOwnsTouch {
                 strokeOwnsTouch = true
                 endScrollIfActive()
+            }
+        }
+
+        if arbitratesTwoFingers {
+            if count == 2, !drag.routesMovementToPointer, !strokeOwnsTouch, !pinchOwnsTouch, !twoFingers.isTracking {
+                let points = activeTouches.map { $0.location(in: self) }
+                twoFingers.begin(
+                    TouchPoint(x: points[0].x, y: points[0].y),
+                    TouchPoint(x: points[1].x, y: points[1].y),
+                    at: now
+                )
+            } else if count > 2 || strokeOwnsTouch {
+                // A third finger: the Mac's system gestures take over.
+                finishTwoFingers(twoFingers.cancel())
             }
         }
 
@@ -245,6 +284,38 @@ final class TouchTrackingView: UIView {
             return
         }
 
+        // A pinch owns the touch until every finger lifts (OR-16).
+        if pinchOwnsTouch, !twoFingers.isTracking {
+            reportTouches()
+            return
+        }
+
+        // Two fingers on the picture: scroll, or pinch and pan (OR-16).
+        if arbitratesTwoFingers, twoFingers.isTracking, count == 2 {
+            let points = activeTouches.map { $0.location(in: self) }
+            let step = twoFingers.move(
+                TouchPoint(x: points[0].x, y: points[0].y),
+                TouchPoint(x: points[1].x, y: points[1].y)
+            )
+            switch step {
+            case .none:
+                break
+            case let .scroll(sdx, sdy):
+                scrollActive = true
+                callbacks.onScrollDelta(Float(sdx) * 0.5 * scrollSign, Float(sdy) * 0.5 * scrollSign)
+                callbacks.onGestureChanged(.scroll)
+            case let .zoom(scale, anchor, pdx, pdy):
+                pinchOwnsTouch = true
+                callbacks.onPictureZoom(
+                    CGFloat(scale),
+                    CGPoint(x: anchor.x, y: anchor.y),
+                    CGSize(width: pdx, height: pdy)
+                )
+            }
+            reportTouches()
+            return
+        }
+
         switch count {
         case 1:
             // 1-finger: cursor OR scroll depending on mode
@@ -285,7 +356,18 @@ final class TouchTrackingView: UIView {
                 callbacks.onGestureChanged(.system(gesture))
             }
         }
+        let liftedAt = lastCentroid ?? touchDownLocation
         activeTouches.removeAll { touches.contains($0) }
+
+        // Fewer than two fingers: the two-finger touch is decided (OR-16).
+        if twoFingers.isTracking, activeTouches.count < 2 {
+            let ending = twoFingers.end(at: now)
+            if ending == .tap, !drag.isButtonDown {
+                GestureHaptic.medium.trigger()
+                callbacks.onTwoFingerTap(liftedAt)
+            }
+            finishTwoFingers(ending)
+        }
 
         let machineOwnedTouch = drag.ownsTouch
         let outputs = drag.touchEnded(remaining: activeTouches.count, at: now)
@@ -316,6 +398,7 @@ final class TouchTrackingView: UIView {
 
             lastCentroid = nil
             strokeOwnsTouch = false
+            pinchOwnsTouch = false
             if !drag.isButtonDown {
                 callbacks.onGestureChanged(nil)
             }
@@ -336,10 +419,14 @@ final class TouchTrackingView: UIView {
         // a stroke sends nothing and a held button is released.
         stroke.cancel()
         handle(drag.touchesCancelled())
+        if activeTouches.count < 2 {
+            finishTwoFingers(twoFingers.cancel())
+        }
         if activeTouches.isEmpty {
             endScrollIfActive()
             lastCentroid = nil
             strokeOwnsTouch = false
+            pinchOwnsTouch = false
             callbacks.onGestureChanged(nil)
         }
         reportTouches()
@@ -422,6 +509,16 @@ final class TouchTrackingView: UIView {
     }
 
     // MARK: - Helpers
+
+    /// Closes what a two-finger touch opened. The tap itself is sent by
+    /// `touchesEnded`, which knows where the fingers were.
+    private func finishTwoFingers(_ ending: TwoFingerArbiter.Ending) {
+        switch ending {
+        case .scrollEnded: endScrollIfActive()
+        case .pinchEnded: callbacks.onPictureZoomEnded()
+        case .tap, .nothing: break
+        }
+    }
 
     private func endScrollIfActive() {
         if scrollActive {

@@ -10,6 +10,9 @@
 //  after the person stops it, the navy empty state with "Show screen"
 //  (its button carries the Pro lock in the free plan). Under the pane is
 //  the Pointer surface's pad, not the classic trackpad (build 18 QA).
+//  OR-16: where the pane shows with no trackpad (the screen-only preset,
+//  or this surface when the pad doesn't fit), its toolbar offers pointer
+//  control on the picture.
 //  Spec: `Product/Design/03-Layout-Strategy.md` (Option A), board
 //  "New features" › Mirror with display and desktop chrome.
 //
@@ -24,6 +27,11 @@ struct ScreenSurface: View {
     var includesTrackpad = true
     /// The shell's app dock carries the keyboard button (UX-005).
     var keyboardInDock = true
+    /// OR-16: no trackpad shows anywhere else in this arrangement (the
+    /// Screen tab, the screen-only preset), so when the pane stands alone
+    /// its toolbar offers pointer control on the picture. Off where a pad
+    /// sits beside it (Split, Duo).
+    var screenOnly = false
 
     @EnvironmentObject private var settings: DeckHandSettings
     @Environment(\.entitlements) private var entitlements
@@ -41,8 +49,15 @@ struct ScreenSurface: View {
                     ? Self.split(size: proxy.size, aspect: MirrorPicture.aspect(session))
                     : (pane: proxy.size.height, showsTrackpad: false)
                 VStack(spacing: PixelHandTheme.Space.md) {
-                    MirrorPane(session: session, macName: macName)
-                        .frame(height: layout.pane)
+                    MirrorPane(
+                        session: session,
+                        macName: macName,
+                        offersPointerControl: PicturePointerControl.isOffered(
+                            screenOnly: screenOnly,
+                            showsTrackpad: layout.showsTrackpad
+                        )
+                    )
+                    .frame(height: layout.pane)
                     if layout.showsTrackpad, let sender = session.sender {
                         // The Pointer surface's pad (dot field, click strip,
                         // caption), never the classic TrackpadView with its
