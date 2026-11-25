@@ -1396,5 +1396,31 @@ Mac should check: build all targets; Core, Loom and app tests; run the
 landscape, Stage Manager at iPhone width) and re-check OR-03 to OR-06 and
 OR-10 to OR-13 against each lane's table; install on Mac and iPad.
 
-Status: READY FOR MAC BUILD (build 20)
 
+## Build 21 queued (2026-11-25, replaces build 20)
+
+Build 20 (the three owner-review lanes) was not built yet. **Build 21 is
+build 20 plus `LANE-build19-fixes.md`**, merged at `4f2f62c`, which fixes the 5
+bugs in "Mac build results (build 19)":
+- VQ-001: a simulator dialling the Mac's own Wi-Fi address over `lo0` is
+  now "this Mac".
+- The deck tile.
+- The pill name.
+- Capture errors.
+- An iPad listed as a Mac (new additive `ph-role` advertisement metadata;
+  the protocol stays at 14).
+
+Linux: Core **992 / 992 pass** (179 suites); `linux-typecheck/run.sh`
+passes.
+
+**Mac should check:**
+1. The build 20 checks: the re-check steps in `LANE-or-ios-chrome.md`,
+   `LANE-or-canvas.md` and `LANE-or-mac-panel.md`.
+2. The Mac re-check steps in `LANE-build19-fixes.md`.
+3. The `PixelHandUITests` walks.
+4. Run `xcodegen generate` first.
+
+OR-16 (pointer control on the picture) is in progress in its own lane and
+will be build 22.
+
+Status: READY FOR MAC BUILD (build 21)
