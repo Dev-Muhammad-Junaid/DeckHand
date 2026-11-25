@@ -73,7 +73,8 @@ three-finger gestures.
   button comes first** (thumb reach); on wide, macOS order.
 - Otherwise: pinned chips for the front app → recents → "+ Suggest".
 - Long-press a chip: Pin to deck, Run on…, Edit.
-- Every chip shows the delivery strip and announces the receipt.
+- Running a chip gives the press state and a haptic only; a refusal tints
+  its outline danger and is announced (no dot row, OR-02).
 
 ### App dock
 - Tap: bring the app to front on the Mac. Long-press: Quit, Hide, Show

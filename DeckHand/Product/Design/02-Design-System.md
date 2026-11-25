@@ -185,7 +185,7 @@ is talking.
 | Lit trail | Under fingers on the trackpad | Existing `DotField`: 64 pt reach, 0.3 s afterglow |
 | Live pixel | Mac pill, Mac cards, app dock front app | 6–8 pt mint square with glow; grey when offline |
 | Running dots | App dock, under each running app | 4 pt square, `ink3`; front app mint |
-| Delivery strip | Chips (3 dots) and keys (4 dots) | Idle `fill2` → sending glow (sequential) → delivered mint, then a check → refused danger, then a cross |
+| Delivery receipt | Chips and keys | No dots (owner review, OR-02): press state and haptic only; refused tints the outline danger for 1.4 s and is announced |
 | Dot beam | Pairing waits, transfers, AI thinking | Row of 6 pt dots filling left to right; turns mint and collapses on success |
 | DotScan | Searching for Macs | Existing component |
 | 8 × 8 pixel glyphs | Deck keys, empty states | Same dots as the icon; editable in the deck editor |

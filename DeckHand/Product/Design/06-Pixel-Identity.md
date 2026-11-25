@@ -175,10 +175,17 @@ the mirror stats (Mirror lane), `LinkKind` (Network lane).
   plus `.shadow(color: glow.opacity(0.5), radius: 9)`; disable the system
   focus effect on those views.
 - **Press.** A key's or chip's glyph dots flash to phosphor for 120 ms
-  (`quick` motion), then the delivery strip takes over.
-- **Selection.** Selected tab, preset or Mac gets a 4 pt lit dot under the
-  label (tab bar) or the 2 pt cobalt ring (cards). No filled pills for
-  selection inside navy chrome.
+  (`quick` motion) and a haptic plays. Nothing else: no dot row, no loader
+  (owner review of build 18, OR-02). A refusal tints the outline danger
+  for 1.4 s and VoiceOver hears why (`ChromeRule.pressFeedback`).
+- **Selection.** By colour and fill only: the selected tab is accent on a
+  `fill2` capsule, cards get the 2 pt cobalt ring, the front app in the
+  dock its accent ring. No dot or indicator under a selected tab, chip or
+  row (OR-01). No filled pills for selection inside navy chrome.
+- **Panels and status rows** fade in and out over 180 ms, ease-out, and
+  never slide in from the bottom; Reduce Motion changes them at once
+  (`ChromeRule.panelFade`). The dot-matrix loader is only for real waiting:
+  an Ask plan running, waiting on the Mac, a slow step, connecting.
 - **Disconnected.** No phosphor, glow or mint anywhere. Glyphs stay ink.
 
 ## 6. Loading and empty states
