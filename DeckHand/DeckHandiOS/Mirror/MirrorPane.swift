@@ -95,6 +95,9 @@ struct MirrorPane: View {
                         }
                     )
                     .transition(.opacity)
+                    // VQ-095: a flick can't throw the pointer off the
+                    // mirrored display.
+                    MirrorPicturePointerGuardFeed(session: session, sender: sender)
                 }
                 if controlling && zoom.isZoomed {
                     // Reads the cursor in its own view so 60 updates a

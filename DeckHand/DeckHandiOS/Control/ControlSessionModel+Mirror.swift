@@ -328,6 +328,17 @@ extension ControlSessionModel: MirrorStreamSink {
         return mirrorWindowSelection.pointWidth(displayWidth: Double(display?.width ?? 1_440))
     }
 
+    /// The mirrored display's size in points, for keeping the picture's
+    /// pointer on it (VQ-095). Nil while a window is mirrored or before
+    /// the display list arrives: then only the gain cap applies.
+    var mirroredDisplayPointSize: (width: Double, height: Double)? {
+        guard !mirrorWindowSelection.isActive,
+              let display = mirrorDisplays.first(where: { $0.displayID == selectedMirrorDisplayID }),
+              display.width > 0, display.height > 0
+        else { return nil }
+        return (Double(display.width), Double(display.height))
+    }
+
     // MARK: - Helpers
 
     private func restartMirror(displayID: UInt32?) {
