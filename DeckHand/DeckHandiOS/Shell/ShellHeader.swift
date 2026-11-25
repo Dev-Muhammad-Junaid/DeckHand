@@ -154,6 +154,9 @@ struct ShellHeader: View {
         .padding(.leading, horizontalPadding + windowControlsInset)
         .padding(.trailing, horizontalPadding)
         .frame(minHeight: PixelHandTheme.ControlHeight.dock)
+        // Build 22: its full height in every layout, so the AX3 two-line
+        // pill isn't squeezed and the banner below can't ride up over it.
+        .fixedSize(horizontal: false, vertical: true)
         .phGlassGroup()
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .background { WindowControlsInset(inset: $windowControlsInset) }

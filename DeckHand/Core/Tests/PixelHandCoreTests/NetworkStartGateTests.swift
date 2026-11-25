@@ -31,7 +31,8 @@ import Testing
         #expect(gate.attempt == 1)
         #expect(gate.phase == .starting(attempt: 1))
         // The one start finishes: running, no error shown.
-        #expect(gate.finished(attempt: 1, error: nil))
+        let ended1 = gate.finished(attempt: 1, error: nil)
+        #expect(ended1)
         #expect(gate.isRunning)
         #expect(gate.failureMessage == nil)
     }
@@ -51,12 +52,14 @@ import Testing
     func failureThenRetry() {
         var gate = NetworkStartGate()
         _ = gate.request()
-        #expect(gate.finished(attempt: 1, error: "No network"))
+        let ended2 = gate.finished(attempt: 1, error: "No network")
+        #expect(ended2)
         #expect(gate.failureMessage == "No network")
         #expect(!gate.isStarting)
         #expect(gate.request() == .start(attempt: 2))
         #expect(gate.failureMessage == nil)
-        #expect(gate.finished(attempt: 2, error: nil))
+        let ended3 = gate.finished(attempt: 2, error: nil)
+        #expect(ended3)
         #expect(gate.isRunning)
     }
 
@@ -67,19 +70,24 @@ import Testing
         gate.finished(attempt: 1, error: "Failed")
         _ = gate.request() // attempt 2
         // A late report from attempt 1 can't fail attempt 2.
-        #expect(!gate.finished(attempt: 1, error: "CancellationError"))
+        let ended4 = gate.finished(attempt: 1, error: "CancellationError")
+        #expect(!ended4)
         #expect(gate.phase == .starting(attempt: 2))
         // Nor can a duplicate report after attempt 2 ended.
-        #expect(gate.finished(attempt: 2, error: nil))
-        #expect(!gate.finished(attempt: 2, error: "Already advertising service"))
+        let ended5 = gate.finished(attempt: 2, error: nil)
+        #expect(ended5)
+        let ended6 = gate.finished(attempt: 2, error: "Already advertising service")
+        #expect(!ended6)
         #expect(gate.isRunning)
     }
 
     @Test("Nothing finishes while idle")
     func idleIgnoresResults() {
         var gate = NetworkStartGate()
-        #expect(!gate.finished(attempt: 0, error: nil))
-        #expect(!gate.finished(attempt: 1, error: "x"))
+        let ended7 = gate.finished(attempt: 0, error: nil)
+        #expect(!ended7)
+        let ended8 = gate.finished(attempt: 1, error: "x")
+        #expect(!ended8)
         #expect(gate.phase == .idle)
     }
 

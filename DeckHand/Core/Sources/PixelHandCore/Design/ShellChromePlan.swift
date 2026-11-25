@@ -92,6 +92,75 @@ public enum ShellHeaderPlan {
         }
         return candidates
     }
+
+    /// The smallest the fallback's lines shrink to before they truncate:
+    /// a long first word gets smaller rather than cut ("Muhamma…", build 22).
+    public static let pillNameMinimumScale: Double = 0.7
+
+    /// The pill's name at the Huge band (build 22, VQ-065): `candidates`
+    /// are tried in order and the first whose every line fits whole is
+    /// shown; `fallback` shows when none does.
+    public struct PillNameLayout: Sendable, Hashable {
+        /// Whole-word layouts, best first; none truncates. After the word
+        /// splits (`pillNameCandidates`) come the tail ones: the first word
+        /// alone, then as many next words as fit and "…" ("Muhammad’s /
+        /// MacBook…").
+        public let candidates: [[String]]
+        /// Shown when no candidate fits: the first word alone on line 1
+        /// (shrunk to `pillNameMinimumScale` before it truncates), the rest
+        /// on line 2, truncating at the tail. Never one line for a name of
+        /// two or more words.
+        public let fallback: [String]
+    }
+
+    /// The pill's name on `lines` lines, broken only between words.
+    public static func pillNameLayout(_ name: String, lines: Int) -> PillNameLayout {
+        let words = name.split(whereSeparator: \.isWhitespace).map(String.init)
+        var candidates = pillNameCandidates(name, lines: lines)
+        guard lines >= 2, words.count >= 2 else {
+            return PillNameLayout(candidates: candidates, fallback: candidates[0])
+        }
+        if words.count >= 3 {
+            for end in stride(from: words.count - 1, through: 2, by: -1) {
+                candidates.append([words[0], words[1..<end].joined(separator: " ") + "…"])
+            }
+        }
+        return PillNameLayout(
+            candidates: candidates,
+            fallback: [words[0], words[1...].joined(separator: " ")]
+        )
+    }
+}
+
+/// How a status banner (the lock banner, missing permissions) lays out
+/// (build 22). At AX3 the lock banner kept its glyph, message and Keyboard
+/// button on one row; the message column got so narrow that "Muhammad’s"
+/// broke mid-word ("Muham-"). Stacked, the button goes under the message,
+/// which then has the banner's full width and breaks only between words.
+public enum StatusBannerPlan {
+    public enum Arrangement: Sendable, Hashable {
+        /// Glyph, message and fix button on one row.
+        case inline
+        /// Glyph and message, then the fix button on its own row.
+        case stacked
+    }
+
+    /// The message column is never narrower than this beside a fix button.
+    public static let inlineMinimumMessageWidth: Double = 160
+    /// The fix button (about "Keyboard" in footnote semibold with its
+    /// padding) and the gap before it, at the Standard band.
+    public static let fixSlot: Double = 108
+    /// The glyph, the gap after it, and the banner's own insets (14 + 12).
+    public static let chromeWidth: Double = 54
+
+    /// `width` is the banner's measured width (`nil` before the first
+    /// measure); `hasFix` says whether it has a fix button.
+    public static func arrangement(width: Double?, band: TypeBand, hasFix: Bool) -> Arrangement {
+        guard hasFix else { return .inline }
+        if band >= .large { return .stacked }
+        guard let width else { return .inline }
+        return width - chromeWidth - fixSlot >= inlineMinimumMessageWidth ? .inline : .stacked
+    }
 }
 
 /// How the deck's page header lays out in its column.
