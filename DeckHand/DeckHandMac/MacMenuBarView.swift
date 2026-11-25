@@ -8,7 +8,7 @@
 //  Header: the icon's hand tile, this Mac's name and what it is doing.
 //  Requests: Deny / Pair… / Allow, amber. Devices: each connected device
 //  with its link badge and a visible Disconnect; the lock state when this
-//  Mac is locked. Paired: Forget… and Pair a device… (`PairingMenuSection`).
+//  Mac is locked. Paired: Forget and Pair a device (`PairingMenuSection`).
 //  Permissions: a live pixel per permission and a labelled fix button.
 //  Footer: updates, crash reports, the version line and Quit.
 //  Nothing is hover-only; every control is a labelled button.
@@ -36,6 +36,10 @@ struct MacMenuBarView: View {
 
     /// `MacLockMonitor` isn't observable; the panel re-reads it each second.
     @State private var isLocked = MacLockMonitor.shared.state.isLocked
+    /// Takes keyboard focus when the panel opens, so no button (least of
+    /// all Forget) starts out focused and Return or Space does nothing
+    /// (VQ-021, VQ-042).
+    @FocusState private var isFocusSinkFocused: Bool
 
     private static let width: CGFloat = 340
 
@@ -43,7 +47,15 @@ struct MacMenuBarView: View {
         let authorizedConnections = connections.filter { $0.state == .connected && authManager.isAuthorized(peerID: $0.peerID) }
 
         VStack(alignment: .leading, spacing: 0) {
+            focusSink
+
             header(connected: authorizedConnections.count)
+
+            if let refusal = authManager.recentRefusal,
+               authManager.pendingConnections.isEmpty,
+               let copy = MacPanelCopy.turnedAway(name: refusal.deviceName, reason: refusal.reason) {
+                turnedAwayNote(copy, reason: refusal.reason)
+            }
 
             if let startupError = daemon.fatalStartupError {
                 Text(startupError)
@@ -152,7 +164,9 @@ struct MacMenuBarView: View {
             failedToStart: failed,
             connected: connected,
             pending: authManager.pendingConnections.count,
-            isLocked: isLocked && connected > 0
+            isLocked: isLocked && connected > 0,
+            pendingName: authManager.pendingConnections.first?.peerName,
+            turnedAwayName: authManager.pendingConnections.isEmpty ? authManager.recentRefusal?.deviceName : nil
         )
         return HStack(spacing: PixelHandTheme.Space.md) {
             MacHandTile(size: 36)
@@ -190,6 +204,63 @@ struct MacMenuBarView: View {
         }
         .padding(.horizontal, PixelHandTheme.Space.lg)
         .padding(.vertical, PixelHandTheme.Space.md)
+    }
+
+    // MARK: Focus
+
+    /// An empty, invisible focus target that takes the panel's first focus.
+    @ViewBuilder
+    private var focusSink: some View {
+        Color.clear
+            .frame(width: 1, height: 1)
+            .focusable()
+            .focused($isFocusSinkFocused)
+            .focusEffectDisabled()
+            .accessibilityHidden(true)
+            .onAppear { isFocusSinkFocused = true }
+    }
+
+    // MARK: Turned away (VQ-023)
+
+    /// "iPhone 17 Pro tried to connect from another network. Pair it on the
+    /// same Wi-Fi first." with Pair a device, amber like a request.
+    private func turnedAwayNote(_ copy: (line: String, action: String), reason: AuthRefusal) -> some View {
+        HStack(alignment: .top, spacing: PixelHandTheme.Space.sm) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(PixelHandTheme.warning)
+                .frame(width: 7, height: 7)
+                .padding(.top, 5)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
+                Text(copy.line)
+                    .font(.caption)
+                    .foregroundStyle(PixelHandTheme.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: PixelHandTheme.Space.sm) {
+                    if reason != .unverified {
+                        Button(copy.action) {
+                            authManager.dismissRecentRefusal()
+                            PairDeviceWindow.shared.open(authManager)
+                        }
+                        .buttonStyle(.macPrimary)
+                        .accessibilityIdentifier("ph.mac.turnedAwayPair")
+                    }
+                    Button("Dismiss") { authManager.dismissRecentRefusal() }
+                        .buttonStyle(.macQuiet)
+                        .accessibilityIdentifier("ph.mac.turnedAwayDismiss")
+                }
+            }
+        }
+        .padding(PixelHandTheme.Space.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous)
+                .fill(PixelHandTheme.warningTint)
+        )
+        .padding(.horizontal, PixelHandTheme.Space.sm)
+        .padding(.bottom, PixelHandTheme.Space.sm)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ph.mac.turnedAway")
     }
 
     // MARK: Devices
@@ -280,6 +351,8 @@ struct MacMenuBarView: View {
         VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
             Toggle("Share crash reports", isOn: $shareCrashReports)
                 .toggleStyle(.checkbox)
+                // Cobalt, not the system accent (VQ-021).
+                .tint(PixelHandTheme.accent)
                 .font(.callout)
                 .foregroundStyle(PixelHandTheme.ink2)
                 .help("Sends crash, hang and performance reports to the developer. Never includes your screen, your device names or who you are.")
@@ -295,12 +368,16 @@ struct MacMenuBarView: View {
                 )
                 .foregroundStyle(PixelHandTheme.ink3)
                 Spacer(minLength: PixelHandTheme.Space.xs)
-                Button("Updates…") { updater.checkForUpdates() }
-                    .buttonStyle(.macSecondary)
-                    .disabled(!updater.canCheckForUpdates)
-                    .help(updater.isConfigured ? "Check for a newer version of Pixel Hand" : "Updates aren't set up in this build")
-                    .accessibilityLabel("Check for updates")
-                    .accessibilityIdentifier("ph.mac.checkForUpdates")
+                // Hidden while this build has no update feed: a dim button
+                // that did nothing read as broken (VQ-040).
+                if updater.isConfigured {
+                    Button("Updates") { updater.checkForUpdates() }
+                        .buttonStyle(.macSecondary)
+                        .disabled(!updater.canCheckForUpdates)
+                        .help("Check for a newer version of Pixel Hand")
+                        .accessibilityLabel("Check for updates")
+                        .accessibilityIdentifier("ph.mac.checkForUpdates")
+                }
                 Button("Quit") { NSApplication.shared.terminate(nil) }
                     .buttonStyle(.macSecondary)
                     .keyboardShortcut("q")
@@ -335,16 +412,17 @@ struct MacMenuBarView: View {
         }
     }
 
-    /// Resolves iPhone vs iPad (etc.) from the live peer list; Pixel Hand remote is iOS-only so unknown falls back to phone.
+    /// Resolves iPhone vs iPad (etc.) from the live peer list, then from
+    /// the device's name (a pending request often isn't in the peer list
+    /// yet: an iPad showed an iPhone glyph, VQ-043); iPhone last.
     private func deviceSystemImage(for connection: LoomConnectionSnapshot) -> String {
-        guard let peer = peers.first(where: { $0.id == connection.peerID }) else {
-            return DeviceType.iPhone.systemImage
-        }
-        switch peer.deviceType {
-        case .unknown:
-            return DeviceType.iPhone.systemImage
-        default:
+        if let peer = peers.first(where: { $0.id == connection.peerID }), peer.deviceType != .unknown {
             return peer.deviceType.systemImage
+        }
+        switch MacPanelCopy.deviceClass(fromName: connection.peerName) {
+        case .iPad: return DeviceType.iPad.systemImage
+        case .mac: return DeviceType.mac.systemImage
+        case .iPhone, nil: return DeviceType.iPhone.systemImage
         }
     }
 }
@@ -402,7 +480,7 @@ private struct PermissionRow: View {
                     .font(.callout.weight(.medium))
                     .foregroundStyle(PixelHandTheme.success)
             } else {
-                Button("Turn on…", action: onFix)
+                Button("Turn on", action: onFix)
                     .buttonStyle(.macSecondary)
                     .help("Open System Settings to turn on \(title)")
                     .accessibilityLabel("Turn on \(title)")
@@ -475,7 +553,7 @@ private struct ConnectionRow: View {
                 authManager.removeAndDisconnect(connection: connection, loomContext: loomContext)
             }
             .buttonStyle(.macSecondary)
-            .help("Disconnect and end this session's access. A paired device stays paired; use Forget… under Paired.")
+            .help("Disconnect and end this session's access. A paired device stays paired; use Forget under Paired.")
             .accessibilityLabel("Disconnect \(connection.peerName)")
             .accessibilityIdentifier("ph.mac.disconnect")
         }
@@ -533,7 +611,7 @@ private struct PendingConnectionRow: View {
                 .accessibilityLabel("Deny \(connection.peerName)")
                 .accessibilityIdentifier("ph.mac.deny")
                 Spacer(minLength: 0)
-                Button("Pair…") {
+                Button("Pair") {
                     PairDeviceWindow.shared.open(authManager)
                 }
                 .buttonStyle(.macSecondary)

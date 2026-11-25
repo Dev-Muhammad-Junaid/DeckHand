@@ -172,8 +172,45 @@ struct MacPanelCopyTests {
         #expect(line() == "Ready for a device")
         #expect(line(connected: 1) == "1 device connected · ready")
         #expect(line(connected: 2) == "2 devices connected · ready")
-        #expect(line(connected: 1, pending: 1) == "1 device asking · 1 device connected · ready")
+        #expect(line(connected: 1, pending: 1) == "1 device asking · 1 device connected")
+        #expect(line(pending: 2) == "2 devices asking")
         #expect(line(connected: 1, locked: true) == "1 device connected · locked")
         #expect(line(locked: true) == "Locked")
+    }
+}
+
+@Suite("Mac panel: who is asking, who was turned away (VQ-023, VQ-043)")
+struct MacPanelRequestCopyTests {
+    @Test("One request names the device")
+    func namesTheAskingDevice() {
+        #expect(MacPanelCopy.headerStatus(isRunning: true, failedToStart: false, connected: 0, pending: 1, isLocked: false, pendingName: "iPad Pro") == "iPad Pro is asking to connect")
+        // With others connected the count reads better.
+        #expect(MacPanelCopy.headerStatus(isRunning: true, failedToStart: false, connected: 1, pending: 1, isLocked: false, pendingName: "iPad Pro") == "1 device asking · 1 device connected")
+    }
+
+    @Test("Right after a refusal the header doesn't say Ready")
+    func turnedAwayHeader() {
+        #expect(MacPanelCopy.headerStatus(isRunning: true, failedToStart: false, connected: 0, pending: 0, isLocked: false, turnedAwayName: "iPhone 17 Pro") == "iPhone 17 Pro couldn’t connect")
+    }
+
+    @Test("Rules and timeouts get a line and a button; a person's Deny doesn't")
+    func turnedAwayLines() {
+        let remote = MacPanelCopy.turnedAway(name: "iPhone 17 Pro", reason: .notPairedRemote)
+        #expect(remote?.line.contains("another network") == true)
+        #expect(remote?.action == "Pair a device")
+        #expect(MacPanelCopy.turnedAway(name: "iPad", reason: .timedOut)?.action == "Pair a device")
+        #expect(MacPanelCopy.turnedAway(name: "iPad", reason: .declined) == nil)
+        #expect(MacPanelCopy.turnedAway(name: "iPad", reason: .replaced) == nil)
+        for reason in AuthRefusal.allCases {
+            #expect(MacPanelCopy.turnedAway(name: "iPad", reason: reason)?.action.hasSuffix("…") != true)
+        }
+    }
+
+    @Test("Device class from a name")
+    func deviceClass() {
+        #expect(MacPanelCopy.deviceClass(fromName: "iPad Pro 11-inch (M5)") == .iPad)
+        #expect(MacPanelCopy.deviceClass(fromName: "Muhammad’s iPhone") == .iPhone)
+        #expect(MacPanelCopy.deviceClass(fromName: "Studio") == nil)
+        #expect(MacPanelCopy.deviceClass(fromName: "MacBook Air") == .mac)
     }
 }

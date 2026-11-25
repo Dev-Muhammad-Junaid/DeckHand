@@ -160,9 +160,6 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
             return
 
         case let .autoGrant(device):
-            if let candidate = identities[connection.id] {
-                store.noteSeen(candidate)
-            }
             DeckHandLog.trust.info("🔑 \(device.name, privacy: .public) is paired; connecting without a prompt conn=\(connection.id, privacy: .public)")
             grant(connection, handle: handle, gate: gate)
             return
@@ -201,6 +198,11 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
     /// whether it is paired.
     private func grant(_ connection: LoomConnectionSnapshot, handle: LoomConnectionHandle, gate: PreApprovalGate) {
         gates.removeValue(forKey: connection.id)
+        // Every connect of a paired device refreshes its name and "Last
+        // seen", not only the prompt-free ones (VQ-041).
+        if let candidate = identities[connection.id], store.isPaired(candidate.ref) {
+            store.noteSeen(candidate)
+        }
         authorizedDeviceIDs.insert(connection.peerID)
         liveHandles[connection.id] = handle
         livePeerIDs[connection.id] = connection.peerID
@@ -414,8 +416,12 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
         }
     }
 
-    /// Drops what the Mac knew about a connection that is gone.
+    /// Drops what the Mac knew about a connection that is gone. A paired
+    /// device's "Last seen" becomes now (VQ-041).
     private func forgetConnection(_ connectionID: UUID) {
+        if liveHandles[connectionID] != nil, let candidate = identities[connectionID], store.isPaired(candidate.ref) {
+            store.noteSeen(candidate)
+        }
         identities.removeValue(forKey: connectionID)
         rawIdentities.removeValue(forKey: connectionID)
         liveHandles.removeValue(forKey: connectionID)

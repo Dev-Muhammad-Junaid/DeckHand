@@ -4,7 +4,7 @@
 //
 //  The menu-bar panel's pairing part (S4, restyled for UX-012): the paired
 //  devices, each with a visible "Forget…" that confirms in place; a status
-//  line while a code is showing or pairing is paused; and "Pair a device…",
+//  line while a code is showing or pairing is paused; and "Pair a device",
 //  which opens the "Pair a device" window (`PairDeviceWindow`) with the QR
 //  code and the seven-digit code. Forgetting a connected device ends its
 //  session.
@@ -37,7 +37,7 @@ struct PairingMenuSection: View {
             PairingStatusLine()
 
             HStack(spacing: PixelHandTheme.Space.sm) {
-                Button("Pair a device…") { PairDeviceWindow.shared.open(authManager) }
+                Button("Pair a device") { PairDeviceWindow.shared.open(authManager) }
                     .buttonStyle(.macPrimary)
                     .disabled(authManager.pairingDisplay.isLockedOut)
                     .help("Show a code to scan or type on an iPhone or iPad. A paired device connects without asking.")
@@ -161,7 +161,7 @@ private struct PairedDeviceRow: View {
                 .accessibilityLabel("Confirm forget \(device.name)")
                 .accessibilityIdentifier("ph.mac.confirmForget")
             } else {
-                Button("Forget…") { isConfirming = true }
+                Button("Forget") { isConfirming = true }
                     .buttonStyle(.macSecondary)
                     .help("Unpair \(device.name)")
                     .accessibilityLabel("Forget \(device.name)")
