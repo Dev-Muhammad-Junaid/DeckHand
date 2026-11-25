@@ -98,7 +98,8 @@ struct MirrorTileKeepOutRegistryTests {
         registry.report(header, for: "deckHeader", owner: 1, reporter: normal)
         // Tap Edit: the edit header reports first, then the old one leaves.
         registry.report(editHeader, for: "deckHeader", owner: 1, reporter: edit)
-        #expect(!registry.withdraw("deckHeader", owner: 1, reporter: normal))
+        let lateWithdrawal = registry.withdraw("deckHeader", owner: 1, reporter: normal)
+        #expect(!lateWithdrawal)
         #expect(registry.frame("deckHeader", owner: 1) == editHeader)
         // Tap Done: the same race the other way.
         registry.report(header, for: "deckHeader", owner: 1, reporter: normal)
@@ -112,7 +113,8 @@ struct MirrorTileKeepOutRegistryTests {
         let id = UUID()
         registry.report(header, for: "deckHeader", owner: 1, reporter: id)
         #expect(registry.hasParts(owner: 1))
-        #expect(registry.withdraw("deckHeader", owner: 1, reporter: id))
+        let withdrew = registry.withdraw("deckHeader", owner: 1, reporter: id)
+        #expect(withdrew)
         #expect(registry.frame("deckHeader", owner: 1) == nil)
         #expect(!registry.hasParts(owner: 1))
     }
@@ -121,10 +123,13 @@ struct MirrorTileKeepOutRegistryTests {
     func ownersAreSeparate() {
         var registry = Registry()
         let id = UUID()
-        #expect(registry.report(header, for: "pad", owner: 1, reporter: id))
-        #expect(!registry.report(header, for: "pad", owner: 1, reporter: id))
+        let first = registry.report(header, for: "pad", owner: 1, reporter: id)
+        let again = registry.report(header, for: "pad", owner: 1, reporter: id)
+        #expect(first)
+        #expect(!again)
         #expect(registry.frame("pad", owner: 2) == nil)
-        #expect(!registry.withdraw("pad", owner: 2, reporter: id))
+        let otherOwner = registry.withdraw("pad", owner: 2, reporter: id)
+        #expect(!otherOwner)
         #expect(registry.frame("pad", owner: 1) == header)
     }
 }

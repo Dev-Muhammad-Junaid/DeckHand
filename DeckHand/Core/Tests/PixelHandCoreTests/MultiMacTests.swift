@@ -418,6 +418,25 @@ struct MacReconnectTests {
         ) == nil)
     }
 
+    @Test("Build 23 (VQ-058): a Mac listed before the network can dial waits, then reconnects")
+    func waitsForNetwork() {
+        func pick(_ last: UUID?, ready: Bool, tried: Bool = false) -> UUID? {
+            MacReconnectPolicy.launchTarget(
+                isEnabled: true, hasCompletedOnboarding: true, alreadyTried: tried, hasSession: false,
+                isNetworkReady: ready, lastActiveDeviceID: last, listings: listings, isLockedByFreePlan: { _ in false }
+            )
+        }
+        // Loom lists the Mac before its start returns: no dial yet, and the
+        // caller's one try per launch isn't spent.
+        #expect(pick(studio, ready: false) == nil)
+        #expect(pick(nil, ready: false) == nil)
+        // Start finished: the same launch now reconnects, after a relaunch
+        // (last Mac) and after onboarding (no last Mac).
+        #expect(pick(studio, ready: true) == studio)
+        #expect(pick(nil, ready: true) == studio)
+        #expect(pick(studio, ready: true, tried: true) == nil)
+    }
+
     @Test("Own iCloud Macs reconnect at launch without pairing")
     func iCloud() {
         let own = [MacListing(deviceID: laptop, name: "Laptop", isReachable: true, isOwnICloud: true)]
