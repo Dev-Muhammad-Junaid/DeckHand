@@ -40,6 +40,10 @@ struct PeerPickerView: View {
     @State private var isSheetClosing = false
     /// No Mac after 10 s: show the three checks (04 §7, VQ-069).
     @State private var showsChecks = false
+    /// Bumped by Try again on the checks card, so the 10 s wait for them
+    /// starts over (build 22: Try again joins a start still in flight, or
+    /// refreshes discovery, and the card comes back if still no Mac).
+    @State private var checksRound = 0
     private let pairing = PairedMacsStore.shared
 
     private enum PickerSheet: String, Identifiable {
@@ -111,14 +115,14 @@ struct PeerPickerView: View {
         .onChange(of: sheet) { old, new in
             if old != nil, new == nil { isSheetClosing = true }
         }
-        .task(id: peers.isEmpty) {
+        .task(id: "\(peers.isEmpty)-\(checksRound)") {
             showsChecks = false
             guard peers.isEmpty, startError == nil else { return }
             try? await Task.sleep(for: .seconds(LANFallbackPlan.checksDelay))
             guard !Task.isCancelled else { return }
             withAnimation(PixelHandMotion.panelFade(reduceMotion: reduceMotion)) { showsChecks = true }
         }
-        .task(id: peers.isEmpty) {
+        .task(id: "\(peers.isEmpty)-\(checksRound)") {
             // VQ-069: while Bonjour is quiet, look again on a schedule. Each
             // refresh restarts the browse and probes the paired Macs' saved
             // VPN hosts and last LAN addresses (`LastLANStore`); a paired
@@ -277,6 +281,7 @@ struct PeerPickerView: View {
             HStack(spacing: PixelHandTheme.Space.md) {
                 Button("Try again") {
                     showsChecks = false
+                    checksRound += 1
                     onRetryStart()
                 }
                 .buttonStyle(.ph(.primary, size: .regular))

@@ -101,6 +101,11 @@ public final class LoomContext {
     }
 
     /// Starts the shared LoomKit runtime if needed.
+    ///
+    /// Starting is single-flight: a call made while a start is in flight waits for
+    /// that start instead of beginning another, and cancelling the calling task
+    /// doesn't cancel the start. Advertising and nearby discovery begin before the
+    /// CloudKit account check, so a slow check doesn't hold back nearby peers.
     public func start() async throws {
         try await store.start()
     }
