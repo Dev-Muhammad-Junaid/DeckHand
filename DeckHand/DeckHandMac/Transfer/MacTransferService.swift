@@ -62,6 +62,23 @@ final class MacTransferService: ObservableObject {
         var isActive: Bool
         /// The landed file, for Show in Finder.
         var savedURL: URL?
+        /// When the row appeared, and when it stopped moving: the
+        /// Transfers tab lists a finished row for an hour (OR-13).
+        var startedAt = Date()
+        var finishedAt: Date?
+
+        /// The row as the panel's Transfers plan sees it.
+        var panelItem: TransferPanelPlan.Item {
+            TransferPanelPlan.Item(
+                id: id,
+                direction: direction == .incoming ? .incoming : .outgoing,
+                outcome: TransferPanelPlan.outcome(status: status, isActive: isActive),
+                bytes: meter.bytes,
+                totalBytes: meter.totalBytes,
+                startedAt: startedAt,
+                finishedAt: finishedAt
+            )
+        }
 
         var caption: String {
             switch status {
@@ -124,6 +141,7 @@ final class MacTransferService: ObservableObject {
         // Finder › Services › "Send to iPhone or iPad with Pixel Hand".
         NSApp?.servicesProvider = MacTransferServicesProvider.shared
         cleanOldPartials()
+        startPruning()
     }
 
     // MARK: - Connections
@@ -519,6 +537,27 @@ final class MacTransferService: ObservableObject {
         rows.removeAll { !$0.isActive && $0.status?.isFinal != false }
     }
 
+    /// Every row as the Transfers tab's plan sees it.
+    var panelItems: [TransferPanelPlan.Item] { rows.map(\.panelItem) }
+
+    /// Drops rows that finished more than an hour ago, so the Transfers
+    /// tab goes away on its own (OR-13).
+    func pruneExpired(now: Date = Date()) {
+        let kept = rows.filter { $0.panelItem.isListed(at: now) }
+        if kept.count != rows.count { rows = kept }
+    }
+
+    private var pruneTask: Task<Void, Never>?
+
+    private func startPruning() {
+        pruneTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 60 * 1_000_000_000)
+                self?.pruneExpired()
+            }
+        }
+    }
+
     private func upsertRow(_ row: Row) {
         if let index = rows.firstIndex(where: { $0.id == row.id }) {
             rows[index] = row
@@ -530,7 +569,11 @@ final class MacTransferService: ObservableObject {
 
     private func markRow(_ id: UUID, _ body: (inout Row) -> Void) {
         guard let index = rows.firstIndex(where: { $0.id == id }) else { return }
+        let wasActive = rows[index].isActive
         body(&rows[index])
+        if wasActive, !rows[index].isActive, rows[index].finishedAt == nil {
+            rows[index].finishedAt = Date()
+        }
     }
 
     private func sendStatus(_ status: TransferStatus, for id: UUID, connectionID: UUID) {

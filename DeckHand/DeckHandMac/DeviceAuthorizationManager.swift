@@ -375,6 +375,14 @@ final class DeviceAuthorizationManager: NSObject, ObservableObject, UNUserNotifi
         return store.isPaired(ref)
     }
 
+    /// The paired record of the device on `connectionID`, when it is on
+    /// the paired list: the panel shows a paired, connected device once
+    /// (OR-08).
+    func pairedRef(connectionID: UUID) -> PairedDeviceRef? {
+        guard let ref = identities[connectionID]?.ref, store.isPaired(ref) else { return nil }
+        return ref
+    }
+
     // MARK: - Forget (S4)
 
     /// "Forget" in the menu bar: unpairs the device and ends its live

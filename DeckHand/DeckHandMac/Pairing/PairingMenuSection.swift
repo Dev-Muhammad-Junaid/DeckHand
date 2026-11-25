@@ -2,42 +2,91 @@
 //  PairingMenuSection.swift
 //  DeckHandMac
 //
-//  The menu-bar panel's pairing part (S4, restyled for UX-012): the paired
-//  devices, each with a visible "Forget…" that confirms in place; a status
-//  line while a code is showing or pairing is paused; and "Pair a device",
-//  which opens the "Pair a device" window (`PairDeviceWindow`) with the QR
-//  code and the seven-digit code. Forgetting a connected device ends its
-//  session.
+//  The menu-bar panel's one Devices list (OR-08, replacing the separate
+//  Devices, Paired and "Pair a device…" parts). Each iPhone or iPad is one
+//  row with its state, from Core's `MacDeviceListPlan`:
+//
+//  - Asking to connect: amber, with Deny / Pair / Allow on the row;
+//  - Connected: the live pixel, its link badge, Disconnect (and Forget
+//    when paired) in the row's menu;
+//  - Paired · not connected: dim, Forget in the row's menu.
+//
+//  Forget confirms in the row. One "Pair a device" button sits under the
+//  list, with the code's status line while a code shows. Labels carry no
+//  trailing "…" (OR-12).
 //
 
+import Loom
+import LoomKit
 import SwiftUI
 
-struct PairingMenuSection: View {
+struct MacDevicesList: View {
+    /// Allowed, live connections.
+    let connections: [LoomConnectionSnapshot]
+    let loomContext: LoomContext
+    let isLocked: Bool
+    /// The SF Symbol for a connection's device (iPad, iPhone…).
+    let systemImage: @MainActor (LoomConnectionSnapshot) -> String
+
     @EnvironmentObject private var authManager: DeviceAuthorizationManager
     @ObservedObject private var store = PairedDeviceStore.shared
     private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
-            MacSectionLabel(text: "Paired")
-                .padding(.horizontal, PixelHandTheme.Space.lg)
+        let paired = Dictionary(store.devices.map { (Self.key($0.ref), $0) }, uniquingKeysWith: { first, _ in first })
+        let snapshots = Dictionary(
+            (authManager.pendingConnections + connections).map { ($0.id, $0) },
+            uniquingKeysWith: { _, last in last }
+        )
+        let rows = MacDeviceListPlan.rows(
+            asking: authManager.pendingConnections.map { (pending: LoomConnectionSnapshot) -> MacDeviceListPlan.Asking in
+                MacDeviceListPlan.Asking(
+                    connectionID: pending.id,
+                    name: pending.peerName,
+                    requestedAt: authManager.pendingRequestedDate(for: pending.id)
+                )
+            },
+            live: connections.map { (live: LoomConnectionSnapshot) -> MacDeviceListPlan.Live in
+                MacDeviceListPlan.Live(
+                    connectionID: live.id,
+                    name: live.peerName,
+                    connectedAt: live.connectedAt,
+                    pairedKey: authManager.pairedRef(connectionID: live.id).map { Self.key($0) }
+                )
+            },
+            paired: store.devices.map { (device: PairedDevice) -> MacDeviceListPlan.Paired in
+                MacDeviceListPlan.Paired(key: Self.key(device.ref), name: device.name, lastSeenAt: device.lastSeenAt)
+            }
+        )
 
-            if store.devices.isEmpty {
-                Text("None yet. A paired iPhone or iPad connects without the Allow prompt.")
-                    .font(.callout)
+        VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
+            if rows.isEmpty {
+                waitingState
+            }
+            ForEach(rows) { row in
+                let connection = row.connectionID.flatMap { snapshots[$0] }
+                let device = row.pairedKey.flatMap { paired[$0] }
+                MacDeviceRowView(
+                    row: row,
+                    systemImage: connection.map { systemImage($0) } ?? device?.kind.systemImage ?? DeviceType.iPhone.systemImage,
+                    connection: connection,
+                    pairedRef: device?.ref,
+                    isLocked: isLocked,
+                    loomContext: loomContext
+                )
+            }
+            if !rows.isEmpty, let hint = MacDeviceListPlan.hint(rows: rows, macName: PairDeviceView.macName) {
+                Text(hint)
+                    .font(.caption)
                     .foregroundStyle(PixelHandTheme.ink3)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, PixelHandTheme.Space.lg)
-            } else {
-                ForEach(store.devices) { device in
-                    PairedDeviceRow(device: device, isConnected: authManager.liveRefs.contains(device.ref))
-                }
             }
 
             PairingStatusLine()
 
             HStack(spacing: PixelHandTheme.Space.sm) {
-                Button("Pair a device") { PairDeviceWindow.shared.open(authManager) }
+                Button(MacDeviceListPlan.pairButton) { PairDeviceWindow.shared.open(authManager) }
                     .buttonStyle(.macPrimary)
                     .disabled(authManager.pairingDisplay.isLockedOut)
                     .help("Show a code to scan or type on an iPhone or iPad. A paired device connects without asking.")
@@ -57,6 +106,31 @@ struct PairingMenuSection: View {
         // Moves an expired code or a finished lockout on while the panel is open.
         .onReceive(ticker) { _ in authManager.refreshPairingDisplay() }
     }
+
+    /// The plan's key for a paired record.
+    static func key(_ ref: PairedDeviceRef) -> String {
+        "\(ref.identityKeyID)/\(ref.deviceID.uuidString)"
+    }
+
+    private var waitingState: some View {
+        HStack(spacing: PixelHandTheme.Space.md) {
+            PixelScreen(cornerRadius: 10, padding: 6) {
+                PixelGlyph(bitmap: PixelArt.hand, pitch: 1.4, glows: false)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text("No devices yet")
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(PixelHandTheme.ink)
+                Text(MacDeviceListPlan.hint(rows: [], macName: PairDeviceView.macName) ?? "")
+                    .font(.caption)
+                    .foregroundStyle(PixelHandTheme.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, PixelHandTheme.Space.lg)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("ph.mac.waitingState")
+    }
 }
 
 private extension PairingCodeWindow.Display {
@@ -66,10 +140,216 @@ private extension PairingCodeWindow.Display {
     }
 }
 
+// MARK: - Row
+
+private struct MacDeviceRowView: View {
+    let row: MacDeviceListPlan.Row
+    let systemImage: String
+    let connection: LoomConnectionSnapshot?
+    let pairedRef: PairedDeviceRef?
+    let isLocked: Bool
+    let loomContext: LoomContext
+
+    @EnvironmentObject private var authManager: DeviceAuthorizationManager
+    @State private var isConfirmingForget = false
+    @State private var isHovering = false
+
+    private var isAsking: Bool { row.state == .asking }
+    private var isAway: Bool { row.state == .pairedAway }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
+            HStack(alignment: .center, spacing: PixelHandTheme.Space.md) {
+                MacDeviceIcon(
+                    systemImage: systemImage,
+                    isLive: row.state == .connected,
+                    tint: isAsking ? PixelHandTheme.warning : PixelHandTheme.accent,
+                    isDim: isAway
+                )
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(row.name)
+                        .font(.body.weight(isAway ? .medium : .semibold))
+                        .foregroundStyle(isAway ? PixelHandTheme.ink2 : PixelHandTheme.ink)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    TimelineView(.periodic(from: .now, by: 60)) { _ in
+                        Text(MacDeviceListPlan.detailText(row.detail) { $0.formatted(.relative(presentation: .named)) })
+                            .font(.caption)
+                            .foregroundStyle(isAway ? PixelHandTheme.ink3 : PixelHandTheme.ink2)
+                            .lineLimit(2)
+                    }
+                    if row.state == .connected, let connection {
+                        HStack(spacing: PixelHandTheme.Space.sm) {
+                            HostLinkBadge(connectionID: connection.id) // Network lane (S13)
+                            if isLocked {
+                                MacDotText("LOCKED", pitch: 1.3, label: "Mac locked")
+                                    .foregroundStyle(PixelHandTheme.warning)
+                            }
+                        }
+                        // The live connection id, for matching against the
+                        // remote's log and spotting silent session swaps.
+                        Text("session \(connection.id.uuidString.prefix(8))")
+                            .font(.caption2.monospaced())
+                            .foregroundStyle(PixelHandTheme.ink3)
+                            .textSelection(.enabled)
+                            .accessibilityHidden(true)
+                    }
+                }
+                Spacer(minLength: PixelHandTheme.Space.xs)
+                if !row.menu.isEmpty, !isConfirmingForget {
+                    rowMenu
+                }
+            }
+
+            if isAsking {
+                requestButtons
+            }
+            if isConfirmingForget {
+                forgetConfirmation
+            }
+        }
+        .padding(.vertical, isAsking ? PixelHandTheme.Space.md : 0)
+        .padding(.horizontal, isAsking ? PixelHandTheme.Space.md : PixelHandTheme.Space.lg)
+        .background(
+            RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous)
+                .fill(isAsking ? PixelHandTheme.warningTint : Color.clear)
+        )
+        .padding(.horizontal, isAsking ? PixelHandTheme.Space.sm : 0)
+        .contentShape(Rectangle())
+        .onHover { isHovering = $0 }
+        .contextMenu {
+            if !isConfirmingForget {
+                menuItems
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(row.name), \(MacDeviceListPlan.spokenState(row.state))")
+        .accessibilityIdentifier(rowIdentifier)
+    }
+
+    private var rowIdentifier: String {
+        switch row.state {
+        case .asking: "ph.mac.pendingRow"
+        case .connected: "ph.mac.deviceRow"
+        case .pairedAway: "ph.mac.pairedDeviceRow"
+        }
+    }
+
+    // MARK: Menu
+
+    /// Disconnect, Forget or Pair: in a menu, not a row of buttons
+    /// (OR-08). Always there for the keyboard; brighter on hover.
+    private var rowMenu: some View {
+        Menu {
+            menuItems
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .font(.body)
+                .foregroundStyle(isHovering ? PixelHandTheme.ink : PixelHandTheme.ink3)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Options for \(row.name)")
+        .accessibilityLabel("Options for \(row.name)")
+        .accessibilityIdentifier("ph.mac.deviceMenu")
+    }
+
+    @ViewBuilder private var menuItems: some View {
+        ForEach(row.menu, id: \.self) { action in
+            Button(action.title, role: action == .forget ? .destructive : nil) {
+                perform(action)
+            }
+            .accessibilityLabel("\(action.title) \(row.name)")
+            .accessibilityIdentifier(identifier(for: action))
+        }
+    }
+
+    // MARK: Request
+
+    /// Deny sits apart from the primary Allow; Pair shows a code the device
+    /// can type so it connects without asking from now on.
+    private var requestButtons: some View {
+        HStack(spacing: PixelHandTheme.Space.sm) {
+            Button(MacDeviceListPlan.Action.deny.title) { perform(.deny) }
+                .buttonStyle(.macDestructive)
+                .help("Refuse this request")
+                .accessibilityLabel("Deny \(row.name)")
+                .accessibilityIdentifier("ph.mac.deny")
+            Spacer(minLength: 0)
+            Button(MacDeviceListPlan.Action.pair.title) { perform(.pair) }
+                .buttonStyle(.macSecondary)
+                .help("Show a pairing code to enter on the device. Paired devices connect without asking.")
+                .accessibilityLabel("Pair \(row.name)")
+                .accessibilityIdentifier("ph.mac.pairRequest")
+            Button(MacDeviceListPlan.Action.allow.title) { perform(.allow) }
+                .buttonStyle(.macPrimary)
+                .help("Allow for this session")
+                .accessibilityLabel("Allow \(row.name)")
+                .accessibilityIdentifier("ph.mac.allow")
+        }
+        .padding(.leading, 28 + PixelHandTheme.Space.md)
+    }
+
+    // MARK: Forget
+
+    private var forgetConfirmation: some View {
+        VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
+            Text(MacDeviceListPlan.forgetPrompt(name: row.name, isConnected: row.state == .connected))
+                .font(.caption)
+                .foregroundStyle(PixelHandTheme.ink2)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: PixelHandTheme.Space.sm) {
+                Spacer(minLength: 0)
+                Button("Cancel") { isConfirmingForget = false }
+                    .buttonStyle(.macQuiet)
+                    .keyboardShortcut(.cancelAction)
+                    .accessibilityLabel("Keep \(row.name)")
+                    .accessibilityIdentifier("ph.mac.cancelForget")
+                Button(MacDeviceListPlan.Action.forget.title) {
+                    if let pairedRef { authManager.forget(pairedRef) }
+                    isConfirmingForget = false
+                }
+                .buttonStyle(.macDestructive)
+                .accessibilityLabel("Confirm forget \(row.name)")
+                .accessibilityIdentifier("ph.mac.confirmForget")
+            }
+        }
+        .padding(.leading, 28 + PixelHandTheme.Space.md)
+    }
+
+    // MARK: Actions
+
+    private func perform(_ action: MacDeviceListPlan.Action) {
+        switch action {
+        case .deny:
+            if let connection { authManager.reject(connection: connection, loomContext: loomContext) }
+        case .pair:
+            PairDeviceWindow.shared.open(authManager)
+        case .allow:
+            if let connection { authManager.authorize(connection: connection) }
+        case .disconnect:
+            if let connection { authManager.removeAndDisconnect(connection: connection, loomContext: loomContext) }
+        case .forget:
+            isConfirmingForget = true
+        }
+    }
+
+    private func identifier(for action: MacDeviceListPlan.Action) -> String {
+        switch action {
+        case .deny: "ph.mac.deny"
+        case .pair: row.state == .asking ? "ph.mac.pairRequest" : "ph.mac.pairConnected"
+        case .allow: "ph.mac.allow"
+        case .disconnect: "ph.mac.disconnect"
+        case .forget: "ph.mac.forget"
+        }
+    }
+}
+
 // MARK: - Status line
 
-/// One line under the paired list while a code is live, pairing is paused,
-/// or a device just paired.
+/// One line under the list while a code is live, pairing is paused, or a
+/// device just paired.
 private struct PairingStatusLine: View {
     @EnvironmentObject private var authManager: DeviceAuthorizationManager
 
@@ -109,7 +389,7 @@ private struct PairingStatusLine: View {
 
             case .paired:
                 HStack(spacing: PixelHandTheme.Space.sm) {
-                    LivePixel(color: PixelHandTheme.success, size: 6)
+                    MacStatusPixel(color: PixelHandTheme.success, size: 6)
                     Text("Paired.")
                         .font(.callout.weight(.medium))
                         .foregroundStyle(PixelHandTheme.success)
@@ -124,62 +404,16 @@ private struct PairingStatusLine: View {
     }
 }
 
-// MARK: - Paired device row
-
-private struct PairedDeviceRow: View {
-    let device: PairedDevice
-    let isConnected: Bool
-    @EnvironmentObject private var authManager: DeviceAuthorizationManager
-    @State private var isConfirming = false
-
-    var body: some View {
-        HStack(spacing: PixelHandTheme.Space.md) {
-            MacDeviceIcon(systemImage: device.kind.systemImage, isLive: isConnected)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(device.name)
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(PixelHandTheme.ink)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Text(isConnected ? "Connected now" : "Last seen \(device.lastSeenAt.formatted(.relative(presentation: .named)))")
-                    .font(.caption)
-                    .foregroundStyle(PixelHandTheme.ink2)
-            }
-            Spacer(minLength: PixelHandTheme.Space.xs)
-            if isConfirming {
-                Button("Cancel") { isConfirming = false }
-                    .buttonStyle(.macQuiet)
-                    .keyboardShortcut(.cancelAction)
-                    .accessibilityLabel("Keep \(device.name)")
-                    .accessibilityIdentifier("ph.mac.cancelForget")
-                Button("Forget") {
-                    authManager.forget(device.ref)
-                    isConfirming = false
-                }
-                .buttonStyle(.macDestructive)
-                .help(isConnected ? "Unpair and disconnect now. It must be allowed or paired again." : "Unpair. It must be allowed or paired again.")
-                .accessibilityLabel("Confirm forget \(device.name)")
-                .accessibilityIdentifier("ph.mac.confirmForget")
-            } else {
-                Button("Forget") { isConfirming = true }
-                    .buttonStyle(.macSecondary)
-                    .help("Unpair \(device.name)")
-                    .accessibilityLabel("Forget \(device.name)")
-                    .accessibilityIdentifier("ph.mac.forget")
-            }
-        }
-        .padding(.horizontal, PixelHandTheme.Space.lg)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("ph.mac.pairedDeviceRow")
-    }
-}
+// MARK: - Device icon
 
 /// A device's symbol in a 28 pt circle; a mint pixel on its corner while
-/// it is connected.
+/// it is connected (fading in, never flowing in: OR-09); dim while a
+/// paired device is away.
 struct MacDeviceIcon: View {
     let systemImage: String
     var isLive = false
     var tint: Color = PixelHandTheme.accent
+    var isDim = false
 
     var body: some View {
         Image(systemName: systemImage)
@@ -188,9 +422,10 @@ struct MacDeviceIcon: View {
             .foregroundStyle(tint)
             .frame(width: 28, height: 28)
             .background(Circle().fill(PixelHandTheme.fill))
+            .opacity(isDim ? 0.5 : 1)
             .overlay(alignment: .bottomTrailing) {
                 if isLive {
-                    LivePixel(color: PixelHandTheme.success, size: 6)
+                    MacStatusPixel(color: PixelHandTheme.success, size: 6)
                         .offset(x: 1, y: 1)
                 }
             }
