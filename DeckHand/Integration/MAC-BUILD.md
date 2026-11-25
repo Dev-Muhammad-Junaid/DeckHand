@@ -84,6 +84,33 @@ still remote (paired and pinned only). The trust log says
 (Pair a device on the Mac, Enter code on the simulator); after that it
 connects without a prompt.
 
+## QA walks: iPad landscape and picking the Mac (VQ-092, VQ-096)
+- **Landscape on iPad.** With the simulator's windowing on, the app stays a
+  portrait window when the device rotates, so `test02` and `test11` (and
+  the Macs sidebar, OR-04/05) captured portrait. Before a QA run, turn
+  windowing off on each iPad simulator: Settings › Multitasking & Gestures
+  › **Full Screen Apps**. It stays set for that simulator. Or let the walks
+  do it: add `TEST_RUNNER_PH_QA_FULLSCREEN=1`, and `test02` and `test11`
+  first set Full Screen Apps through the Settings app (a
+  `fullscreen-missing-…` snapshot says if a step wasn't found). Put the
+  simulator back to Windowed Apps or Stage Manager afterwards if the next
+  check needs windows (the Stage Manager items, VQ-080/081).
+- **Which Mac.** With another Mac on the network, set
+  `TEST_RUNNER_PH_QA_MAC_NAME="Muhammad’s MacBook Pro"` (the start of the
+  name is enough). `connect()` then taps that Mac's row, and never sends
+  another Mac a request. Unset, it taps the first Mac, as before.
+
+Example:
+
+```sh
+TEST_RUNNER_PH_QA_MAC_NAME="Muhammad’s MacBook" \
+TEST_RUNNER_PH_QA_FULLSCREEN=1 \
+TEST_RUNNER_PH_QA_OUT=/tmp/shots \
+xcodebuild test-without-building -project DeckHand.xcodeproj -scheme DeckHandiOS \
+  -destination 'platform=iOS Simulator,name=iPad Pro 11-inch (M5)' \
+  -only-testing:PixelHandUITests/PixelHandUITests/test11_Landscape
+```
+
 ## Report
 Append a dated "Mac build results" section to
 `DeckHand/Integration/STATUS.md`: build status, test counts, fixes pushed,

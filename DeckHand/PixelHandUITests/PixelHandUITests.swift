@@ -66,6 +66,7 @@ final class PixelHandUITests: XCTestCase {
     }
 
     func test02_OnboardingLandscape() {
+        useFullScreenAppsIfAsked()
         XCUIDevice.shared.orientation = .landscapeLeft
         launch(onboarded: false)
         sleep(1)
@@ -207,6 +208,13 @@ final class PixelHandUITests: XCTestCase {
         // Picture in Picture: start it, go Home, come back.
         if tapIfExists("ph.mirror.pictureInPicture") {
             sleep(2)
+            // iPhone simulators report no PiP: the button explains (VQ-060).
+            let unavailable = app.alerts["Picture in Picture isn’t available"].firstMatch
+            if unavailable.exists {
+                snap("pip-unavailable")
+                unavailable.buttons["OK"].tap()
+                sleep(1)
+            }
             snap("pip-started")
             XCUIDevice.shared.press(.home)
             sleep(3)
@@ -276,6 +284,7 @@ final class PixelHandUITests: XCTestCase {
     }
 
     func test11_Landscape() {
+        useFullScreenAppsIfAsked()
         launch()
         guard connect() else { return }
         XCUIDevice.shared.orientation = .landscapeLeft
@@ -408,6 +417,8 @@ final class PixelHandUITests: XCTestCase {
         if tapIfExists("ph.mirror.pointerControl") {
             sleep(1)
             snap("pointer-control-on")
+            // VQ-093: the picture's input layer carries this ID while
+            // pointer control is on (`MirrorPicturePointerLayer`).
             let surface = element("ph.mirror.pointerSurface")
             if surface.waitForExistence(timeout: 2) {
                 // A finger anywhere moves the pointer relative to where it is.
@@ -569,7 +580,7 @@ final class PixelHandUITests: XCTestCase {
             for _ in 0..<8 where !isConnected() { sleep(1) }
             if isConnected() { sleep(1); return true }
         }
-        let row = element("ph.connect.macRow")
+        let row = macRow()
         acceptSystemAlerts(timeout: 1)
         guard row.waitForExistence(timeout: 45) else {
             snap("no-mac-found")
@@ -594,6 +605,56 @@ final class PixelHandUITests: XCTestCase {
         }
         sleep(2)
         return true
+    }
+
+    /// VQ-092: with the iPad simulator's windowing on, the app stays a
+    /// portrait window when the device rotates, so the landscape walks
+    /// captured portrait. With PH_QA_FULLSCREEN=1 (set
+    /// TEST_RUNNER_PH_QA_FULLSCREEN=1) this sets Settings › Multitasking &
+    /// Gestures to Full Screen Apps first. iPad only; a snapshot names
+    /// any step it couldn't find, and the walk goes on either way.
+    private func useFullScreenAppsIfAsked() {
+        guard ProcessInfo.processInfo.environment["PH_QA_FULLSCREEN"] == "1",
+              UIDevice.current.userInterfaceIdiom == .pad else { return }
+        let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
+        settings.launch()
+        let multitasking = settings.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Multitasking")).firstMatch
+        var found = multitasking.waitForExistence(timeout: 3)
+        // The row can sit below the fold of the sidebar.
+        for _ in 0..<4 where !found || !multitasking.isHittable {
+            settings.swipeUp()
+            found = multitasking.exists
+        }
+        guard found, multitasking.isHittable else {
+            snap("fullscreen-missing-multitasking")
+            settings.terminate()
+            return
+        }
+        multitasking.tap()
+        let fullScreen = settings.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Full Screen Apps")).firstMatch
+        if fullScreen.waitForExistence(timeout: 3), fullScreen.isHittable {
+            fullScreen.tap()
+            sleep(1)
+            snap("fullscreen-set")
+        } else {
+            snap("fullscreen-missing-option")
+        }
+        settings.terminate()
+    }
+
+    /// The picker's row for the Mac to test against (VQ-096): the one whose
+    /// name starts with PH_QA_MAC_NAME (set TEST_RUNNER_PH_QA_MAC_NAME), so
+    /// another Mac on the network isn't sent a request; the first Mac when
+    /// it isn't set. Rows read "<name>, my Mac, paired, nearby" to
+    /// VoiceOver, so the name leads the label.
+    private func macRow() -> XCUIElement {
+        let rows = app.descendants(matching: .any).matching(identifier: "ph.connect.macRow")
+        guard let name = ProcessInfo.processInfo.environment["PH_QA_MAC_NAME"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty
+        else { return rows.firstMatch }
+        return rows.matching(NSPredicate(format: "label BEGINSWITH[c] %@", name)).firstMatch
     }
 
     /// The shell is up and no approval or refusal card covers it.
