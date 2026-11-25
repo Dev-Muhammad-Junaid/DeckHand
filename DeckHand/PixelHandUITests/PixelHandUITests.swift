@@ -380,6 +380,7 @@ final class PixelHandUITests: XCTestCase {
         } else if refused.exists {
             snap("refused")
         }
+    }
 
     /// OR-16: pointer control on the picture. The screen-only arrangement
     /// (iPad: the "Screen focus" preset; iPhone: the Screen tab in
