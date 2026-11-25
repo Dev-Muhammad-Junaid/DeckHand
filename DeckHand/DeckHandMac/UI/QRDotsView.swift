@@ -4,8 +4,8 @@
 //
 //  A QR code drawn in the app's dots (`06-Pixel-Identity.md` §4 "Pairing
 //  code"): data modules are round dots, the three finder squares stay
-//  square so scanners still lock on, and the pointer glyph sits on a navy
-//  tile in the centre, inside level H's error correction. The cleared
+//  square so scanners still lock on, and the icon's hand tile sits on the
+//  centre module, inside level H's error correction. The cleared
 //  centre and finder rules are Core's `QRDotPlan`.
 //
 
@@ -99,7 +99,6 @@ struct QRDotsView: View {
         let module = side / CGFloat(n + 2 * quietModules)
         let inset = module * CGFloat(quietModules)
         let ink = PixelHandTheme.Brand.screen
-        let cleared = CGFloat(QRDotPlan.clearedSide(modules: n)) * module
 
         ZStack {
             RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous)
@@ -128,8 +127,14 @@ struct QRDotsView: View {
                     }
                 }
             }
-            if cleared > 0 {
-                MacGlyphTile(glyph: PixelGlyphs.pointer, size: max(20, cleared - module), pitch: cleared >= 32 ? 2.2 : 1.8)
+            // The icon's hand tile, a whole odd number of modules placed on
+            // the centre module's centre (OR-10): it used to be sized from
+            // the cleared square less a module and centred by its canvas,
+            // which left the art off the code's centre.
+            if let tile = QRCentreTile.frame(modules: n, moduleSide: Double(module), quietModules: quietModules) {
+                let centre = CGFloat(QRCentreTile.centreModuleCentre(modules: n, moduleSide: Double(module), quietModules: quietModules))
+                MacHandTile(size: CGFloat(tile.side))
+                    .position(x: centre, y: centre)
             }
         }
         .frame(width: side, height: side)

@@ -3,7 +3,7 @@
 //  DeckHandMac
 //
 //  The "Pair a device" window (UX-012, board `v2PairMac`): the QR code in
-//  dots with the pointer glyph at its centre, the code in dot-matrix
+//  dots with the icon's hand tile on its centre module (OR-10), the code in dot-matrix
 //  numerals (two groups of four, all at full brightness) and a dot beam counting
 //  down the 5-minute window. Opened from the menu-bar panel's "Pair a
 //  device" and a pending request's "Pair". Closing it cancels the code.
@@ -173,7 +173,7 @@ struct PairDeviceView: View {
                 .foregroundStyle(PixelHandTheme.ink2)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: PixelHandTheme.Space.sm) {
-                LivePixel(color: PixelHandTheme.success, size: 8)
+                MacStatusPixel(color: PixelHandTheme.success, size: 8, breathes: true)
                 MacDotText("PAIRED", pitch: 2, label: "Paired")
                     .foregroundStyle(PixelHandTheme.success)
             }

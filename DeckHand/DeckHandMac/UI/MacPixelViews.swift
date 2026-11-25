@@ -137,9 +137,18 @@ struct MacGlyphTile: View {
             .overlay(
                 MacGlyph(glyph: glyph, pitch: pitch, accent: isLit ? PixelHandTheme.Brand.glow : PixelHandTheme.Brand.phosphor)
                     .foregroundStyle(isLit ? PixelHandTheme.Brand.phosphor : PixelHandTheme.Brand.stripDim)
+                    // Centre the lit dots, not the 9 × 9 canvas: the pointer's
+                    // dots fill only its left six columns (OR-10).
+                    .offset(x: inkOffset.x, y: inkOffset.y)
             )
             .frame(width: size, height: size)
             .accessibilityHidden(true)
+    }
+
+    private var inkOffset: CGPoint {
+        guard let box = GlyphInkCentring.box(glyph: glyph) else { return .zero }
+        let offset = GlyphInkCentring.offset(box: box, columns: GlyphBitmap.size, rows: GlyphBitmap.size, pitch: Double(pitch))
+        return CGPoint(x: offset.x, y: offset.y)
     }
 }
 
@@ -157,7 +166,11 @@ struct MacHandTile: View {
                     .padding(3)
             )
             .overlay(
-                PixelGlyph(bitmap: PixelArt.hand, pitch: (size - 10) / 18, palette: .brand, glows: false)
+                // The glyph's frame is its 17 × 18 canvas; its lit dots are
+                // 16 × 18, so it moves half a pitch right to sit on the
+                // tile's centre (OR-10). The pitch is a whole half point.
+                PixelGlyph(bitmap: PixelArt.hand, pitch: handPitch, palette: .brand, glows: false)
+                    .offset(x: handOffset.x, y: handOffset.y)
             )
             .overlay(alignment: .topTrailing) {
                 RoundedRectangle(cornerRadius: 1, style: .continuous)
@@ -167,6 +180,117 @@ struct MacHandTile: View {
             }
             .frame(width: size, height: size)
             .accessibilityHidden(true)
+    }
+
+    private static let handBox = GlyphInkCentring.box(rows: MenuBarHand.handRows)
+
+    /// Fits the hand's lit dots inside the tile's screen (3 pt in from each
+    /// edge) with a point to spare.
+    private var handPitch: CGFloat {
+        guard let box = Self.handBox else { return (size - 10) / 18 }
+        return CGFloat(GlyphInkCentring.pitch(fitting: box, in: Double(size - 6), margin: 1))
+    }
+
+    private var handOffset: CGPoint {
+        guard let box = Self.handBox else { return .zero }
+        let offset = GlyphInkCentring.offset(
+            box: box,
+            columns: PixelArt.hand.width,
+            rows: PixelArt.hand.height,
+            pitch: Double(handPitch)
+        )
+        return CGPoint(x: offset.x, y: offset.y)
+    }
+}
+
+// MARK: - Status pixel
+
+/// The panel's status light (OR-09): it fades in over 180 ms, ease-out,
+/// when the panel opens, and a live one then breathes. Both change only
+/// the dot's opacity, in animations scoped to the dot, so it never moves
+/// with the panel's layout (it used to flow in from the bottom). Under
+/// Reduce Motion it is simply there, still.
+struct MacStatusPixel: View {
+    var color: Color = PixelHandTheme.success
+    var size: CGFloat = 7
+    /// Only one light per panel breathes: the header's.
+    var breathes = false
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isShown = false
+    @State private var isDim = false
+
+    var body: some View {
+        let fade = MacPanelMotion.fade(reduceMotion: reduceMotion).map { Animation.easeOut(duration: $0) }
+        let breath: Animation? = reduceMotion
+            ? nil
+            : .easeInOut(duration: MacPanelMotion.halfBreath).repeatForever(autoreverses: true)
+        RoundedRectangle(cornerRadius: size * 0.26, style: .continuous)
+            .fill(color)
+            .frame(width: size, height: size)
+            .shadow(color: color.opacity(0.45), radius: size * 0.6)
+            .animation(breath) { $0.opacity(isDim ? MacPanelMotion.breathDim : 1) }
+            .animation(fade) { $0.opacity(isShown ? 1 : 0) }
+            .onAppear {
+                isShown = true
+                if breathes, !reduceMotion { isDim = true }
+            }
+            .onChange(of: reduceMotion) { _, reduced in
+                isDim = breathes && !reduced
+            }
+            .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Panel tabs
+
+/// Devices | Transfers at the top of the panel (OR-13). Selection is
+/// colour and fill only: no dot or bar under the chosen segment.
+struct MacPanelTabs: View {
+    enum Tab: Hashable { case devices, transfers }
+
+    @Binding var selection: Tab
+    /// The Transfers count; `nil` hides the badge.
+    let transfersBadge: Int?
+
+    var body: some View {
+        HStack(spacing: 2) {
+            segment(.devices, title: "Devices", badge: nil, id: "ph.mac.tabDevices")
+            segment(.transfers, title: "Transfers", badge: transfersBadge, id: "ph.mac.tabTransfers")
+        }
+        .padding(2)
+        .background(Capsule(style: .continuous).fill(PixelHandTheme.fill))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ph.mac.tabs")
+    }
+
+    private func segment(_ tab: Tab, title: String, badge: Int?, id: String) -> some View {
+        let isOn = selection == tab
+        return Button {
+            selection = tab
+        } label: {
+            HStack(spacing: PixelHandTheme.Space.xs) {
+                Text(title)
+                    .font(.callout.weight(isOn ? .semibold : .regular))
+                    .foregroundStyle(isOn ? PixelHandTheme.ink : PixelHandTheme.ink2)
+                if let badge {
+                    Text("\(badge)")
+                        .font(.caption2.weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(isOn ? Color.white : PixelHandTheme.ink2)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Capsule(style: .continuous).fill(isOn ? AnyShapeStyle(PixelHandTheme.accent) : AnyShapeStyle(PixelHandTheme.fill2)))
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 22)
+            .background(Capsule(style: .continuous).fill(isOn ? AnyShapeStyle(PixelHandTheme.elevated) : AnyShapeStyle(Color.clear)))
+            .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(badge.map { "\(title), \($0)" } ?? title)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+        .accessibilityIdentifier(id)
     }
 }
 

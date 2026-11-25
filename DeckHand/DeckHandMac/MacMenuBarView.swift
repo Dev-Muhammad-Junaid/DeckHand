@@ -6,12 +6,15 @@
 //  styles so it follows the Mac's text size, and the Pixel Hand tokens.
 //
 //  Header: the icon's hand tile, this Mac's name and what it is doing.
-//  Requests: Deny / Pair… / Allow, amber. Devices: each connected device
-//  with its link badge and a visible Disconnect; the lock state when this
-//  Mac is locked. Paired: Forget and Pair a device (`PairingMenuSection`).
-//  Permissions: a live pixel per permission and a labelled fix button.
+//  Then, while transfers exist or finished in the last hour, a Devices |
+//  Transfers switch (OR-13).
+//  Devices: one list of iPhones and iPads, each asking (amber, Deny / Pair /
+//  Allow), connected (live pixel) or paired and away (dim), with Forget and
+//  Disconnect in each row's menu and one "Pair a device" under it (OR-08,
+//  `MacDevicesList`); the Send section with a one-line transfer summary;
+//  permissions with a fading status dot each (OR-09).
+//  Transfers: under way, then the last hour's (`MacTransfersTab`).
 //  Footer: updates, crash reports, the version line and Quit.
-//  Nothing is hover-only; every control is a labelled button.
 //
 
 import Combine
@@ -30,6 +33,10 @@ struct MacMenuBarView: View {
 
     @ObservedObject private var permissions = PermissionsMonitor.shared
     @ObservedObject private var updater = AppUpdater.shared
+    @ObservedObject private var transfers = MacTransferService.shared
+
+    /// Devices or Transfers (OR-13).
+    @State private var tab: MacPanelTabs.Tab = .devices
 
     /// Mirrors `DeckHandDiagnostics.isEnabledByUser` (absent = on).
     @AppStorage(DeckHandDiagnostics.enabledKey) private var shareCrashReports = true
@@ -67,80 +74,26 @@ struct MacMenuBarView: View {
                     .padding(.bottom, PixelHandTheme.Space.md)
             }
 
-            if !authManager.pendingConnections.isEmpty {
-                PanelDivider()
-                PanelSection {
-                    MacSectionLabel(text: "Asking to connect", color: PixelHandTheme.warning)
-                        .padding(.horizontal, PixelHandTheme.Space.lg)
-                    ForEach(authManager.pendingConnections) { connection in
-                        PendingConnectionRow(
-                            connection: connection,
-                            loomContext: loomContext,
-                            deviceSystemImage: deviceSystemImage(for: connection)
-                        )
-                    }
-                }
-            }
-
-            // A nearby iPhone or iPad on a different Loom protocol can't
-            // connect (its handshake fails), so say which side to update.
-            if !outdatedPeers.isEmpty {
-                PanelDivider()
-                PanelSection {
-                    MacSectionLabel(text: "Needs an update", color: PixelHandTheme.warning)
-                    ForEach(outdatedPeers, id: \.peer.id) { item in
-                        HStack(alignment: .top, spacing: PixelHandTheme.Space.md) {
-                            MacDeviceIcon(systemImage: item.peer.deviceType.systemImage, tint: PixelHandTheme.warning)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(item.peer.name)
-                                    .font(.body.weight(.medium))
-                                    .lineLimit(1)
-                                Text(item.message)
-                                    .font(.caption)
-                                    .foregroundStyle(PixelHandTheme.ink2)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-                        .accessibilityElement(children: .combine)
-                    }
-                }
+            let showsTransfers = TransferPanelPlan.showsTab(
+                transfers.panelItems,
+                waitingPrompts: transfers.prompts.count,
+                at: Date()
+            )
+            if showsTransfers {
+                MacPanelTabs(
+                    selection: $tab,
+                    transfersBadge: TransferPanelPlan.badge(transfers.panelItems, waitingPrompts: transfers.prompts.count, at: Date())
+                )
                 .padding(.horizontal, PixelHandTheme.Space.lg)
+                .padding(.bottom, PixelHandTheme.Space.sm)
             }
 
-            PanelDivider()
-
-            PanelSection {
-                MacSectionLabel(text: "Devices")
-                    .padding(.horizontal, PixelHandTheme.Space.lg)
-                if authorizedConnections.isEmpty {
-                    waitingState
-                } else {
-                    if isLocked {
-                        lockedNote
-                    }
-                    ForEach(authorizedConnections) { connection in
-                        ConnectionRow(
-                            connection: connection,
-                            loomContext: loomContext,
-                            deviceSystemImage: deviceSystemImage(for: connection),
-                            isLocked: isLocked
-                        )
-                    }
-                }
+            if showsTransfers && tab == .transfers {
+                PanelDivider()
+                MacTransfersTab()
+            } else {
+                devicesView(authorizedConnections: authorizedConnections)
             }
-
-            MacTransferSection() // Sharing lane: Send, prompts, transfers (S1/S2)
-
-            PanelDivider()
-
-            // ── Pairing (S4) ──────────────────────────────────────────
-            PanelSection {
-                PairingMenuSection()
-            }
-
-            PanelDivider()
-
-            permissionsSection
 
             PanelDivider()
 
@@ -152,6 +105,60 @@ struct MacMenuBarView: View {
             let locked = MacLockMonitor.shared.state.isLocked
             if locked != isLocked { isLocked = locked }
         }
+    }
+
+    // MARK: Devices view
+
+    @ViewBuilder
+    private func devicesView(authorizedConnections: [LoomConnectionSnapshot]) -> some View {
+        // A nearby iPhone or iPad on a different Loom protocol can't
+        // connect (its handshake fails), so say which side to update.
+        if !outdatedPeers.isEmpty {
+            PanelDivider()
+            PanelSection {
+                MacSectionLabel(text: "Needs an update", color: PixelHandTheme.warning)
+                ForEach(outdatedPeers, id: \.peer.id) { item in
+                    HStack(alignment: .top, spacing: PixelHandTheme.Space.md) {
+                        MacDeviceIcon(systemImage: item.peer.deviceType.systemImage, tint: PixelHandTheme.warning)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.peer.name)
+                                .font(.body.weight(.medium))
+                                .lineLimit(1)
+                            Text(item.message)
+                                .font(.caption)
+                                .foregroundStyle(PixelHandTheme.ink2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            }
+            .padding(.horizontal, PixelHandTheme.Space.lg)
+        }
+
+        PanelDivider()
+
+        // One list: asking, connected, paired and away (OR-08).
+        PanelSection {
+            MacSectionLabel(text: "Devices")
+                .padding(.horizontal, PixelHandTheme.Space.lg)
+            if isLocked && !authorizedConnections.isEmpty {
+                lockedNote
+            }
+            MacDevicesList(
+                connections: authorizedConnections,
+                loomContext: loomContext,
+                isLocked: isLocked,
+                systemImage: { deviceSystemImage(for: $0) }
+            )
+        }
+
+        // Sharing lane: Send, prompts, and one transfer summary row (S1/S2, OR-13).
+        MacTransferSection(onOpenTransfers: { tab = .transfers })
+
+        PanelDivider()
+
+        permissionsSection
     }
 
     // MARK: Header
@@ -192,13 +199,11 @@ struct MacMenuBarView: View {
                     .foregroundStyle(PixelHandTheme.warning)
             } else if running {
                 // Lit only while something is live (`02-Design-System.md` §6).
+                // Fades in, never flows in (OR-09); the panel's one breath.
                 if connected > 0 {
-                    LivePixel(color: PixelHandTheme.success, size: 8)
+                    MacStatusPixel(color: PixelHandTheme.success, size: 8, breathes: true)
                 } else {
-                    RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .fill(PixelHandTheme.fill2)
-                        .frame(width: 8, height: 8)
-                        .accessibilityHidden(true)
+                    MacStatusPixel(color: PixelHandTheme.fill2, size: 8)
                 }
             }
         }
@@ -264,26 +269,6 @@ struct MacMenuBarView: View {
     }
 
     // MARK: Devices
-
-    private var waitingState: some View {
-        HStack(spacing: PixelHandTheme.Space.md) {
-            PixelScreen(cornerRadius: 10, padding: 6) {
-                PixelGlyph(bitmap: PixelArt.hand, pitch: 1.4, glows: false)
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text("No device connected")
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(PixelHandTheme.ink)
-                Text("Open Pixel Hand on your iPhone or iPad and choose \(PairDeviceView.macName).")
-                    .font(.caption)
-                    .foregroundStyle(PixelHandTheme.ink2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(.horizontal, PixelHandTheme.Space.lg)
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("ph.mac.waitingState")
-    }
 
     private var lockedNote: some View {
         HStack(alignment: .top, spacing: PixelHandTheme.Space.sm) {
@@ -492,149 +477,15 @@ private struct PermissionRow: View {
         .accessibilityIdentifier("ph.mac.permission" + title.replacingOccurrences(of: " ", with: ""))
     }
 
+    /// Fades in with the panel (OR-09); never breathes.
     @ViewBuilder private var statusDot: some View {
         switch status {
         case .granted:
-            LivePixel(color: PixelHandTheme.success, size: 7)
+            MacStatusPixel(color: PixelHandTheme.success, size: 7)
         case .denied:
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(PixelHandTheme.warning)
-                .frame(width: 7, height: 7)
-                .accessibilityHidden(true)
+            MacStatusPixel(color: PixelHandTheme.warning, size: 7)
         case .unknown:
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(PixelHandTheme.fill2)
-                .frame(width: 7, height: 7)
-                .accessibilityHidden(true)
+            MacStatusPixel(color: PixelHandTheme.fill2, size: 7)
         }
-    }
-}
-
-// MARK: - ConnectionRow
-
-private struct ConnectionRow: View {
-    let connection: LoomConnectionSnapshot
-    let loomContext: LoomContext
-    let deviceSystemImage: String
-    let isLocked: Bool
-    @EnvironmentObject private var authManager: DeviceAuthorizationManager
-
-    var body: some View {
-        HStack(alignment: .center, spacing: PixelHandTheme.Space.md) {
-            MacDeviceIcon(systemImage: deviceSystemImage, isLive: true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(connection.peerName)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(PixelHandTheme.ink)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                TimelineView(.periodic(from: .now, by: 60)) { _ in
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(PixelHandTheme.ink2)
-                }
-                HStack(spacing: PixelHandTheme.Space.sm) {
-                    HostLinkBadge(connectionID: connection.id) // Network lane (S13)
-                    if isLocked {
-                        MacDotText("LOCKED", pitch: 1.3, label: "Mac locked")
-                            .foregroundStyle(PixelHandTheme.warning)
-                    }
-                }
-                // The live connection id, for matching against the remote's
-                // log and spotting silent session swaps.
-                Text("session \(connection.id.uuidString.prefix(8))")
-                    .font(.caption2.monospaced())
-                    .foregroundStyle(PixelHandTheme.ink3)
-                    .textSelection(.enabled)
-                    .accessibilityHidden(true)
-            }
-            Spacer(minLength: PixelHandTheme.Space.xs)
-            Button("Disconnect") {
-                authManager.removeAndDisconnect(connection: connection, loomContext: loomContext)
-            }
-            .buttonStyle(.macSecondary)
-            .help("Disconnect and end this session's access. A paired device stays paired; use Forget under Paired.")
-            .accessibilityLabel("Disconnect \(connection.peerName)")
-            .accessibilityIdentifier("ph.mac.disconnect")
-        }
-        .padding(.horizontal, PixelHandTheme.Space.lg)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("ph.mac.deviceRow")
-    }
-
-    private var subtitle: String {
-        "Connected \(connection.connectedAt.formatted(.relative(presentation: .named)))"
-    }
-}
-
-// MARK: - PendingConnectionRow
-
-private struct PendingConnectionRow: View {
-    let connection: LoomConnectionSnapshot
-    let loomContext: LoomContext
-    let deviceSystemImage: String
-    @EnvironmentObject private var authManager: DeviceAuthorizationManager
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
-            HStack(alignment: .center, spacing: PixelHandTheme.Space.md) {
-                MacDeviceIcon(systemImage: deviceSystemImage, tint: PixelHandTheme.warning)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(connection.peerName)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(PixelHandTheme.ink)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Group {
-                        if let requestedAt = authManager.pendingRequestedDate(for: connection.id) {
-                            Text("Wants to control this Mac · \(requestedAt.formatted(.relative(presentation: .named)))")
-                        } else {
-                            Text("Wants to control this Mac")
-                        }
-                    }
-                    .font(.caption)
-                    .foregroundStyle(PixelHandTheme.ink2)
-                }
-                Spacer(minLength: 0)
-            }
-
-            // Allow (this session), Deny, or Pair: show a code the device
-            // can enter to connect without asking from now on. Labelled
-            // buttons, so the choice never rests on telling colours apart.
-            // Deny sits apart from the primary Allow.
-            HStack(spacing: PixelHandTheme.Space.sm) {
-                Button("Deny") {
-                    authManager.reject(connection: connection, loomContext: loomContext)
-                }
-                .buttonStyle(.macDestructive)
-                .help("Refuse this request")
-                .accessibilityLabel("Deny \(connection.peerName)")
-                .accessibilityIdentifier("ph.mac.deny")
-                Spacer(minLength: 0)
-                Button("Pair") {
-                    PairDeviceWindow.shared.open(authManager)
-                }
-                .buttonStyle(.macSecondary)
-                .help("Show a pairing code to enter on the device. Paired devices connect without asking.")
-                .accessibilityLabel("Pair \(connection.peerName)")
-                .accessibilityIdentifier("ph.mac.pairRequest")
-                Button("Allow") {
-                    authManager.authorize(connection: connection)
-                }
-                .buttonStyle(.macPrimary)
-                .help("Allow for this session")
-                .accessibilityLabel("Allow \(connection.peerName)")
-                .accessibilityIdentifier("ph.mac.allow")
-            }
-            .padding(.leading, 28 + PixelHandTheme.Space.md)
-        }
-        .padding(PixelHandTheme.Space.md)
-        .background(
-            RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous)
-                .fill(PixelHandTheme.warningTint)
-        )
-        .padding(.horizontal, PixelHandTheme.Space.sm)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("ph.mac.pendingRow")
     }
 }

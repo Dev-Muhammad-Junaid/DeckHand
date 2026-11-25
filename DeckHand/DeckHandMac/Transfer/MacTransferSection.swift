@@ -3,10 +3,11 @@
 //  DeckHandMac – Transfer
 //
 //  S1/S2: the menu-bar panel's Send section. One row per paired, connected
-//  iPhone or iPad with "Send File…" and "Send Clipboard", a drop target
-//  (drag files, text or a link onto the device row), incoming prompts,
-//  and the last transfers with a dot beam, progress, Cancel and Show in
-//  Finder. Placed in `MacMenuBarView` after Devices (one announced line).
+//  iPhone or iPad with Send › File and Clipboard, a drop target (drag
+//  files, text or a link onto the device row), incoming prompts, and one
+//  summary line for transfers ("3 files sending · 42 %") that opens the
+//  Transfers tab (OR-13), where each transfer has its dot beam, progress,
+//  Cancel and Show in Finder.
 //
 
 import AppKit
@@ -15,28 +16,19 @@ import UniformTypeIdentifiers
 
 struct MacTransferSection: View {
     @ObservedObject private var service = MacTransferService.shared
+    /// Opens the Transfers tab (the summary row's action).
+    var onOpenTransfers: () -> Void = {}
 
     var body: some View {
-        if !service.targets.isEmpty || !service.rows.isEmpty || !service.prompts.isEmpty {
+        if !service.targets.isEmpty || !service.prompts.isEmpty || summary != nil {
             VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
                 Rectangle()
                     .fill(PixelHandTheme.hairline)
                     .frame(height: 0.5)
                     .padding(.horizontal, PixelHandTheme.Space.lg)
                     .accessibilityHidden(true)
-                HStack {
-                    MacSectionLabel(text: "Send")
-                    Spacer()
-                    if service.rows.contains(where: { !$0.isActive }) {
-                        Button("Clear") { service.clearFinished() }
-                            .buttonStyle(.plain)
-                            .font(.caption)
-                            .foregroundStyle(PixelHandTheme.ink2)
-                            .accessibilityLabel("Clear finished transfers")
-                            .accessibilityIdentifier("ph.mac.clearTransfers")
-                    }
-                }
-                .padding(.horizontal, PixelHandTheme.Space.lg)
+                MacSectionLabel(text: "Send")
+                    .padding(.horizontal, PixelHandTheme.Space.lg)
 
                 ForEach(service.prompts) { prompt in
                     MacTransferPromptRow(prompt: prompt)
@@ -44,8 +36,10 @@ struct MacTransferSection: View {
                 ForEach(service.targets.sorted(by: { $0.value < $1.value }), id: \.key) { target in
                     MacSendTargetRow(connectionID: target.key, name: target.value)
                 }
-                ForEach(service.rows) { row in
-                    MacTransferRowView(row: row)
+                // One line instead of a row per file (OR-13): six files used
+                // to push everything else off the panel.
+                if let summary {
+                    MacTransferSummaryRow(summary: summary, fraction: fraction, onOpen: onOpenTransfers)
                 }
             }
             .padding(.vertical, PixelHandTheme.Space.md)
@@ -54,6 +48,101 @@ struct MacTransferSection: View {
         }
         Color.clear.frame(height: 0)
             .onAppear { service.refreshTargets() } // pairing may have changed
+    }
+
+    private var summary: String? {
+        TransferPanelPlan.summary(service.panelItems, at: Date())
+    }
+
+    private var fraction: Double? {
+        TransferPanelPlan.overallFraction(service.panelItems, at: Date())
+    }
+}
+
+/// "3 files sending · 42 %" with the overall beam; opens the Transfers tab.
+private struct MacTransferSummaryRow: View {
+    let summary: String
+    let fraction: Double?
+    let onOpen: () -> Void
+
+    var body: some View {
+        Button(action: onOpen) {
+            HStack(spacing: PixelHandTheme.Space.md) {
+                Image(systemName: "arrow.up.arrow.down.circle")
+                    .foregroundStyle(PixelHandTheme.ink2)
+                    .frame(width: 22)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: PixelHandTheme.Space.xs) {
+                    Text(summary)
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(PixelHandTheme.ink)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                    if let fraction {
+                        MacDotBeam(lit: TransferBeamPhase.sending(fraction: fraction).litDots(of: 20), total: 20, dot: 4, gap: 3)
+                    }
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(PixelHandTheme.ink3)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, PixelHandTheme.Space.lg)
+            .padding(.vertical, PixelHandTheme.Space.xs)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Show transfers")
+        .accessibilityLabel(summary)
+        .accessibilityHint("Shows the Transfers tab")
+        .accessibilityIdentifier("ph.mac.transferSummary")
+    }
+}
+
+/// The Transfers tab (OR-13): under way first, then the last hour's
+/// finished ones, each with its beam, Cancel or Show in Finder.
+struct MacTransfersTab: View {
+    @ObservedObject private var service = MacTransferService.shared
+
+    var body: some View {
+        let now = Date()
+        let groups = TransferPanelPlan.groups(service.panelItems, at: now)
+        let rowsByID = Dictionary(service.rows.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
+            ForEach(service.prompts) { prompt in
+                MacTransferPromptRow(prompt: prompt)
+            }
+            ForEach(groups.map { $0.group }, id: \.self) { group in
+                let items = groups.first(where: { $0.group == group })?.items ?? []
+                HStack {
+                    MacSectionLabel(text: group.title)
+                    Spacer()
+                    if group == .finished {
+                        Button("Clear") { service.clearFinished() }
+                            .buttonStyle(.macQuiet)
+                            .accessibilityLabel("Clear finished transfers")
+                            .accessibilityIdentifier("ph.mac.clearTransfers")
+                    }
+                }
+                .padding(.horizontal, PixelHandTheme.Space.lg)
+                .padding(.top, PixelHandTheme.Space.xs)
+                ForEach(items) { item in
+                    if let row = rowsByID[item.id] {
+                        MacTransferRowView(row: row)
+                    }
+                }
+            }
+            if groups.isEmpty && service.prompts.isEmpty {
+                Text("Nothing moving. Finished transfers stay here for an hour.")
+                    .font(.callout)
+                    .foregroundStyle(PixelHandTheme.ink3)
+                    .padding(.horizontal, PixelHandTheme.Space.lg)
+            }
+        }
+        .padding(.vertical, PixelHandTheme.Space.md)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ph.mac.transfersTab")
     }
 }
 
@@ -79,7 +168,7 @@ private struct MacSendTargetRow: View {
                 .lineLimit(1)
             Spacer()
             Menu("Send") {
-                Button("File…") { chooseFiles() }
+                Button("File") { chooseFiles() }
                 Button("Clipboard") { MacTransferService.shared.sendClipboard(to: connectionID) }
             }
             .menuStyle(.borderlessButton)
