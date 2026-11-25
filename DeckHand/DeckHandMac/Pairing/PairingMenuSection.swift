@@ -172,8 +172,13 @@ private struct MacDeviceRowView: View {
                         .foregroundStyle(isAway ? PixelHandTheme.ink2 : PixelHandTheme.ink)
                         .lineLimit(1)
                         .truncationMode(.middle)
-                    TimelineView(.periodic(from: .now, by: 60)) { _ in
-                        Text(MacDeviceListPlan.detailText(row.detail) { $0.formatted(.relative(presentation: .named)) })
+                    // VQ-097: minute-grained, redrawn every 30 s, so "last
+                    // seen" never freezes on "38 seconds ago".
+                    TimelineView(.periodic(from: .now, by: MacDeviceListPlan.seenRefreshInterval)) { context in
+                        Text(MacDeviceListPlan.detailText(row.detail) { date in
+                            MacDeviceListPlan.recentSeen(date, now: context.date)
+                                ?? date.formatted(.relative(presentation: .named))
+                        })
                             .font(.caption)
                             .foregroundStyle(isAway ? PixelHandTheme.ink3 : PixelHandTheme.ink2)
                             .lineLimit(2)

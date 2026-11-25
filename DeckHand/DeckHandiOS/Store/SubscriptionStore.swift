@@ -184,7 +184,7 @@ final class SubscriptionStore {
             switch try await purchaseAction(product) {
             case let .success(verification):
                 guard case let .verified(transaction) = verification else {
-                    errorMessage = "The App Store couldn't verify this purchase. Try Restore Purchases."
+                    errorMessage = "The App Store couldn't verify this purchase. Try Restore purchases."
                     return false
                 }
                 await transaction.finish()
@@ -204,7 +204,7 @@ final class SubscriptionStore {
         }
     }
 
-    /// Restore Purchases: syncs this Apple Account's transactions with the
+    /// Restore purchases: syncs this Apple Account's transactions with the
     /// App Store (it may ask the person to sign in), then re-reads them.
     func restore() async {
         isWorking = true

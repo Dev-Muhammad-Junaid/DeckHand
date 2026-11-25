@@ -12,7 +12,7 @@
 //  starts, that it renews automatically and how to cancel, and working
 //  links to the Terms of Use (Apple's standard EULA) and the privacy
 //  policy. All of it is on this screen, next to the button, along with
-//  Restore Purchases. The words are in PixelHandCore (`SubscriptionCopy`).
+//  Restore purchases. The words are in PixelHandCore (`SubscriptionCopy`).
 //
 //  Only features that ship are listed; AI isn't until it does.
 //
@@ -321,7 +321,7 @@ struct PaywallView: View {
     }
 
     /// Apple's required text, unchanged, at a size that stays legible at AX5,
-    /// with Restore Purchases, Terms of Use and Privacy Policy. The links
+    /// with Restore purchases, Terms of Use and Privacy Policy. The links
     /// stack when they don't fit on one line.
     private var disclosure: some View {
         VStack(spacing: 14) {
@@ -347,7 +347,7 @@ struct PaywallView: View {
 
     @ViewBuilder
     private var disclosureLinks: some View {
-        Button("Restore Purchases") {
+        Button("Restore purchases") {
             Task { await store.restore() }
         }
         .disabled(store.isWorking)

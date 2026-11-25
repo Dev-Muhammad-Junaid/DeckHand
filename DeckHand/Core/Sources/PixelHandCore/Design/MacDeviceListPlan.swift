@@ -185,6 +185,22 @@ public enum MacDeviceListPlan {
         }
     }
 
+    /// How often the panel redraws "last seen" (build 23, VQ-097).
+    public static let seenRefreshInterval: TimeInterval = 30
+
+    /// "just now", "1 min ago", "38 min ago", or nil from an hour on
+    /// (the app then uses the system's relative date: "2 hours ago",
+    /// "yesterday"). Minutes at the finest, so the panel's periodic
+    /// redraw keeps it true: build 23 showed "38 seconds ago" and froze
+    /// there while the panel stayed open (VQ-097).
+    public static func recentSeen(_ date: Date, now: Date) -> String? {
+        let elapsed = now.timeIntervalSince(date)
+        guard elapsed.isFinite else { return nil }
+        if elapsed < 60 { return "just now" }
+        let minutes = Int(elapsed / 60)
+        return minutes < 60 ? "\(minutes) min ago" : nil
+    }
+
     /// The short state word VoiceOver reads after the name.
     public static func spokenState(_ state: State) -> String {
         switch state {

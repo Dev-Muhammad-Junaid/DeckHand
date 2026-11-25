@@ -74,6 +74,11 @@ struct PairDeviceView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
+    /// Takes the window's first keyboard focus, so New code doesn't open
+    /// with the system's (pink) focus ring (VQ-094), as in the panel
+    /// (VQ-021). Tab still reaches every button.
+    @FocusState private var isFocusSinkFocused: Bool
+
     var body: some View {
         HStack(alignment: .center, spacing: PixelHandTheme.Space.xl) {
             qr
@@ -86,6 +91,15 @@ struct PairDeviceView: View {
         .padding(.vertical, PixelHandTheme.Space.xl)
         .frame(minWidth: 560, minHeight: 300)
         .background(PixelHandTheme.canvas)
+        .background(alignment: .topLeading) {
+            Color.clear
+                .frame(width: 1, height: 1)
+                .focusable()
+                .focused($isFocusSinkFocused)
+                .focusEffectDisabled()
+                .accessibilityHidden(true)
+                .onAppear { isFocusSinkFocused = true }
+        }
         .onReceive(ticker) { _ in authManager.refreshPairingDisplay() }
     }
 
