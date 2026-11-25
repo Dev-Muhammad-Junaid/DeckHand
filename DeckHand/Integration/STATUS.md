@@ -1693,4 +1693,39 @@ floating "Connect and pair" covers the code sheet's footer).
 `test16` (OR-16 picture pointer), the Mac panel items (VQ-021…023,
 VQ-040…043, OR-08…13), widgets and Control Center (VQ-070…079, OR-14/15).
 
-Status: BUILT (build 23) — 2 bugs
+
+### Second pass, Mac free (build 23) — 2026-11-25 evening
+
+The owner freed the Mac, so the walks that type and click ran too, with a
+scratch TextEdit document in front: iPad `test04`, `test05`, `test16`;
+iPhone `test04`, `test05`, `test06`; the Mac menu-bar panel and pair
+window; OR-16 by hand on the iPad. All walks passed. `VISUAL-QA-build23.md`
+and the gallery are updated.
+
+- **Totals now:** VQ-001…082 51 pass · 4 fail · 27 not checked;
+  OR-01…16 10 pass · 6 not checked; new findings VQ-083…097: 15
+  (P1 1 · P2 5 · P3 9).
+- **Passed this time:** OR-08 (one Devices list), OR-10, OR-11, OR-12,
+  OR-16 (the picture moves the Mac pointer), VQ-005, VQ-021, VQ-022,
+  VQ-036, VQ-040, VQ-041, VQ-042, VQ-047, VQ-059.
+- **Failed:** VQ-034 (iPhone modifier row runs off with no fade), VQ-060
+  (no PiP button in the iPhone mirror toolbar; iPad has it), VQ-061 (the
+  iPhone mirror toolbar never hides; iPad's does), plus VQ-058 from the first
+  pass.
+- **Another Mac is on the network** ("AH's Mac mini"). `connect()` in the
+  walks taps the first Mac, so one `test04` run sent that Mac a connection
+  request (never approved). The rest of the run used a local, uncommitted
+  patch that picks the Mac by name (VQ-096).
+
+**Open bugs**
+1. **VQ-083 (P1):** iPhone deck edit mode: the mirror tile hides Done.
+2. **VQ-058:** the picker doesn't reconnect to the paired Mac.
+3. **VQ-095 (P2):** with pointer control on, a quick flick throws the Mac
+   pointer off the mirrored display (210 pt flick → about 3,250 pt; a slow
+   50 pt drag → 182 pt, which is fine).
+
+**Still not checked:** iPad landscape and the Macs sidebar (OR-04/05; the
+simulator's windowing returns on rotation), widgets and Control Center
+(VQ-070…079, OR-14/15), transfers (OR-13), dark mode, iPad mini, Duo.
+
+Status: BUILT (build 23) — 3 bugs
