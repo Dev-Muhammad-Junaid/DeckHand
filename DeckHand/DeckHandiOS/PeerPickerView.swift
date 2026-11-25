@@ -23,7 +23,10 @@ struct PeerPickerView: View {
 
     @Environment(\.loomContext) private var loomContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @LoomQuery(.peers(sort: .name)) private var peers: [LoomPeerSnapshot]
+    @LoomQuery(.peers(sort: .name)) private var discoveredPeers: [LoomPeerSnapshot]
+    /// Only Macs: other iPads and iPhones running Pixel Hand advertise the
+    /// same service (build 19, `PeerRole`).
+    private var peers: [LoomPeerSnapshot] { discoveredPeers.macsOnly }
 
     @State private var connecting: UUID?
     @State private var errorMessage: String?
@@ -416,7 +419,7 @@ struct PeerPickerView: View {
                 await MainActor.run {
                     DeckHandLog.connection.error("📡 Connect failed for \(peer.name, privacy: .public): \(error.localizedDescription, privacy: .public)")
                     connecting = nil
-                    showError("Couldn’t connect to \(peer.name). \(error.localizedDescription)")
+                    showError(UserFacingError.connectFailure(macName: peer.name, detail: error.localizedDescription))
                 }
             }
         }

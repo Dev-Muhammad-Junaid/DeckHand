@@ -21,7 +21,10 @@ struct ContentRootView: View {
     @Environment(\.loomContext) private var loomContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var settings: DeckHandSettings
-    @LoomQuery(.peers(sort: .name)) private var peers: [LoomPeerSnapshot]
+    @LoomQuery(.peers(sort: .name)) private var discoveredPeers: [LoomPeerSnapshot]
+    /// Only Macs: other iPads and iPhones running Pixel Hand advertise the
+    /// same service (build 19, `PeerRole`).
+    private var peers: [LoomPeerSnapshot] { discoveredPeers.macsOnly }
     @State private var activeConnection: (handle: LoomConnectionHandle, peerName: String)?
     @State private var authStatus: String = "pending"
     /// Keeps the approval card up for a moment after a grant, so the hand

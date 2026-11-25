@@ -346,7 +346,11 @@ final class ControlSessionModel {
             handleMirrorError(message, fallbackDisplayID: fallbackDisplayID)
 
         case let .capture(.screenshotError(requestID, message)):
-            capture.handleScreenshotError(requestID: requestID, message: message)
+            // Build 19: a locked Mac reads as locked, whatever it sent.
+            capture.handleScreenshotError(
+                requestID: requestID,
+                message: macLockState.isLocked ? LockPolicy.lockedErrorMessage : message
+            )
 
         case let .capture(.windowListResponse(requestID, windows)):
             capture.handleWindowList(requestID: requestID, windows: windows)

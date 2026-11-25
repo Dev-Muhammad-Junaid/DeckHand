@@ -192,7 +192,9 @@ extension ControlSessionModel: MirrorStreamSink {
         clearMirrorState()
         syncMirrorAudio()
         mirrorPiPMirrorActiveChanged()
-        capture.showMirrorError(message)
+        // Build 19: the lock banner already knows the Mac is locked; say
+        // so instead of whatever an older Mac sent.
+        capture.showMirrorError(macLockState.isLocked ? LockPolicy.lockedErrorMessage : message)
     }
 
     // MARK: - Start, stop, re-negotiate

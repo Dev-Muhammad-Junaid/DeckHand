@@ -15,8 +15,9 @@
 //  Mac side (`admission`): a connection that arrives over a remote path
 //  (a tunnel interface, an overlay address, or cellular) is admitted only
 //  if it is already paired. No Allow prompt and no pairing code from
-//  outside the local network. Loopback is this same machine (a simulator,
-//  VQ-001) and counts as local: the prompt and the code still need a
+//  outside the local network. Loopback, and a peer at one of the Mac's
+//  own addresses, is this same machine (a simulator, VQ-001) and counts
+//  as local: the prompt and the code still need a
 //  person at the Mac.
 //
 
@@ -131,10 +132,12 @@ public enum RemoteAccessPolicy {
 
     /// Where a connection came from, as far as admission cares.
     public enum PathClass: Equatable, Sendable {
-        /// The same machine: loopback (`127.0.0.0/8`, `::1`, or an
-        /// IPv4-mapped loopback). A simulator on this Mac, or a process
-        /// running here. Treated like the local network: the Allow prompt
-        /// and the pairing code still need a person at the Mac.
+        /// The same machine: a loopback address (`127.0.0.0/8`, `::1`, or
+        /// an IPv4-mapped loopback), one of this Mac's own interface
+        /// addresses, or anything carried over the loopback interface. A
+        /// simulator on this Mac, or a process running here. Treated like
+        /// the local network: the Allow prompt and the pairing code still
+        /// need a person at the Mac.
         case sameMachine
         /// The local network (Wi-Fi, Ethernet, the USB cable, AWDL), link-
         /// local addresses included.
@@ -144,21 +147,31 @@ public enum RemoteAccessPolicy {
         case remote
     }
 
-    /// Classifies a connection's path. Overlay addresses win over
-    /// everything (a Tailscale peer is remote whatever the interface says);
-    /// then loopback is the same machine; then tunnels and cellular are
-    /// remote; everything else is the local network.
-    public static func pathClass(link: LinkKind, remoteHost: String?) -> PathClass {
-        if RemoteHost.isOverlayAddress(remoteHost) { return .remote }
+    /// Classifies a connection's path.
+    ///
+    /// 1. A loopback address, or one of this Mac's own addresses, is the
+    ///    same machine whatever the link says. A peer elsewhere can't hold
+    ///    the Mac's own address: replies to it never leave the Mac, so a
+    ///    handshake from it can't complete. (VQ-001: a simulator dials the
+    ///    Mac's Bonjour-resolved Wi-Fi address; the kernel carries it over
+    ///    `lo0`, from that same address.)
+    /// 2. Any other overlay (Tailscale) address is remote, whatever the
+    ///    interface says.
+    /// 3. The loopback interface is the same machine: only this Mac can
+    ///    put a packet on `lo0`.
+    /// 4. Tunnels and cellular are remote; everything else is the local
+    ///    network.
+    ///
+    /// - Parameter ownAddresses: this Mac's interface addresses (the keys
+    ///   of `InterfaceAddressTable.current()`). Link-local entries are
+    ///   ignored: those are unique only per link, so another device can
+    ///   hold the same one.
+    public static func pathClass(link: LinkKind, remoteHost: String?, ownAddresses: Set<String> = []) -> PathClass {
         if LinkJudge.isLoopback(remoteHost) { return .sameMachine }
+        if isOwnAddress(remoteHost, ownAddresses: ownAddresses) { return .sameMachine }
+        if RemoteHost.isOverlayAddress(remoteHost) { return .remote }
         switch link {
         case .loopback:
-            // The path says loopback but the address wasn't reported (or
-            // isn't a loopback literal): only trust it when no other address
-            // contradicts it.
-            if let remoteHost, !remoteHost.isEmpty, !LinkJudge.isLoopback(remoteHost) {
-                return LinkJudge.isLinkLocal(remoteHost) ? .localNetwork : .remote
-            }
             return .sameMachine
         case .tunnel, .cellular:
             return .remote
@@ -167,11 +180,29 @@ public enum RemoteAccessPolicy {
         }
     }
 
+    /// Whether `host` is one of `ownAddresses` (this Mac's interface
+    /// addresses): compared without zone, brackets, case or an IPv4-mapped
+    /// prefix. Link-local addresses never match.
+    public static func isOwnAddress(_ host: String?, ownAddresses: Set<String>) -> Bool {
+        guard let host, !host.isEmpty, !ownAddresses.isEmpty,
+              !LinkJudge.isLinkLocal(host) else { return false }
+        let normalized = normalizedAddress(host)
+        return ownAddresses.contains { own in
+            !LinkJudge.isLinkLocal(own) && normalizedAddress(own) == normalized
+        }
+    }
+
+    private static func normalizedAddress(_ host: String) -> String {
+        let h = LinkJudge.unscoped(host)
+        if h.hasPrefix("::ffff:"), h.dropFirst(7).contains(".") { return String(h.dropFirst(7)) }
+        return h
+    }
+
     /// Whether a connection's path is a remote one: anything that isn't the
     /// local network or this same machine (VQ-001: a simulator on the Mac
     /// reaches it over loopback and must be able to pair).
-    public static func isRemotePath(link: LinkKind, remoteHost: String?) -> Bool {
-        pathClass(link: link, remoteHost: remoteHost) == .remote
+    public static func isRemotePath(link: LinkKind, remoteHost: String?, ownAddresses: Set<String> = []) -> Bool {
+        pathClass(link: link, remoteHost: remoteHost, ownAddresses: ownAddresses) == .remote
     }
 
     /// The Mac's decision for a connection, given the pairing decision and

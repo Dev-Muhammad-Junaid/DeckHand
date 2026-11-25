@@ -363,10 +363,12 @@ public struct LoomPeerIdentityPin: Hashable, Sendable {
 public struct LoomPeerAdvertisement: Sendable, Hashable {
     public let deviceID: UUID?
     public let identityKeyID: String?
+    public let metadata: [String: String]
 }
 public struct LoomPeerSnapshot: Identifiable, Hashable, Sendable {
     public let id: LoomPeerID
     public let name: String
+    public let deviceType: DeviceType
     public let isNearby: Bool
     public let advertisement: LoomPeerAdvertisement
     public var deviceID: UUID { id.deviceID }

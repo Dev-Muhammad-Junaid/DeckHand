@@ -105,19 +105,24 @@ public enum CaptureSheetChrome {
         message == LockPolicy.lockedErrorMessage
     }
 
-    /// The alert title for a failed capture or mirror.
-    public static func errorTitle(message: String, isMirror: Bool) -> String {
-        if isLockedRefusal(message) { return "Mac Is Locked" }
-        return isMirror ? "Live Screen Unavailable" : "Screenshot Failed"
+    /// The alert title for a failed capture or mirror. Sentence case, like
+    /// the lock banner (build 19).
+    public static func errorTitle(message: String, isMirror: Bool, macLocked: Bool = false) -> String {
+        if macLocked || isLockedRefusal(message) { return "Mac is locked" }
+        return isMirror ? "Live screen unavailable" : "Screenshot failed"
     }
 
-    /// The alert body. The locked refusal says what to do; everything else
-    /// is the Mac's own message.
-    public static func errorMessage(message: String, isMirror: Bool) -> String {
-        guard isLockedRefusal(message) else { return message }
-        return isMirror
-            ? "Unlock the Mac to see its screen. Pixel Hand never shows the lock screen."
-            : "Unlock the Mac to take a screenshot. Pixel Hand never captures the lock screen."
+    /// The alert body. A locked Mac (the refusal, or the remote's own lock
+    /// state) says what to do; anything else is the Mac's sentence, or our
+    /// own copy when it is a raw system error (`UserFacingError`).
+    public static func errorMessage(message: String, isMirror: Bool, macLocked: Bool = false) -> String {
+        if macLocked || isLockedRefusal(message) {
+            return isMirror
+                ? "Unlock the Mac to see its screen. Pixel Hand never shows the lock screen."
+                : "Unlock the Mac to take a screenshot. Pixel Hand never captures the lock screen."
+        }
+        return UserFacingError.sentence(from: message)
+            ?? CaptureFailure.captureFailed.message(isMirror: isMirror)
     }
 
     /// The window picker's empty state, which is also what a locked Mac

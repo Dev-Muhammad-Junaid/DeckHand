@@ -4,7 +4,9 @@
 //
 //  Where the floating screen tile may sit over a surface. The Pointer
 //  surface reserves its click strip, its caption row and the keyboard
-//  button; the tile is anchored to the pad's top-trailing corner, and every
+//  button; the Deck surface reserves its header (build 19). The tile is
+//  anchored to the pad's top-trailing corner (or, on the Deck, the
+//  canvas below the header), and every
 //  drag and pinch is clamped so the tile stays inside the canvas and clear
 //  of those areas (polish spec: the tile never covers a control).
 //
@@ -45,8 +47,41 @@ public enum MirrorTilePlacement {
         return areas
     }
 
-    /// The tile's resting frame: top-trailing in `anchor` (the pad, or the
-    /// canvas when the surface has no pad), `homeInset` from both edges.
+    /// The tile's home anchor and the areas it keeps clear of, for
+    /// whichever surface reported its parts (all in the canvas's space).
+    ///
+    /// - Pointer: anchored to the pad; clear of the click strip, the
+    ///   caption row and the keyboard button (`pointerKeepOut`).
+    /// - Deck: clear of the deck header (page name, counter, pin and Edit;
+    ///   Undo, the page menu and Done while editing), reported across the
+    ///   deck's width so the tile doesn't jump as the counter comes and
+    ///   goes. Without a pad, the tile's home is the canvas below the
+    ///   header (build 19: on iPhone the tile sat on the counter, pin and
+    ///   Edit, and `ph.deck.edit` wasn't hittable).
+    /// - With both (an iPad showing the pad and the deck column), the pad
+    ///   stays the anchor and every area is kept clear.
+    public static func surfaceLayout(
+        bounds: MirrorRect,
+        pad: MirrorRect? = nil,
+        clickStrip: MirrorRect? = nil,
+        caption: MirrorRect? = nil,
+        keyboard: MirrorRect? = nil,
+        deckHeader: MirrorRect? = nil
+    ) -> (anchor: MirrorRect?, keepOut: [MirrorRect]) {
+        var keepOut = pointerKeepOut(pad: pad, clickStrip: clickStrip, caption: caption, keyboard: keyboard)
+        if let deckHeader { keepOut.append(deckHeader) }
+        if let pad { return (pad, keepOut) }
+        if let deckHeader {
+            let top = min(max(deckHeader.y + deckHeader.height, bounds.y), bounds.y + bounds.height)
+            let below = MirrorRect(x: bounds.x, y: top, width: bounds.width, height: bounds.y + bounds.height - top)
+            return (below, keepOut)
+        }
+        return (nil, keepOut)
+    }
+
+    /// The tile's resting frame: top-trailing in `anchor` (the pad, the
+    /// canvas below the deck header, or the canvas; `surfaceLayout`),
+    /// `homeInset` from both edges.
     public static func home(width: Double, height: Double, anchor: MirrorRect) -> MirrorRect {
         MirrorRect(
             x: anchor.x + anchor.width - homeInset - width,

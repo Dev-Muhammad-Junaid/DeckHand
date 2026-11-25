@@ -67,6 +67,31 @@ public enum ShellHeaderPlan {
     public static func pillNameLines(band: TypeBand) -> Int {
         band == .huge ? 2 : 1
     }
+
+    /// Ways to set the Mac's name on `lines` lines, breaking only between
+    /// words, best first. The view (`ViewThatFits`) shows the first whose
+    /// lines each fit on one line; the last is the fallback, and each of
+    /// its lines truncates at the tail. So a name never hyphenates
+    /// ("Muham- / mad’s Mac…", build 19, VQ-065): it reads "Muhammad’s /
+    /// MacBook Pro", or "Muhammad’s / MacBook P…".
+    ///
+    /// - One line: the whole name.
+    /// - Two lines: the whole name, then the first line taking as many
+    ///   words as it can (all but one, down to one), the rest underneath.
+    ///   A one-word name has only itself.
+    public static func pillNameCandidates(_ name: String, lines: Int) -> [[String]] {
+        let words = name.split(whereSeparator: \.isWhitespace).map(String.init)
+        let whole = words.joined(separator: " ")
+        guard lines >= 2, words.count >= 2 else { return [[whole]] }
+        var candidates = [[whole]]
+        for split in stride(from: words.count - 1, through: 1, by: -1) {
+            candidates.append([
+                words[..<split].joined(separator: " "),
+                words[split...].joined(separator: " "),
+            ])
+        }
+        return candidates
+    }
 }
 
 /// How the deck's page header lays out in its column.

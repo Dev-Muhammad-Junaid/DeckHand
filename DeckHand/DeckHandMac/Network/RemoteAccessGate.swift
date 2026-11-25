@@ -3,8 +3,8 @@
 //  DeckHandMac
 //
 //  S15: connections that arrive over a VPN, an overlay address or cellular
-//  are admitted only for paired devices. Loopback (a simulator on this
-//  Mac) counts as local (VQ-001). No Allow prompt and no
+//  are admitted only for paired devices. Loopback and the Mac's own
+//  addresses (a simulator on this Mac) count as local (VQ-001). No Allow prompt and no
 //  pairing code from outside the local network: `RemoteAccessPolicy`
 //  (PixelHandCore) decides from the link and the peer's address; this file
 //  only reads the path Loom reports for the new connection.
@@ -52,9 +52,16 @@ enum RemoteAccessGate {
         if remoteHost == nil, let authenticated = session as? LoomAuthenticatedSession {
             remoteHost = await authenticated.backendRemoteEndpoint?.hostPort?.host.rawValue
         }
-        let isRemote = RemoteAccessPolicy.isRemotePath(link: link, remoteHost: remoteHost)
-        if RemoteAccessPolicy.pathClass(link: link, remoteHost: remoteHost) == .sameMachine {
-            DeckHandLog.trust.info("🔑 conn=\(handle.id, privacy: .public) is on this Mac (loopback, e.g. a simulator): local rules apply")
+        // VQ-001: a simulator dials the Mac's own Wi-Fi address, which the
+        // kernel carries over lo0; matching the Mac's own addresses (and
+        // the loopback link) makes that the same machine.
+        let ownAddresses = await Task.detached(priority: .utility) {
+            Set(InterfaceAddressTable.current().keys)
+        }.value
+        let pathClass = RemoteAccessPolicy.pathClass(link: link, remoteHost: remoteHost, ownAddresses: ownAddresses)
+        let isRemote = pathClass == .remote
+        if pathClass == .sameMachine {
+            DeckHandLog.trust.info("🔑 conn=\(handle.id, privacy: .public) is on this Mac (loopback or its own address, e.g. a simulator): local rules apply")
         }
         return PathVerdict(link: link, remoteHost: remoteHost, isRemote: isRemote)
     }

@@ -63,11 +63,18 @@ struct DeckSurface: View {
             )
             if isUnlocked {
                 VStack(spacing: PixelHandTheme.Space.md) {
-                    if model.isEditing {
-                        editHeader(grid: grid, plan: plan)
-                    } else {
-                        header(grid: grid, plan: plan)
+                    Group {
+                        if model.isEditing {
+                            editHeader(grid: grid, plan: plan)
+                        } else {
+                            header(grid: grid, plan: plan)
+                        }
                     }
+                    // The whole header row, centred as before: the floating
+                    // screen tile keeps clear of its counter, pin and Edit
+                    // (build 19, `MirrorTilePlacement.surfaceLayout`).
+                    .frame(maxWidth: .infinity)
+                    .mirrorTileKeepOut(.deckHeader, owner: sender)
                     pager(grid: grid, asRows: asRows)
                     pageDots
                 }

@@ -336,6 +336,52 @@ final class PixelHandUITests: XCTestCase {
         sleep(1)
     }
 
+    // MARK: - Build 19 fixes
+
+    /// Bug 2 (build 19): on iPhone the floating screen tile covered the
+    /// deck header, and `ph.deck.edit` wasn't hittable. Starts the mirror
+    /// from the Screen tab, goes to Deck, and records whether the header's
+    /// pin and Edit can be tapped (`not-hittable-…` screenshots if not).
+    func test14_DeckWithMirror() {
+        launch()
+        guard connect() else { return }
+        guard tapIfExists("ph.tab.screen") else { return }
+        let show = app.buttons["Show screen"].firstMatch
+        if show.waitForExistence(timeout: 1), show.isHittable { show.tap() }
+        sleep(3)
+        snap("mirror-running")
+        guard tapIfExists("ph.tab.deck") else { return }
+        sleep(2)
+        snap("deck-with-tile")
+        for id in ["ph.deck.pin", "ph.deck.edit"] {
+            let el = element(id)
+            if el.waitForExistence(timeout: 2), !el.isHittable { snap("not-hittable-\(id)") }
+        }
+        if tapIfExists("ph.deck.edit") {
+            sleep(1)
+            snap("deck-edit-with-tile")
+            tapIfExists("ph.deck.done")
+        }
+    }
+
+    /// VQ-001 (build 19): an unpaired simulator pairs by code instead of
+    /// being refused as "remote path (loopback)". Needs PH_QA_PAIRCODE_FILE
+    /// and a simulator the Mac doesn't know (Forget it in the Mac panel, or
+    /// erase the simulator). Records `refused` if the Mac still refuses.
+    func test15_PairUnpairedSimulatorByCode() {
+        guard pairingCode() != nil else {
+            snap("skipped-no-PH_QA_PAIRCODE_FILE")
+            return
+        }
+        launch()
+        let refused = element("ph.authorization.dismiss")
+        if connect() {
+            snap("paired-and-connected")
+        } else if refused.exists {
+            snap("refused")
+        }
+    }
+
     // MARK: - Helpers
 
     /// Opens Ask: the tab bar's Ask on compact windows, the Ask field or

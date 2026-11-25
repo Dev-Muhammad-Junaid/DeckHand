@@ -70,21 +70,12 @@ final class CaptureHandler: DomainHandler {
                 payload = try await ScreenCaptureService.shared.captureWindowJPEG(windowID: windowID)
             }
             try await handle.send(.capture(.screenshotData(requestID: requestID, data: payload)))
-        } catch ScreenCaptureService.CaptureError.permissionDenied {
-            await sendError(requestID: requestID, to: handle,
-                            message: "Screen Recording permission required. Please allow Pixel Hand in System Settings > Privacy & Security > Screen Recording, then try again.")
-        } catch ScreenCaptureService.CaptureError.noDisplay {
-            await sendError(requestID: requestID, to: handle, message: "Display capture failed. No displays found.")
-        } catch ScreenCaptureService.CaptureError.windowNotFound {
-            await sendError(requestID: requestID, to: handle,
-                            message: "That window has closed. Refresh the window list and try again.")
-        } catch ScreenCaptureService.CaptureError.captureFailed(let detail) {
-            await sendError(requestID: requestID, to: handle, message: "Capture failed: \(detail)")
-        } catch ScreenCaptureService.CaptureError.encodeFailed {
-            await sendError(requestID: requestID, to: handle, message: "Image compression failed.")
         } catch {
-            await sendError(requestID: requestID, to: handle,
-                            message: "Unexpected capture error: \(error.localizedDescription)")
+            // A sentence for the remote's alert, never the raw error
+            // (build 19); "The Mac is locked." while it is locked.
+            DeckHandLog.app.error("Screenshot failed: \(error.localizedDescription, privacy: .public)")
+            let failure = CaptureFailure.reported(for: error)
+            await sendError(requestID: requestID, to: handle, message: failure.message(isMirror: false))
         }
     }
 
@@ -96,11 +87,13 @@ final class CaptureHandler: DomainHandler {
             // Window enumeration failures share the same TCC requirement as
             // capture, so route them through the same error channel — the
             // iPad already knows how to surface this copy.
-            await sendError(
-                requestID: requestID,
-                to: handle,
-                message: "Couldn't read window list: \(error.localizedDescription)"
+            DeckHandLog.app.error("Window list failed: \(error.localizedDescription, privacy: .public)")
+            let cause = CaptureFailure.cause(of: error)
+            let failure = CaptureFailure.reported(
+                for: nil,
+                fallback: cause == .screenRecordingDenied ? cause : .windowListFailed
             )
+            await sendError(requestID: requestID, to: handle, message: failure.message(isMirror: false))
         }
     }
 

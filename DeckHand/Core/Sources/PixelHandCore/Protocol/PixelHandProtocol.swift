@@ -57,9 +57,18 @@ public enum PixelHandProtocol {
     /// stay under 9 bytes.
     public static let advertisementKey = "ph-proto"
 
-    /// What each app passes as `LoomContainerConfiguration.advertisementMetadata`.
+    /// The protocol version alone, as builds before `ph-role` advertised it.
     public static var advertisementMetadata: [String: String] {
         [advertisementKey: String(version)]
+    }
+
+    /// What each app passes as `LoomContainerConfiguration.advertisementMetadata`:
+    /// the protocol version and which side it is (`PeerRole`), so a remote
+    /// lists only Macs.
+    public static func advertisementMetadata(role: PeerRole) -> [String: String] {
+        var metadata = advertisementMetadata
+        metadata[PeerRole.advertisementKey] = role.rawValue
+        return metadata
     }
 
     /// The app protocol version a peer advertised, or `nil` when it didn't
