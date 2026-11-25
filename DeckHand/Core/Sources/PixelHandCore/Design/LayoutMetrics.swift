@@ -41,8 +41,13 @@ public struct LayoutMetrics: Sendable, Hashable {
     public static let mediumUpperBound: Double = 900
     public static let shortUpperBound: Double = 500
 
-    /// Fixed column widths on wide layouts (`07-Polish-Spec.md` §1).
-    public static let sidebarWidth: Double = 232
+    /// Fixed column widths on wide layouts (`07-Polish-Spec.md` §1). The
+    /// Macs sidebar only switches Macs, so it is narrow (176, its 16 pt
+    /// leading margin included) with compact Mac cards, and the canvas gets
+    /// the room (OR-04; it was 232).
+    public static let sidebarWidth: Double = 176
+    /// The sidebar's leading margin, inside `sidebarWidth`.
+    public static let sidebarLeadingMargin: Double = 16
     public static let deckColumnWidth: Double = 336
     /// Key size inside the wide deck column (3 × 96 + 2 × 12 + 2 × 12 inset).
     public static let wideKeySize: Double = 96
