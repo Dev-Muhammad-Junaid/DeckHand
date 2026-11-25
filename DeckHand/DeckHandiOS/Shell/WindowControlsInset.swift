@@ -5,9 +5,9 @@
 //  How far Stage Manager's window controls (close, minimise, full screen;
 //  iPadOS 26) reach into the top-leading corner of this view, so the shell
 //  header can start after them instead of under them (build 18 QA,
-//  VQ-080). Reads UIKit's corner-adapted safe area: the difference between
-//  `.safeArea(cornerAdaptation: .horizontal)` and the plain safe area is
-//  the controls' width. 0 on iOS 17–18, full screen, and iPhone.
+//  VQ-080). Reads UIKit's corner-adapted safe area: the gap between the
+//  `.safeArea(cornerAdaptation: .horizontal)` layout guide and the plain
+//  safe-area guide is the controls' width. 0 on iOS 17–18, full screen, and iPhone.
 //
 
 import SwiftUI
@@ -50,10 +50,14 @@ struct WindowControlsInset: UIViewRepresentable {
         private func measure() -> CGFloat {
             #if compiler(>=6.2)
             if #available(iOS 26.0, *) {
-                let adapted = directionalEdgeInsets(for: .safeArea(cornerAdaptation: .horizontal))
-                let plain = safeAreaInsets
-                let leadingPlain = effectiveUserInterfaceLayoutDirection == .rightToLeft ? plain.right : plain.left
-                return max(0, adapted.leading - leadingPlain)
+                // The corner-adapted guide starts after the window controls;
+                // the plain safe-area guide doesn't.
+                let adapted = layoutGuide(for: .safeArea(cornerAdaptation: .horizontal)).layoutFrame
+                let plain = safeAreaLayoutGuide.layoutFrame
+                let inset = effectiveUserInterfaceLayoutDirection == .rightToLeft
+                    ? plain.maxX - adapted.maxX
+                    : adapted.minX - plain.minX
+                return max(0, inset)
             }
             #endif
             return 0

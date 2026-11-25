@@ -75,7 +75,7 @@ struct AppDock: View {
                     }
                     .scrollTargetLayout()
                 }
-                .contentMargins(.horizontal, AppDockFit.inset, for: .scrollContent)
+                .contentMargins(.horizontal, CGFloat(AppDockFit.inset), for: .scrollContent)
                 // Rests on whole icons; the row shows whole slots only, and
                 // fades its end when more apps wait past it.
                 .scrollTargetBehavior(.viewAligned)

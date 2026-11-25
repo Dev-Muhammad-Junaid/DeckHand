@@ -57,7 +57,7 @@ struct DeckSurface: View {
             let grid = DeckGrid.pane(width: proxy.size.width, height: proxy.size.height, band: band)
             let asRows = band == .huge
             let plan = DeckHeaderPlan(
-                width: Double(proxy.size.width - grid.leadingMargin - grid.trailingMargin),
+                width: Double(proxy.size.width) - Double(grid.leadingMargin) - Double(grid.trailingMargin),
                 band: band,
                 pageCount: pages.count
             )
