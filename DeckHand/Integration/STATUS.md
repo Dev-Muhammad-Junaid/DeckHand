@@ -1212,4 +1212,64 @@ Screen widget, Control Center and Stage Manager windows on the iPad.)
   portrait, landscape, and a Stage Manager window dragged down to iPhone
   width, instead of separate iPhone simulators.
 
-Status: BUILT (build 18) — green
+
+## Build 19 queued (2026-11-25)
+
+Build 19 is build 18 plus the three QA fix lanes from
+`VISUAL-QA-build18.md` (82 findings), merged at `7679a07`:
+
+- **A, surfaces** (`LANE-qa-surfaces.md`): header circles fold into More
+  by width and text size, two-row deck header, Stage Manager window
+  controls inset, iPhone Screen tab starts the mirror with the pad under
+  it, keyboard layout, AX3 scrolling, onboarding on iPad and Duo.
+  `PHButtonStyle` inline buttons are now one line at label width, which
+  changes every screen.
+- **B, flows** (`LANE-qa-flows.md`): **VQ-001 loopback counts as this
+  Mac**, so a simulator on the build Mac can connect and pair (see
+  `MAC-BUILD.md` › Simulators). Pairing codes are now **eight digits**
+  with a check digit, plus `pairing.refused(reason:)`. **Protocol 14: the
+  Mac and the iPad/iPhone must both run build 19.** Also the reconnect
+  toast, the paywall opening from Settings, Diagnostics, and Mac panel
+  focus and copy.
+- **C, identity** (`LANE-qa-identity.md`): Settings restyle (glyph
+  headers, cobalt switches, page sheet on iPad), widget strip text, Lock
+  Screen widgets, Control Center dot-glyph custom symbols (new
+  `.symbolset` assets in the widget extension; **run `xcodegen generate`**).
+
+Integration also added `SettingsDiagnosticsSection()` to `SettingsView`,
+with a glyph header.
+
+Linux: Core **916 / 916 pass** (165 suites); `linux-typecheck/run.sh`
+passes.
+
+**Compile risks.** Each handoff lists them, most likely first. The
+likeliest are:
+- `WindowControlsInset` (`.safeArea(cornerAdaptation:)`);
+- `.onGeometryChange` in `ShellHeader`;
+- the `DeckSurface` restructure;
+- `PairingCodeEntryView`;
+- the `MacMenuBarView` focus sink;
+- the generated `.symbolset` SVGs. If Xcode rejects them, re-export one
+  from the SF Symbols app.
+
+**Mac should check:**
+1. The build and the tests.
+2. Install on the Mac and the iPad.
+3. Boot the iPad Pro 11" simulator and pair it with the Mac over loopback
+   (the VQ-001 re-check).
+4. Run the `PixelHandUITests` walks on the iPad Pro 11" and the iPhone 17
+   Pro, plus the free-plan walk (`TEST_RUNNER_PH_QA_FREE=1`) and AX3. The
+   walks now tap `ph.deck.done` and `ph.connect.pair`.
+5. Work through the re-check steps in the three handoffs and mark each VQ
+   ID as pass, fail or not checked in "Mac build results (build 19)".
+
+**Left open by the lanes:**
+- VQ-054 Diagnostics: was waiting for the Settings line, now added.
+- VQ-069: the fallback.
+- VQ-079: Pointer layout.
+- Owner items OR-01, OR-02, OR-04, OR-05, OR-06 and OR-08 to OR-13 were
+  partly or not covered.
+
+See each handoff's table.
+
+Status: READY FOR MAC BUILD (build 19)
