@@ -1397,6 +1397,30 @@ landscape, Stage Manager at iPhone width) and re-check OR-03 to OR-06 and
 OR-10 to OR-13 against each lane's table; install on Mac and iPad.
 
 
+## Mac build results (build 20) — 2026-11-25
+
+Built from `537e21c` while builds 21 and 22 were being queued; superseded
+by build 22, which is being built next. Recorded for the OR re-checks.
+
+- **Build:** Mac, iOS with both extensions, and the simulator test build
+  all build first time; no fixes.
+- **Tests:** Core 970 / 970; Loom 477 pass, 0 failed, no `--skip`;
+  `DeckHandTests` 8 / 8. `PixelHandUITests` on iPad Pro 11": 13 / 13 ran
+  with Pro and 13 / 13 on the free plan.
+- **Install:** Mac replaced and launched with `open`; iPad installed and
+  launched.
+- **OR-02:** pass (no dot row under chips).
+- **OR-03:** pass (free Ask is the dimmed field with the small lock).
+- **OR-06:** pass (Deck | Ask switch, Ask in the column, collapse to the
+  edge handle and back).
+- **Not checked:** OR-04/OR-05 (the walks never showed the Macs sidebar),
+  landscape and Stage Manager at iPhone width (captures come out rotated;
+  the walk can't resize a window), OR-08 to OR-13 (Mac panel).
+- **Bug (P3):** iPad Pro 11" portrait, Pointer with the keyboard panel
+  open, squeezes the right column's deck empty state into a thin cobalt
+  bar showing only "•••". Hide its text and button, or fold the column,
+  when there isn't room.
+
 ## Build 21 queued (2026-11-25, replaces build 20)
 
 Build 20 (the three owner-review lanes) was not built yet. **Build 21 is
