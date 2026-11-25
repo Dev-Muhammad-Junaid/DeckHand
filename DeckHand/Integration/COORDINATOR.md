@@ -1,8 +1,8 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Build 19 queued** (QA lanes A/B/C merged; protocol 14). **Owner review round running**: lanes or-ios-chrome, or-canvas, or-mac-panel (briefs in `BRIEF-or-*.md`). Merge them, then queue build 20. OR-16 waits for the owner's answers.
+> **Build 21 queued** (build 20's owner-review lanes plus build19-fixes). **OR-16 lane running** (the primary started it; answers are in DECISIONS.md). When it is ready: merge it, then queue build 22, then the visual QA re-run, then the review page.
 
-> **Mac builds:** build 16 is green (2026-11-24). Build 17 (Unlock Pro for testing, from the primary session) is queued. The primary session or the owner's Mac session runs Mac builds.
+> **Mac builds:** 15, 16, 18 and 19 built (19 with 5 bugs, fixed in build 21). The primary session or the owner's Mac session runs Mac builds.
 
 ## Needs the owner
 
@@ -28,9 +28,7 @@ weekly usage limit is close).
 | --- | --- | --- | --- |
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac) — **archived since 2026-11-18; start a new Mac session** | session_01H5HwATvLJkqCFPruLyBsX8 (archived) | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
-| Owner review: iOS chrome + glyph rule (OR-01, 02, 05, 12 iOS; VQ-069/079 rest) | session_01H5HwAVd91iSNN88o6K99eH | claude/pixelhand-lane-or-ios-chrome | `LANE-or-ios-chrome.md` ends `Lane: READY TO MERGE` |
-| Owner review: canvas (OR-04 sidebar, OR-06 right column Deck/Ask, OR-03 rest) | session_01H5HwAVASudiwPDAUdaPRid | claude/pixelhand-lane-or-canvas | `LANE-or-canvas.md` ends `Lane: READY TO MERGE` |
-| Owner review: Mac panel (OR-08 to OR-13) | session_01H5HwAV2mHoPQntpo2xFFmK | claude/pixelhand-lane-or-mac-panel | `LANE-or-mac-panel.md` ends `Lane: READY TO MERGE` |
+| OR-16 pointer control on the mirror picture (started by the primary) | session_01H5HwAV5BuMCmxP29N5KVct | claude/pixelhand-lane-or16-picture-pointer | `LANE-or16-picture-pointer.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -196,4 +194,10 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   (branch `claude/pixelhand-lane-build19-fixes`); merge it as build 21.
 - 2026-11-25: owner answered OR-16 (recommendations; see DECISIONS.md).
   Primary session started lane `claude/pixelhand-lane-or16-picture-pointer`.
-
+- 2026-11-25 02:20 UTC: the primary reported three things, all confirmed in
+  the repo: it merged the three owner-review lanes (build 20, `8b1c250`),
+  recorded the OR-16 answers, and started the build19-fixes and OR-16 lanes.
+  I merged build19-fixes. Core has 992 tests, all passing, and the type check
+  passes. **Build 21 queued** (`c993044`), replacing build 20, which was not
+  built. Next: the OR-16 lane, then build 22, the visual QA re-run and the
+  review page.
