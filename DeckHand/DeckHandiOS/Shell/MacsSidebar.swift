@@ -20,23 +20,25 @@ struct MacsSidebar: View {
     let onOpenMacs: () -> Void
 
     private let switcher = MacSwitcher.shared
+    /// Stage Manager's window controls, so the title row starts after them
+    /// like the header does (OR-05, VQ-080).
+    @State private var windowControlsInset: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: PixelHandTheme.Space.md) {
+            // OR-05: the hide button leads the row, in the spot the header's
+            // show button takes while the sidebar is hidden.
             HStack(spacing: PixelHandTheme.Space.sm) {
+                SidebarToggleButton(sidebarShown: true, action: onCollapse)
                 Text("Macs")
                     .font(.phDisplay())
                     .foregroundStyle(PixelHandTheme.ink)
                     .accessibilityAddTraits(.isHeader)
                 Spacer(minLength: 0)
-                GlassCircleButton(
-                    glyph: PixelGlyphs.sidebar,
-                    label: "Hide the Macs sidebar",
-                    size: PixelHandTheme.ControlHeight.secondary,
-                    action: onCollapse
-                )
             }
-            .frame(height: PixelHandTheme.ControlHeight.standard)
+            .padding(.leading, windowControlsInset)
+            .frame(height: CGFloat(SidebarTogglePlacement.rowHeight))
+            .background { WindowControlsInset(inset: $windowControlsInset) }
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: PixelHandTheme.Space.md) {
@@ -67,7 +69,7 @@ struct MacsSidebar: View {
             }
             .scrollBounceBehavior(.basedOnSize)
         }
-        .padding(.leading, PixelHandTheme.Space.xl)
+        .padding(.leading, CGFloat(SidebarTogglePlacement.sidebarLeadingPadding))
         .padding(.bottom, PixelHandTheme.Space.lg)
         .frame(width: CGFloat(LayoutMetrics.sidebarWidth), alignment: .topLeading)
         .frame(maxHeight: .infinity, alignment: .top)

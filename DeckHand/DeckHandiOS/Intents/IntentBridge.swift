@@ -33,6 +33,9 @@ final class IntentBridge {
 
     struct SurfaceRequest: Equatable {
         let surface: ControlSurface
+        /// What was asked for, for the arrangement on preset windows
+        /// (VQ-079, `RemoteSurface.arrangement(from:)`).
+        let requested: RemoteSurface
         let id = UUID()
     }
 
@@ -199,7 +202,7 @@ final class IntentBridge {
         case .deck: .deck
         case .screen: .screen
         }
-        surfaceRequest = SurfaceRequest(surface: target)
+        surfaceRequest = SurfaceRequest(surface: target, requested: surface)
     }
 }
 
@@ -213,9 +216,10 @@ extension View {
     }
 
     /// Switches `selection` when an intent asks for a surface
-    /// (`PixelHandShell`).
-    func intentSurfaceRequests(selection: Binding<ControlSurface>) -> some View {
-        modifier(IntentSurfaceModifier(selection: selection))
+    /// (`PixelHandShell`). On a window that arranges by preset, pass
+    /// `preset` too: "Trackpad" then opens the Pointer arrangement (VQ-079).
+    func intentSurfaceRequests(selection: Binding<ControlSurface>, preset: Binding<LayoutPreset>? = nil) -> some View {
+        modifier(IntentSurfaceModifier(selection: selection, preset: preset))
     }
 }
 
@@ -238,6 +242,11 @@ private struct IntentBridgeModifier: ViewModifier {
 
 private struct IntentSurfaceModifier: ViewModifier {
     @Binding var selection: ControlSurface
+    var preset: Binding<LayoutPreset>?
+
+    /// The last request applied, so a window that comes back (or a
+    /// layout that changes form) doesn't re-apply an old one.
+    @State private var appliedID: UUID?
 
     func body(content: Content) -> some View {
         content
@@ -246,7 +255,13 @@ private struct IntentSurfaceModifier: ViewModifier {
     }
 
     private func apply(_ request: IntentBridge.SurfaceRequest?) {
-        guard let request, selection != request.surface else { return }
-        selection = request.surface
+        guard let request, request.id != appliedID else { return }
+        appliedID = request.id
+        if let preset, let arrangement = request.requested.arrangement(from: preset.wrappedValue) {
+            preset.wrappedValue = arrangement
+        }
+        if selection != request.surface {
+            selection = request.surface
+        }
     }
 }

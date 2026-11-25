@@ -111,9 +111,22 @@ struct PeerPickerView: View {
         .task(id: peers.isEmpty) {
             showsChecks = false
             guard peers.isEmpty, startError == nil else { return }
-            try? await Task.sleep(for: .seconds(10))
+            try? await Task.sleep(for: .seconds(LANFallbackPlan.checksDelay))
             guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.2)) { showsChecks = true }
+            withAnimation(PixelHandMotion.panelFade(reduceMotion: reduceMotion)) { showsChecks = true }
+        }
+        .task(id: peers.isEmpty) {
+            // VQ-069: while Bonjour is quiet, look again on a schedule. Each
+            // refresh restarts the browse and probes the paired Macs' saved
+            // VPN hosts and last LAN addresses (`LastLANStore`); a paired
+            // Mac that answers appears here and dials pinned to its key.
+            for gap in LANFallbackPlan.refreshGaps {
+                guard LANFallbackPlan.shouldRefresh(peersListed: !peers.isEmpty, discoveryRunning: startError == nil) else { return }
+                try? await Task.sleep(for: .seconds(gap))
+                guard !Task.isCancelled, peers.isEmpty else { return }
+                DeckHandLog.connection.info("📡 No Mac listed yet; refreshing discovery and probing saved addresses")
+                await loomContext.refreshPeers()
+            }
         }
         // The picker is a branded surface, not a system one: it stays dark
         // regardless of the appearance preference, the same way the icon does.
@@ -207,7 +220,7 @@ struct PeerPickerView: View {
         }
 
         return VStack(spacing: PixelHandTheme.Space.md) {
-            ForEach(Array(orderedPeers.enumerated()), id: \.element.id) { index, peer in
+            ForEach(orderedPeers, id: \.id) { peer in
                 PeerCard(
                     peer: peer,
                     isPaired: pairing.isPaired(deviceID: peer.deviceID),
@@ -217,13 +230,10 @@ struct PeerPickerView: View {
                     connectTo(peer)
                 }
                 .freeMacBadge(deviceID: peer.deviceID) // Store lane
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
-                .animation(
-                    reduceMotion
-                        ? .easeOut(duration: 0.2)
-                        : .spring(duration: 0.38, bounce: 0.14).delay(Double(index) * 0.05),
-                    value: orderedPeers.count
-                )
+                // Glyph rule: rows fade in, never rise from the bottom;
+                // Reduce Motion is instant.
+                .transition(.opacity)
+                .phPanelFade(value: orderedPeers.count)
             }
         }
         .padding(.horizontal, PixelHandTheme.Space.lg)
@@ -327,7 +337,7 @@ struct PeerPickerView: View {
         PHToast(message: message, isFailure: true)
             .padding(.horizontal, PixelHandTheme.Space.xl)
             .padding(.top, PixelHandTheme.Space.md)
-            .transition(.opacity.combined(with: .scale(scale: 0.96)))
+            .transition(.opacity)
     }
 
     /// Not a repeat of the body sentence (VQ-044): a way to the checks
@@ -336,7 +346,7 @@ struct PeerPickerView: View {
     private var footer: some View {
         if !peers.isEmpty, !showsChecks {
             Button {
-                withAnimation(.easeOut(duration: 0.2)) { showsChecks = true }
+                withAnimation(PixelHandMotion.panelFade(reduceMotion: reduceMotion)) { showsChecks = true }
             } label: {
                 HStack(spacing: PixelHandTheme.Space.sm) {
                     PHGlyph(glyph: PixelGlyphs.wifi, pitch: CGFloat(PixelPitch.badge), stepsWithType: true)
@@ -413,14 +423,14 @@ struct PeerPickerView: View {
     }
 
     private func showError(_ message: String) {
-        withAnimation(.easeOut(duration: 0.22)) {
+        withAnimation(PixelHandMotion.panelFade(reduceMotion: reduceMotion)) {
             errorMessage = message
         }
         Task {
             try? await Task.sleep(for: .seconds(4))
             // Only clear this message, not a newer one shown since.
             guard errorMessage == message else { return }
-            withAnimation(.easeOut(duration: 0.22)) { errorMessage = nil }
+            withAnimation(PixelHandMotion.panelFade(reduceMotion: reduceMotion)) { errorMessage = nil }
         }
     }
 }

@@ -224,18 +224,12 @@ struct QuickActionsBar: View {
                 chipDivider
                 numpadChips
                     .id("numpad-row")
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                        removal: .opacity
-                    ))
+                    .transition(.opacity) // Glyph rule: rows fade, never slide.
             } else if let kind = textEditRowKind {
                 chipDivider
                 textFieldChips(kind)
                     .id("textfield-\(kind.rawValue)")
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                        removal: .opacity
-                    ))
+                    .transition(.opacity) // Glyph rule: rows fade, never slide.
             }
         }
     }

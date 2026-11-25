@@ -112,7 +112,7 @@ struct DialogButtonChip: View {
                             .strokeBorder(stroke, lineWidth: 1)
                     )
             )
-            .deliveryDots(delivery.state)
+            .deliveryReceipt(delivery.state, cornerRadius: 8)
             .scaleEffect(isPressed && !reduceMotion ? 0.93 : 1.0)
             .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isPressed)
         }

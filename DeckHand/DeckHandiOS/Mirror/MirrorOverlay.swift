@@ -165,7 +165,7 @@ struct MirrorDisplayPicker: View {
                     settings.mirrorFollowsCursor = false
                     session.openMirrorWindowPicker()
                 } label: {
-                    Label("Window…", systemImage: "macwindow")
+                    Label("Window", systemImage: "macwindow")
                 }
                 .disabled(!session.canMirrorWindow)
                 if session.mirrorPiPSupported {

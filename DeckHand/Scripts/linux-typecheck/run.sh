@@ -41,6 +41,7 @@ files=(
   "$app/Shared/Pairing+Loom.swift"
   "$app/DeckHandiOS/Pairing/PairedMacsStore.swift"
   "$app/DeckHandiOS/Network/RemoteHostsStore.swift"
+  "$app/DeckHandiOS/Network/LastLANStore.swift"
   "$app/DeckHandiOS/Network/RemoteConnect.swift"
   "$app/DeckHandiOS/Network/RemoteHostTester.swift"
   "$app/DeckHandiOS/TrackpadSender.swift"

@@ -27,12 +27,12 @@ struct CaptureCapsule: View {
             Button {
                 onRegion()
             } label: {
-                Label("Region…", systemImage: "rectangle.dashed.badge.record")
+                Label("Region", systemImage: "rectangle.dashed.badge.record")
             }
             Button {
                 onWindow()
             } label: {
-                Label("Window…", systemImage: "macwindow")
+                Label("Window", systemImage: "macwindow")
             }
             Divider()
             Button {

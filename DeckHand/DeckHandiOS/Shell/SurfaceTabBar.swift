@@ -2,15 +2,15 @@
 //  SurfaceTabBar.swift
 //  DeckHandiOS – Shell
 //
-//  The glass tab bar: Pointer / Screen / Deck with pixel glyphs at pitch 2.6
-//  and a 4 pt lit dot under the selected one, plus the Ask circle in the
-//  search slot. Horizontal at the bottom, or a vertical rail on short, wide
+//  The glass tab bar: Pointer / Screen / Deck with pixel glyphs at pitch 2.6,
+//  plus the Ask circle in the search slot. The selected tab shows by colour
+//  and fill only (accent tint on a `fill2` capsule); no dot under it (OR-01). Horizontal at the bottom, or a vertical rail on short, wide
 //  windows (iPhone landscape). At AX1+ labels drop and long-press shows the
 //  Large Content Viewer.
 //
 //  Drawn by hand rather than with `TabView` so the tabs carry the pixel
 //  glyphs and the layout works the same on iOS 17.4 and 26 (Liquid Glass
-//  via `phGlass`). Board: `.sdock`, `.tabs`, `.ask`, `.tabdot`.
+//  via `phGlass`). Board: `.sdock`, `.tabs`, `.ask`.
 //
 
 import SwiftUI
@@ -23,7 +23,6 @@ struct SurfaceTabBar: View {
 
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Namespace private var selectionSpace
 
     private var showsLabels: Bool { typeSize.typeBand == .standard && axis == .horizontal }
 
@@ -58,7 +57,9 @@ struct SurfaceTabBar: View {
     private func tabButton(_ surface: ControlSurface) -> some View {
         let isOn = selection == surface
         return Button {
-            withAnimation(PixelHandMotion.reduced(PixelHandMotion.standard, reduceMotion: reduceMotion)) {
+            // Colour and fill only: the selected capsule fades in place
+            // (instant under Reduce Motion); no dot, no sliding marker.
+            withAnimation(PixelHandMotion.panelFade(reduceMotion: reduceMotion)) {
                 selection = surface
             }
         } label: {
@@ -77,11 +78,8 @@ struct SurfaceTabBar: View {
                 if isOn {
                     Capsule()
                         .fill(PixelHandTheme.fill2)
-                        .matchedGeometryEffect(id: "selection", in: selectionSpace)
+                        .transition(.opacity)
                 }
-            }
-            .overlay(alignment: .bottom) {
-                if isOn { TabDot().padding(.bottom, 3) }
             }
             .contentShape(Capsule())
         }
@@ -112,20 +110,6 @@ struct SurfaceTabBar: View {
         .accessibilityShowsLargeContentViewer {
             Label { Text("Ask") } icon: { PHGlyph(glyph: PixelGlyphs.ask, pitch: PixelPitch.tabBar) }
         }
-    }
-}
-
-/// The 4 pt selection dot: accent on light, glow on dark.
-private struct TabDot: View {
-    @Environment(\.colorScheme) private var scheme
-
-    var body: some View {
-        let color = scheme == .dark ? PixelHandTheme.Brand.glow : PixelHandTheme.accent
-        RoundedRectangle(cornerRadius: 1, style: .continuous)
-            .fill(color)
-            .frame(width: 4, height: 4)
-            .shadow(color: scheme == .dark ? color : .clear, radius: 2.5)
-            .accessibilityHidden(true)
     }
 }
 

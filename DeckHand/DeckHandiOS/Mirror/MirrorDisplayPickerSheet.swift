@@ -137,7 +137,7 @@ struct MirrorDisplayPickerSheet: View {
 
     private var windowTitle: String {
         if let window = session.mirrorWindowSelection.window { return "Window: \(window.shortLabel)" }
-        return "A window…"
+        return "A window"
     }
 
     private func select(_ display: MirrorArrangedDisplay) {

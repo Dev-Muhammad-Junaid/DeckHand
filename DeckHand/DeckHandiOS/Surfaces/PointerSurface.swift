@@ -84,12 +84,14 @@ struct PointerSurface: View {
                     colorScheme: colorScheme,
                     onActivity: { gestureMap.forget() }
                 )
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .transition(.opacity)
             }
         }
         .padding(.horizontal, margin)
         .padding(.bottom, PixelHandTheme.Space.sm)
-        .animation(PixelHandMotion.reduced(PixelHandMotion.spring, reduceMotion: reduceMotion), value: showKeyboard)
+        // Glyph rule: the keyboard panel fades in 180 ms, never rises from
+        // the bottom; Reduce Motion is instant.
+        .phPanelFade(value: showKeyboard)
     }
 
     // MARK: Pad
@@ -135,8 +137,8 @@ struct PointerSurface: View {
         // The floating screen tile anchors to the pad and keeps clear of the
         // strip, caption and keyboard button (`MirrorTileKeepOut`).
         .mirrorTileKeepOut(.pad, owner: sender)
-        .animation(PixelHandMotion.reduced(PixelHandMotion.standard, reduceMotion: reduceMotion), value: stripShown)
-        .animation(PixelHandMotion.reduced(PixelHandMotion.quick, reduceMotion: reduceMotion), value: caption)
+        .phPanelFade(value: stripShown)
+        .phPanelFade(value: caption)
     }
 
     private var touchSurface: some View {

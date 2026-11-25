@@ -118,7 +118,7 @@ struct TrackpadView: View {
                 )
                 .padding(.horizontal, 20)
                 .padding(.top, 10)
-                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+                .transition(.opacity) // Glyph rule: panels fade, never slide.
             }
 
             // ── Sensitivity slider ────────────────────────────────────

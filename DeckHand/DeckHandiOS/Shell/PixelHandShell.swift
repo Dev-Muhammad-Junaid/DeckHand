@@ -121,9 +121,11 @@ struct PixelHandShell: View {
                 // when the device folds, unfolds or turns.
                 if duoPose.update(input) != nil { dragSize = nil }
             }
+            // Intents lane: "Open Trackpad", "Start Mirror". On preset
+            // windows "Trackpad" also opens the Pointer arrangement (VQ-079).
+            .intentSurfaceRequests(selection: selection, preset: plan.usesPresets ? presetBinding(plan) : nil)
         }
         .duoHingeStatus($hingeStatus)
-        .intentSurfaceRequests(selection: selection) // Intents lane: "Open Trackpad", "Start Mirror"
         .sheet(isPresented: $isAskPresented) {
             AskSheet(session: session, macName: peerName)
         }
@@ -298,7 +300,7 @@ struct PixelHandShell: View {
                     onCollapse: { sidebarCollapsed = true },
                     onOpenMacs: { isMyMacsPresented = true }
                 )
-                .transition(.move(edge: .leading).combined(with: .opacity))
+                .transition(.opacity) // Glyph rule: panels fade, never slide.
             }
 
             // Centre column.
@@ -673,7 +675,7 @@ struct PixelHandShell: View {
         if isKeyboardShown, let sender = session.sender {
             RemoteKeyboardPanel(sender: sender, clipboard: session.clipboard, colorScheme: colorScheme)
                 .padding(.horizontal, margin)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .transition(.opacity) // Glyph rule: panels fade, never slide.
         }
     }
 
