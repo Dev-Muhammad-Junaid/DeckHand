@@ -6,13 +6,6 @@
 
 ## Needs the owner
 
-- **OR-16, pointer control on the mirror picture:** waiting on three answers. The questions and the recommended answers are at the end of `OWNER-REVIEW-visual-qa-build18.md`:
-  1. On or off by default? Recommended: off the first time, then remember the last choice.
-  2. Keep pinch to zoom while control is on? Recommended: yes.
-  3. Trackpad style only, or a touchscreen mode too? Recommended: trackpad style only.
-
-  Not started until the owner answers.
-
 - **Developer portal:** nothing needed. Automatic signing registered the App Group and the widget and share App IDs (builds 15 and 16).
 
 - **App Store Connect:** done 2026-11-20 (see
@@ -201,4 +194,6 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   (resolved MacsSidebar/PixelHandShell conflicts; kept 24 pt padding) and
   or-mac-panel; queued build 20. Started the build 19 fix session
   (branch `claude/pixelhand-lane-build19-fixes`); merge it as build 21.
+- 2026-11-25: owner answered OR-16 (recommendations; see DECISIONS.md).
+  Primary session started lane `claude/pixelhand-lane-or16-picture-pointer`.
 

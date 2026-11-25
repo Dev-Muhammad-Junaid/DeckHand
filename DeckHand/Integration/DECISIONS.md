@@ -3,6 +3,16 @@
 Recorded by the coordinating session ("Deckhand project status review").
 Newest first. If a doc elsewhere disagrees, this file wins.
 
+## 2026-11-25 — OR-16 answers: pointer control on the mirror picture
+The owner chose the recommendations ("go with the recommendations"):
+1. Off the first time the screen-only arrangement opens, then remember the
+   last choice.
+2. Keep pinch to zoom the picture while control is on (two fingers still
+   scroll the Mac).
+3. Trackpad style only (relative movement, same gestures and code as the
+   Pointer surface UX-004). No "tap where you touch" mode for now; it can
+   come later as a setting.
+
 ## 2026-11-24 — "Unlock Pro for testing" switch
 The owner asked for a Settings switch that enables Pro without a
 subscription while the subscriptions aren't live. It sits in
