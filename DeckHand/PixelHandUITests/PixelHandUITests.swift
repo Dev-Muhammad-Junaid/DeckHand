@@ -222,7 +222,7 @@ final class PixelHandUITests: XCTestCase {
     func test07_Ask() {
         launch()
         guard connect() else { return }
-        guard tapIfExists("ph.tab.ask") else { return }
+        guard openAsk() else { return }
         sleep(1)
         snap("ask-empty")
         let field = element("ph.ask.field")
@@ -240,7 +240,7 @@ final class PixelHandUITests: XCTestCase {
             sleep(5)
             snap("ask-example-plan")
         }
-        dismissSheet()
+        closeAsk()
     }
 
     func test08_Capture() {
@@ -293,7 +293,8 @@ final class PixelHandUITests: XCTestCase {
         snap("free-pointer")
         if tapIfExists("ph.tab.deck") { sleep(1); snap("free-deck") }
         if tapIfExists("ph.tab.screen") { sleep(2); snap("free-screen") }
-        if tapIfExists("ph.tab.ask") { sleep(1); snap("free-ask"); dismissSheet() }
+        // OR-03: no upsell card; the field carries the small Pro lock.
+        if openAsk() { sleep(1); snap("free-ask"); closeAsk() }
         if tapIfExists("ph.header.capture") { sleep(1); snap("free-capture"); dismissSheet() }
         guard openSettings() else { return }
         let subscribe = element("ph.settings.subscribe")
@@ -312,7 +313,52 @@ final class PixelHandUITests: XCTestCase {
         dismissSheet()
     }
 
+    /// OR-06: the right column on iPad (landscape, then portrait):
+    /// collapse to the edge handle, bring it back, and switch Deck | Ask.
+    func test13_RightColumn() {
+        launch()
+        guard connect() else { return }
+        for orientation in [UIDeviceOrientation.landscapeLeft, .portrait] {
+            XCUIDevice.shared.orientation = orientation
+            sleep(2)
+            let tag = orientation == .portrait ? "portrait" : "landscape"
+            guard element("ph.column.deck").waitForExistence(timeout: 3) else {
+                snap("\(tag)-no-column")
+                continue
+            }
+            snap("\(tag)-column-deck")
+            if tapIfExists("ph.column.ask") { sleep(1); snap("\(tag)-column-ask") }
+            if tapIfExists("ph.column.collapse") { sleep(1); snap("\(tag)-column-collapsed") }
+            if tapIfExists("ph.column.expand") { sleep(1); snap("\(tag)-column-expanded") }
+            tapIfExists("ph.column.deck")
+        }
+        XCUIDevice.shared.orientation = .portrait
+        sleep(1)
+    }
+
     // MARK: - Helpers
+
+    /// Opens Ask: the tab bar's Ask on compact windows, the Ask field or
+    /// circle (`ph.ask`) on iPad, where it opens in the right column when
+    /// the arrangement has one.
+    @discardableResult
+    private func openAsk() -> Bool {
+        if element("ph.tab.ask").waitForExistence(timeout: 2) {
+            return tapIfExists("ph.tab.ask")
+        }
+        return tapIfExists("ph.ask")
+    }
+
+    /// Closes the Ask sheet, or returns the right column to the deck.
+    private func closeAsk() {
+        let deckSwitch = element("ph.column.deck")
+        if deckSwitch.exists, deckSwitch.isHittable {
+            deckSwitch.tap()
+            sleep(1)
+        } else {
+            dismissSheet()
+        }
+    }
 
     private func launch(onboarded: Bool = true, free: Bool? = nil) {
         app = XCUIApplication()

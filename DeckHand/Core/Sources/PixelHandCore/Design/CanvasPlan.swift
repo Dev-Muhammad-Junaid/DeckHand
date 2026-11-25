@@ -210,7 +210,7 @@ public struct CanvasPlan: Sendable, Hashable {
 
     /// The context strip sits on top of the deck column (rail, columns)
     /// rather than in the bottom chrome. With the wide column collapsed it
-    /// moves over the floating dock.
+    /// moves into the centre column, under the header.
     public var stripInDeckColumn: Bool {
         (form == .columns && !rightColumnCollapsed) || (form == .rail && hasDeckColumn)
     }
