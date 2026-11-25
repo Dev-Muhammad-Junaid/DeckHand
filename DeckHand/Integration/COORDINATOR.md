@@ -27,7 +27,8 @@ weekly usage limit is close).
 | Work | Session | Branch | Done when |
 | --- | --- | --- | --- |
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
-| Mac build loop (owner's Mac) — **archived since 2026-11-18; start a new Mac session** | session_01H5HwATvLJkqCFPruLyBsX8 (archived) | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
+| Primary (cloud, owner-facing: the owner sends changes here) | "★ Pixel Hand · PRIMARY" | claude/pixelhand-integration | programme complete |
+| Mac build loop (owner's Mac, Claude Desktop session "DeckHand MAC build loop", `/loop` every 30 min; the only Mac build loop since 2026-11-25) | local_d0e9b529 | claude/pixelhand-integration (worktree `pixelhand-build`) | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
 
 ## Queue (start in order, max 3 running)
 
