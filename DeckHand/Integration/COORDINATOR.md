@@ -1,10 +1,17 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Build 18 QA fixes running** (82 findings in `VISUAL-QA-build18.md`, split into three lanes below; every ID is assigned to exactly one lane). After they merge: queue build 19; the visual QA UI tests re-check the same flows; then the review page.
+> **Build 19 queued** (QA lanes A/B/C merged; protocol 14). **Owner review round running**: lanes or-ios-chrome, or-canvas, or-mac-panel (briefs in `BRIEF-or-*.md`). Merge them, then queue build 20. OR-16 waits for the owner's answers.
 
 > **Mac builds:** build 16 is green (2026-11-24). Build 17 (Unlock Pro for testing, from the primary session) is queued. The primary session or the owner's Mac session runs Mac builds.
 
 ## Needs the owner
+
+- **OR-16, pointer control on the mirror picture:** waiting on three answers. The questions and the recommended answers are at the end of `OWNER-REVIEW-visual-qa-build18.md`:
+  1. On or off by default? Recommended: off the first time, then remember the last choice.
+  2. Keep pinch to zoom while control is on? Recommended: yes.
+  3. Trackpad style only, or a touchscreen mode too? Recommended: trackpad style only.
+
+  Not started until the owner answers.
 
 - **Developer portal:** nothing needed. Automatic signing registered the App Group and the widget and share App IDs (builds 15 and 16).
 
@@ -28,9 +35,9 @@ weekly usage limit is close).
 | --- | --- | --- | --- |
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac) — **archived since 2026-11-18; start a new Mac session** | session_01H5HwATvLJkqCFPruLyBsX8 (archived) | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
-| QA fixes A: surfaces (33 findings: shell, deck, mirror pane, keyboard, Ask, capture, onboarding, AX3, Stage Manager) | session_01H5HwAVaBukC2xVL8jr3BMa | claude/pixelhand-lane-qa-surfaces | `LANE-qa-surfaces.md` ends `Lane: READY TO MERGE` |
-| QA fixes B: flows (29: VQ-001 loopback refusal, pairing, Mac app, reconnect, paywall, diagnostics) | session_01H5HwASCyPAhMYeQoyMCYGN | claude/pixelhand-lane-qa-flows | `LANE-qa-flows.md` ends `Lane: READY TO MERGE` |
-| QA fixes C: identity (20: Settings, widgets, Lock Screen, Control Center, dot-matrix font) | session_01H5HwAS4j31VzKJ4fJhWYGB | claude/pixelhand-lane-qa-identity | `LANE-qa-identity.md` ends `Lane: READY TO MERGE` |
+| Owner review: iOS chrome + glyph rule (OR-01, 02, 05, 12 iOS; VQ-069/079 rest) | session_01H5HwAVd91iSNN88o6K99eH | claude/pixelhand-lane-or-ios-chrome | `LANE-or-ios-chrome.md` ends `Lane: READY TO MERGE` |
+| Owner review: canvas (OR-04 sidebar, OR-06 right column Deck/Ask, OR-03 rest) | session_01H5HwAVASudiwPDAUdaPRid | claude/pixelhand-lane-or-canvas | `LANE-or-canvas.md` ends `Lane: READY TO MERGE` |
+| Owner review: Mac panel (OR-08 to OR-13) | session_01H5HwAV2mHoPQntpo2xFFmK | claude/pixelhand-lane-or-mac-panel | `LANE-or-mac-panel.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -183,3 +190,10 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   B (flows, 29, starting with VQ-001, which blocks simulator QA) and
   C (identity, 20). Each does P1 → P2 → P3 and reports per-ID status. No
   owner findings yet beyond the QA run.
+- 2026-11-25 00:50 UTC: QA lanes A, B and C were ready, and I merged them:
+  - A merged cleanly.
+  - B conflicted in `ShellHeader`: kept A's folding More menu and B's default-capture menu.
+  - C conflicted in a `MirrorPaneChromeTests` expectation: word-boundary cut plus curly apostrophe gives "JUNAID’S".
+
+  Added `SettingsDiagnosticsSection` to Settings with a glyph header. Core has 916 tests, all passing; the type check passes. **Build 19 queued** (`6e8f18e`), with protocol 14 (8-digit codes, `pairing.refused`).
+- 2026-11-25 01:10 UTC: `OWNER-REVIEW-visual-qa-build18.md` (OR-01 to OR-16) had arrived just before the QA lanes started, and they covered only part of it. Started three owner-review lanes for the rest: or-ios-chrome, or-canvas and or-mac-panel. OR-16 is parked under Needs the owner. After these merge: build 20, then the visual QA re-run, then the review page.
