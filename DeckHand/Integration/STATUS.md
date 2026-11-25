@@ -1609,4 +1609,47 @@ suite.**
    `VISUAL-QA-build23.md`, with a gallery link. List new findings as
    VQ-083 and up, with P1/P2/P3.
 
-Status: READY FOR MAC BUILD (build 23)
+## Mac build results (build 23) — 2026-11-25
+
+Built from `77d2e5c` (build 23) on Xcode 27.2, Release, team `DD5AWPLT2V`,
+automatic signing with `-allowProvisioningUpdates`, in the shared
+`pixelhand-build` worktree with `-derivedDataPath ~/Developer/DeckHand-build/.derived`.
+
+**Build**
+- Mac app: **builds first time**, no fixes.
+- iOS app with `PixelHandWidgets.appex` and `PixelHandShare.appex`:
+  **builds first time**, no fixes.
+- No commits pushed except this section.
+
+**Tests**
+- `swift test --package-path DeckHand/Core`: **1031 / 1031 pass** (183 suites).
+- `swift test --scratch-path .build-local`, no `--skip`: **480 / 480 pass**
+  on a quiet run (377 + 45 + 15 + 13 + 10 + 9 + 6 + 5). The new
+  **`LoomKit Store Start` suite passes** (the LoomKit run went from 42 to 45).
+  - The first full run failed 1 test: "Declined transfers surface a
+    declined terminal state to the sender" (`LoomTransferEngineTests.swift:59`,
+    `.decryptFailed`). It passed 5 of 5 alone and in the second full run,
+    so it's the same timing-sensitive `.decryptFailed` pattern build 22 saw
+    under load. It isn't counted as a bug.
+- `DeckHandTests` (macOS): **8 / 8 pass**.
+
+**Install**
+- Mac: `/Applications/Pixel Hand.app` replaced (old copy quit first; one
+  previous copy kept outside the repo) and launched with `open`.
+- iPad Air 11" (M3): installed with both extensions over Wi-Fi. **Not
+  launched: the iPad was locked.**
+
+**Not done yet: the walks and the visual QA re-run (steps 3–5 above)**
+- The build 22 bug re-checks (`LANE-build22-fixes.md`), OR-16
+  (`test16_PicturePointer`), `test14` on iPhone, and the
+  `VISUAL-QA-build23.md` pass all drive the Mac through `PixelHandUITests`.
+  Those walks type and click into the Mac's frontmost app and need the Mac
+  unlocked under `caffeinate -dimsu`. This build ran from an unattended
+  loop, so I didn't start them. They wait for the owner to be at the Mac
+  (scratch TextEdit document in front, Mac unlocked, iPad unlocked).
+- The build itself is green, so the status below marks it built. The visual
+  QA re-run is still owed for build 23.
+
+**Bugs found:** none by the build gate.
+
+Status: BUILT (build 23) — green
