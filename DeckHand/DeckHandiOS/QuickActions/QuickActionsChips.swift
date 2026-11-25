@@ -3,7 +3,9 @@
 //  DeckHandiOS
 //
 //  Shortcut chips, the "Add shortcuts" call to action and the placeholder chip.
-//  Split out of QuickActionsBar.swift (PH-010).
+//  Split out of QuickActionsBar.swift (PH-010). Running a chip gives the
+//  press state and a haptic only, with no dot row under it (OR-02); a
+//  refusal tints the outline danger (`deliveryReceipt`).
 //
 
 import SwiftUI
@@ -42,7 +44,7 @@ struct ShortcutChip: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(PixelHandTheme.color(PaletteTokens.fill, for: colorScheme))
             )
-            .deliveryDots(delivery.state)
+            .deliveryReceipt(delivery.state, cornerRadius: 8)
             .scaleEffect(isPressed && !reduceMotion ? 0.93 : 1.0)
             .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isPressed)
         }

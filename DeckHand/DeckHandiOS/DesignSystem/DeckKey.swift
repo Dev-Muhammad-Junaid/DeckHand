@@ -3,7 +3,9 @@
 //  DeckHandiOS – Design system
 //
 //  A deck key: square at the grid's whole-point key size, glyph at pitch 3,
-//  a two-line label, the chord and a 4-dot delivery strip. Kinds: standard,
+//  a two-line label and the chord. Running a key gives the press state and a
+//  haptic only; no dot row (owner's glyph rule). A refusal tints the outline
+//  danger (`deliveryReceipt`). Kinds: standard,
 //  system (navy), ghost (AI proposal, dashed, 75 % content) and editing
 //  (dotted outline with a remove badge). Ask-first keys show a `?` corner.
 //  At AX3+ the deck uses `DeckKeyRow` instead.
@@ -63,12 +65,7 @@ struct DeckKey: View {
                     }
                 }
                 .padding(.horizontal, 6)
-                .padding(.bottom, 8)
                 .opacity(kind == .ghost ? 0.75 : 1)
-
-                DeliveryStrip(state: delivery, count: 4, dotSize: 3.5, spacing: 2.5)
-                    .frame(maxHeight: .infinity, alignment: .bottom)
-                    .padding(.bottom, 6)
 
                 if asksFirst {
                     Text("?")
@@ -81,6 +78,7 @@ struct DeckKey: View {
                 }
             }
             .frame(width: size, height: size)
+            .deliveryReceipt(delivery, cornerRadius: PixelHandTheme.Radius.key)
             .contentShape(shape)
         }
         .buttonStyle(ChipPressStyle())
@@ -166,11 +164,11 @@ struct DeckKeyRow: View {
                 if let chord {
                     Text(chord).font(.phChord).foregroundStyle(PixelHandTheme.ink3)
                 }
-                DeliveryStrip(state: delivery, count: 4, dotSize: 3.5, spacing: 2.5)
             }
             .padding(.horizontal, PixelHandTheme.Space.lg)
             .frame(minHeight: 64)
             .background(PixelHandTheme.raised, in: RoundedRectangle(cornerRadius: PixelHandTheme.Radius.key, style: .continuous))
+            .deliveryReceipt(delivery, cornerRadius: PixelHandTheme.Radius.key)
             .contentShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.key, style: .continuous))
         }
         .buttonStyle(ChipPressStyle())

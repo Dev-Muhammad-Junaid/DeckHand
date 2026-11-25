@@ -2,10 +2,11 @@
 //  ContextChip.swift
 //  DeckHandiOS – Design system
 //
-//  One action in the context strip: optional glyph, label, chord in mono and
-//  a 3-dot delivery strip. Minimum 44 pt. Kinds: standard, dialog button,
-//  the dialog's default button (cobalt with a 2 pt ring) and an AI proposal
-//  (dashed outline, no strip). Spec: `02-Design-System.md` §7, board
+//  One action in the context strip: optional glyph, label and chord in mono.
+//  Minimum 44 pt. Kinds: standard, dialog button, the dialog's default
+//  button (cobalt with a 2 pt ring) and an AI proposal (dashed outline).
+//  Running a chip gives the press state and a haptic only; no dot row under
+//  it (OR-02). A refusal tints the outline danger (`deliveryReceipt`). Spec: `02-Design-System.md` §7, board
 //  "Components" (`.chip`).
 //
 
@@ -34,18 +35,14 @@ struct ContextChip: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 3) {
-                label
-                if kind != .suggestion {
-                    DeliveryStrip(state: delivery, onAccent: kind == .defaultAction)
-                }
-            }
-            .padding(.horizontal, 13)
-            .padding(.vertical, 5)
-            .frame(minHeight: PixelHandTheme.ControlHeight.standard)
-            .background(background)
-            .overlay(border)
-            .contentShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous))
+            label
+                .padding(.horizontal, 13)
+                .padding(.vertical, 5)
+                .frame(minHeight: PixelHandTheme.ControlHeight.standard)
+                .background(background)
+                .overlay(border)
+                .deliveryReceipt(delivery, cornerRadius: PixelHandTheme.Radius.chip, onAccent: kind == .defaultAction)
+                .contentShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous))
         }
         .buttonStyle(ChipPressStyle())
         .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.chip)
