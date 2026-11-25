@@ -48,6 +48,22 @@ final class SubscriptionStore {
     }
     /// The App Store's products, by plan. Empty until loaded (or offline).
     private(set) var products: [SubscriptionPlan: Product] = [:]
+
+    /// Where loading the products stands, so the paywall can say "Getting
+    /// prices…" or "Couldn't reach the App Store" with Try again instead of
+    /// failing silently (VQ-055).
+    enum ProductsState: Equatable {
+        case notLoaded, loading, loaded, failed
+    }
+
+    private(set) var productsState: ProductsState = .notLoaded
+
+    /// Loads the products again (the paywall's Try again, and on open when
+    /// none loaded yet).
+    func reloadProducts() async {
+        guard productsState != .loading else { return }
+        await loadProducts()
+    }
     /// Whether this Apple Account can still take the free trial. Assumed
     /// until StoreKit says otherwise, because the disclosure must not hide
     /// a trial the person would get.
@@ -272,6 +288,7 @@ final class SubscriptionStore {
     }
 
     private func loadProducts() async {
+        productsState = .loading
         do {
             let loaded = try await Product.products(for: SubscriptionPlan.productIDs)
             var byPlan: [SubscriptionPlan: Product] = [:]
@@ -279,10 +296,12 @@ final class SubscriptionStore {
                 if let plan = SubscriptionPlan(productID: product.id) { byPlan[plan] = product }
             }
             products = byPlan
+            productsState = byPlan.isEmpty ? .failed : .loaded
             if byPlan.count < SubscriptionPlan.allCases.count {
                 DeckHandLog.app.error("App Store returned \(byPlan.count) of \(SubscriptionPlan.allCases.count) Pro products")
             }
         } catch {
+            productsState = .failed
             DeckHandLog.app.error("Loading Pro products failed: \(error.localizedDescription, privacy: .public)")
         }
     }

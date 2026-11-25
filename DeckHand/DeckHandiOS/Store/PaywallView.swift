@@ -54,6 +54,7 @@ struct PaywallView: View {
                         alreadyPro
                     } else {
                         planPicker
+                        productsStatus
                         purchaseButton
                         statusMessages
                         disclosure
@@ -68,6 +69,9 @@ struct PaywallView: View {
             .background(PixelHandTheme.brandBackground().ignoresSafeArea())
             .foregroundStyle(.white)
             .pixelOnNavy()
+            .task {
+                if store.products.isEmpty { await store.reloadProducts() }
+            }
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
@@ -258,8 +262,44 @@ struct PaywallView: View {
         }
         .buttonStyle(.ph(.primary, fullWidth: true))
         .shadow(color: PixelHandTheme.Brand.cobalt.opacity(0.45), radius: 16, y: 6)
-        .disabled(store.isWorking)
+        .disabled(store.isWorking || store.products[selectedPlan] == nil)
         .accessibilityIdentifier("ph.paywall.subscribe")
+    }
+
+    /// Prices still loading, or the App Store out of reach: said here, with
+    /// Try again, instead of a purchase button that does nothing (VQ-055).
+    @ViewBuilder
+    private var productsStatus: some View {
+        if store.products[selectedPlan] == nil {
+            switch store.productsState {
+            case .notLoaded, .loading:
+                HStack(spacing: PixelHandTheme.Space.sm) {
+                    DotWave(pitch: 2.5, label: "Getting prices")
+                    Text("Getting prices from the App Store…")
+                        .font(.footnote)
+                        .foregroundStyle(.white.opacity(0.72))
+                }
+                .frame(maxWidth: .infinity)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("ph.paywall.loading")
+            case .failed, .loaded:
+                VStack(spacing: PixelHandTheme.Space.sm) {
+                    Text("Couldn’t reach the App Store. Check your connection, then try again.")
+                        .font(.footnote)
+                        .foregroundStyle(PixelHandTheme.warning)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button("Try again") {
+                        Task { await store.reloadProducts() }
+                    }
+                    .buttonStyle(.ph(.secondary, size: .regular))
+                    .accessibilityIdentifier("ph.paywall.retry")
+                }
+                .frame(maxWidth: .infinity)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("ph.paywall.unavailable")
+            }
+        }
     }
 
     @ViewBuilder
