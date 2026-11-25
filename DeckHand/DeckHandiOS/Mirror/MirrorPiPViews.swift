@@ -12,6 +12,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 extension View {
     /// Keeps the session's PiP state in step with Pro and the setting.
@@ -54,7 +55,8 @@ struct MirrorPiPBackground: View {
 }
 
 /// The pane toolbar's PiP button: opens PiP, or closes it when open.
-/// Always there while the device supports PiP (VQ-060): the first tap
+/// Always there on phones and wherever the device supports PiP (VQ-060,
+/// build 23: `MirrorToolbarPlan.pipButton`): the first tap
 /// explains what PiP does in the background and turns on "Keep watching in
 /// Picture in Picture", so leaving the app keeps the picture too.
 struct MirrorPiPToolButton: View {
@@ -64,9 +66,32 @@ struct MirrorPiPToolButton: View {
     /// The explanation was shown once (accepted or not).
     @AppStorage("ph.mirror.pipExplained") private var hasExplained = false
     @State private var isExplaining = false
+    @State private var isExplainingUnavailable = false
+
+    /// VQ-060: phones always show the button (iPhone simulators report no
+    /// PiP; iPhones have it); a tap explains when it can't start here.
+    private var plan: MirrorToolbarPlan.PiPButton {
+        MirrorToolbarPlan.pipButton(
+            systemSupportsPiP: session.mirrorPiPSupported,
+            isPhone: UIDevice.current.userInterfaceIdiom == .phone
+        )
+    }
 
     var body: some View {
-        if session.mirrorPiPSupported {
+        if plan == .explainsUnavailable {
+            MirrorToolButton(
+                glyph: PixelGlyphs.pictureInPicture,
+                label: "Keep watching in Picture in Picture",
+                action: { isExplainingUnavailable = true }
+            )
+            .accessibilityIdentifier("ph.mirror.pictureInPicture")
+            .requiresPro(.mirror)
+            .alert("Picture in Picture isn’t available", isPresented: $isExplainingUnavailable) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("This device can’t show the Mac’s screen in a small window over other apps.")
+            }
+        } else if plan == .available {
             let active = session.mirrorPiPState.isActive
             MirrorToolButton(
                 glyph: PixelGlyphs.pictureInPicture,

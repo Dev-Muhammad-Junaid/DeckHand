@@ -145,9 +145,12 @@ struct MirrorPane: View {
         }
         // UX-041: Pro and the PiP setting.
         .mirrorPiPSync(session: session)
-        .task(id: toolbarTouches) {
-            try? await Task.sleep(for: .seconds(3))
-            guard !Task.isCancelled, !voiceOverOn, !isPickerPresented, hasFrame else { return }
+        // VQ-061: restarts when the first frame lands, a sheet closes or
+        // VoiceOver goes off, not only on a touch, so the toolbar hides on
+        // iPhone too (it used to give up when the pane appeared first).
+        .task(id: toolbarHideKey) {
+            try? await Task.sleep(for: .seconds(MirrorToolbarPlan.hideDelay))
+            guard !Task.isCancelled, MirrorToolbarPlan.mayHide(toolbarHideKey) else { return }
             withAnimation(PixelHandMotion.reduced(.easeOut(duration: 0.2), reduceMotion: reduceMotion)) {
                 isToolbarShown = false
             }
@@ -155,6 +158,15 @@ struct MirrorPane: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Screen of \(macName)")
         .accessibilityIdentifier("ph.mirror")
+    }
+
+    private var toolbarHideKey: MirrorToolbarPlan.HideKey {
+        MirrorToolbarPlan.HideKey(
+            touches: toolbarTouches,
+            hasPicture: hasFrame,
+            isPickerPresented: isPickerPresented,
+            voiceOverOn: voiceOverOn
+        )
     }
 
     /// Shows the toolbar and restarts its 3 s timer.
