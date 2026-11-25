@@ -74,8 +74,8 @@ struct MirrorOverlay: View {
             videoSize: session.mirrorVideoSize,
             homeAnchor: placement.anchor.map { CGRect($0) },
             keepOut: placement.keepOut.map { CGRect($0) },
-            stepsAsideWhenCrowded: placement.stepsAsideWhenCrowded,
-            belowAccessoryHeight: strip.dots.isEmpty ? 0 : MirrorSpaceDots.footprint
+            belowAccessoryHeight: strip.dots.isEmpty ? 0 : MirrorSpaceDots.footprint,
+            stepsAsideWhenCrowded: placement.stepsAsideWhenCrowded
         )
         // S5: HEVC on or off takes effect at once.
         .onChange(of: settings.mirrorPrefersHEVC) {
