@@ -1469,4 +1469,102 @@ passes.
 After a green build 22, the visual QA re-run follows: the same flows and
 gallery as `VISUAL-QA-build18.md`, re-checking every VQ and OR ID.
 
-Status: READY FOR MAC BUILD (build 22)
+## Mac build results (build 22) — 2026-11-25
+
+Built from `dd67627` (build 22) in `pixelhand-build` with the shared
+`.derived`, Xcode 27.2, Release, team `DD5AWPLT2V`,
+`-allowProvisioningUpdates`. Results are for `e5cf881`.
+
+**Build**
+- Mac app and iOS app with both extensions: build first time.
+- Simulator `build-for-testing`: failed in `PixelHandUITests` until fix 1.
+
+**Fixes pushed**
+1. `e5cf881` `PixelHandUITests.swift`: the OR-16 merge dropped
+   `test15_PairUnpairedSimulatorByCode`'s closing brace ("Expected '}' in
+   class"). I restored it as the build 19 fixes lane wrote it.
+
+**Tests**
+- `swift test --package-path DeckHand/Core`: **1018 / 1018 pass** (182 suites).
+- `swift test --scratch-path .build-local`, no `--skip`: **477 pass**,
+  0 failed (377 + 42 + 15 + 13 + 10 + 9 + 6 + 5).
+  - A first run made while a simulator and the Mac app were busy failed
+    2 tests.
+  - "Realtime display queue shapes drains into bounded bursts"
+    (`LoomOrderedUnreliableSendQueueTests.swift:407`) failed.
+  - "iOS-shaped peers exchange messages in both directions" failed with
+    `.decryptFailed` (`LoomKitIntegrationTests.swift:17`).
+  - Both pass on a quiet machine, so they look timing-sensitive under
+    load. They are not counted as bugs.
+- `DeckHandTests` (macOS): **8 / 8 pass**.
+- `PixelHandUITests`:
+  - iPad Pro 11": 16 / 16 ran.
+  - iPhone 17 Pro: `test14_DeckWithMirror` ran in light and AX3, plus
+    `test04` at AX3.
+  - **The Mac locked itself partway through**, so every walk that needs
+    the mirror stopped at the "Mac is locked" alert: `test14`, `test16`.
+  - `test15` skipped (no pairing-code file).
+
+**Install**
+- Mac: `/Applications/Pixel Hand.app` replaced (old copy quit first),
+  launched with `open`.
+- iPad Air 11" (M3): **not installed.** `devicectl` lists it as
+  `unavailable` (error 4016) again. **It is still on build 20.**
+
+**Re-checks of the build 19 bugs**
+- **VQ-001: pass.** On an unpaired iPad mini simulator the Mac logs "is
+  on this Mac (loopback or its own address, e.g. a simulator): local
+  rules apply". It then opens a pending request. The simulator shows
+  "Waiting for approval" with "Enter pairing code". Pairing by code
+  (VQ-003/005/029–031/037) still needs a hand on the Mac's Pair window.
+- **Bug 4 (capture errors): pass** for the locked Mac. "Mac is locked ·
+  Unlock the Mac to see its screen. Pixel Hand never shows the lock
+  screen." The Screen Recording-off case was not checked.
+- **Bug 5 (iPad listed as a Mac): pass.** The iPad mini picker listed
+  only the Mac while the iPad Pro simulator was booted.
+- **Bug 3 (VQ-065): partly fixed.** See bug 2 below.
+- **Bug 2 (deck tile over the iPhone header): not checked.** The Mac was
+  locked, so the mirror couldn't start.
+- **OR-16 (pointer on the picture): not checked**, for the same reason.
+
+**Bugs found: 3**
+1. **Try again during a slow first start breaks discovery (P2).**
+   - Fresh install on the iPad mini simulator, no iCloud account. The
+     first `LoomContext` start waited about 45 s on the CloudKit account
+     check.
+   - The picker showed the "Can't find your Mac?" card. Tapping **Try
+     again** started attempt 2 while attempt 1 was still pending.
+   - Both failed: "LoomContext start failed: Already advertising
+     service", then `CancellationError`. The picker stayed on SEARCHING
+     with the Mac advertising, until a relaunch.
+   - Make Try again wait for (or cancel) the start in flight, and don't
+     block advertising and browsing on the CloudKit check.
+2. **AX3 Mac pill still cuts the name mid-word (P2, VQ-065).**
+   - iPhone 17 Pro at AX3: the pill reads "Muhamma…" on one line.
+   - Expected "Muhammad’s" / "MacBook Pro" on two lines, or a tail "…"
+     on line 2. The hyphen is gone.
+3. **AX3 lock banner overflows into the header (P2).**
+   - iPhone 17 Pro at AX3 with the Mac locked: the banner's text wraps
+     "Muham-" mid-word. Its first line draws over the Mac pill in the
+     header (`iphone-ax3/test04_ConnectAndPointer/01-pointer`).
+   - The banner should grow downward and break at words.
+
+Not re-checked: build 20's P3, the squeezed deck column with the keyboard
+up.
+
+**Hands-on checks for the owner (build 22)**
+- **Install on the iPad:** keep it on Wi-Fi and unlocked so the Mac can
+  reach it. It is on build 20.
+- **OR-16:** Layout › Screen focus, then the pointer button in the mirror
+  toolbar. Move, tap, two-finger tap, scroll, drag, pinch to zoom.
+- **Bug 2:** iPhone, Deck with the mirror running. The tile sits below
+  the header, and Edit and pin work.
+- **Pairing by code:** Pair on the Mac's request row; type the code on the
+  device.
+- **Mac panel (OR-08 to OR-13), the Macs sidebar (OR-04, OR-05).**
+
+## Owner testing (build 22)
+
+(none reported yet)
+
+Status: BUILT (build 22) — 3 bugs
