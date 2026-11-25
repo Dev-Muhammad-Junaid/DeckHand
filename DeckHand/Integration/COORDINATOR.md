@@ -1,6 +1,6 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Build 22 built: 3 P2 bugs** (in STATUS.md). The build22-fixes lane is running. When it is ready: merge it, then queue build 23 with the visual QA re-run (Mac unlocked; iPad installed), then the review page.
+> **Build 23 queued, with the full visual QA re-run** (`VISUAL-QA-build23.md`). No lanes running. If the re-run is clean (no P1, few P2): publish the review page and finish. Otherwise: one more fix round.
 
 > **Mac builds:** 15, 16, 18 and 19 built (19 with 5 bugs, fixed in build 21). The primary session or the owner's Mac session runs Mac builds.
 
@@ -28,7 +28,6 @@ weekly usage limit is close).
 | --- | --- | --- | --- |
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac) — **archived since 2026-11-18; start a new Mac session** | session_01H5HwATvLJkqCFPruLyBsX8 (archived) | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
-| Build 22 fixes (slow-start Try again, AX3 pill, AX3 lock banner) | session_01H5HwAUHRpmzfnzounCcCEs | claude/pixelhand-lane-build22-fixes | `LANE-build22-fixes.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -218,3 +217,11 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
     deck tile. The iPad is still on build 20.
 
   Started the build22-fixes lane (`BRIEF-build22-fixes.md`).
+- 2026-11-25 13:05 UTC: build22-fixes ready.
+  - It touched Loom: `LoomStore.start()` is single-flight, CloudKit runs
+    after advertising, with DocC and tests. I checked that the Loom diff
+    doesn't mention the product.
+  - Merged at `0f92060`. Core has 1031 tests, all passing; the type check
+    passes; the UI tests' braces balance.
+  - **Build 23 queued**, with the full VQ and OR visual QA re-run. Loom
+    tests must run on the Mac.

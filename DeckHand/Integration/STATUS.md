@@ -1568,4 +1568,45 @@ up.
 
 (none reported yet)
 
-Status: BUILT (build 22) — 3 bugs
+
+## Build 23 queued (2026-11-25): fixes plus the visual QA re-run
+
+Build 23 is build 22 plus `LANE-build22-fixes.md`, merged at `0f92060`. It
+fixes the 3 bugs from build 22:
+
+1. **Try again during a slow first start.**
+   - The app runs its start in its own task, so a second tap no longer
+     cancels the first.
+   - Loom's `LoomStore.start()` is single-flight.
+   - Advertising and discovery start before the CloudKit account check
+     and peer setup.
+   - This is a Loom change, with DocC updated and a new `LoomKit Store
+     Start` suite.
+2. **The AX3 Mac pill** breaks only at words: two lines, with a tail "…".
+3. **The AX3 lock banner** sits below the header, grows downward and breaks
+   at words.
+
+Linux: Core **1031 / 1031 pass** (183 suites); `linux-typecheck/run.sh`
+passes. The UI test file's braces are balanced. **Loom can't run on Linux:
+run `swift test --scratch-path .build-local` here, including the new
+suite.**
+
+**Mac should do:**
+1. The build and every test suite, Loom included.
+2. Install on the Mac and the iPad. Keep the iPad on Wi-Fi and unlocked.
+3. **Keep the Mac from locking during the walks.** Run `caffeinate -dimsu`
+   alongside them. Build 22's mirror walks stopped at the lock screen.
+4. Re-check the build 22 bugs (`LANE-build22-fixes.md` re-check steps),
+   plus the items build 22 couldn't reach:
+   - OR-16, pointer control on the picture (`test16_PicturePointer` and by
+     hand);
+   - bug 2 from build 19, the deck tile on iPhone (`test14`).
+5. **Visual QA re-run.** Capture the same flows and sizes as
+   `VISUAL-QA-build18.md`, and use the `PixelHandUITests` walks on the
+   iPad Pro 11" (portrait, landscape, Stage Manager down to iPhone width),
+   the iPhone 17 Pro, the free plan and AX3. Mark every **VQ-001…082** and
+   **OR-01…OR-16** ID as pass, fail or not checked, in a new
+   `VISUAL-QA-build23.md`, with a gallery link. List new findings as
+   VQ-083 and up, with P1/P2/P3.
+
+Status: READY FOR MAC BUILD (build 23)
