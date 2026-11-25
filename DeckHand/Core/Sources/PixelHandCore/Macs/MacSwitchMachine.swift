@@ -161,16 +161,22 @@ public enum MacReconnectPolicy {
     /// reach that connects without a prompt; none when there are several,
     /// so the person picks. Never twice per launch, never before
     /// onboarding, never over a running session.
+    ///
+    /// Never before the network can dial (`isNetworkReady`): since Loom
+    /// browses before its start returns, the paired Mac is listed before
+    /// the remote can connect to it. Build 23 (VQ-058) spent its one try
+    /// on that dial, which failed silently, and then waited for a tap.
     public static func launchTarget(
         isEnabled: Bool,
         hasCompletedOnboarding: Bool,
         alreadyTried: Bool,
         hasSession: Bool,
+        isNetworkReady: Bool = true,
         lastActiveDeviceID: UUID?,
         listings: [MacListing],
         isLockedByFreePlan: (UUID) -> Bool
     ) -> UUID? {
-        guard isEnabled, hasCompletedOnboarding, !alreadyTried, !hasSession else { return nil }
+        guard isEnabled, hasCompletedOnboarding, isNetworkReady, !alreadyTried, !hasSession else { return nil }
         func connectsWithoutPrompt(_ mac: MacListing) -> Bool {
             mac.isReachable && (mac.isPaired || mac.isOwnICloud) && !isLockedByFreePlan(mac.deviceID)
         }

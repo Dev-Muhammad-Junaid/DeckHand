@@ -126,12 +126,12 @@ final class InputInjector {
 
     /// macOS-style pointer acceleration: small deltas stay 1:1,
     /// large swipes ramp up for fast traversal.
+    /// The curve lives in Core (`MacPointerAcceleration`) so the remote can
+    /// predict where a delta lands (picture pointer control, VQ-095).
     private func applyAcceleration(_ delta: Float) -> Float {
-        let magnitude = abs(delta)
         // Below 3pt of movement, keep 1:1 for precision work.
         // Above that, gently ramp up to feel natural on large screens.
-        let factor: Float = magnitude < 3 ? 1.0 : 1.0 + (magnitude - 3) * 0.12
-        return delta * factor
+        Float(MacPointerAcceleration.apply(Double(delta)))
     }
 
     // MARK: - Scroll

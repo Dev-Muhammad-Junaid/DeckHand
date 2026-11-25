@@ -349,3 +349,24 @@ struct TransferPanelPlanTests {
         #expect(Plan.outcome(status: .refused(reason: .declined), isActive: false) == .failed)
     }
 }
+
+@Suite("Mac panel: \"last seen\" keeps up while the panel is open (VQ-097)")
+struct MacPanelLastSeenTests {
+    let seen = Date(timeIntervalSince1970: 1_800_000_000)
+
+    @Test("Minutes at the finest, so the 30 s redraw keeps it true")
+    func minutes() {
+        typealias Plan = MacDeviceListPlan
+        #expect(Plan.recentSeen(seen, now: seen.addingTimeInterval(38)) == "just now")
+        #expect(Plan.recentSeen(seen, now: seen.addingTimeInterval(60)) == "1 min ago")
+        #expect(Plan.recentSeen(seen, now: seen.addingTimeInterval(38 * 60 + 20)) == "38 min ago")
+        #expect(Plan.recentSeen(seen, now: seen.addingTimeInterval(3600)) == nil)
+        #expect(Plan.recentSeen(seen, now: seen.addingTimeInterval(-5)) == "just now")
+        #expect(Plan.seenRefreshInterval <= 30)
+        // No seconds anywhere: nothing that a 30 s tick would leave stale.
+        for elapsed in stride(from: 0.0, to: 3600, by: 7) {
+            let text = Plan.recentSeen(seen, now: seen.addingTimeInterval(elapsed)) ?? ""
+            #expect(!text.contains("second"))
+        }
+    }
+}

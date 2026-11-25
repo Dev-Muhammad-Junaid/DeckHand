@@ -42,10 +42,12 @@ struct ContextStrip: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     content
                         .padding(.leading, margin)
-                        .padding(.trailing, PixelHandTheme.Space.xl)
+                        .padding(.trailing, TrailingFade.overflowWidth)
                         .padding(.vertical, PixelHandTheme.Space.xs)
                 }
-                .mask { TrailingFade(width: PixelHandTheme.Space.xl) }
+                // VQ-088: a chip wide, so a label cut at the edge reads as
+                // "more this way" (24 pt went unseen).
+                .mask { TrailingFade() }
             }
         }
         .accessibilityElement(children: .contain)
@@ -206,7 +208,9 @@ enum StripItem: Identifiable {
         case .media(.next): "Next track"
         case .moreShortcuts: "Shortcuts"
         case .proUpsell: "App chips · Pro"
-        case .idle: "Bring an app to the front on the Mac"
+        // VQ-091: short enough for the landscape rail ("…front c…" was
+        // cut there); VoiceOver still hears "on the Mac".
+        case .idle: "Bring an app to the front"
         }
     }
 }
@@ -248,7 +252,8 @@ private struct StripChip: View {
                     .lineLimit(1)
             }
             .frame(minHeight: PixelHandTheme.ControlHeight.standard)
-            .accessibilityElement(children: .combine)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Bring an app to the front on the Mac")
         }
     }
 

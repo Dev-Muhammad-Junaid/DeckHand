@@ -137,6 +137,9 @@ final class MacSwitcher {
 
     func start(context: LoomContext) {
         self.context = context
+        // The Mac may have been listed before Loom finished starting: the
+        // launch reconnect waited for this (VQ-058).
+        reconnectAtLaunchIfNeeded()
     }
 
     /// Discovery changed. Also the moment to reconnect at launch.
@@ -398,6 +401,7 @@ final class MacSwitcher {
             hasCompletedOnboarding: defaults.bool(forKey: MultiMacSettingsKey.hasCompletedOnboarding),
             alreadyTried: triedLaunchReconnect,
             hasSession: handle != nil,
+            isNetworkReady: context != nil,
             lastActiveDeviceID: book.lastActiveDeviceID,
             listings: listings,
             isLockedByFreePlan: { SubscriptionStore.shared.isLockedMac(deviceID: $0) }

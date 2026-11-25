@@ -194,6 +194,8 @@ struct PeerPickerView: View {
                 Text(headerSubtitle)
                     .font(.subheadline)
                     .foregroundStyle(.white.opacity(0.66))
+                    // VQ-084: wraps at AX3 instead of "Pick the Mac to contr…".
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .multilineTextAlignment(isShort ? .leading : .center)
             .contentTransition(.opacity)
@@ -455,6 +457,10 @@ private struct PeerCard: View {
     let isDimmed: Bool
     let onTap: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+    /// The headline size at the current Dynamic Type size.
+    @ScaledMetric(relativeTo: .headline) private var nameSize: CGFloat = 17
+
     /// Set when this Mac runs a different Loom protocol, so the card says
     /// which side to update before anyone taps it.
     private var updateMessage: String? {
@@ -470,11 +476,14 @@ private struct PeerCard: View {
 
                 VStack(alignment: .leading, spacing: PixelHandTheme.Space.xs) {
                     HStack(spacing: PixelHandTheme.Space.sm) {
-                        Text(peer.name)
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
+                        // VQ-084: never cut in the middle ("Muh…ok Pro");
+                        // two whole-word lines at accessibility sizes.
+                        WholeWordName(
+                            name: peer.name,
+                            lines: typeSize.isAccessibilitySize ? 2 : 1,
+                            size: nameSize,
+                            color: .white
+                        )
 
                         // Provably the user's own device (private CloudKit
                         // DB record). The Mac still asks to allow it.
@@ -501,6 +510,9 @@ private struct PeerCard: View {
                             Text(statusLine)
                                 .font(.footnote)
                                 .foregroundStyle(.white.opacity(0.66))
+                                // VQ-084: "Paired · Near…" at AX3. Wraps at
+                                // the " · " instead.
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel(statusAccessibility)

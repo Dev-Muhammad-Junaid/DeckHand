@@ -115,3 +115,40 @@ struct MirrorCursorFollower: View {
             .accessibilityHidden(true)
     }
 }
+
+/// Feeds the sender's picture guard (VQ-095): the mirrored display's size
+/// and the Mac's cursor stream, so a flick on the picture can't throw the
+/// pointer off the mirrored display. Clears the guard when the picture
+/// stops driving the pointer. Its own view so only it reads the 60 Hz
+/// cursor state.
+struct MirrorPicturePointerGuardFeed: View {
+    let session: ControlSessionModel
+    let sender: TrackpadSender
+
+    var body: some View {
+        let size = session.mirroredDisplayPointSize
+        Color.clear
+            .onAppear { setDisplay(size) }
+            .onChange(of: size?.width) { _, _ in setDisplay(session.mirroredDisplayPointSize) }
+            .onChange(of: size?.height) { _, _ in setDisplay(session.mirroredDisplayPointSize) }
+            .onChange(of: session.mirrorCursor, initial: true) { _, state in
+                guard let state else { return }
+                Task {
+                    await sender.syncPicturePointer(x: state.x, y: state.y, isOnMirroredDisplay: state.isOnMirroredDisplay)
+                }
+            }
+            .onDisappear {
+                Task { await sender.stopPicturePointer() }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+
+    private func setDisplay(_ size: (width: Double, height: Double)?) {
+        // With no display size (a window, or not known yet) the guard still
+        // caps the gain; it only clamps once it knows the display.
+        let width = size?.width ?? 0
+        let height = size?.height ?? 0
+        Task { await sender.startPicturePointer(displayWidth: width, height: height) }
+    }
+}

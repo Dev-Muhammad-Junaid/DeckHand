@@ -6,8 +6,8 @@
 //  the Mac's name and the front app (or approval state), on glass, 44 pt.
 //  Offline shows a grey pixel; locked shows the lock glyph. At AX1+ the
 //  second line drops before the name truncates; at AX3+ the name gets two
-//  lines, broken between words, never hyphenated, and the first word
-//  shrinks rather than cut (build 22). Names truncate at the tail.
+//  lines, broken between words, never hyphenated; at AX5 the word splits
+//  shrink, then the first word stands alone (build 23, VQ-085).
 //  Spec: `02-Design-System.md` §7, board `.macpill`.
 //
 
@@ -75,40 +75,18 @@ struct MacPill: View {
     /// Build 22: when none fits, the fallback still has two lines, and its
     /// first word shrinks before it truncates, so the pill never reads
     /// "Muhamma…" on one line.
-    @ViewBuilder
+    ///
+    /// Build 23 (VQ-085): at AX5 even that cut both lines mid-word, because
+    /// `ViewThatFits` measures ideal sizes and never chose a shrinking line
+    /// by size. The whole-word splits are now also offered at smaller real
+    /// font sizes (`pillNameShrinkScales`), and the last resort is the
+    /// first word alone.
     private var nameText: some View {
-        let layout = ShellHeaderPlan.pillNameLayout(name, lines: nameLines)
-        if layout.candidates.count == 1, layout.fallback == layout.candidates[0] {
-            nameLine(layout.fallback.first ?? name)
-        } else {
-            ViewThatFits(in: .horizontal) {
-                ForEach(layout.candidates.indices, id: \.self) { index in
-                    nameStack(layout.candidates[index])
-                }
-                nameStack(layout.fallback, minimumScale: ShellHeaderPlan.pillNameMinimumScale)
-            }
-        }
+        WholeWordName(name: name, lines: nameLines, size: nameSize)
     }
 
-    private func nameStack(_ lines: [String], minimumScale: Double = 1) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(lines.indices, id: \.self) { line in
-                nameLine(lines[line])
-                    .minimumScaleFactor(CGFloat(minimumScale))
-            }
-        }
-        // Its full height, even in a tight header (build 22: the second
-        // line was lost and the first cut).
-        .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private func nameLine(_ text: String) -> some View {
-        Text(text)
-            .font(.callout.weight(.semibold))
-            .foregroundStyle(PixelHandTheme.ink)
-            .lineLimit(1)
-            .truncationMode(.tail)
-    }
+    /// The callout size at the current Dynamic Type size.
+    @ScaledMetric(relativeTo: .callout) private var nameSize: CGFloat = 16
 
     private var tile: some View {
         PHGlyph(glyph: status == .locked ? PixelGlyphs.lock : PixelGlyphs.mac, pitch: 1.8, accent: PixelHandTheme.Brand.glow)

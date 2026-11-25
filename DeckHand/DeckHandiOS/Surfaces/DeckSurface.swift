@@ -76,6 +76,10 @@ struct DeckSurface: View {
                     .frame(maxWidth: .infinity)
                     .mirrorTileKeepOut(.deckHeader, owner: sender)
                     pager(grid: grid, asRows: asRows)
+                        // VQ-083: while editing, the key slots are kept
+                        // clear too; on iPhone that leaves no room, so the
+                        // tile steps aside until Done.
+                        .mirrorTileKeepOut(.deckEditGrid, owner: sender, isActive: model.isEditing)
                     pageDots
                 }
                 .padding(.top, PixelHandTheme.Space.xs)

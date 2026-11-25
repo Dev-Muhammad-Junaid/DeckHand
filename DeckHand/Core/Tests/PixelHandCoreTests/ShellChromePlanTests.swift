@@ -116,6 +116,26 @@ import Testing
         }
     }
 
+    @Test("AX5 pill (VQ-085): shrink the whole-word splits, then the first word alone; never a mid-word cut")
+    func pillNameShrinks() {
+        let layout = ShellHeaderPlan.pillNameLayout("Muhammad’s MacBook Pro", lines: 2)
+        #expect(layout.shrinkCandidates == [
+            ["Muhammad’s", "MacBook Pro"],
+            ["Muhammad’s MacBook", "Pro"],
+        ])
+        #expect(layout.lastResort == ["Muhammad’s"])
+        #expect(layout.shrinkCandidates.allSatisfy { $0.allSatisfy { !$0.hasSuffix("…") } })
+        let scales = ShellHeaderPlan.pillNameShrinkScales
+        #expect(scales == scales.sorted(by: >))
+        #expect(scales.allSatisfy { $0 < 1 && $0 >= ShellHeaderPlan.pillNameMinimumScale })
+        // One word, and the Standard band: nothing to split.
+        let one = ShellHeaderPlan.pillNameLayout("Studio", lines: 2)
+        #expect(one.shrinkCandidates == [["Studio"]])
+        #expect(one.lastResort == ["Studio"])
+        let standard = ShellHeaderPlan.pillNameLayout("Muhammad’s MacBook Pro", lines: 1)
+        #expect(standard.shrinkCandidates.isEmpty)
+    }
+
     @Test("Pill layout for long and short names")
     func pillNameLayoutNames() {
         let long = ShellHeaderPlan.pillNameLayout("Jean-Luc’s Big Studio Mac", lines: 2)
@@ -270,5 +290,29 @@ import Testing
         )
         #expect(strip.items == ["STUDIO", "CONNECTING"])
         #expect(!strip.items.contains { $0.contains("FPS") })
+    }
+}
+
+@Suite("Build 23 accessibility sizes: column switch, Ask placeholder, Settings pickers")
+struct Build23AccessibilityPlanTests {
+    @Test("VQ-087: the Deck | Ask switch drops its words only at the Huge band")
+    func columnSwitch() {
+        #expect(RightColumnMode.switchShowsTitles(band: .standard))
+        #expect(RightColumnMode.switchShowsTitles(band: .large))
+        #expect(!RightColumnMode.switchShowsTitles(band: .huge))
+    }
+
+    @Test("VQ-087: the Ask placeholder is short at the Huge band")
+    func askPlaceholder() {
+        #expect(AskFieldCopy.placeholder(band: .standard) == "What should your Mac do?")
+        #expect(AskFieldCopy.placeholder(band: .huge) == "Ask your Mac")
+        #expect(AskFieldCopy.placeholder(band: .huge).count < AskFieldCopy.placeholder(band: .standard).count)
+    }
+
+    @Test("VQ-089: Settings' segmented pickers become menus at the Huge band")
+    func settingsPickers() {
+        #expect(!SettingsPickerPlan.usesMenu(band: .standard))
+        #expect(!SettingsPickerPlan.usesMenu(band: .large))
+        #expect(SettingsPickerPlan.usesMenu(band: .huge))
     }
 }

@@ -214,6 +214,12 @@ struct TrackpadInputLayer: View {
         ZStack {
             if drawsDotField {
                 DotField(model: dots)
+            } else {
+                // A SwiftUI node for the layer's accessibility element and
+                // identifier to sit on: with only the UIKit view inside,
+                // `ph.mirror.pointerSurface` never appeared (VQ-093). Clear
+                // and without a content shape, so touches reach the pad.
+                Color.clear
             }
             MultiTouchTrackpad(
                 callbacks: callbacks,

@@ -107,6 +107,7 @@ struct AskPanel: View {
 
     @ObservedObject private var model = AskModel.shared
     @Environment(\.entitlements) private var entitlements
+    @Environment(\.dynamicTypeSize) private var typeSize
     @FocusState private var isFieldFocused: Bool
 
     @State private var isEditing = false
@@ -161,7 +162,8 @@ struct AskPanel: View {
 
     private var field: some View {
         HStack(spacing: PixelHandTheme.Space.sm) {
-            TextField("What should your Mac do?", text: $model.request, axis: .vertical)
+            // VQ-087: a short placeholder at AX3+ ("What shou…" in the column).
+            TextField(AskFieldCopy.placeholder(band: typeSize.typeBand), text: $model.request, axis: .vertical)
                 .lineLimit(1...4)
                 .focused($isFieldFocused)
                 .accessibilityIdentifier("ph.ask.field")

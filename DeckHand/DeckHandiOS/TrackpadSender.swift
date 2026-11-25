@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import PixelHandCore
 import LoomKit
 import os
 import QuartzCore
@@ -50,6 +51,11 @@ actor TrackpadSender {
     private var pendingDeltaY: Float = 0
     private var isSendScheduled: Bool = false
 
+    // ── Picture pointer control (VQ-095) ────────────────────────────
+    /// Set while the mirror picture drives the pointer: caps the Mac's
+    /// acceleration and keeps the pointer on the mirrored display.
+    private var pictureGuard: PicturePointerGuard?
+
     // ── Scroll accumulator ──────────────────────────────────────────
     private var pendingScrollDX: Float = 0
     private var pendingScrollDY: Float = 0
@@ -85,6 +91,29 @@ actor TrackpadSender {
         self.handle = handle
     }
 
+    // MARK: - Picture pointer control (VQ-095)
+
+    /// Starts (or resizes) the picture's guard for a mirrored display of
+    /// `width` × `height` points. 0 (a window, or not known yet) keeps only
+    /// the gain cap. The Pointer surface's deltas are never limited.
+    func startPicturePointer(displayWidth width: Double, height: Double) {
+        if pictureGuard == nil {
+            pictureGuard = PicturePointerGuard(displayWidth: width, displayHeight: height)
+        } else {
+            pictureGuard?.resize(width: width, height: height)
+        }
+    }
+
+    /// The picture stopped driving the pointer.
+    func stopPicturePointer() {
+        pictureGuard = nil
+    }
+
+    /// The Mac's cursor stream, for the guard's estimate.
+    func syncPicturePointer(x: Double, y: Double, isOnMirroredDisplay: Bool) {
+        pictureGuard?.sync(x: x, y: y, isOnMirroredDisplay: isOnMirroredDisplay, now: CACurrentMediaTime())
+    }
+
     // MARK: - Throttled mouse delta (120 Hz)
 
     func sendMouseDelta(dx: Float, dy: Float) async {
@@ -110,8 +139,14 @@ actor TrackpadSender {
         isSendScheduled = false
         guard pendingDeltaX != 0 || pendingDeltaY != 0 else { return }
 
-        let dx = pendingDeltaX
-        let dy = pendingDeltaY
+        var dx = pendingDeltaX
+        var dy = pendingDeltaY
+        if var guardrail = pictureGuard {
+            let limited = guardrail.limit(dx: Double(dx), dy: Double(dy), now: CACurrentMediaTime())
+            pictureGuard = guardrail
+            dx = Float(limited.dx)
+            dy = Float(limited.dy)
+        }
         pendingDeltaX = 0
         pendingDeltaY = 0
         lastMouseSentAt = CACurrentMediaTime()

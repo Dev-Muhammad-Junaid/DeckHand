@@ -42,7 +42,7 @@ struct MirrorOverlay: View {
 
     private func tile(container: CGRect) -> some View {
         let strip = session.mirrorSpaceStrip
-        let placement = MirrorTileKeepOut.shared.layout(for: session.sender, in: container)
+        let placement = MirrorTileKeepOut.shared.plan(for: session.sender, in: container)
         return MirrorThumbnailView(
             image: session.mirrorImage,
             containerSize: containerSize,
@@ -72,8 +72,9 @@ struct MirrorOverlay: View {
                 ? AnyView(MirrorVideoLayerView(renderer: session.mirrorVideoRenderer))
                 : nil,
             videoSize: session.mirrorVideoSize,
-            homeAnchor: placement.anchor,
-            keepOut: placement.keepOut,
+            homeAnchor: placement.anchor.map { CGRect($0) },
+            keepOut: placement.keepOut.map { CGRect($0) },
+            stepsAsideWhenCrowded: placement.stepsAsideWhenCrowded,
             belowAccessoryHeight: strip.dots.isEmpty ? 0 : MirrorSpaceDots.footprint
         )
         // S5: HEVC on or off takes effect at once.

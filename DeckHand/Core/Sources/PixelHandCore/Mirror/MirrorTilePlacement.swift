@@ -16,6 +16,25 @@
 
 import Foundation
 
+/// Where the floating tile rests, what it keeps clear of, and whether it
+/// may step aside when nothing is clear (`MirrorTilePlacement.surfacePlan`).
+public struct MirrorTileSurfacePlan: Equatable, Sendable {
+    /// The rect the tile's home is anchored to (top-trailing); the canvas
+    /// when nil.
+    public var anchor: MirrorRect?
+    /// Areas the tile never covers.
+    public var keepOut: [MirrorRect]
+    /// True while the deck is being edited: with no clear spot left, the
+    /// tile hides instead of covering the least it can.
+    public var stepsAsideWhenCrowded: Bool
+
+    public init(anchor: MirrorRect?, keepOut: [MirrorRect], stepsAsideWhenCrowded: Bool = false) {
+        self.anchor = anchor
+        self.keepOut = keepOut
+        self.stepsAsideWhenCrowded = stepsAsideWhenCrowded
+    }
+}
+
 public enum MirrorTilePlacement {
     /// Clearance between the tile and a reserved area.
     public static let keepOutGap = 8.0
@@ -60,23 +79,68 @@ public enum MirrorTilePlacement {
     ///   Edit, and `ph.deck.edit` wasn't hittable).
     /// - With both (an iPad showing the pad and the deck column), the pad
     ///   stays the anchor and every area is kept clear.
+    /// - Deck in edit mode (build 23, VQ-083): the edit grid (keys, ghost
+    ///   slots and Add key) is kept clear too. Where no clear spot is left
+    ///   for the smallest tile (iPhone: the grid fills the canvas under the
+    ///   header), the tile steps aside until Done (`isShown`).
     public static func surfaceLayout(
         bounds: MirrorRect,
         pad: MirrorRect? = nil,
         clickStrip: MirrorRect? = nil,
         caption: MirrorRect? = nil,
         keyboard: MirrorRect? = nil,
-        deckHeader: MirrorRect? = nil
+        deckHeader: MirrorRect? = nil,
+        deckEditGrid: MirrorRect? = nil
     ) -> (anchor: MirrorRect?, keepOut: [MirrorRect]) {
+        let plan = surfacePlan(
+            bounds: bounds, pad: pad, clickStrip: clickStrip, caption: caption,
+            keyboard: keyboard, deckHeader: deckHeader, deckEditGrid: deckEditGrid
+        )
+        return (plan.anchor, plan.keepOut)
+    }
+
+    /// `surfaceLayout` plus whether the tile may step aside (hide) when it
+    /// has no clear spot: only while the deck is being edited.
+    public static func surfacePlan(
+        bounds: MirrorRect,
+        pad: MirrorRect? = nil,
+        clickStrip: MirrorRect? = nil,
+        caption: MirrorRect? = nil,
+        keyboard: MirrorRect? = nil,
+        deckHeader: MirrorRect? = nil,
+        deckEditGrid: MirrorRect? = nil
+    ) -> MirrorTileSurfacePlan {
         var keepOut = pointerKeepOut(pad: pad, clickStrip: clickStrip, caption: caption, keyboard: keyboard)
         if let deckHeader { keepOut.append(deckHeader) }
-        if let pad { return (pad, keepOut) }
+        if let deckEditGrid { keepOut.append(deckEditGrid) }
+        let stepsAside = deckEditGrid != nil
+        if let pad { return MirrorTileSurfacePlan(anchor: pad, keepOut: keepOut, stepsAsideWhenCrowded: stepsAside) }
         if let deckHeader {
             let top = min(max(deckHeader.y + deckHeader.height, bounds.y), bounds.y + bounds.height)
             let below = MirrorRect(x: bounds.x, y: top, width: bounds.width, height: bounds.y + bounds.height - top)
-            return (below, keepOut)
+            return MirrorTileSurfacePlan(anchor: below, keepOut: keepOut, stepsAsideWhenCrowded: stepsAside)
         }
-        return (nil, keepOut)
+        return MirrorTileSurfacePlan(anchor: nil, keepOut: keepOut, stepsAsideWhenCrowded: stepsAside)
+    }
+
+    /// Whether the tile is drawn. It always is, except while the deck is
+    /// being edited and even the smallest tile (`minimumWidth`) has no spot
+    /// clear of the header and the edit grid: then it steps aside until
+    /// Done, rather than cover Done or the key slots (VQ-083).
+    public static func isShown(
+        _ plan: MirrorTileSurfacePlan,
+        minimumWidth: Double,
+        aspect: Double,
+        extraHeight: Double = 0,
+        in bounds: MirrorRect
+    ) -> Bool {
+        guard plan.stepsAsideWhenCrowded else { return true }
+        return fits(
+            width: minimumWidth,
+            height: minimumWidth * aspect + extraHeight,
+            in: bounds,
+            avoiding: plan.keepOut
+        )
     }
 
     /// The tile's resting frame: top-trailing in `anchor` (the pad, the
