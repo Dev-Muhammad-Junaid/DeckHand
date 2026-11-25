@@ -116,6 +116,26 @@ import Testing
         }
     }
 
+    @Test("AX5 pill (VQ-085): shrink the whole-word splits, then the first word alone; never a mid-word cut")
+    func pillNameShrinks() {
+        let layout = ShellHeaderPlan.pillNameLayout("Muhammad’s MacBook Pro", lines: 2)
+        #expect(layout.shrinkCandidates == [
+            ["Muhammad’s", "MacBook Pro"],
+            ["Muhammad’s MacBook", "Pro"],
+        ])
+        #expect(layout.lastResort == ["Muhammad’s"])
+        #expect(layout.shrinkCandidates.allSatisfy { $0.allSatisfy { !$0.hasSuffix("…") } })
+        let scales = ShellHeaderPlan.pillNameShrinkScales
+        #expect(scales == scales.sorted(by: >))
+        #expect(scales.allSatisfy { $0 < 1 && $0 >= ShellHeaderPlan.pillNameMinimumScale })
+        // One word, and the Standard band: nothing to split.
+        let one = ShellHeaderPlan.pillNameLayout("Studio", lines: 2)
+        #expect(one.shrinkCandidates == [["Studio"]])
+        #expect(one.lastResort == ["Studio"])
+        let standard = ShellHeaderPlan.pillNameLayout("Muhammad’s MacBook Pro", lines: 1)
+        #expect(standard.shrinkCandidates.isEmpty)
+    }
+
     @Test("Pill layout for long and short names")
     func pillNameLayoutNames() {
         let long = ShellHeaderPlan.pillNameLayout("Jean-Luc’s Big Studio Mac", lines: 2)

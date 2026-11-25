@@ -93,9 +93,17 @@ public enum ShellHeaderPlan {
         return candidates
     }
 
-    /// The smallest the fallback's lines shrink to before they truncate:
-    /// a long first word gets smaller rather than cut ("Muhamma…", build 22).
-    public static let pillNameMinimumScale: Double = 0.7
+    /// The smallest the name's lines shrink to before they truncate:
+    /// a long first word gets smaller rather than cut ("Muhamma…", build 22;
+    /// 0.5 since build 23, VQ-085).
+    public static let pillNameMinimumScale: Double = 0.5
+
+    /// The font scales the whole-word splits are tried at, after every
+    /// candidate at full size failed (build 23, VQ-085). They are real font
+    /// sizes, not `minimumScaleFactor`, so `ViewThatFits` can measure them:
+    /// at AX5 build 22's shrinking fallback was never picked by size, and
+    /// both lines truncated mid-word ("Muhamma… / MacBook…").
+    public static let pillNameShrinkScales: [Double] = [0.85, 0.7, 0.55]
 
     /// The pill's name at the Huge band (build 22, VQ-065): `candidates`
     /// are tried in order and the first whose every line fits whole is
@@ -111,6 +119,14 @@ public enum ShellHeaderPlan {
         /// on line 2, truncating at the tail. Never one line for a name of
         /// two or more words.
         public let fallback: [String]
+        /// Tried at each of `pillNameShrinkScales` after `candidates`
+        /// (build 23, VQ-085): the whole-word splits only, never a "…".
+        public let shrinkCandidates: [[String]]
+        /// The last resort when not even the smallest split fits: the first
+        /// word alone, at `pillNameMinimumScale`, so it is never cut
+        /// mid-word next to a cut second line. The full name stays in the
+        /// accessibility label.
+        public let lastResort: [String]
     }
 
     /// The pill's name on `lines` lines, broken only between words.
@@ -118,8 +134,16 @@ public enum ShellHeaderPlan {
         let words = name.split(whereSeparator: \.isWhitespace).map(String.init)
         var candidates = pillNameCandidates(name, lines: lines)
         guard lines >= 2, words.count >= 2 else {
-            return PillNameLayout(candidates: candidates, fallback: candidates[0])
+            return PillNameLayout(
+                candidates: candidates,
+                fallback: candidates[0],
+                shrinkCandidates: lines >= 2 ? candidates : [],
+                lastResort: candidates[0]
+            )
         }
+        // The two-line word splits, first line shortest first: the first
+        // word alone keeps the most room for it as the font shrinks.
+        let splits = Array(candidates.dropFirst().reversed())
         if words.count >= 3 {
             for end in stride(from: words.count - 1, through: 2, by: -1) {
                 candidates.append([words[0], words[1..<end].joined(separator: " ") + "…"])
@@ -127,7 +151,9 @@ public enum ShellHeaderPlan {
         }
         return PillNameLayout(
             candidates: candidates,
-            fallback: [words[0], words[1...].joined(separator: " ")]
+            fallback: [words[0], words[1...].joined(separator: " ")],
+            shrinkCandidates: splits,
+            lastResort: [words[0]]
         )
     }
 }

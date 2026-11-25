@@ -123,19 +123,19 @@ struct PairingCodeEntryView: View {
             .background(PixelHandTheme.brandBackground().ignoresSafeArea())
             .foregroundStyle(.white)
             .pixelOnNavy()
-            .navigationTitle("Pair with \(targetName)")
+            // VQ-086: "Pair with Muhammad’s MacBook…" truncated; the Mac's
+            // name is in the heading under it.
+            .navigationTitle("Pair")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
-                // The number pad has no Return key: a Pair key above it.
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button(isConnected ? "Pair" : "Connect and pair") { submit(validCode) }
-                        .disabled(validCode == nil || target == nil || store.isAwaitingCodeResult)
-                }
+                // VQ-086: no second Pair button on the keyboard's bar; it
+                // floated over the footer on iPhone. The one under the
+                // field stays above the number pad (VQ-030), and a full
+                // code sends itself.
             }
             .defaultFocus($isFieldFocused, true)
             .task {
