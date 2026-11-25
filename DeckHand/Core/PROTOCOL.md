@@ -11,6 +11,9 @@ protocol version and exactly one domain key.
 - Version: `PixelHandProtocol.version`, also advertised in the Bonjour TXT
   key `ph-proto` so `PeerCompatibility` can say "Please update" before
   dialling.
+- Role: the TXT key `ph-role` (`mac` or `remote`, `PeerRole`) says which
+  app is advertising, so a remote lists only Macs. Additive (no version
+  bump): a peer without it falls back to Loom's advertised device type.
 - Domains, one file each in `Sources/PixelHandCore/Protocol/`:
 
 | Domain | File | What | Lane |

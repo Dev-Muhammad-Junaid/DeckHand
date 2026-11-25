@@ -58,6 +58,37 @@ import Testing
         #expect(ShellHeaderPlan.pillNameLines(band: .standard) == 1)
     }
 
+    @Test("The pill name breaks only between words, best split first, never mid-word (build 19, VQ-065)")
+    func pillNameBreaksAtWords() {
+        let name = "Muhammad’s MacBook Pro"
+        #expect(ShellHeaderPlan.pillNameCandidates(name, lines: 1) == [[name]])
+        let two = ShellHeaderPlan.pillNameCandidates(name, lines: 2)
+        #expect(two == [
+            [name],
+            ["Muhammad’s MacBook", "Pro"],
+            ["Muhammad’s", "MacBook Pro"],
+        ])
+        // Every line is made of whole words of the name, in order.
+        let words = name.split(separator: " ").map(String.init)
+        for candidate in two {
+            #expect(candidate.joined(separator: " ") == name)
+            for line in candidate {
+                #expect(line.split(separator: " ").allSatisfy { words.contains(String($0)) })
+                #expect(!line.hasSuffix("-"))
+            }
+        }
+        // The fallback (last) keeps the first word whole on its own line.
+        #expect(two.last?.first == "Muhammad’s")
+    }
+
+    @Test("Odd names: one word, extra spaces, hyphens kept inside a word")
+    func pillNameOddNames() {
+        #expect(ShellHeaderPlan.pillNameCandidates("Studio", lines: 2) == [["Studio"]])
+        #expect(ShellHeaderPlan.pillNameCandidates("  Office   iMac ", lines: 2) == [["Office iMac"], ["Office", "iMac"]])
+        #expect(ShellHeaderPlan.pillNameCandidates("Jean-Luc’s Mac", lines: 2) == [["Jean-Luc’s Mac"], ["Jean-Luc’s", "Mac"]])
+        #expect(ShellHeaderPlan.pillNameCandidates("", lines: 2) == [[""]])
+    }
+
     // MARK: Deck header
 
     @Test("The iPad deck columns get two header rows (VQ-024)")

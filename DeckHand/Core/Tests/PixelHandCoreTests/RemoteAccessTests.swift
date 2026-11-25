@@ -403,10 +403,9 @@ struct RemoteAdmissionTests {
         #expect(RemoteAccessPolicy.isRemotePath(link: .cellular, remoteHost: "203.0.113.9"))
         #expect(RemoteAccessPolicy.isRemotePath(link: .tunnel, remoteHost: "fe80::1%utun3"))
         #expect(RemoteAccessPolicy.isRemotePath(link: .tunnel, remoteHost: nil))
-        // An overlay address wins even over a loopback-looking link.
+        // An overlay address that isn't this Mac's wins even over a
+        // loopback-looking link.
         #expect(RemoteAccessPolicy.isRemotePath(link: .loopback, remoteHost: "100.64.0.1"))
-        // A loopback link that reports a routable peer isn't trusted as local.
-        #expect(RemoteAccessPolicy.isRemotePath(link: .loopback, remoteHost: "203.0.113.9"))
     }
 
     @Test("Loopback is the same machine, not a remote path (VQ-001: simulators)")
@@ -428,7 +427,72 @@ struct RemoteAdmissionTests {
         #expect(RemoteAccessPolicy.pathClass(link: .wired, remoteHost: "fe80::1%en7") == .localNetwork)
         #expect(RemoteAccessPolicy.pathClass(link: .wifi, remoteHost: "169.254.10.2") == .localNetwork)
         #expect(RemoteAccessPolicy.pathClass(link: .peerToPeer, remoteHost: "fe80::2%awdl0") == .localNetwork)
-        #expect(RemoteAccessPolicy.pathClass(link: .loopback, remoteHost: "fe80::3%en0") == .localNetwork)
+        #expect(RemoteAccessPolicy.pathClass(link: .ethernet, remoteHost: "fe80::3%en0") == .localNetwork)
+    }
+
+    // MARK: VQ-001 (build 19): the simulator dials the Mac's Wi-Fi address
+
+    /// This Mac's interface addresses, as `InterfaceAddressTable` keys them.
+    let own: Set<String> = [
+        "127.0.0.1", "::1", "fe80::1",            // lo0
+        "192.168.0.121", "fe80::1c2b:3a4d:5e6f:7081", "2001:db8:1::121", // en0
+        "100.101.1.7",                            // utun4 (Tailscale)
+        "10.8.0.6",                               // utun5 (WireGuard)
+    ]
+
+    @Test("Anything over the loopback interface is the same machine, even from a routable address")
+    func loopbackLinkIsSameMachine() {
+        for host in ["192.168.0.121", "203.0.113.9", "10.0.0.4", "2001:db8:1::121", "fe80::3%en0", ""] {
+            #expect(RemoteAccessPolicy.pathClass(link: .loopback, remoteHost: host) == .sameMachine, "\(host)")
+            #expect(RemoteAccessPolicy.pathClass(link: .loopback, remoteHost: host, ownAddresses: own) == .sameMachine, "\(host)")
+            #expect(!RemoteAccessPolicy.isRemotePath(link: .loopback, remoteHost: host), "\(host)")
+        }
+    }
+
+    @Test("A peer at one of this Mac's own addresses is the same machine, whatever the link says")
+    func ownAddressIsSameMachine() {
+        for link: LinkKind in [.wifi, .ethernet, .unknown, .other, .tunnel, .cellular, .loopback] {
+            for host in ["192.168.0.121", "::ffff:192.168.0.121", "2001:DB8:1::121", "[2001:db8:1::121]", "10.8.0.6", "100.101.1.7"] {
+                #expect(RemoteAccessPolicy.pathClass(link: link, remoteHost: host, ownAddresses: own) == .sameMachine, "\(link) \(host)")
+            }
+        }
+        #expect(RemoteAccessPolicy.isOwnAddress("192.168.0.121", ownAddresses: own))
+        #expect(!RemoteAccessPolicy.isOwnAddress("192.168.0.122", ownAddresses: own))
+        #expect(!RemoteAccessPolicy.isOwnAddress(nil, ownAddresses: own))
+        #expect(!RemoteAccessPolicy.isOwnAddress("192.168.0.121", ownAddresses: []))
+    }
+
+    @Test("Link-local addresses never count as this Mac's own (another device can hold the same one)")
+    func linkLocalIsNotOwn() {
+        #expect(!RemoteAccessPolicy.isOwnAddress("fe80::1%en7", ownAddresses: own))
+        #expect(RemoteAccessPolicy.pathClass(link: .wired, remoteHost: "fe80::1%en7", ownAddresses: own) == .localNetwork)
+        #expect(RemoteAccessPolicy.pathClass(link: .tunnel, remoteHost: "fe80::1%utun3", ownAddresses: own) == .remote)
+    }
+
+    @Test("Other devices' overlay and VPN addresses stay remote with the Mac's addresses known")
+    func overlayAndVPNStayRemote() {
+        // Another Tailscale node, on any link, loopback included.
+        for link: LinkKind in [.wifi, .tunnel, .unknown, .loopback] {
+            #expect(RemoteAccessPolicy.pathClass(link: link, remoteHost: "100.101.1.2", ownAddresses: own) == .remote, "\(link)")
+            #expect(RemoteAccessPolicy.pathClass(link: link, remoteHost: "fd7a:115c:a1e0::9", ownAddresses: own) == .remote, "\(link)")
+        }
+        // A WireGuard peer on the tunnel, and a cellular peer.
+        #expect(RemoteAccessPolicy.pathClass(link: .tunnel, remoteHost: "10.8.0.2", ownAddresses: own) == .remote)
+        #expect(RemoteAccessPolicy.pathClass(link: .cellular, remoteHost: "203.0.113.9", ownAddresses: own) == .remote)
+        // Another device on the LAN stays the local network.
+        #expect(RemoteAccessPolicy.pathClass(link: .wifi, remoteHost: "192.168.0.50", ownAddresses: own) == .localNetwork)
+    }
+
+    @Test("An unpaired simulator dialling the Mac's Wi-Fi address over lo0 gets the prompt, not a refusal (build 19)")
+    func simulatorOnWiFiAddressCanPair() {
+        let ask = PairingAdmission.askUser(device.ref)
+        let remote = RemoteAccessPolicy.isRemotePath(link: .loopback, remoteHost: "192.168.0.121", ownAddresses: own)
+        #expect(!remote)
+        #expect(RemoteAccessPolicy.admission(ask, isRemotePath: remote) == ask)
+        // The Mac's own address wins over the link judgement; without the
+        // address table the link judgement stands.
+        #expect(!RemoteAccessPolicy.isRemotePath(link: .tunnel, remoteHost: "192.168.0.121", ownAddresses: own))
+        #expect(RemoteAccessPolicy.isRemotePath(link: .tunnel, remoteHost: "192.168.0.121"))
     }
 
     @Test("An unpaired simulator over loopback gets the usual prompt and code, not a refusal")

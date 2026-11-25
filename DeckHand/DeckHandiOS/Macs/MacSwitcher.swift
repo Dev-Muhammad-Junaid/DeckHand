@@ -141,7 +141,8 @@ final class MacSwitcher {
 
     /// Discovery changed. Also the moment to reconnect at launch.
     func update(peers: [LoomPeerSnapshot]) {
-        self.peers = peers
+        // Only Macs, whoever calls (build 19: another iPad listed as a Mac).
+        self.peers = peers.macsOnly
         pairingRevision += 1
         reconnectAtLaunchIfNeeded()
     }
@@ -324,7 +325,7 @@ final class MacSwitcher {
                     if reconnectingDeviceID == target {
                         scheduleRedial(target, attempt: redialAttempt + 1, isVerdict: false)
                     } else {
-                        show("Couldn’t connect to \(peer.name): \(error.localizedDescription)")
+                        show(UserFacingError.connectFailure(macName: peer.name, detail: error.localizedDescription))
                     }
                 }
             }

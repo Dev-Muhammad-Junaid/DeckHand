@@ -4,7 +4,8 @@
 //
 //  The parts of a surface the floating screen tile must not cover. The
 //  Pointer surface reports its pad, click strip, caption and keyboard
-//  button (window coordinates) with `.mirrorTileKeepOut(_:owner:)`; the
+//  button, the Deck surface its header (window coordinates), with
+//  `.mirrorTileKeepOut(_:owner:)`; the
 //  tile (`MirrorOverlay`) reads them for the same session and clamps itself
 //  clear with `MirrorTilePlacement` (Core).
 //
@@ -23,6 +24,9 @@ enum MirrorTileKeepOutPart: Hashable {
     case clickStrip
     case caption
     case keyboard
+    /// The deck's header row: page name, counter, pin and Edit (or Undo,
+    /// the page menu and Done while editing). Build 19.
+    case deckHeader
 }
 
 @MainActor
@@ -54,14 +58,15 @@ final class MirrorTileKeepOut {
                 height: Double(rect.height)
             )
         }
-        let pad = local(.pad)
-        let areas = MirrorTilePlacement.pointerKeepOut(
-            pad: pad,
+        let layout = MirrorTilePlacement.surfaceLayout(
+            bounds: MirrorRect(x: 0, y: 0, width: Double(container.width), height: Double(container.height)),
+            pad: local(.pad),
             clickStrip: local(.clickStrip),
             caption: local(.caption),
-            keyboard: local(.keyboard)
+            keyboard: local(.keyboard),
+            deckHeader: local(.deckHeader)
         )
-        return (pad.map { CGRect($0) }, areas.map { CGRect($0) })
+        return (layout.anchor.map { CGRect($0) }, layout.keepOut.map { CGRect($0) })
     }
 }
 

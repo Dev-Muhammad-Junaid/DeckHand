@@ -38,8 +38,9 @@ struct DeckHandApp: App {
                     // channel every half second (p90 ~50 ms instead of ~4 ms).
                     enablePeerToPeer: false,
                     // `ph-proto` in the Bonjour TXT record, so the Mac's menu
-                    // bar can say "Please update" (PeerCompatibility).
-                    advertisementMetadata: PixelHandProtocol.advertisementMetadata,
+                    // bar can say "Please update" (PeerCompatibility), and
+                    // `ph-role` so other remotes don't list this one as a Mac.
+                    advertisementMetadata: PixelHandProtocol.advertisementMetadata(role: .remote),
                     // Manual lifecycle only — see MacHostApp for rationale.
                     retryPolicy: .disabled
                 )

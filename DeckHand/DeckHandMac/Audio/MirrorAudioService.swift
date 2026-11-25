@@ -146,7 +146,12 @@ final class MirrorAudioService {
         }
     }
 
+    /// No raw error in the copy (build 19): the reason only when it reads
+    /// as a sentence.
     static func unavailableMessage(_ reason: String) -> String {
-        "The Mac's sound couldn't be played here (\(reason)). The mirror carries on without it."
+        let base = "The Mac’s sound couldn’t be played here."
+        let tail = "The mirror carries on without it."
+        guard let sentence = UserFacingError.sentence(from: reason) else { return "\(base) \(tail)" }
+        return "\(base) \(sentence) \(tail)"
     }
 }

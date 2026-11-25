@@ -208,7 +208,8 @@ final class MirrorStreamService: NSObject {
         subscriber.onNeedsKeyFrame = { [weak self] in self?.output?.requestKeyFrame() }
         guard await subscriber.open() else {
             subscribers.removeValue(forKey: subscriberID)
-            try? await handle.send(.mirror(.error(message: "Live mirror unavailable: couldn't open the mirror stream.")))
+            let failure = CaptureFailure.reported(for: nil, fallback: .streamOpenFailed)
+            try? await handle.send(.mirror(.error(message: failure.message(isMirror: true))))
             if subscribers.isEmpty { await teardownStream() }
             return
         }
@@ -247,9 +248,10 @@ final class MirrorStreamService: NSObject {
                 DeckHandLog.app.error("Mirror stream failed to start: \(error.localizedDescription, privacy: .public)")
                 subscribers.removeValue(forKey: subscriberID)
                 await subscriber.close()
-                try? await handle.send(.mirror(.error(
-                    message: "Live mirror unavailable: \(error.localizedDescription)"
-                )))
+                // Build 19: a sentence, never the raw error; "The Mac is
+                // locked." while it is locked.
+                let failure = CaptureFailure.reported(for: error)
+                try? await handle.send(.mirror(.error(message: failure.message(isMirror: true))))
                 return
             }
             for other in subscribers.values { other.markFormatChanged() }
@@ -667,6 +669,12 @@ final class MirrorStreamService: NSObject {
         }
     }
 
+    /// Why a running stream stopped, for the remote: Screen Recording
+    /// turned off, or "the live screen stopped".
+    private static func stoppedFailure(for error: Error) -> CaptureFailure {
+        CaptureFailure.cause(of: error) == .screenRecordingDenied ? .screenRecordingDenied : .streamStopped
+    }
+
     /// Called by `MirrorFrameOutput` when ScreenCaptureKit reports the
     /// stream died (display unplugged, TCC revoked mid-stream, …).
     fileprivate func handleStreamFailure(_ error: Error, from source: MirrorFrameOutput? = nil) {
@@ -696,12 +704,11 @@ final class MirrorStreamService: NSObject {
         currentTarget = nil
         currentWindow = nil
         windowTracker = nil
+        let failure = CaptureFailure.reported(for: nil, fallback: Self.stoppedFailure(for: error))
         for subscriber in dropped {
             Task {
                 await subscriber.close()
-                try? await subscriber.handle.send(.mirror(.error(
-                    message: "Live mirror stopped: \(error.localizedDescription)"
-                )))
+                try? await subscriber.handle.send(.mirror(.error(message: failure.message(isMirror: true))))
             }
         }
     }

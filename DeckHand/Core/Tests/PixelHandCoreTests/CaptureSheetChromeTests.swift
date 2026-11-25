@@ -59,12 +59,12 @@ import Testing
     func lockedRefusal() {
         let locked = LockPolicy.lockedErrorMessage
         #expect(CaptureSheetChrome.isLockedRefusal(locked))
-        #expect(CaptureSheetChrome.errorTitle(message: locked, isMirror: false) == "Mac Is Locked")
-        #expect(CaptureSheetChrome.errorTitle(message: locked, isMirror: true) == "Mac Is Locked")
+        #expect(CaptureSheetChrome.errorTitle(message: locked, isMirror: false) == "Mac is locked")
+        #expect(CaptureSheetChrome.errorTitle(message: locked, isMirror: true) == "Mac is locked")
         #expect(CaptureSheetChrome.errorMessage(message: locked, isMirror: false).hasPrefix("Unlock the Mac"))
-        #expect(CaptureSheetChrome.errorTitle(message: "Timeout", isMirror: false) == "Screenshot Failed")
-        #expect(CaptureSheetChrome.errorTitle(message: "Timeout", isMirror: true) == "Live Screen Unavailable")
-        #expect(CaptureSheetChrome.errorMessage(message: "Timeout", isMirror: true) == "Timeout")
+        #expect(CaptureSheetChrome.errorTitle(message: "Timeout", isMirror: false) == "Screenshot failed")
+        #expect(CaptureSheetChrome.errorTitle(message: "Timeout", isMirror: true) == "Live screen unavailable")
+        #expect(CaptureSheetChrome.errorMessage(message: "Timeout", isMirror: true) == "Timeout.")
         #expect(CaptureSheetChrome.emptyWindowsMessage(isMirror: false).contains("unlock"))
     }
 

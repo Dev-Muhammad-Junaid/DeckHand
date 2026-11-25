@@ -6,7 +6,8 @@
 //  the Mac's name and the front app (or approval state), on glass, 44 pt.
 //  Offline shows a grey pixel; locked shows the lock glyph. At AX1+ the
 //  second line drops before the name truncates; at AX3+ the name gets two
-//  lines. Names truncate at the tail.
+//  lines, broken between words, never hyphenated. Names truncate at the
+//  tail.
 //  Spec: `02-Design-System.md` §7, board `.macpill`.
 //
 
@@ -44,14 +45,7 @@ struct MacPill: View {
         HStack(spacing: PixelHandTheme.Space.sm) {
             tile
             VStack(alignment: .leading, spacing: 0) {
-                Text(name)
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(PixelHandTheme.ink)
-                    .lineLimit(nameLines)
-                    // Tail, so the first word stays ("Muhammad’s Mac…", never
-                    // "Mu…k Pro"; VQ-032, VQ-081).
-                    .truncationMode(.tail)
-                    .fixedSize(horizontal: false, vertical: nameLines > 1)
+                nameText
                 if let subtitle, typeSize.typeBand == .standard {
                     Text(subtitle)
                         .font(.caption)
@@ -71,6 +65,38 @@ struct MacPill: View {
         .frame(minHeight: PixelHandTheme.ControlHeight.standard)
         .phGlass(in: Capsule(), interactive: action != nil)
         .contentShape(Capsule())
+    }
+
+    /// The name, breaking only between words (build 19: at AX3 a wrapped
+    /// `Text` hyphenated it, "Muham- / mad’s Mac…"). Each line is its own
+    /// one-line `Text`, which never hyphenates; `ViewThatFits` picks the
+    /// first word split whose lines fit, and the last split truncates at
+    /// the tail, so the first word stays ("Muhammad’s Mac…", never
+    /// "Mu…k Pro"; VQ-032, VQ-081).
+    @ViewBuilder
+    private var nameText: some View {
+        let candidates = ShellHeaderPlan.pillNameCandidates(name, lines: nameLines)
+        if candidates.count == 1 {
+            nameLine(candidates[0].first ?? name)
+        } else {
+            ViewThatFits(in: .horizontal) {
+                ForEach(candidates.indices, id: \.self) { index in
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(candidates[index].indices, id: \.self) { line in
+                            nameLine(candidates[index][line])
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func nameLine(_ text: String) -> some View {
+        Text(text)
+            .font(.callout.weight(.semibold))
+            .foregroundStyle(PixelHandTheme.ink)
+            .lineLimit(1)
+            .truncationMode(.tail)
     }
 
     private var tile: some View {
@@ -113,6 +139,8 @@ struct MacPill: View {
         MacPill(name: "Studio", subtitle: "Xcode", action: {})
         MacPill(name: "Mac mini", subtitle: "Locked", status: .locked)
         MacPill(name: "Office iMac", subtitle: "Offline", status: .offline)
+        MacPill(name: "Muhammad’s MacBook Pro", nameLines: 2, action: {})
+            .frame(width: 180, alignment: .leading)
     }
     .padding(16)
     .background(.phCanvas)

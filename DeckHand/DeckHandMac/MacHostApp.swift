@@ -61,8 +61,9 @@ final class MacDaemon: ObservableObject {
                     // channel every half second (p90 ~50 ms instead of ~4 ms).
                     enablePeerToPeer: false,
                     // `ph-proto` in the Bonjour TXT record, so remotes can
-                    // say "Please update" before dialling (PeerCompatibility).
-                    advertisementMetadata: PixelHandProtocol.advertisementMetadata,
+                    // say "Please update" before dialling (PeerCompatibility),
+                    // and `ph-role` so remotes list it as a Mac (PeerRole).
+                    advertisementMetadata: PixelHandProtocol.advertisementMetadata(role: .mac),
                     // No transport-level auto-retry: connection lifecycle is
                     // owned entirely by the app (explicit connect, ping/pong
                     // liveness). Retry created overlapping reconnect state
