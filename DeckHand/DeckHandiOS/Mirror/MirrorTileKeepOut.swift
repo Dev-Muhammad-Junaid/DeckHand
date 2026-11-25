@@ -12,7 +12,8 @@
 //  Entries are keyed by the session's `TrackpadSender`, so two windows on
 //  iPad, each with its own Mac connection, don't see each other's areas.
 //  A part removes itself when it leaves the screen (strip hidden, surface
-//  switched).
+//  switched), but only the report it made itself: a replacement that
+//  appeared first keeps its frame (VQ-083, `MirrorTileKeepOutRegistry`).
 //
 
 import SwiftUI
@@ -27,6 +28,10 @@ enum MirrorTileKeepOutPart: Hashable {
     /// The deck's header row: page name, counter, pin and Edit (or Undo,
     /// the page menu and Done while editing). Build 19.
     case deckHeader
+    /// The page's keys, ghost slots and Add key, reported only while the
+    /// deck is being edited (VQ-083). Where it leaves no room, the tile
+    /// steps aside until Done.
+    case deckEditGrid
 }
 
 @MainActor
@@ -34,23 +39,33 @@ enum MirrorTileKeepOutPart: Hashable {
 final class MirrorTileKeepOut {
     static let shared = MirrorTileKeepOut()
 
-    private var frames: [ObjectIdentifier: [MirrorTileKeepOutPart: CGRect]] = [:]
+    /// Keyed by owner and part; each entry remembers which view reported
+    /// it, so a view leaving late can't wipe its replacement's frame
+    /// (VQ-083: the normal deck header's disappear after the edit header's
+    /// appear left the tile over Done).
+    private var frames = MirrorTileKeepOutRegistry<ObjectIdentifier, MirrorTileKeepOutPart, CGRect>()
 
-    func set(_ frame: CGRect?, for part: MirrorTileKeepOutPart, owner: AnyObject) {
-        let key = ObjectIdentifier(owner)
-        var parts = frames[key] ?? [:]
-        guard parts[part] != frame else { return }
-        parts[part] = frame
-        frames[key] = parts.isEmpty ? nil : parts
+    func set(_ frame: CGRect, for part: MirrorTileKeepOutPart, owner: AnyObject, reporter: UUID) {
+        // Mutate a copy, so an unchanged report doesn't invalidate the tile.
+        var next = frames
+        if next.report(frame, for: part, owner: ObjectIdentifier(owner), reporter: reporter) { frames = next }
     }
 
-    /// The pad (the tile's home anchor) and the areas to avoid, converted
-    /// from window coordinates into the tile's container (whose window
-    /// frame is `container`).
-    func layout(for owner: AnyObject?, in container: CGRect) -> (anchor: CGRect?, keepOut: [CGRect]) {
-        guard let owner, let parts = frames[ObjectIdentifier(owner)] else { return (nil, []) }
+    func withdraw(_ part: MirrorTileKeepOutPart, owner: AnyObject, reporter: UUID) {
+        var next = frames
+        if next.withdraw(part, owner: ObjectIdentifier(owner), reporter: reporter) { frames = next }
+    }
+
+    /// The pad (the tile's home anchor), the areas to avoid, and whether
+    /// the tile may step aside (deck editing), converted from window
+    /// coordinates into the tile's container (whose window frame is
+    /// `container`).
+    func plan(for owner: AnyObject?, in container: CGRect) -> MirrorTileSurfacePlan {
+        guard let owner else { return MirrorTileSurfacePlan(anchor: nil, keepOut: []) }
+        let key = ObjectIdentifier(owner)
+        guard frames.hasParts(owner: key) else { return MirrorTileSurfacePlan(anchor: nil, keepOut: []) }
         func local(_ part: MirrorTileKeepOutPart) -> MirrorRect? {
-            guard let rect = parts[part], !rect.isEmpty else { return nil }
+            guard let rect = frames.frame(part, owner: key), !rect.isEmpty else { return nil }
             return MirrorRect(
                 x: Double(rect.minX - container.minX),
                 y: Double(rect.minY - container.minY),
@@ -58,15 +73,15 @@ final class MirrorTileKeepOut {
                 height: Double(rect.height)
             )
         }
-        let layout = MirrorTilePlacement.surfaceLayout(
+        return MirrorTilePlacement.surfacePlan(
             bounds: MirrorRect(x: 0, y: 0, width: Double(container.width), height: Double(container.height)),
             pad: local(.pad),
             clickStrip: local(.clickStrip),
             caption: local(.caption),
             keyboard: local(.keyboard),
-            deckHeader: local(.deckHeader)
+            deckHeader: local(.deckHeader),
+            deckEditGrid: local(.deckEditGrid)
         )
-        return (layout.anchor.map { CGRect($0) }, layout.keepOut.map { CGRect($0) })
     }
 }
 
@@ -85,19 +100,29 @@ extension MirrorRect {
 private struct MirrorTileKeepOutReporter: ViewModifier {
     let part: MirrorTileKeepOutPart
     let owner: AnyObject
+    let isActive: Bool
+    /// This reporter's identity: its withdrawal only clears its own report.
+    @State private var reporter = UUID()
 
     func body(content: Content) -> some View {
         content.background {
             GeometryReader { proxy in
                 let frame = proxy.frame(in: .global)
                 Color.clear
-                    .onAppear { MirrorTileKeepOut.shared.set(frame, for: part, owner: owner) }
-                    .onChange(of: frame) { _, newFrame in
-                        MirrorTileKeepOut.shared.set(newFrame, for: part, owner: owner)
-                    }
-                    .onDisappear { MirrorTileKeepOut.shared.set(nil, for: part, owner: owner) }
+                    .onAppear { report(frame) }
+                    .onChange(of: frame) { _, newFrame in report(newFrame) }
+                    .onChange(of: isActive) { _, _ in report(frame) }
+                    .onDisappear { MirrorTileKeepOut.shared.withdraw(part, owner: owner, reporter: reporter) }
             }
             .accessibilityHidden(true)
+        }
+    }
+
+    private func report(_ frame: CGRect) {
+        if isActive {
+            MirrorTileKeepOut.shared.set(frame, for: part, owner: owner, reporter: reporter)
+        } else {
+            MirrorTileKeepOut.shared.withdraw(part, owner: owner, reporter: reporter)
         }
     }
 }
@@ -105,7 +130,9 @@ private struct MirrorTileKeepOutReporter: ViewModifier {
 extension View {
     /// Reports this view's frame as an area the floating screen tile keeps
     /// clear of, for the session that `owner` (its `TrackpadSender`) belongs to.
-    func mirrorTileKeepOut(_ part: MirrorTileKeepOutPart, owner: AnyObject) -> some View {
-        modifier(MirrorTileKeepOutReporter(part: part, owner: owner))
+    /// `isActive: false` withdraws the area while the view stays on screen
+    /// (the deck's edit grid outside edit mode).
+    func mirrorTileKeepOut(_ part: MirrorTileKeepOutPart, owner: AnyObject, isActive: Bool = true) -> some View {
+        modifier(MirrorTileKeepOutReporter(part: part, owner: owner, isActive: isActive))
     }
 }

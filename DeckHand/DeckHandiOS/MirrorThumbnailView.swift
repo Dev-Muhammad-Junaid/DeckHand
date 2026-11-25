@@ -13,7 +13,9 @@
 //  Pointer pad, else the canvas), 12 pt in, and every drag, pinch and
 //  layout change is clamped by `MirrorTilePlacement` (Core) so it stays on
 //  the canvas and clear of the areas the surface reserves (the Pointer
-//  surface's click strip, caption row and keyboard button).
+//  surface's click strip, caption row and keyboard button; the deck header,
+//  and the edit grid while editing). While the deck is edited and no clear
+//  spot is left (iPhone), the tile steps aside until Done (VQ-083).
 //
 //  The view is intentionally dumb: frame decode, the cursor and the
 //  start/stop protocol live in `ControlSessionModel+Mirror` and the binary
@@ -70,6 +72,10 @@ struct MirrorThumbnailView: View {
     /// Height of `belowAccessory` plus its gap, counted when clearing
     /// `keepOut` so the dots don't land on a reserved area either.
     var belowAccessoryHeight: CGFloat = 0
+    /// While the deck is being edited (VQ-083): with no spot clear of the
+    /// deck header and the edit grid, the tile steps aside until Done
+    /// instead of covering Done or the key slots.
+    var stepsAsideWhenCrowded: Bool = false
 
     /// Persisted drag offset (committed at drag end) + live in-drag delta.
     @State private var committedOffset: CGSize = .zero
@@ -155,6 +161,23 @@ struct MirrorThumbnailView: View {
     }
 
     private var keepOutRects: [MirrorRect] { keepOut.map(MirrorRect.init) }
+
+    /// False only while the deck is edited and even the smallest tile has
+    /// no clear spot (`MirrorTilePlacement.isShown`).
+    private var isShown: Bool {
+        guard containerSize.width > 0, containerSize.height > 0 else { return true }
+        return MirrorTilePlacement.isShown(
+            MirrorTileSurfacePlan(
+                anchor: homeAnchor.map(MirrorRect.init),
+                keepOut: keepOutRects,
+                stepsAsideWhenCrowded: stepsAsideWhenCrowded
+            ),
+            minimumWidth: Double(minWidth),
+            aspect: Double(frameAspect),
+            extraHeight: Double(belowAccessoryHeight),
+            in: bounds
+        )
+    }
 
     /// The tile's resting frame at this width (offset zero).
     private func home(width: CGFloat) -> MirrorRect {
@@ -334,6 +357,12 @@ struct MirrorThumbnailView: View {
         // tile clear smoothly instead of jumping.
         .animation(.snappy(duration: 0.2), value: keepOut)
         .animation(.snappy(duration: 0.2), value: homeAnchor)
+        // VQ-083: stepped aside while the deck is edited on a canvas with no
+        // room for it; back on Done. The stream keeps running.
+        .opacity(isShown ? 1 : 0)
+        .allowsHitTesting(isShown)
+        .accessibilityHidden(!isShown)
+        .animation(.snappy(duration: 0.2), value: isShown)
         .frame(
             width: containerSize.width > 0 ? containerSize.width : nil,
             height: containerSize.height > 0 ? containerSize.height : nil,
