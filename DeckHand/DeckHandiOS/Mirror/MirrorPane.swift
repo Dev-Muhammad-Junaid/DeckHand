@@ -8,7 +8,9 @@
 //  (`ON 2 →`, only while the pointer is on another display), the S6 stats
 //  strip under it when turned on, and the glass toolbar at the bottom:
 //  display picker (`1/2`), ‹ desktop dots ›, sound, Picture in Picture
-//  (UX-041), stop.
+//  (UX-041), stop. The toolbar fades after 3 s without a touch (never under
+//  VoiceOver) and a tap on the picture brings it back; the strip is dim
+//  with CONNECTING until the first frame.
 //
 //  Everything the floating tile does still runs here: the binary stream
 //  (JPEG or HEVC with its watchdog, in `ControlSessionModel+Mirror`), the
@@ -27,12 +29,19 @@ struct MirrorPane: View {
     @EnvironmentObject private var settings: DeckHandSettings
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isPickerPresented = false
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverOn
+    /// The toolbar fades after 3 s without a touch so the Mac's Dock shows
+    /// (VQ-061); a tap on the picture brings it back.
+    @State private var isToolbarShown = true
+    @State private var toolbarTouches = 0
 
     var body: some View {
         GeometryReader { proxy in
             let wide = proxy.size.width >= 600
             ZStack {
                 Color.black
+                    .contentShape(Rectangle())
+                    .onTapGesture { touchToolbar() }
                 MirrorPicture(session: session)
                     .mirrorScanline(on: scanKey)
                     .accessibilityElement(children: .ignore)
@@ -57,6 +66,7 @@ struct MirrorPane: View {
             )
             .overlay(alignment: .top) { topChrome(wide: wide) }
             .overlay(alignment: .bottom) { bottomChrome }
+            .simultaneousGesture(TapGesture().onEnded { touchToolbar() })
             .pixelOnNavy()
             .onAppear { syncStreamWidth(proxy.size.width) }
             .onChange(of: proxy.size.width) { _, width in syncStreamWidth(width) }
@@ -75,14 +85,33 @@ struct MirrorPane: View {
         }
         // UX-041: Pro and the PiP setting.
         .mirrorPiPSync(session: session)
+        .task(id: toolbarTouches) {
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled, !voiceOverOn, !isPickerPresented, hasFrame else { return }
+            withAnimation(PixelHandMotion.reduced(.easeOut(duration: 0.2), reduceMotion: reduceMotion)) {
+                isToolbarShown = false
+            }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Screen of \(macName)")
         .accessibilityIdentifier("ph.mirror")
     }
 
+    /// Shows the toolbar and restarts its 3 s timer.
+    private func touchToolbar() {
+        if !isToolbarShown {
+            withAnimation(PixelHandMotion.reduced(.easeOut(duration: 0.15), reduceMotion: reduceMotion)) {
+                isToolbarShown = true
+            }
+        }
+        toolbarTouches += 1
+    }
+
     // MARK: Data
 
     private var strip: MirrorSpaceStrip { session.mirrorSpaceStrip }
+
+    private var hasFrame: Bool { session.mirrorShowsVideo || session.mirrorImage != nil }
 
     /// A new picture (first frame, display, window or desktop) sweeps in
     /// under the scanline.
@@ -122,12 +151,21 @@ struct MirrorPane: View {
             mirroringWindow: session.mirrorWindowSelection.isActive,
             spaces: strip,
             host: session.mirrorHostStats,
-            client: session.mirrorClientStats
+            client: session.mirrorClientStats,
+            hasFrame: hasFrame
         )
         return VStack(alignment: .leading, spacing: PixelHandTheme.Space.xs) {
             HStack(alignment: .center, spacing: PixelHandTheme.Space.sm) {
-                StatusStrip(items: status.items, pitch: wide ? 1.8 : 1.6, accessibilityText: status.spoken)
-                    .layoutPriority(1)
+                // Drops whole segments, the Mac's name first (VQ-038); dim
+                // with CONNECTING until the first frame (VQ-062).
+                StatusStrip(
+                    items: status.items,
+                    style: hasFrame ? .live : .dim,
+                    pitch: wide ? 1.8 : 1.6,
+                    accessibilityText: status.spoken,
+                    candidates: MirrorPaneChrome.stripCandidates(status.items)
+                )
+                .layoutPriority(1)
                 Spacer(minLength: 0)
                 if let badge = cursorBadge {
                     MirrorCursorBadgeView(badge: badge) {
@@ -171,6 +209,9 @@ struct MirrorPane: View {
                     .transition(.opacity)
             }
             toolbar
+                .opacity(isToolbarShown || voiceOverOn ? 1 : 0)
+                .allowsHitTesting(isToolbarShown || voiceOverOn)
+                .accessibilityHidden(!(isToolbarShown || voiceOverOn))
         }
         .padding(PixelHandTheme.Space.sm)
         .animation(PixelHandMotion.reduced(PixelHandMotion.quick, reduceMotion: reduceMotion), value: chrome)

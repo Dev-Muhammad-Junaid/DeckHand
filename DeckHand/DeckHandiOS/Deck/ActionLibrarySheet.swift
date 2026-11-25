@@ -83,7 +83,9 @@ struct ActionLibrarySheet: View {
                     }
                 }
             }
-            .searchable(text: $query, prompt: "Search actions and apps")
+            // Pinned under the title, so it never floats over the list in
+            // the medium detent (VQ-047).
+            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search actions and apps")
             .navigationTitle("Add key")
             .accessibilityIdentifier("ph.deck.actionLibrary")
             .navigationBarTitleDisplayMode(.inline)
@@ -150,7 +152,8 @@ struct ActionLibrarySheet: View {
                     Text(subtitle)
                         .font(.caption)
                         .foregroundStyle(PixelHandTheme.ink2)
-                        .lineLimit(2)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
                 Image(systemName: accessory)

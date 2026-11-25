@@ -68,7 +68,12 @@ struct PHButtonStyle: ButtonStyle {
         var body: some View {
             configuration.label
                 .font(size.font)
-                .lineLimit(2)
+                // A button never wraps a word (build 18 QA: "E / di",
+                // "Do / ne"). Inline buttons take their label's width and
+                // the row around them gives way; full-width buttons may
+                // take a second line at the largest sizes.
+                .lineLimit(fullWidth ? 2 : 1)
+                .fixedSize(horizontal: !fullWidth, vertical: false)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(foreground)
                 .padding(.horizontal, size.horizontalPadding)

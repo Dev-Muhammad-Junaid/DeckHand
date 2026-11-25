@@ -5,7 +5,8 @@
 //  The header's Mac pill: a navy tile with the Mac glyph and its live pixel,
 //  the Mac's name and the front app (or approval state), on glass, 44 pt.
 //  Offline shows a grey pixel; locked shows the lock glyph. At AX1+ the
-//  second line drops before the name truncates.
+//  second line drops before the name truncates; at AX3+ the name gets two
+//  lines. Names truncate at the tail.
 //  Spec: `02-Design-System.md` §7, board `.macpill`.
 //
 
@@ -17,6 +18,9 @@ struct MacPill: View {
     let name: String
     var subtitle: String?
     var status: Status = .online
+    /// 2 at the Huge type band: the name wraps rather than collapsing to
+    /// "…" (`ShellHeaderPlan.pillNameLines`, VQ-065).
+    var nameLines = 1
     var action: (() -> Void)?
 
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -43,8 +47,11 @@ struct MacPill: View {
                 Text(name)
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(PixelHandTheme.ink)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                    .lineLimit(nameLines)
+                    // Tail, so the first word stays ("Muhammad’s Mac…", never
+                    // "Mu…k Pro"; VQ-032, VQ-081).
+                    .truncationMode(.tail)
+                    .fixedSize(horizontal: false, vertical: nameLines > 1)
                 if let subtitle, typeSize.typeBand == .standard {
                     Text(subtitle)
                         .font(.caption)

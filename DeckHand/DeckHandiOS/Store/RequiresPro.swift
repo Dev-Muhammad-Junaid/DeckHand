@@ -14,7 +14,7 @@
 //  `.requiresPro` leaves the control as it is when the feature is unlocked
 //  (Pro, the free trial, grace and billing retry, or a free feature). When
 //  it's locked, the control is dimmed and can't be used, a small lock sits
-//  on its corner, and a tap anywhere on it opens the paywall for that
+//  inside its bottom-trailing corner, and a tap anywhere on it opens the paywall for that
 //  feature. VoiceOver reads it as "<label>, Pixel Hand Pro" with the hint
 //  "Opens Pixel Hand Pro".
 //
@@ -60,9 +60,10 @@ private struct RequiresProModifier: ViewModifier {
                 .disabled(true)
                 .opacity(0.45)
                 .accessibilityHidden(true)
-                .overlay(alignment: .topTrailing) {
+                // Anchored inside the control's bottom-trailing corner, so
+                // it never hangs off a header circle's edge (VQ-026).
+                .overlay(alignment: .bottomTrailing) {
                     ProLockBadge()
-                        .offset(x: 4, y: -4)
                         .allowsHitTesting(false)
                 }
                 .overlay {

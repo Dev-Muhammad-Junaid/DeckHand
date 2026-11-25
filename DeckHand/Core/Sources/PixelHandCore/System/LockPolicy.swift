@@ -40,7 +40,9 @@ public enum MacLockState: String, Codable, Sendable, Hashable, CaseIterable {
         case .unlocked:
             nil
         case .screenLocked:
-            "\(macName) is locked. Type its password and press Return to unlock it; apps, windows and shortcuts come back once it is unlocked."
+            // One short sentence; the banner carries a Keyboard button
+            // (build 18 QA, VQ-068).
+            "\(macName) is locked. Type the password to unlock."
         case .offConsole:
             "Another user is using \(macName), or it is at the login window. Nothing you send reaches it until your account is back."
         }

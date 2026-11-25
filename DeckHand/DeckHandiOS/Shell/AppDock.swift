@@ -8,6 +8,10 @@
 //  that's showing a dialog. A hairline, then the keyboard button, which sits
 //  in the dock so the keyboard can never cover its own toggle.
 //
+//  The row shows whole icons only (`AppDockFit`): it snaps its width to a
+//  whole number of slots, rests on whole icons when scrolled, and fades
+//  its end when more apps wait past it.
+//
 //  Tap brings an app to the front on the Mac. Touch and hold (or the
 //  VoiceOver actions): Bring to front, Shortcuts, Hide, Quit. Order comes
 //  from `AppDockPlan` (stable slots, new apps at the end).
@@ -28,7 +32,16 @@ struct AppDock: View {
     let onQuit: (InstalledAppInfo) -> Void
     let onKeyboard: () -> Void
 
+    /// The room the app row may take, measured; the row then snaps to
+    /// whole icons (`AppDockFit`, VQ-039).
+    @State private var rowAvailable: CGFloat = 0
+
+    private var shownCount: Int {
+        entries.filter { apps[$0.bundleID] != nil }.count
+    }
+
     var body: some View {
+        let fit = AppDockFit.row(available: Double(rowAvailable), count: max(shownCount, 1))
         HStack(spacing: PixelHandTheme.Space.xs) {
             ScrollViewReader { reader in
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -60,10 +73,22 @@ struct AppDock: View {
                             }
                         }
                     }
-                    .padding(.leading, PixelHandTheme.Space.md)
-                    .padding(.trailing, PixelHandTheme.Space.xl)
+                    .scrollTargetLayout()
                 }
-                .mask { TrailingFade(width: PixelHandTheme.Space.xl) }
+                .contentMargins(.horizontal, CGFloat(AppDockFit.inset), for: .scrollContent)
+                // Rests on whole icons; the row shows whole slots only, and
+                // fades its end when more apps wait past it.
+                .scrollTargetBehavior(.viewAligned)
+                .mask {
+                    if fit.overflows {
+                        TrailingFade(width: PixelHandTheme.Space.lg)
+                    } else {
+                        Rectangle()
+                    }
+                }
+                .frame(width: rowAvailable > 0 && shownCount > 0 ? CGFloat(fit.width) : nil)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { rowAvailable = $0 }
                 .onChange(of: entries.first(where: \.isFront)?.bundleID) { _, front in
                     guard let front else { return }
                     withAnimation(PixelHandMotion.standard) { reader.scrollTo(front) }

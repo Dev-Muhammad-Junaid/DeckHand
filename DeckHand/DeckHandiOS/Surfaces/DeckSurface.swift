@@ -12,7 +12,9 @@
 //  Edit mode: dotted keys with remove badges, tap a key for the inspector,
 //  drag to reorder, the ghost "Add key" opens the action library, Undo /
 //  Redo and the page menu in the header. Decks are Pro: in the free plan
-//  the surface is a dimmed preview with an inline card.
+//  the surface is one empty state whose button carries the Pro lock.
+//  The header goes to two rows when one would crush it (`DeckHeaderPlan`);
+//  the page number is only in the dot-matrix counter.
 //
 //  Suggestions (UX-021, D7): under an app page's grid (and the Context
 //  page's, for the front app), `DeckSuggestionsPanel` offers ghost keys
@@ -40,8 +42,6 @@ struct DeckSurface: View {
     @State private var isRenaming = false
     @State private var renameText = ""
     @State private var isConfirmingDelete = false
-    @State private var isLockCardDismissed = false
-    @State private var isPaywallPresented = false
 
     private var apps: [String: InstalledAppInfo] { InstalledAppInfo.byBundleID(session.installedApps) }
     private var pages: [DeckPage] { store.document.orderedPages }
@@ -56,21 +56,30 @@ struct DeckSurface: View {
             let band = typeSize.typeBand
             let grid = DeckGrid.pane(width: proxy.size.width, height: proxy.size.height, band: band)
             let asRows = band == .huge
-            VStack(spacing: PixelHandTheme.Space.md) {
-                if model.isEditing && isUnlocked {
-                    editHeader(grid: grid)
-                } else {
-                    header(grid: grid)
+            let plan = DeckHeaderPlan(
+                width: Double(proxy.size.width) - Double(grid.leadingMargin) - Double(grid.trailingMargin),
+                band: band,
+                pageCount: pages.count
+            )
+            if isUnlocked {
+                VStack(spacing: PixelHandTheme.Space.md) {
+                    if model.isEditing {
+                        editHeader(grid: grid, plan: plan)
+                    } else {
+                        header(grid: grid, plan: plan)
+                    }
+                    pager(grid: grid, asRows: asRows)
+                    pageDots
                 }
-                pager(grid: grid, asRows: asRows)
-                pageDots
-            }
-            .padding(.top, PixelHandTheme.Space.xs)
-            .disabled(!isUnlocked)
-            .opacity(isUnlocked ? (isMacLocked ? 0.55 : 1) : 0.45)
-            .saturation(isUnlocked ? 1 : 0.4)
-            .overlay(alignment: .top) {
-                if !isUnlocked { lockCard.padding(.horizontal, grid.leadingMargin).padding(.top, 96) }
+                .padding(.top, PixelHandTheme.Space.xs)
+                .opacity(isMacLocked ? 0.55 : 1)
+            } else {
+                // Free plan: one state, never the upsell over the empty
+                // page (VQ-025, OR-03); the lock sits on the button.
+                lockedState
+                    .padding(.leading, grid.leadingMargin)
+                    .padding(.trailing, grid.trailingMargin)
+                    .padding(.vertical, PixelHandTheme.Space.xs)
             }
         }
         .onChange(of: session.activeBundleID, initial: true) { _, bundleID in
@@ -114,9 +123,6 @@ struct DeckSurface: View {
                 }
             )
         }
-        .sheet(isPresented: $isPaywallPresented) {
-            PaywallView(reason: .feature(.decks))
-        }
         .alert("Rename page", isPresented: $isRenaming) {
             TextField("Title", text: $renameText)
             Button("Rename") {
@@ -153,48 +159,87 @@ struct DeckSurface: View {
 
     // MARK: Header
 
-    private func header(grid: DeckGrid) -> some View {
-        HStack(spacing: PixelHandTheme.Space.md) {
-            pageBadge
-            VStack(alignment: .leading, spacing: 2) {
-                Text(shownTitle)
-                    .font(.headline)
-                    .foregroundStyle(PixelHandTheme.ink)
-                    .lineLimit(1)
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(PixelHandTheme.ink2)
-                    .lineLimit(1)
+    /// Name, counter, pin and Edit: one row when `DeckHeaderPlan` says it
+    /// fits, otherwise the name on its own row and the controls under it
+    /// (iPad deck columns, Large and Huge type; VQ-024, VQ-065).
+    @ViewBuilder
+    private func header(grid: DeckGrid, plan: DeckHeaderPlan) -> some View {
+        Group {
+            if plan.isOneRow {
+                HStack(spacing: PixelHandTheme.Space.md) {
+                    pageBadge
+                    pageTitle
+                    if plan.showsCounter { counter }
+                    pinButton
+                    editButton
+                }
+            } else {
+                VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
+                    HStack(spacing: PixelHandTheme.Space.md) {
+                        pageBadge
+                        pageTitle
+                    }
+                    HStack(spacing: PixelHandTheme.Space.sm) {
+                        if plan.showsCounter { counter }
+                        Spacer(minLength: 0)
+                        pinButton
+                        editButton
+                    }
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityElement(children: .combine)
-            if pages.count > 1 {
-                PageCounter(current: shownIndex + 1, total: pages.count)
-            }
-            Button {
-                model.togglePin()
-            } label: {
-                PHGlyph(glyph: PixelGlyphs.pin, pitch: PixelPitch.chip)
-                    .foregroundStyle(isPinned ? PixelHandTheme.accent : PixelHandTheme.ink2)
-                    .frame(width: 36, height: 36)
-                    .background(isPinned ? PixelHandTheme.accentTint : PixelHandTheme.fill2, in: Capsule())
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .phosphorFocusable(cornerRadius: 18)
-            .accessibilityLabel(isPinned ? "Unpin page" : "Pin page")
-            .accessibilityIdentifier("ph.deck.pin")
-            .accessibilityHint("A pinned page stays when the app in front changes")
-            Button("Edit") {
-                GestureHaptic.light.trigger()
-                withAnimation(PixelHandMotion.reduced(PixelHandMotion.standard, reduceMotion: reduceMotion)) { model.isEditing = true }
-            }
-            .buttonStyle(.ph(.secondary, size: .small))
-            .accessibilityIdentifier("ph.deck.edit")
         }
         .padding(.leading, grid.leadingMargin)
         .padding(.trailing, grid.trailingMargin)
+    }
+
+    private var pageTitle: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(shownTitle)
+                .font(.headline)
+                .foregroundStyle(PixelHandTheme.ink)
+                .lineLimit(typeSize.typeBand == .huge ? 2 : 1)
+            if let subtitle {
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(PixelHandTheme.ink2)
+                    .lineLimit(typeSize.typeBand == .standard ? 1 : 2)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// The page number, in dot-matrix only (the subtitle no longer repeats
+    /// it; VQ-082).
+    private var counter: some View {
+        PageCounter(current: shownIndex + 1, total: pages.count)
+    }
+
+    private var pinButton: some View {
+        Button {
+            model.togglePin()
+        } label: {
+            PHGlyph(glyph: PixelGlyphs.pin, pitch: PixelPitch.chip)
+                .foregroundStyle(isPinned ? PixelHandTheme.accent : PixelHandTheme.ink2)
+                .frame(width: 36, height: 36)
+                .background(isPinned ? PixelHandTheme.accentTint : PixelHandTheme.fill2, in: Capsule())
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .phosphorFocusable(cornerRadius: 18)
+        .accessibilityLabel(isPinned ? "Unpin page" : "Pin page")
+        .accessibilityIdentifier("ph.deck.pin")
+        .accessibilityHint("A pinned page stays when the app in front changes")
+    }
+
+    private var editButton: some View {
+        Button("Edit") {
+            GestureHaptic.light.trigger()
+            withAnimation(PixelHandMotion.reduced(PixelHandMotion.standard, reduceMotion: reduceMotion)) { model.isEditing = true }
+        }
+        .buttonStyle(.ph(.secondary, size: .small))
+        .accessibilityIdentifier("ph.deck.edit")
     }
 
     private var isPinned: Bool {
@@ -202,12 +247,12 @@ struct DeckSurface: View {
         return store.document.pinnedPageID == id
     }
 
-    private var subtitle: String {
-        let page = "page \(shownIndex + 1) of \(pages.count)"
-        if isPinned { return "Pinned · " + page }
-        if model.followedBundleID != nil { return "Follows the front app · " + page }
-        if !store.document.followFrontApp { return "Following off · " + page }
-        return page.prefix(1).uppercased() + page.dropFirst()
+    private var subtitle: String? {
+        DeckHeaderPlan.subtitle(
+            isPinned: isPinned,
+            followsApp: model.followedBundleID != nil,
+            followingOn: store.document.followFrontApp
+        )
     }
 
     @ViewBuilder
@@ -235,30 +280,70 @@ struct DeckSurface: View {
         }
     }
 
-    private func editHeader(grid: DeckGrid) -> some View {
-        HStack(spacing: PixelHandTheme.Space.sm) {
-            Button {
-                model.undo()
-            } label: {
-                Label("Undo", systemImage: "arrow.uturn.backward")
+    /// Undo, the page name, the page menu and Done; the name gets its own
+    /// row when one row would wrap a button (VQ-065).
+    @ViewBuilder
+    private func editHeader(grid: DeckGrid, plan: DeckHeaderPlan) -> some View {
+        Group {
+            if plan.isOneRow {
+                HStack(spacing: PixelHandTheme.Space.sm) {
+                    undoButton(glyphOnly: plan.undoIsGlyphOnly)
+                    editTitle
+                        .frame(maxWidth: .infinity)
+                    pageMenu
+                    doneButton
+                }
+            } else {
+                VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
+                    editTitle
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(spacing: PixelHandTheme.Space.sm) {
+                        undoButton(glyphOnly: plan.undoIsGlyphOnly)
+                        Spacer(minLength: 0)
+                        pageMenu
+                        doneButton
+                    }
+                }
             }
-            .buttonStyle(.ph(.secondary, size: .small))
-            .disabled(!model.history.canUndo)
-            .keyboardShortcut("z", modifiers: .command)
-            Text("Edit “\(shownTitle)”")
-                .font(.headline)
-                .foregroundStyle(PixelHandTheme.ink)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity)
-            pageMenu
-            Button("Done") {
-                GestureHaptic.light.trigger()
-                withAnimation(PixelHandMotion.reduced(PixelHandMotion.standard, reduceMotion: reduceMotion)) { model.isEditing = false }
-            }
-            .buttonStyle(.ph(.primary, size: .small))
         }
         .padding(.leading, grid.leadingMargin)
         .padding(.trailing, grid.trailingMargin)
+    }
+
+    private var editTitle: some View {
+        Text("Edit “\(shownTitle)”")
+            .font(.headline)
+            .foregroundStyle(PixelHandTheme.ink)
+            .lineLimit(typeSize.typeBand == .huge ? 2 : 1)
+    }
+
+    @ViewBuilder
+    private func undoButton(glyphOnly: Bool) -> some View {
+        Button {
+            model.undo()
+        } label: {
+            if glyphOnly {
+                Image(systemName: "arrow.uturn.backward")
+                    .accessibilityLabel("Undo")
+            } else {
+                Label("Undo", systemImage: "arrow.uturn.backward")
+            }
+        }
+        .buttonStyle(.ph(.secondary, size: .small))
+        .disabled(!model.history.canUndo)
+        .keyboardShortcut("z", modifiers: .command)
+        .accessibilityShowsLargeContentViewer {
+            Label("Undo", systemImage: "arrow.uturn.backward")
+        }
+    }
+
+    private var doneButton: some View {
+        Button("Done") {
+            GestureHaptic.light.trigger()
+            withAnimation(PixelHandMotion.reduced(PixelHandMotion.standard, reduceMotion: reduceMotion)) { model.isEditing = false }
+        }
+        .buttonStyle(.ph(.primary, size: .small))
+        .accessibilityIdentifier("ph.deck.done")
     }
 
     private var pageMenu: some View {
@@ -372,7 +457,14 @@ struct DeckSurface: View {
                             spacing: grid.gutter
                         ) {
                             ForEach(keys) { shown in keyView(shown, page: page, grid: grid, asRow: false) }
-                            if editing { addKey(size: grid.keySize) }
+                            if editing {
+                                addKey(size: grid.keySize)
+                                // Fill the row with dashed ghost slots, so an
+                                // empty page reads as editable (VQ-048).
+                                ForEach(0..<ghostSlots(keyCount: keys.count, columns: grid.columns), id: \.self) { _ in
+                                    ghostSlot(size: grid.keySize)
+                                }
+                            }
                         }
                     }
                     if let target {
@@ -490,6 +582,23 @@ struct DeckSurface: View {
         .accessibilityHint("Opens the action library")
     }
 
+    /// Empty dashed slots after "Add key" up to the end of its row (a full
+    /// first row on an empty page).
+    private func ghostSlots(keyCount: Int, columns: Int) -> Int {
+        let columns = max(1, columns)
+        let used = (keyCount + 1) % columns
+        return used == 0 ? 0 : columns - used
+    }
+
+    private func ghostSlot(size: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: PixelHandTheme.Radius.key, style: .continuous)
+            .strokeBorder(PixelHandTheme.ink3.opacity(0.6), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+            .frame(width: size, height: size)
+            .contentShape(Rectangle())
+            .onTapGesture { isLibraryPresented = true }
+            .accessibilityHidden(true)
+    }
+
     private var addRow: some View {
         DeckKeyRow(title: "Add key", glyph: PixelGlyphs.add) {
             isLibraryPresented = true
@@ -552,40 +661,18 @@ struct DeckSurface: View {
 
     // MARK: Free plan
 
-    @ViewBuilder
-    private var lockCard: some View {
-        if isLockCardDismissed {
-            Button {
-                isPaywallPresented = true
-            } label: {
-                Text("Decks · Pro")
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, PixelHandTheme.Space.lg)
-                    .frame(height: 36)
-            }
-            .buttonStyle(.ph(.tint, size: .small))
-        } else {
-            VStack(alignment: .leading, spacing: PixelHandTheme.Space.md) {
-                DotMatrixText("PRO", pitch: 2, label: "Pro")
-                    .foregroundStyle(PixelHandTheme.accent)
-                Text("Decks follow the app in front")
-                    .font(.phDisplay(.title3))
-                    .foregroundStyle(PixelHandTheme.ink)
-                Text("Keys for every app, built from their real menus. Try every Pro feature free for 2 weeks.")
-                    .font(.subheadline)
-                    .foregroundStyle(PixelHandTheme.ink2)
-                    .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: PixelHandTheme.Space.sm) {
-                    Button("Try 2 weeks free") { isPaywallPresented = true }
-                        .buttonStyle(.ph(.primary, size: .regular))
-                    Button("Not now") { isLockCardDismissed = true }
-                        .buttonStyle(.ph(.secondary, size: .regular))
-                }
-            }
-            .padding(22)
-            .frame(maxWidth: 420, alignment: .leading)
-            .background(PixelHandTheme.elevated, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-            .shadow(color: PixelHandTheme.Brand.screen.opacity(0.3), radius: 25, y: 20)
+    /// The free plan's deck: one empty state whose button carries the Pro
+    /// lock (OR-03: no upsell card; the paywall opens from the button).
+    private var lockedState: some View {
+        PixelSurface(cornerRadius: PixelHandTheme.Radius.pane) {
+            PHEmptyState(
+                glyph: PixelGlyphs.deck,
+                title: "Decks",
+                message: "Keys for every app, built from their real menus.",
+                primaryTitle: "Show decks",
+                primaryAction: {},
+                primaryRequires: .decks
+            )
         }
     }
 }

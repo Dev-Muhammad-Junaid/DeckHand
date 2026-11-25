@@ -79,9 +79,15 @@ struct ScreenshotPreviewView: View {
                     case .readText: OCRResultView(state: textState, onRetry: { Task { await readText(force: true) } })
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // The preview hugs the picture (fitted to the width), with
+                // the dock right under it rather than at the foot of an
+                // empty black area (VQ-051).
+                .frame(maxWidth: .infinity, maxHeight: step == .preview ? nil : .infinity)
                 .transition(.opacity)
                 dock
+                if step == .preview {
+                    Spacer(minLength: 0)
+                }
             }
             .overlay(alignment: .bottom) { toastView }
         }
@@ -188,6 +194,14 @@ struct ScreenshotPreviewView: View {
             }
             .clipped()
         }
+        .aspectRatio(pictureAspect, contentMode: .fit)
+    }
+
+    /// Width ÷ height of the capture, for the preview's well.
+    private var pictureAspect: CGFloat {
+        let size = current.size
+        guard size.width > 0, size.height > 0 else { return 16.0 / 10.0 }
+        return size.width / size.height
     }
 
     private var zoomGesture: some Gesture {

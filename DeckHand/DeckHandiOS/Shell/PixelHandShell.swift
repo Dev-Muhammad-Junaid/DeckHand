@@ -179,12 +179,17 @@ struct PixelHandShell: View {
         .safeAreaInset(edge: .bottom, spacing: PixelHandTheme.Space.sm) {
             VStack(spacing: PixelHandTheme.Space.sm) {
                 bottomChrome(metrics: metrics, foldsDock: height < Self.foldedDockHeight)
-                SurfaceTabBar(
-                    selection: selection,
-                    tabs: ControlSurface.tabs(includeDeck: true),
-                    onAsk: { isAskPresented = true }
-                )
-                .padding(.horizontal, CGFloat(metrics.margin))
+                // While typing, the tab bar steps aside so the pad stays
+                // usable above the keyboard (VQ-033).
+                if !isKeyboardShown {
+                    SurfaceTabBar(
+                        selection: selection,
+                        tabs: ControlSurface.tabs(includeDeck: true),
+                        onAsk: { isAskPresented = true }
+                    )
+                    .padding(.horizontal, CGFloat(metrics.margin))
+                    .transition(.opacity)
+                }
             }
         }
     }
@@ -210,7 +215,7 @@ struct PixelHandShell: View {
                 canvas(centre: centre, plan: plan, margin: 0)
                 VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
                     header(showsMirrorToggle: false, horizontalPadding: 0)
-                    statusPills
+                    statusPills(offersKeyboard: false)
                     stripOnly(metrics: metrics, foldedDock: true, margin: 0)
                     if let sender = session.sender {
                         deck(sender: sender, columns: plan.deckColumnKeys, inset: 0)
@@ -221,7 +226,7 @@ struct PixelHandShell: View {
             } else {
                 VStack(spacing: PixelHandTheme.Space.xs) {
                     header()
-                    statusPills
+                    statusPills(offersKeyboard: false)
                         .padding(.horizontal, CGFloat(metrics.margin))
                     canvas(centre: centre, plan: plan)
                     stripOnly(metrics: metrics, foldedDock: true, margin: CGFloat(metrics.margin))
@@ -649,7 +654,12 @@ struct PixelHandShell: View {
     private func bottomChrome(metrics: LayoutMetrics, foldsDock: Bool) -> some View {
         VStack(spacing: PixelHandTheme.Space.sm) {
             keyboardPanel(margin: CGFloat(metrics.margin))
-            stripOnly(metrics: metrics, foldedDock: foldsDock, margin: CGFloat(metrics.margin))
+            // While typing the strip collapses (the keyboard panel has the
+            // keys it would offer); the dock stays, it holds the keyboard
+            // toggle. A folded dock lives in the strip, so it stays then.
+            if !isKeyboardShown || foldsDock {
+                stripOnly(metrics: metrics, foldedDock: foldsDock, margin: CGFloat(metrics.margin))
+            }
             if !foldsDock {
                 dock
             }
@@ -777,8 +787,12 @@ struct PixelHandShell: View {
 
     /// Host permission and lock warnings: the Mac reports what it can do, so
     /// a missing permission shows here instead of taps failing silently.
+    private var statusPills: some View { statusPills(offersKeyboard: true) }
+
+    /// `offersKeyboard`: the lock banner's Keyboard button opens the shell's
+    /// keyboard panel, so it shows only where that panel can (not the rail).
     @ViewBuilder
-    private var statusPills: some View {
+    private func statusPills(offersKeyboard: Bool) -> some View {
         VStack(spacing: PixelHandTheme.Space.sm) {
             if session.hostAccessibilityGranted == false {
                 StatusPill(
@@ -787,7 +801,14 @@ struct PixelHandShell: View {
                 )
             }
             if let lockText = session.macLockState.bannerText(macName: peerName) {
-                StatusPill(kind: .locked, message: lockText)
+                if offersKeyboard, session.macLockState == .screenLocked {
+                    StatusPill(kind: .locked, message: lockText, fixTitle: "Keyboard") {
+                        GestureHaptic.light.trigger()
+                        isKeyboardShown = true
+                    }
+                } else {
+                    StatusPill(kind: .locked, message: lockText)
+                }
             }
             if session.hostScreenRecordingGranted == false {
                 StatusPill(
@@ -845,10 +866,10 @@ struct PixelHandShell: View {
                 clipboard: session.clipboard,
                 margin: margin,
                 // The dock carries the keyboard button wherever it shows.
-                keyboardInDock: !plan.foldsDockIntoStrip && CGFloat(plan.metrics.height) >= Self.foldedDockHeight
+                keyboardInDock: dockCarriesKeyboard(plan)
             )
         case .screen:
-            ScreenSurface(session: session, macName: peerName)
+            ScreenSurface(session: session, macName: peerName, keyboardInDock: dockCarriesKeyboard(plan))
                 .padding(.horizontal, margin)
                 .padding(.bottom, PixelHandTheme.Space.sm)
         case .deck:
@@ -856,6 +877,11 @@ struct PixelHandShell: View {
         }
         // (The strip and dock live in the shell's chrome, so the deck hides
         // its own Quick Actions bar and edit buttons.)
+    }
+
+    /// Whether the app dock shows (and so carries the keyboard button).
+    private func dockCarriesKeyboard(_ plan: CanvasPlan) -> Bool {
+        !plan.foldsDockIntoStrip && CGFloat(plan.metrics.height) >= Self.foldedDockHeight
     }
 
     // MARK: - Deck

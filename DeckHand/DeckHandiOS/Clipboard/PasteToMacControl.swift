@@ -83,9 +83,13 @@ struct ClipboardRow: View {
             .accessibilityHint("Sends this device's clipboard text to the Mac")
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(settings.pasteRightAway ? "to the Mac, where its cursor is" : "to the Mac's clipboard")
+                // Short, and allowed a second line, so it's never cut at
+                // its start (VQ-033).
+                Text(settings.pasteRightAway ? "at the Mac’s cursor" : "to the Mac’s clipboard")
                     .font(.system(.caption2, design: .rounded, weight: .medium))
                     .foregroundStyle(Color.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 if let status = clipboard?.pasteStatus {
                     Text(status)
                         .font(.system(.caption2, design: .rounded))

@@ -108,7 +108,36 @@ public enum MirrorPaneChrome {
         }
         out = out.trimmingCharacters(in: .whitespaces)
         guard out.count > maxLength else { return out }
-        return String(out.prefix(maxLength)).trimmingCharacters(in: .whitespaces)
+        // Cut at a word boundary, never mid-word (`06-Pixel-Identity.md`
+        // §3); a first word longer than the limit is the only exception.
+        var words: [Substring] = []
+        var length = 0
+        for word in out.split(separator: " ") {
+            let added = words.isEmpty ? word.count : length + 1 + word.count
+            guard added <= maxLength else { break }
+            words.append(word)
+            length = added
+        }
+        if words.isEmpty { return String(out.prefix(maxLength)) }
+        return words.joined(separator: " ")
+    }
+
+    /// The strip's fallbacks, widest first, for `StatusStrip` to try in
+    /// turn: everything; the Mac's first word in place of its full name;
+    /// then without the name (it is the one segment the header already
+    /// shows); then trailing items dropped one at a time. Each step drops
+    /// whole segments, so the strip truncates at a separator.
+    public static func stripCandidates(_ items: [String]) -> [[String]] {
+        guard let name = items.first else { return [] }
+        var candidates: [[String]] = [items]
+        let rest = Array(items.dropFirst())
+        if let first = name.split(separator: " ").first, first.count < name.count {
+            candidates.append([String(first)] + rest)
+        }
+        for count in stride(from: rest.count, through: 1, by: -1) {
+            candidates.append(Array(rest.prefix(count)))
+        }
+        return candidates
     }
 
     /// Frames per second for the strip: whole numbers, the remote's
@@ -153,10 +182,18 @@ public enum MirrorPaneChrome {
         mirroringWindow: Bool,
         spaces: MirrorSpaceStrip,
         host: MirrorHostStats?,
-        client: MirrorClientStats?
+        client: MirrorClientStats?,
+        hasFrame: Bool = true
     ) -> (items: [String], spoken: String) {
         var items = [dotMatrixSafe(macName).isEmpty ? "MAC" : dotMatrixSafe(macName)]
         var spoken = [macName]
+        // Before the first frame: no fps (a lit "0 FPS" reads as live) but
+        // CONNECTING, drawn dim by the caller (VQ-062).
+        guard hasFrame else {
+            items.append("CONNECTING")
+            spoken.append("connecting")
+            return (items, spoken.joined(separator: ", "))
+        }
         if mirroringWindow {
             items.append("WINDOW")
             spoken.append(windowTitle.map { "window \($0)" } ?? "a window")

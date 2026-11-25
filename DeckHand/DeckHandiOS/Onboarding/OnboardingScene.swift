@@ -73,7 +73,10 @@ struct OnboardingSceneView: View {
         }
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.sheet, style: .continuous))
-        .shadow(color: PixelHandTheme.Brand.cobalt.opacity(0.45), radius: size * 0.1)
+        // No glow here: the page's pixel dissolve masks this view to its
+        // square frame, which cut the glow into a hard-edged square behind
+        // the rounded card (VQ-004). `OnboardingSceneGlow` draws it
+        // outside the transition instead.
     }
 
     @ViewBuilder
@@ -85,6 +88,20 @@ struct OnboardingSceneView: View {
         case .capture: CaptureScene(size: size, progress: progress)
         case .pairing: PairingScene(size: size, progress: progress)
         }
+    }
+}
+
+/// The cobalt glow behind a scene's plate, drawn outside the page
+/// transition so nothing clips it; matches the plate's concentric radius.
+struct OnboardingSceneGlow: View {
+    let size: CGFloat
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: PixelHandTheme.Radius.sheet, style: .continuous)
+            .fill(PixelHandTheme.Brand.screen)
+            .frame(width: size, height: size)
+            .shadow(color: PixelHandTheme.Brand.cobalt.opacity(0.45), radius: size * 0.1)
+            .accessibilityHidden(true)
     }
 }
 
@@ -349,7 +366,8 @@ private struct MirrorScene: View {
             .overlay(RoundedRectangle(cornerRadius: 10 * k, style: .continuous).strokeBorder(.white.opacity(0.14), lineWidth: 1))
             .offset(x: frame.minX, y: frame.minY)
 
-            StatusStrip(items: ["LIVE", "60 FPS"], pitch: 1.6, accessibilityText: "Live, 60 frames per second")
+            // The mirror's settings top out at 30 fps (VQ-018).
+            StatusStrip(items: ["LIVE", "30 FPS"], pitch: 1.6, accessibilityText: "Live, 30 frames per second")
                 .offset(x: frame.minX + 8 * k, y: frame.minY + 8 * k)
 
             // A small iPhone-sized pane under the screen, the live view in hand.

@@ -5,6 +5,8 @@
 //  The trackpad's keyboard panel: a live typing field (every letter goes
 //  to the Mac as you type), a row of keys that aren't characters (Escape,
 //  Tab, arrows, Backspace, Return) with latching ⌘ ⌥ ⌃ ⇧, and Paste to Mac.
+//  Escape and Tab are labelled in text; the row fades at its trailing edge
+//  when it runs on (build 18 QA, VQ-034).
 //
 
 import SwiftUI
@@ -23,6 +25,9 @@ struct RemoteKeyboardPanel: View {
         let key: RemoteKey
         let symbol: String
         let label: String
+        /// Shown as text instead of the symbol, where the symbol alone
+        /// doesn't say what the key is (VQ-034: Escape read as "⟲").
+        var text: String?
         var id: RemoteKey { key }
     }
 
@@ -34,8 +39,8 @@ struct RemoteKeyboardPanel: View {
     }
 
     private static let keys: [KeyButton] = [
-        KeyButton(key: .escape, symbol: "escape", label: "Escape"),
-        KeyButton(key: .tab, symbol: "arrow.right.to.line", label: "Tab"),
+        KeyButton(key: .escape, symbol: "escape", label: "Escape", text: "esc"),
+        KeyButton(key: .tab, symbol: "arrow.right.to.line", label: "Tab", text: "tab"),
         KeyButton(key: .left, symbol: "arrow.left", label: "Left arrow"),
         KeyButton(key: .down, symbol: "arrow.down", label: "Down arrow"),
         KeyButton(key: .up, symbol: "arrow.up", label: "Up arrow"),
@@ -114,8 +119,16 @@ struct RemoteKeyboardPanel: View {
                             GestureHaptic.light.trigger()
                             Task { await sender.sendKey(key, modifiers: modifiers) }
                         } label: {
-                            Image(systemName: item.symbol)
-                                .font(.system(size: 14, weight: key == .return ? .semibold : .medium))
+                            Group {
+                                if let text = item.text {
+                                    Text(text)
+                                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                        .padding(.horizontal, 4)
+                                } else {
+                                    Image(systemName: item.symbol)
+                                        .font(.system(size: 14, weight: key == .return ? .semibold : .medium))
+                                }
+                            }
                                 .frame(minWidth: 40, minHeight: 36)
                                 .foregroundStyle(key == .return ? Color.white : Color.primary.opacity(0.85))
                                 .background(
@@ -130,7 +143,11 @@ struct RemoteKeyboardPanel: View {
                     }
                 }
                 .padding(.vertical, 2)
+                .padding(.trailing, PixelHandTheme.Space.lg)
             }
+            // The row runs past the edge on a phone: fade it so it reads
+            // as "more this way" (VQ-034).
+            .mask { TrailingFade(width: PixelHandTheme.Space.lg) }
 
             ClipboardRow(sender: sender, clipboard: clipboard, colorScheme: colorScheme, onActivity: onActivity)
         }

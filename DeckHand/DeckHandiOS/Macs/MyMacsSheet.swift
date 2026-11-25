@@ -7,7 +7,8 @@
 //  order (⌘1–⌘4 on the first four). Tap a Mac to switch to it; the focused
 //  Mac's card says so. A Mac the free plan doesn't cover carries the PRO
 //  badge, and picking it opens the paywall (Store lane's `admitMac`).
-//  Disconnect stays at the foot.
+//  A dashed "Add another Mac" card fills the grid; Disconnect is a plain
+//  row at the foot.
 //
 
 import SwiftUI
@@ -47,6 +48,9 @@ struct MyMacsSheet: View {
                             .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.chip + 4)
                             .contextMenu { menu(for: listing) }
                         }
+                        // A ghost card fills the grid and says how another
+                        // Mac joins (VQ-057).
+                        addAnotherCard
                     }
 
                     if let notice = switcher.notice {
@@ -54,17 +58,28 @@ struct MyMacsSheet: View {
                             .transition(.opacity)
                     }
 
-                    HStack(alignment: .top, spacing: PixelHandTheme.Space.md) {
-                        PHGlyph(glyph: PixelGlyphs.mac, pitch: PixelPitch.chip)
-                            .foregroundStyle(PixelHandTheme.accent)
-                        Text(helpText)
-                            .font(.subheadline)
-                            .foregroundStyle(PixelHandTheme.ink2)
-                            .fixedSize(horizontal: false, vertical: true)
+                    if let helpText {
+                        HStack(alignment: .top, spacing: PixelHandTheme.Space.md) {
+                            PHGlyph(glyph: PixelGlyphs.mac, pitch: PixelPitch.chip)
+                                .foregroundStyle(PixelHandTheme.accent)
+                            Text(helpText)
+                                .font(.subheadline)
+                                .foregroundStyle(PixelHandTheme.ink2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
 
-                    Button("Disconnect from \(currentMacName)", role: .destructive, action: onDisconnect)
-                        .buttonStyle(.ph(.destructive, size: .regular, fullWidth: true))
+                    // A plain secondary row, never the sheet's loudest
+                    // control (VQ-057).
+                    Button(role: .destructive, action: onDisconnect) {
+                        Label("Disconnect", systemImage: "xmark.circle")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(PixelHandTheme.danger)
+                            .frame(minHeight: PixelHandTheme.ControlHeight.hit)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Disconnect from \(currentMacName)")
+                    .accessibilityIdentifier("ph.macs.disconnect")
                 }
                 .padding(.horizontal, PixelHandTheme.Space.lg)
                 .padding(.vertical, PixelHandTheme.Space.sm)
@@ -83,11 +98,35 @@ struct MyMacsSheet: View {
         .presentationDragIndicator(.visible)
     }
 
-    private var helpText: String {
-        let hasOthers = switcher.listings.contains { !$0.isActive }
-        guard hasOthers else {
-            return "Open Pixel Hand on another Mac on the same Wi-Fi or a cable, and it shows up here."
+    /// The dashed "Add another Mac" card: same size as a Mac card, with
+    /// the one step it takes.
+    private var addAnotherCard: some View {
+        VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
+            PHGlyph(glyph: PixelGlyphs.add, pitch: PixelPitch.chip)
+                .foregroundStyle(PixelHandTheme.accent)
+            Text("Add another Mac")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(PixelHandTheme.ink)
+            Text("Open Pixel Hand on it, on the same Wi-Fi or a cable.")
+                .font(.caption)
+                .foregroundStyle(PixelHandTheme.ink2)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .padding(PixelHandTheme.Space.md)
+        .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
+        .overlay(
+            RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous)
+                .strokeBorder(PixelHandTheme.ink3.opacity(0.6), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+        )
+        .padding(4)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// How to switch, once there's another Mac; the ghost card covers
+    /// adding one.
+    private var helpText: String? {
+        let hasOthers = switcher.listings.contains { !$0.isActive }
+        guard hasOthers else { return nil }
         return "Tap a Mac to switch. Swipe the Mac pill, swipe three fingers sideways on the trackpad, or press ⌘1–⌘4 with a keyboard."
     }
 

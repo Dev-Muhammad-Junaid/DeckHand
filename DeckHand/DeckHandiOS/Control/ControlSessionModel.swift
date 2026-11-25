@@ -327,6 +327,9 @@ final class ControlSessionModel {
             handlePairedStatus(paired)
 
         case let .apps(.activeAppUpdate(name, bundleID)):
+            // Pixel Hand's own menu-bar panel isn't an app to drive: keep
+            // the one that was in front (VQ-063).
+            guard ContextStripPlan.acceptsFrontApp(bundleID: bundleID) else { break }
             withAnimation(.easeInOut(duration: 0.2)) {
                 activeAppName = name
                 activeBundleID = bundleID

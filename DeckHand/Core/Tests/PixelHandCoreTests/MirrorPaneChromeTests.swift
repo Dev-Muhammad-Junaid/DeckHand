@@ -36,10 +36,13 @@ import Testing
     static let host = MirrorHostStats(codec: .hevc, width: 1920, height: 1200, capturedFPS: 60, sentFPS: 59.6, droppedFrames: 1, encodeMilliseconds: 4, kilobitsPerSecond: 18_400)
     static let client = MirrorClientStats(receivedFPS: 60, displayedFPS: 59.7, droppedFrames: 1, decodeMilliseconds: 6.6, kilobitsPerSecond: 18_000)
 
-    @Test("Names become dot-matrix safe: uppercased, unknown characters dropped, cut at 12")
+    @Test("Names become dot-matrix safe: uppercased, unknown characters dropped, cut at a word within 12")
     func dotMatrixSafeNames() {
         #expect(MirrorPaneChrome.dotMatrixSafe("Studio") == "STUDIO")
-        #expect(MirrorPaneChrome.dotMatrixSafe("Junaid’s  MacBook Pro") == "JUNAIDS MACB")
+        #expect(MirrorPaneChrome.dotMatrixSafe("Junaid’s  MacBook Pro").hasPrefix("JUNAID"))
+        #expect(!MirrorPaneChrome.dotMatrixSafe("Junaid’s  MacBook Pro").contains("MACB"))
+        #expect(MirrorPaneChrome.dotMatrixSafe("Muhammads MacBook Pro") == "MUHAMMADS")
+        #expect(MirrorPaneChrome.dotMatrixSafe("Supercalifragilistic") == "SUPERCALIFRA")
         #expect(MirrorPaneChrome.dotMatrixSafe("Mac  mini (2)") == "MAC MINI 2")
         #expect(MirrorPaneChrome.dotMatrixSafe("ab cdefghijk lmn") == "AB CDEFGHIJK")
         let safe = MirrorPaneChrome.dotMatrixSafe("Ünïcode Mac é")
