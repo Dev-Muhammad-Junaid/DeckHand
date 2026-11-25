@@ -1423,4 +1423,26 @@ passes.
 OR-16 (pointer control on the picture) is in progress in its own lane and
 will be build 22.
 
-Status: READY FOR MAC BUILD (build 21)
+
+## Build 22 queued (2026-11-25, replaces build 21)
+
+Build 21 was not built yet. **Build 22 is build 21 plus OR-16**
+(`LANE-or16-picture-pointer.md`), merged at `bca7639`. OR-16 is pointer control
+on the mirror picture: a toolbar toggle that makes the picture work like a
+trackpad, with relative movement, tap, two-finger tap, scroll and drag, and
+pinch to zoom kept. It is off the first time, then remembers the last
+choice. There is no protocol, `project.yml` or plist change. Its UI walk
+is `test16_PicturePointer`, renamed from test14 because the build19-fixes
+walk also took test14.
+
+Linux: Core **1018 / 1018 pass** (182 suites); `linux-typecheck/run.sh`
+passes.
+
+**Mac should check:**
+- The build 21 list above.
+- The OR-16 re-check steps in its handoff.
+
+After a green build 22, the visual QA re-run follows: the same flows and
+gallery as `VISUAL-QA-build18.md`, re-checking every VQ and OR ID.
+
+Status: READY FOR MAC BUILD (build 22)

@@ -1,6 +1,6 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Build 21 queued** (build 20's owner-review lanes plus build19-fixes). **OR-16 lane running** (the primary started it; answers are in DECISIONS.md). When it is ready: merge it, then queue build 22, then the visual QA re-run, then the review page.
+> **Build 22 queued** (build 21 plus OR-16; every lane merged, none running). Next: the Mac builds 22, then the visual QA re-run against build 22, then fixes if needed, then the review page.
 
 > **Mac builds:** 15, 16, 18 and 19 built (19 with 5 bugs, fixed in build 21). The primary session or the owner's Mac session runs Mac builds.
 
@@ -28,7 +28,6 @@ weekly usage limit is close).
 | --- | --- | --- | --- |
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac) — **archived since 2026-11-18; start a new Mac session** | session_01H5HwATvLJkqCFPruLyBsX8 (archived) | claude/pixelhand-integration | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
-| OR-16 pointer control on the mirror picture (started by the primary) | session_01H5HwAV5BuMCmxP29N5KVct | claude/pixelhand-lane-or16-picture-pointer | `LANE-or16-picture-pointer.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -201,3 +200,8 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   passes. **Build 21 queued** (`c993044`), replacing build 20, which was not
   built. Next: the OR-16 lane, then build 22, the visual QA re-run and the
   review page.
+- 2026-11-25 02:35 UTC: OR-16 ready. Merged it (`bca7639`): the UI test
+  conflicted only on numbering, so OR-16's walk is now test16. Core has 1018
+  tests, all passing, and the type check passes. **Build 22 queued**,
+  replacing build 21. No lanes are running. Waiting on the Mac build, then
+  the visual QA re-run.
