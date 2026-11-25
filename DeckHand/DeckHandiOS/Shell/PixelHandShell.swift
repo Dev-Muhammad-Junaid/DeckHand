@@ -121,9 +121,11 @@ struct PixelHandShell: View {
                 // when the device folds, unfolds or turns.
                 if duoPose.update(input) != nil { dragSize = nil }
             }
+            // Intents lane: "Open Trackpad", "Start Mirror". On preset
+            // windows "Trackpad" also opens the Pointer arrangement (VQ-079).
+            .intentSurfaceRequests(selection: selection, preset: plan.usesPresets ? presetBinding(plan) : nil)
         }
         .duoHingeStatus($hingeStatus)
-        .intentSurfaceRequests(selection: selection) // Intents lane: "Open Trackpad", "Start Mirror"
         .sheet(isPresented: $isAskPresented) {
             AskSheet(session: session, macName: peerName)
         }

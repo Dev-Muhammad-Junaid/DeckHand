@@ -95,7 +95,7 @@ struct InboxPanel: View {
         if item.isPhotoLibraryCompatible {
             Button { saveToPhotos(item) } label: { Label("Save to Photos", systemImage: "photo.badge.plus") }
         }
-        Button { shareURL = center.inboxURL(for: item); center.markSeen(item.id) } label: { Label("Share…", systemImage: "square.and.arrow.up") }
+        Button { shareURL = center.inboxURL(for: item); center.markSeen(item.id) } label: { Label("Share", systemImage: "square.and.arrow.up") }
         Button(role: .destructive) { center.deleteInboxItem(item.id) } label: { Label("Delete", systemImage: "trash") }
     }
 

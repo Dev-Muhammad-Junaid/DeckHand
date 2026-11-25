@@ -287,7 +287,7 @@ struct PairingCodeEntryView: View {
             Text("Not connected to \(targetName) now. Pixel Hand connects again and sends the code.")
                 .foregroundStyle(.white.opacity(0.7))
         } else {
-            Text("No code on \(targetName)? Choose Pair a device in Pixel Hand’s menu bar there. A paired \(UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone") connects without asking.")
+            Text("No code on \(targetName)? Choose “Pair a device” in Pixel Hand’s menu bar there. A paired \(UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone") connects without asking.")
                 .foregroundStyle(.white.opacity(0.7))
         }
     }
