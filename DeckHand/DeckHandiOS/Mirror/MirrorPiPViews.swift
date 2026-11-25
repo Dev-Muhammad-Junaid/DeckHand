@@ -54,8 +54,16 @@ struct MirrorPiPBackground: View {
 }
 
 /// The pane toolbar's PiP button: opens PiP, or closes it when open.
+/// Always there while the device supports PiP (VQ-060): the first tap
+/// explains what PiP does in the background and turns on "Keep watching in
+/// Picture in Picture", so leaving the app keeps the picture too.
 struct MirrorPiPToolButton: View {
     let session: ControlSessionModel
+
+    @EnvironmentObject private var settings: DeckHandSettings
+    /// The explanation was shown once (accepted or not).
+    @AppStorage("ph.mirror.pipExplained") private var hasExplained = false
+    @State private var isExplaining = false
 
     var body: some View {
         if session.mirrorPiPSupported {
@@ -64,11 +72,35 @@ struct MirrorPiPToolButton: View {
                 glyph: PixelGlyphs.pictureInPicture,
                 label: active ? "Close Picture in Picture" : "Keep watching in Picture in Picture",
                 isOn: active,
-                isEnabled: session.mirrorPiPCanStart,
-                action: { session.toggleMirrorPiP() }
+                // Usable whenever the mirror runs; a PiP that can't start
+                // yet starts once its layer has a picture.
+                isEnabled: active || session.mirrorPiPState.isAvailable,
+                action: tapped
             )
             .accessibilityIdentifier("ph.mirror.pictureInPicture")
             .requiresPro(.mirror)
+            .alert("Keep watching in Picture in Picture", isPresented: $isExplaining) {
+                Button("Turn on") {
+                    settings.mirrorPiPAutoStart = true
+                    session.setMirrorPiPAutoStart(true)
+                    session.toggleMirrorPiP()
+                }
+                Button("Just this once") {
+                    session.toggleMirrorPiP()
+                }
+                Button("Not now", role: .cancel) {}
+            } message: {
+                Text("The Mac’s screen keeps playing in a small window over other apps, with its sound. Pixel Hand stays connected while it shows. Turn it on to start it whenever you leave the app; change it in Settings › Live mirror.")
+            }
         }
+    }
+
+    private func tapped() {
+        if !session.mirrorPiPState.isActive, !hasExplained, !settings.mirrorPiPAutoStart {
+            hasExplained = true
+            isExplaining = true
+            return
+        }
+        session.toggleMirrorPiP()
     }
 }
