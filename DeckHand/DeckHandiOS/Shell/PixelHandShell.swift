@@ -30,6 +30,13 @@
 //  surface are scene storage, so they survive rotation, Split View, Stage
 //  Manager resizes and scene restoration.
 //
+//  The right column (rail, sideBySide, columns: the deck and the front
+//  app's shortcuts) switches Deck | Ask, and on iPad collapses to a slim
+//  edge handle, remembered per arrangement (`RightColumnPlan`,
+//  `RightColumnMemory`; OR-06). Ask (⌘K, the Ask field or circle) runs in
+//  place in the column wherever there is one, and in its sheet elsewhere.
+//  Panels fade; nothing slides in.
+//
 //  The surfaces keep their reserved areas: the pad's click strip and
 //  caption sit at its own foot, and the floating screen tile is laid over
 //  the pad alone, so its 120 pt band lines up with the pad's foot.
@@ -60,6 +67,12 @@ struct PixelHandShell: View {
     @SceneStorage("pixelhand.layout.sidebarCollapsed") private var sidebarCollapsed = false
     /// Presets per Mac and form (`LayoutPresetMemory`).
     @AppStorage("pixelhand.layout.presets") private var presetMemoryJSON = "{}"
+    /// Collapsed right columns per arrangement (`RightColumnMemory`).
+    @AppStorage("pixelhand.layout.rightColumn") private var rightColumnJSON = "[]"
+    /// What the right column shows: the deck or Ask.
+    @SceneStorage("pixelhand.layout.rightColumnMode") private var columnModeRawValue = RightColumnMode.deck.rawValue
+    /// Bumped to focus Ask's field when Ask opens in the column.
+    @State private var askFocusRequest = 0
     @State private var isAskPresented = false
     @State private var isMyMacsPresented = false
     @State private var isKeyboardShown = false
@@ -88,12 +101,23 @@ struct PixelHandShell: View {
     var body: some View {
         GeometryReader { proxy in
             let crease = DuoPoseMachine.band(for: DuoCrease.input(proxy: proxy, hingeStatus: hingeStatus))
-            let plan = CanvasPlan(
+            let base = CanvasPlan(
                 width: Double(proxy.size.width),
                 height: Double(proxy.size.height),
                 sidebarCollapsed: sidebarCollapsed,
                 crease: crease
             )
+            // A collapsed wide column gives the centre its room, so the plan
+            // is made again with it (the arrangement key needs the form).
+            let plan = base.form == .columns && rightColumn(base).isCollapsed
+                ? CanvasPlan(
+                    width: Double(proxy.size.width),
+                    height: Double(proxy.size.height),
+                    sidebarCollapsed: sidebarCollapsed,
+                    rightColumnCollapsed: true,
+                    crease: crease
+                )
+                : base
 
             ZStack {
                 PixelHandTheme.canvas.ignoresSafeArea()
@@ -114,7 +138,8 @@ struct PixelHandShell: View {
                 }
             }
             .animation(PixelHandMotion.reduced(PixelHandMotion.spring, reduceMotion: reduceMotion), value: plan.form)
-            .animation(PixelHandMotion.reduced(PixelHandMotion.spring, reduceMotion: reduceMotion), value: plan.showsSidebar)
+            // The sidebar fades in and out; it never slides (OR-06 motion rule).
+            .animation(Animation.phPanelFade(reduceMotion: reduceMotion), value: plan.showsSidebar)
             .onChange(of: crease, initial: true) { _, _ in
                 let input = DuoCrease.input(proxy: proxy, hingeStatus: hingeStatus)
                 // A pane drag in flight belongs to the old panes: drop it
@@ -187,7 +212,7 @@ struct PixelHandShell: View {
                     SurfaceTabBar(
                         selection: selection,
                         tabs: ControlSurface.tabs(includeDeck: true),
-                        onAsk: { isAskPresented = true }
+                        onAsk: { openAsk(plan) }
                     )
                     .padding(.horizontal, CGFloat(metrics.margin))
                     .transition(.opacity)
@@ -208,21 +233,34 @@ struct PixelHandShell: View {
                 selection: selection,
                 tabs: ControlSurface.tabs(includeDeck: plan.tabSurfacesIncludeDeck),
                 axis: .vertical,
-                onAsk: { isAskPresented = true }
+                onAsk: { openAsk(plan) }
             )
             .padding(.leading, PixelHandTheme.Space.sm)
             .frame(maxHeight: .infinity)
 
             if plan.hasDeckColumn {
                 canvas(centre: centre, plan: plan, margin: 0)
+                // The column holds the header, so it never collapses; it
+                // still switches Deck | Ask.
                 VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
                     header(showsMirrorToggle: false, horizontalPadding: 0)
                     statusPills(offersKeyboard: false)
-                    stripOnly(metrics: metrics, foldedDock: true, margin: 0)
-                    if let sender = session.sender {
-                        deck(sender: sender, columns: plan.deckColumnKeys, inset: 0)
+                    RightColumnSwitch(mode: columnMode, canCollapse: false, onCollapse: {})
+                    Group {
+                        if columnMode.wrappedValue == .ask {
+                            askColumn(framed: false)
+                        } else {
+                            VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
+                                stripOnly(metrics: metrics, foldedDock: true, margin: 0)
+                                if let sender = session.sender {
+                                    deck(sender: sender, columns: plan.deckColumnKeys, inset: 0)
+                                }
+                            }
+                        }
                     }
+                    .transition(.opacity)
                 }
+                .animation(Animation.phPanelFade(reduceMotion: reduceMotion), value: columnMode.wrappedValue)
                 .frame(width: CGFloat(plan.deckColumnWidth))
                 .padding(.trailing, CGFloat(metrics.margin))
             } else {
@@ -255,7 +293,7 @@ struct PixelHandShell: View {
                         screenOverPane(size: proxy.size) {
                             HStack(spacing: PixelHandTheme.Space.md) {
                                 pointerPane(margin: 0, keyboardInDock: true)
-                                deckColumn(plan: plan)
+                                sideColumn(plan: plan)
                             }
                         }
                     }
@@ -265,7 +303,7 @@ struct PixelHandShell: View {
                     HStack(spacing: PixelHandTheme.Space.md) {
                         pointerPane(margin: 0, keyboardInDock: true)
                             .floatingScreenTile(session: session)
-                        deckColumn(plan: plan)
+                        sideColumn(plan: plan)
                     }
                 }
             }
@@ -278,7 +316,7 @@ struct PixelHandShell: View {
                 stripOnly(metrics: metrics, foldedDock: false, margin: margin)
                 HStack(spacing: PixelHandTheme.Space.md) {
                     dock
-                    AskCircleButton(action: { isAskPresented = true })
+                    AskCircleButton(action: { openAsk(plan) })
                 }
                 .padding(.horizontal, margin)
             }
@@ -307,12 +345,17 @@ struct PixelHandShell: View {
             VStack(spacing: PixelHandTheme.Space.md) {
                 header(
                     presets: preset,
-                    onAsk: { isAskPresented = true },
+                    onAsk: { openAsk(plan) },
                     onShowSidebar: showSidebarAction(plan),
                     showsMirrorToggle: false,
                     horizontalPadding: 0
                 )
                 statusPills
+                // With the column collapsed, the front app's shortcuts
+                // move here, under the header.
+                if !plan.stripInDeckColumn {
+                    stripOnly(metrics: metrics, foldedDock: false, margin: 0)
+                }
                 centreCanvas(preset: preset.wrappedValue)
                     .padding(.bottom, CGFloat(CanvasPlan.floatingDockReserve))
                     .overlay(alignment: .bottom) {
@@ -327,18 +370,12 @@ struct PixelHandShell: View {
             }
             .frame(maxWidth: .infinity)
 
-            // Deck column: the strip (a card while a dialog is up), then the deck.
-            VStack(alignment: .leading, spacing: PixelHandTheme.Space.md) {
-                stripCard(metrics: metrics)
-                if let sender = session.sender {
-                    deck(sender: sender, columns: plan.deckColumnKeys, inset: PixelHandTheme.Space.md)
-                        .background(PixelHandTheme.raised.opacity(0.5), in: RoundedRectangle(cornerRadius: PixelHandTheme.Radius.pane, style: .continuous))
-                        .clipShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.pane, style: .continuous))
-                }
-            }
-            .frame(width: CGFloat(LayoutMetrics.deckColumnWidth))
-            .frame(maxHeight: .infinity, alignment: .top)
+            // Right column: Deck | Ask; Deck is the strip (a card while a
+            // dialog is up) then the deck. Collapsed: the edge handle.
+            wideColumn(plan: plan)
         }
+        .animation(Animation.phPanelFade(reduceMotion: reduceMotion), value: rightColumn(plan).isCollapsed)
+        .animation(Animation.phPanelFade(reduceMotion: reduceMotion), value: columnMode.wrappedValue)
         .padding(.leading, plan.showsSidebar ? 0 : CGFloat(metrics.margin))
         .padding(.trailing, CGFloat(metrics.margin))
         .padding(.bottom, PixelHandTheme.Space.sm)
@@ -433,7 +470,7 @@ struct PixelHandShell: View {
             SurfaceTabBar(
                 selection: selection,
                 tabs: DuoArrangement.bookTabs.compactMap(ControlSurface.init(rawValue:)),
-                onAsk: { isAskPresented = true }
+                onAsk: { openAsk(plan) }
             )
         }
         .padding(.trailing, outer)
@@ -477,11 +514,123 @@ struct PixelHandShell: View {
             SurfaceTabBar(
                 selection: selection,
                 tabs: DuoArrangement.laptopTabs.compactMap(ControlSurface.init(rawValue:)),
-                onAsk: { isAskPresented = true }
+                onAsk: { openAsk(plan) }
             )
             .padding(.horizontal, outer)
         }
         .padding(.bottom, PixelHandTheme.Space.sm)
+    }
+
+    // MARK: - Right column (OR-06)
+
+    private var columnMode: Binding<RightColumnMode> {
+        Binding(
+            get: { RightColumnMode(rawValue: columnModeRawValue) ?? .deck },
+            set: { columnModeRawValue = $0.rawValue }
+        )
+    }
+
+    /// The right column for this plan, with its remembered collapsed state.
+    private func rightColumn(_ plan: CanvasPlan) -> RightColumnPlan {
+        let preset: LayoutPreset? = plan.usesPresets ? presetBinding(plan).wrappedValue : nil
+        let arrangement = ArrangementPreset(plan: plan, preset: preset)
+        let collapsed = RightColumnMemory(json: rightColumnJSON).isCollapsed(arrangement)
+        return RightColumnPlan(plan: plan, preset: preset, collapsed: collapsed)
+    }
+
+    private func setCollapsed(_ collapsed: Bool, _ column: RightColumnPlan) {
+        GestureHaptic.light.trigger()
+        var memory = RightColumnMemory(json: rightColumnJSON)
+        memory.set(collapsed, for: column.arrangement)
+        rightColumnJSON = memory.json
+    }
+
+    /// Ask (⌘K, the Ask field or circle, the tab bar's Ask): in place in
+    /// the right column where there is one (expanding it), else the sheet.
+    private func openAsk(_ plan: CanvasPlan) {
+        let column = rightColumn(plan)
+        switch column.askRoute {
+        case .column:
+            var memory = RightColumnMemory(json: rightColumnJSON)
+            memory.expandForAsk(column)
+            rightColumnJSON = memory.json
+            columnModeRawValue = RightColumnMode.ask.rawValue
+            askFocusRequest += 1
+        case .sheet:
+            isAskPresented = true
+        }
+    }
+
+    /// Ask in the column: the same panel and model as the sheet.
+    private func askColumn(framed: Bool) -> some View {
+        AskPanel(session: session, macName: peerName, placement: .column, focusRequest: askFocusRequest)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .background(
+                framed ? PixelHandTheme.raised.opacity(0.5) : Color.clear,
+                in: RoundedRectangle(cornerRadius: PixelHandTheme.Radius.pane, style: .continuous)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.pane, style: .continuous))
+    }
+
+    /// iPad portrait's column beside the pad (Split and Pointer presets).
+    @ViewBuilder
+    private func sideColumn(plan: CanvasPlan) -> some View {
+        let column = rightColumn(plan)
+        Group {
+            if column.isCollapsed {
+                RightColumnHandle(mode: columnMode.wrappedValue) { setCollapsed(false, column) }
+                    .transition(.opacity)
+            } else {
+                VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
+                    RightColumnSwitch(mode: columnMode, canCollapse: column.canCollapse) { setCollapsed(true, column) }
+                    Group {
+                        if columnMode.wrappedValue == .ask {
+                            askColumn(framed: true)
+                        } else {
+                            deckColumn(plan: plan)
+                        }
+                    }
+                    .transition(.opacity)
+                }
+                .frame(width: CGFloat(column.expandedWidth))
+                .transition(.opacity)
+            }
+        }
+        .animation(Animation.phPanelFade(reduceMotion: reduceMotion), value: column.isCollapsed)
+        .animation(Animation.phPanelFade(reduceMotion: reduceMotion), value: columnMode.wrappedValue)
+    }
+
+    /// iPad landscape's trailing column.
+    @ViewBuilder
+    private func wideColumn(plan: CanvasPlan) -> some View {
+        let column = rightColumn(plan)
+        if column.isCollapsed {
+            RightColumnHandle(mode: columnMode.wrappedValue) { setCollapsed(false, column) }
+                .transition(.opacity)
+        } else {
+            VStack(alignment: .leading, spacing: PixelHandTheme.Space.md) {
+                RightColumnSwitch(mode: columnMode, canCollapse: column.canCollapse) { setCollapsed(true, column) }
+                    .frame(height: PixelHandTheme.ControlHeight.standard)
+                Group {
+                    if columnMode.wrappedValue == .ask {
+                        askColumn(framed: true)
+                    } else {
+                        VStack(alignment: .leading, spacing: PixelHandTheme.Space.md) {
+                            stripCard(metrics: plan.metrics)
+                            if let sender = session.sender {
+                                deck(sender: sender, columns: plan.deckColumnKeys, inset: PixelHandTheme.Space.md)
+                                    .background(PixelHandTheme.raised.opacity(0.5), in: RoundedRectangle(cornerRadius: PixelHandTheme.Radius.pane, style: .continuous))
+                                    .clipShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.pane, style: .continuous))
+                            }
+                        }
+                    }
+                }
+                .transition(.opacity)
+            }
+            .frame(width: CGFloat(column.expandedWidth))
+            .frame(maxHeight: .infinity, alignment: .top)
+            .transition(.opacity)
+        }
     }
 
     // MARK: - Presets
@@ -888,14 +1037,16 @@ struct PixelHandShell: View {
 
     // MARK: - Deck
 
-    /// The deck beside the pad (iPad portrait): 300 pt, 3 keys a row.
+    /// The deck beside the pad (iPad portrait): 3 keys a row, in the
+    /// 300 pt right column (`sideColumn` sets the width).
     @ViewBuilder
     private func deckColumn(plan: CanvasPlan) -> some View {
         if let sender = session.sender {
             deck(sender: sender, columns: plan.deckColumnKeys, inset: PixelHandTheme.Space.md)
                 .background(PixelHandTheme.raised.opacity(0.5), in: RoundedRectangle(cornerRadius: PixelHandTheme.Radius.pane, style: .continuous))
                 .clipShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.pane, style: .continuous))
-                .frame(width: CGFloat(plan.deckColumnWidth))
+        } else {
+            Color.clear
         }
     }
 

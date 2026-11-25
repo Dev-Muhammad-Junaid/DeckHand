@@ -12,8 +12,16 @@
 //  Nothing runs until Run. Steps that are destructive or type on the Mac
 //  ask once more (`AskSafety`). While the Mac is locked the plan shows but
 //  Run is off, and the Mac's own gate refuses anyway. Ask is Pro: in the
-//  free plan the sheet shows the lock card and plans nothing.
-//  Thinking = a cyan dot scan over the plan area; no sparkles.
+//  free plan the field carries the small Pro lock (`.requiresPro(.ai)`),
+//  plans nothing, and a tap on it opens the paywall. No upsell card (OR-03).
+//  Thinking = a cyan dot scan over the plan area; the step that is running
+//  shows the dot wave. Those are real waits, so they get the loader; no
+//  sparkles.
+//
+//  `AskPanel` is the content, one view for both places Ask runs: the sheet
+//  (compact windows, and arrangements without a right column) and the
+//  right column's Ask switch (OR-06). Both read `AskModel.shared`, so a
+//  request typed in one shows in the other.
 //
 
 import PixelHandCore
@@ -26,62 +34,120 @@ struct AskSheet: View {
     @ObservedObject private var model = AskModel.shared
     @Environment(\.entitlements) private var entitlements
     @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            AskPanel(session: session, macName: macName, placement: .sheet)
+                .background(PixelHandTheme.canvas.ignoresSafeArea())
+                .toolbar {
+                    ToolbarItem(placement: .principal) { AskTitle(macName: macName) }
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") { dismiss() }
+                    }
+                    if entitlements.allows(.ai), model.planner != nil {
+                        ToolbarItem(placement: .primaryAction) { OnDevicePill() }
+                    }
+                }
+                .navigationBarTitleDisplayMode(.inline)
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+}
+
+/// The sheet's title: the Ask glyph and "Ask", never a truncated "Ask
+/// Muhammad’s Mac…" (VQ-050); VoiceOver still hears which Mac.
+private struct AskTitle: View {
+    let macName: String
+
+    var body: some View {
+        HStack(spacing: PixelHandTheme.Space.sm) {
+            PHGlyph(glyph: PixelGlyphs.ask, pitch: PixelPitch.header)
+                .foregroundStyle(PixelHandTheme.ink)
+            Text("Ask")
+                .font(.headline)
+                .foregroundStyle(PixelHandTheme.ink)
+                .lineLimit(1)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Ask \(macName)")
+    }
+}
+
+/// "On device" while Apple Intelligence plans.
+private struct OnDevicePill: View {
+    var body: some View {
+        Text("On device")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(PixelHandTheme.ink2)
+            .lineLimit(1)
+            .padding(.horizontal, PixelHandTheme.Space.sm)
+            .padding(.vertical, 4)
+            .background(PixelHandTheme.fill, in: Capsule())
+            .accessibilityLabel("Plans on this device with Apple Intelligence")
+    }
+}
+
+/// Ask's content: the typed request, the plan and the step-by-step run.
+struct AskPanel: View {
+    enum Placement {
+        /// In the Ask sheet: closing it stops a run.
+        case sheet
+        /// In the right column: the run keeps going while the column shows
+        /// the deck, and the column is narrower.
+        case column
+    }
+
+    let session: ControlSessionModel
+    let macName: String
+    var placement: Placement = .sheet
+    /// Bumped by the shell each time Ask is opened in the column (⌘K, the
+    /// Ask field), to focus the field.
+    var focusRequest: Int = 0
+
+    @ObservedObject private var model = AskModel.shared
+    @Environment(\.entitlements) private var entitlements
     @FocusState private var isFieldFocused: Bool
 
     @State private var isEditing = false
     @State private var isConfirming = false
-    @State private var isPaywallPresented = false
     @State private var saveNote: String?
 
     private var isUnlocked: Bool { entitlements.allows(.ai) }
     private var isMacLocked: Bool { session.macLockState.isLocked }
     private var catalog: AskAppCatalog { AskAppCatalog(installed: session.installedApps) }
+    private var padding: CGFloat { placement == .sheet ? PixelHandTheme.Space.lg : PixelHandTheme.Space.md }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: PixelHandTheme.Space.lg) {
-                    if isUnlocked {
-                        field
-                        if let lock = session.macLockState.bannerText(macName: macName) {
-                            banner(lock, tint: PixelHandTheme.warningTint)
-                        }
-                        content
-                    } else {
-                        lockCard
-                    }
+        ScrollView {
+            VStack(alignment: .leading, spacing: PixelHandTheme.Space.lg) {
+                if placement == .column, isUnlocked, model.planner != nil {
+                    OnDevicePill()
+                        .frame(maxWidth: .infinity, alignment: .trailing)
                 }
-                .padding(PixelHandTheme.Space.lg)
-            }
-            .background(PixelHandTheme.canvas.ignoresSafeArea())
-            .toolbar {
-                ToolbarItem(placement: .principal) { title }
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                }
-                if isUnlocked, model.planner != nil {
-                    ToolbarItem(placement: .primaryAction) {
-                        Text("On device")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(PixelHandTheme.ink2)
-                            .padding(.horizontal, PixelHandTheme.Space.sm)
-                            .padding(.vertical, 4)
-                            .background(PixelHandTheme.fill, in: Capsule())
-                            .accessibilityLabel("Plans on this device with Apple Intelligence")
+                field
+                if isUnlocked {
+                    if let lock = session.macLockState.bannerText(macName: macName) {
+                        banner(lock, tint: PixelHandTheme.warningTint)
                     }
+                    content
                 }
             }
-            .navigationBarTitleDisplayMode(.inline)
+            .padding(padding)
         }
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
+        .scrollDismissesKeyboard(.interactively)
         .onAppear {
             model.planner = isUnlocked ? OnDeviceAskPlanner.makeIfAvailable() : nil
-            if isUnlocked, model.plan == nil { isFieldFocused = true }
+            // The sheet focuses on open; the column only when Ask was asked
+            // for (⌘K, the Ask field), which may be what made it appear.
+            let asked = placement == .sheet || focusRequest > 0
+            if isUnlocked, model.plan == nil, asked { isFieldFocused = true }
         }
-        .onDisappear { model.cancelRun() }
-        .sheet(isPresented: $isPaywallPresented) {
-            PaywallView(reason: .feature(.ai))
+        .onChange(of: focusRequest) { _, _ in
+            if isUnlocked, !model.isRunning { isFieldFocused = true }
+        }
+        .onDisappear {
+            if placement == .sheet { model.cancelRun() }
         }
         .confirmationDialog("Run this plan on \(macName)?", isPresented: $isConfirming, titleVisibility: .visible) {
             Button("Run", role: model.confirmationReasons == [.typesText] ? nil : .destructive) { startRun() }
@@ -92,21 +158,6 @@ struct AskSheet: View {
     }
 
     // MARK: Header and field
-
-    private var title: some View {
-        HStack(spacing: PixelHandTheme.Space.sm) {
-            PHGlyph(glyph: PixelGlyphs.ask, pitch: PixelPitch.header)
-                .foregroundStyle(PixelHandTheme.ink)
-            // "Ask", never a truncated "Ask Muhammad’s Mac…" (VQ-050);
-            // VoiceOver still hears which Mac.
-            Text("Ask")
-                .font(.headline)
-                .foregroundStyle(PixelHandTheme.ink)
-                .lineLimit(1)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Ask \(macName)")
-    }
 
     private var field: some View {
         HStack(spacing: PixelHandTheme.Space.sm) {
@@ -139,6 +190,9 @@ struct AskSheet: View {
             RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous)
                 .strokeBorder(PixelHandTheme.hairline)
         )
+        // Free plan: the field is dimmed with the small lock in its corner,
+        // and a tap opens the paywall for Ask (OR-03). Unlocked, no change.
+        .requiresPro(.ai)
     }
 
     private var canSubmit: Bool {
@@ -279,6 +333,10 @@ struct AskSheet: View {
                 Button(role: .destructive) { model.edit { $0.remove(at: index) } } label: { Image(systemName: "minus.circle.fill") }
                     .foregroundStyle(PixelHandTheme.danger)
                     .accessibilityLabel("Remove step")
+            } else if model.phase == .running(index: index) {
+                // The run waits on the Mac for this step: the real wait the
+                // dot-matrix loader is for.
+                DotWave(pitch: 3, label: "Running step \(index + 1)")
             } else {
                 deliveryMark(index)
             }
@@ -411,25 +469,6 @@ struct AskSheet: View {
     private func outcomeTint(_ outcome: AskModel.RunOutcome) -> Color {
         if case .done = outcome { return PixelHandTheme.successTint }
         return PixelHandTheme.warningTint
-    }
-
-    private var lockCard: some View {
-        VStack(alignment: .leading, spacing: PixelHandTheme.Space.md) {
-            DotMatrixText("PRO", pitch: 2, label: "Pro")
-                .foregroundStyle(PixelHandTheme.accent)
-            Text("Ask \(macName) in your own words")
-                .font(.phDisplay(.title3))
-                .foregroundStyle(PixelHandTheme.ink)
-            Text("Say what you want done and Pixel Hand plans the steps, on this device. Try every Pro feature free for 2 weeks.")
-                .font(.subheadline)
-                .foregroundStyle(PixelHandTheme.ink2)
-                .fixedSize(horizontal: false, vertical: true)
-            Button("Try 2 weeks free") { isPaywallPresented = true }
-                .buttonStyle(.ph(.primary, size: .regular))
-        }
-        .padding(22)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PixelHandTheme.elevated, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
     }
 }
 

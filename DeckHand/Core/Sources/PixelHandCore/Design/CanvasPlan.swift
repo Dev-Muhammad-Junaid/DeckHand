@@ -106,14 +106,29 @@ public struct CanvasPlan: Sendable, Hashable {
     /// The two panes around the iPhone Duo crease (book, laptop); `nil`
     /// otherwise.
     public let duoPanes: DuoPanes?
+    /// Whether the wide deck column is collapsed to its edge handle
+    /// (OR-06). Only the columns form reads it here; `RightColumnPlan`
+    /// holds the rule for every form.
+    public let rightColumnCollapsed: Bool
 
     /// `crease` is the keep-out band from `DuoPoseMachine` (system division
     /// or inferred). With one, the plan is `book` or `laptop`, whatever the
     /// size class says.
-    public init(width: Double, height: Double, sidebarCollapsed: Bool = false, crease: DuoCreaseBand? = nil) {
+    ///
+    /// `rightColumnCollapsed` gives the wide centre the deck column's room
+    /// (less the edge handle), which can bring the sidebar back on a
+    /// narrower window.
+    public init(
+        width: Double,
+        height: Double,
+        sidebarCollapsed: Bool = false,
+        rightColumnCollapsed: Bool = false,
+        crease: DuoCreaseBand? = nil
+    ) {
         let metrics = LayoutMetrics(width: width, height: height)
         self.metrics = metrics
         if let crease {
+            self.rightColumnCollapsed = false
             let panes = DuoPanes(width: metrics.width, height: metrics.height, band: crease)
             duoPanes = panes
             form = panes.pose == .book ? .book : .laptop
@@ -123,6 +138,7 @@ public struct CanvasPlan: Sendable, Hashable {
             return
         }
         duoPanes = nil
+        self.rightColumnCollapsed = rightColumnCollapsed && metrics.arrangement == .columns
         switch metrics.arrangement {
         case .single:
             form = .single
@@ -144,7 +160,11 @@ public struct CanvasPlan: Sendable, Hashable {
         case .columns:
             form = .columns
             deckColumnWidth = LayoutMetrics.deckColumnWidth
-            canShowSidebar = Self.centreWidth(width: metrics.width, sidebar: true) >= Self.minimumCentreWidth
+            canShowSidebar = Self.centreWidth(
+                width: metrics.width,
+                sidebar: true,
+                rightColumnCollapsed: rightColumnCollapsed
+            ) >= Self.minimumCentreWidth
         }
         showsSidebar = canShowSidebar && !sidebarCollapsed
     }
@@ -159,17 +179,20 @@ public struct CanvasPlan: Sendable, Hashable {
         return available - deck - gutter >= minimumPadWidth ? deck : 0
     }
 
-    /// The wide centre column's width: the window minus the sidebar (232,
-    /// its 24 pt leading margin included) or the leading margin, the deck
-    /// column, the two gaps and the trailing margin.
-    public static func centreWidth(width: Double, sidebar: Bool) -> Double {
+    /// The wide centre column's width: the window minus the sidebar (176,
+    /// its 16 pt leading margin included) or the leading margin, the deck
+    /// column (or its collapsed edge handle), the two gaps and the trailing
+    /// margin.
+    public static func centreWidth(width: Double, sidebar: Bool, rightColumnCollapsed: Bool = false) -> Double {
         let leading = sidebar ? LayoutMetrics.sidebarWidth : 24
-        return max(0, width - leading - 2 * columnGap - LayoutMetrics.deckColumnWidth - 24)
+        let column = rightColumnCollapsed ? RightColumnPlan.handleWidth : LayoutMetrics.deckColumnWidth
+        return max(0, width - leading - 2 * columnGap - column - 24)
     }
 
     /// The wide centre column's width for this plan.
     public var centreWidth: Double {
-        form == .columns ? Self.centreWidth(width: metrics.width, sidebar: showsSidebar) : metrics.width
+        guard form == .columns else { return metrics.width }
+        return Self.centreWidth(width: metrics.width, sidebar: showsSidebar, rightColumnCollapsed: rightColumnCollapsed)
     }
 
     /// Whether the deck shows in its own column beside the pad.
@@ -186,8 +209,11 @@ public struct CanvasPlan: Sendable, Hashable {
     public var asksInToolbar: Bool { form == .columns }
 
     /// The context strip sits on top of the deck column (rail, columns)
-    /// rather than in the bottom chrome.
-    public var stripInDeckColumn: Bool { form == .columns || (form == .rail && hasDeckColumn) }
+    /// rather than in the bottom chrome. With the wide column collapsed it
+    /// moves into the centre column, under the header.
+    public var stripInDeckColumn: Bool {
+        (form == .columns && !rightColumnCollapsed) || (form == .rail && hasDeckColumn)
+    }
 
     /// The app dock floats at the foot of the centre column (wide).
     public var floatsDock: Bool { form == .columns }

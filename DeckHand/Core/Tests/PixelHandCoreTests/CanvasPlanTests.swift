@@ -93,17 +93,22 @@ struct CanvasPlanTests {
         #expect(land.deckColumnKeys == 3)
     }
 
-    @Test("Wide: the Macs sidebar shows until the centre would drop under 480 pt")
+    @Test("Wide: the narrow Macs sidebar shows until the centre would drop under 480 pt")
     func sidebarCollapse() {
+        // OR-04: 176 pt (16 pt leading margin included), down from 232.
+        #expect(LayoutMetrics.sidebarWidth == 176)
+        #expect(LayoutMetrics.sidebarWidth >= 168 && LayoutMetrics.sidebarWidth <= 184)
+        #expect(LayoutMetrics.sidebarLeadingMargin < LayoutMetrics.sidebarWidth)
+
         let land = CanvasPlan(width: 1180, height: 820)
         #expect(land.showsSidebar)
-        #expect(land.centreWidth == 556)  // board: 1180 − 232 − 16 − 16 − 336 − 24; without the sidebar, 24 leading
+        #expect(land.centreWidth == 612)  // 1180 − 176 − 16 − 16 − 336 − 24: 56 pt more canvas than at 232
 
-        #expect(CanvasPlan(width: 1104, height: 820).showsSidebar)
-        let narrow = CanvasPlan(width: 1103, height: 820)
+        #expect(CanvasPlan(width: 1048, height: 820).showsSidebar)
+        let narrow = CanvasPlan(width: 1047, height: 820)
         #expect(!narrow.canShowSidebar)
         #expect(!narrow.showsSidebar)
-        #expect(narrow.centreWidth == 687)
+        #expect(narrow.centreWidth == 631)
 
         let collapsed = CanvasPlan(width: 1366, height: 1024, sidebarCollapsed: true)
         #expect(collapsed.canShowSidebar)
@@ -113,6 +118,27 @@ struct CanvasPlanTests {
         // Never on smaller forms, collapsed or not.
         #expect(!CanvasPlan(width: 820, height: 1180).canShowSidebar)
         #expect(!CanvasPlan(width: 874, height: 402).canShowSidebar)
+    }
+
+    @Test("Wide: a collapsed right column gives the centre its room, less the edge handle")
+    func rightColumnCollapsedWide() {
+        let land = CanvasPlan(width: 1180, height: 820, rightColumnCollapsed: true)
+        #expect(land.rightColumnCollapsed)
+        #expect(land.centreWidth == 928)  // 1180 − 176 − 32 − 20 − 24
+        #expect(!land.stripInDeckColumn)
+        #expect(land.floatsDock)
+        // The deck column width itself is unchanged; the handle replaces it.
+        #expect(land.deckColumnWidth == 336)
+
+        // A narrow wide window gets the sidebar back once the column folds.
+        #expect(!CanvasPlan(width: 1000, height: 800).canShowSidebar)
+        let folded = CanvasPlan(width: 1000, height: 800, rightColumnCollapsed: true)
+        #expect(folded.canShowSidebar)
+        #expect(folded.centreWidth == 748)
+
+        // Only the columns form reads it.
+        #expect(!CanvasPlan(width: 820, height: 1180, rightColumnCollapsed: true).rightColumnCollapsed)
+        #expect(CanvasPlan(width: 756, height: 381, rightColumnCollapsed: true).stripInDeckColumn)
     }
 
     @Test("Screen over pad: picture height by default, clamped, nil when both can't fit")

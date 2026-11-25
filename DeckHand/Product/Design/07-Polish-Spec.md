@@ -20,8 +20,9 @@ Width classes come from `LayoutMetrics` (`03-Layout-Strategy.md` §0).
   The remainder is split between the two margins (an odd point goes to the
   trailing one), never into gutters. 402 pt → 4 keys of 83 pt, margins 17 and
   17. 375 pt → 76 pt keys, margins 17 and 18.
-- **Fixed column widths on wide.** Macs sidebar 232 (incl. its 24 leading
-  margin), deck column 336 (3 × 96 + 2 × 12 + 2 × 12 inset), the rest is the
+- **Fixed column widths on wide.** Macs sidebar 176 with compact Mac cards
+  (incl. its 16 leading margin; 232 until the build 18 owner review, OR-04),
+  deck column 336 (3 × 96 + 2 × 12 + 2 × 12 inset), the rest is the
   centre column.
 - **iPhone Duo.** Each pane is its own compact grid. 20 pt clear on both sides
   of the crease (the 40 pt division), measured from the system's reserved
