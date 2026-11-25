@@ -1508,8 +1508,9 @@ Built from `dd67627` (build 22) in `pixelhand-build` with the shared
 **Install**
 - Mac: `/Applications/Pixel Hand.app` replaced (old copy quit first),
   launched with `open`.
-- iPad Air 11" (M3): **not installed.** `devicectl` lists it as
-  `unavailable` (error 4016) again. **It is still on build 20.**
+- iPad Air 11" (M3): installed later with both extensions, once it was
+  reachable again. The remote launch failed (error 10002, iPad probably
+  locked), so open it by hand.
 
 **Re-checks of the build 19 bugs**
 - **VQ-001: pass.** On an unpaired iPad mini simulator the Mac logs "is
