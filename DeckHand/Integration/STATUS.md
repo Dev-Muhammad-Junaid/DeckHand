@@ -1652,4 +1652,45 @@ automatic signing with `-allowProvisioningUpdates`, in the shared
 
 **Bugs found:** none by the build gate.
 
-Status: BUILT (build 23) — green
+
+## Visual QA and re-checks (build 23) — 2026-11-25
+
+Report: `DeckHand/Integration/VISUAL-QA-build23.md`. Gallery (private Artifact,
+mirror pictures blurred): https://claude.ai/artifact/Gmd7tNoxKcsQ9FnMKhYmqK
+
+**Mac-free run.** The owner was using the Mac, so after one full iPad run
+no walk sent input to it: `test04`, `test05` and `test16` were left out, and
+the Mac menu-bar panel wasn't opened. The first iPad run's `test04` typed
+"hello" (no Return) into Chrome; nothing was submitted.
+
+- `PixelHandUITests`: iPad Pro 11" light **17 / 17 passed**; iPad Pro 11"
+  AX3 **7 / 7** (Mac-free set); iPhone 17 Pro light **9 / 9** (Mac-free
+  set). Hand checks: iPad Stage Manager window at iPhone width, iPhone 17 Pro
+  at AX3 and AX5.
+- **Build 22 re-checks:** bug 1 (Try again) **pass**, bug 2 (AX3 pill)
+  **pass**, bug 3 (AX3 lock banner) **pass**. The Mac locked itself, so the
+  banner was checked without `test04`. OR-16 not checked (it drives the Mac
+  pointer).
+- **VQ-001…082:** 44 pass · 1 fail (VQ-058) · 37 not checked.
+  **OR-01…16:** 5 pass · 11 not checked. Most "not checked" items are on the
+  Mac panel, the widgets, iPad landscape (the simulator has Stage Manager on,
+  VQ-092) or need input to the Mac.
+- **New findings VQ-083…093:** 11 (P1 1 · P2 4 · P3 6).
+
+**Open bugs**
+1. **VQ-083 (P1), build 19 bug 2 still open:** on iPhone, in deck edit mode
+   the floating mirror tile covers the deck header's Done (not hittable) and
+   three key slots.
+2. **VQ-058:** after onboarding and after a relaunch, the picker shows the
+   paired Mac as "Paired · Nearby" and waits for a tap instead of
+   reconnecting.
+
+P2 findings for the fix lane: VQ-084 (AX3 picker truncates the Mac name in
+the middle), VQ-085 (AX5 pill cuts both lines mid-word), VQ-086 (a second
+floating "Connect and pair" covers the code sheet's footer).
+
+**Still for the owner (needs the Mac to yourself):** `test04`, `test05`,
+`test16` (OR-16 picture pointer), the Mac panel items (VQ-021…023,
+VQ-040…043, OR-08…13), widgets and Control Center (VQ-070…079, OR-14/15).
+
+Status: BUILT (build 23) — 2 bugs
