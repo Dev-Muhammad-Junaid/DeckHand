@@ -57,6 +57,7 @@ files=(
   "$app/DeckHandiOS/Store/SubscriptionStore.swift"
   "$app/DeckHandiOS/Store/DeveloperUnlock.swift"
   "$app/DeckHandiOS/Macs/MacSwitcher.swift"
+  "$app/DeckHandiOS/Settings/ConnectionDiagnostics.swift"
   "$app/Shared/LoomConnectionHandle+ControlMessage.swift"
   "$@"
 )
