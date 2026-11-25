@@ -1272,4 +1272,101 @@ likeliest are:
 
 See each handoff's table.
 
-Status: READY FOR MAC BUILD (build 19)
+## Mac build results (build 19) — 2026-11-25
+
+Built from `bce0e75` (build 19) in the single `pixelhand-build` worktree
+with the shared `~/Developer/DeckHand-build/.derived`, Xcode 27.2,
+Release, team `DD5AWPLT2V`, `-allowProvisioningUpdates`.
+
+**Build**
+- Mac app: builds first time.
+- iOS app with `PixelHandWidgets.appex` (new `Assets.car`, so the
+  `.symbolset` control symbols compiled) and `PixelHandShare.appex`:
+  builds first time. None of the listed compile risks fired.
+- Simulator `build-for-testing` (app + `PixelHandUITests`): builds.
+
+**Fixes pushed:** none needed.
+
+**Tests**
+- `swift test --package-path DeckHand/Core`: **916 / 916 pass** (165 suites).
+- `swift test --scratch-path .build-local`, no `--skip`: **477 pass**
+  (377 + 42 + 15 + 13 + 10 + 9 + 6 + 5), 0 failed.
+- `DeckHandTests` (macOS): **8 / 8 pass**.
+- `PixelHandUITests` walks: **12 / 12 ran** on each of iPad Pro 11" (M5)
+  light, iPad Pro 11" free plan (`PH_QA_FREE=1`), iPhone 17 Pro light and
+  iPhone 17 Pro AX3 (243 screenshots). They are capture walks; I reviewed
+  the key screens by eye.
+
+**Install**
+- Mac: `/Applications/Pixel Hand.app` replaced (old copy quit first),
+  launched with `open`.
+- iPad Air 11" (M3): installed with both extensions. Launch from
+  `devicectl` failed (error 10002 / 4000, iPad probably locked): open it
+  by hand.
+
+**Re-checks** (pass / fail; anything not listed is not checked)
+- Pass: VQ-002 (refusal reads "Pair <Mac> first", sentence case), VQ-006,
+  VQ-007 (Pair capsule), VQ-009, VQ-010, VQ-011, VQ-016 (page sheet on
+  iPad), VQ-019 (iPad mini), VQ-025, VQ-026, VQ-032, VQ-033, VQ-034,
+  VQ-035 (Disconnect on one line; the Debug simulator build shows
+  "Classic layout (debug)" as designed), VQ-036 ("Typing into Google
+  Chrome"), VQ-038, VQ-044, VQ-046, VQ-049, VQ-050 (title), VQ-051,
+  VQ-053, VQ-054 (Diagnostics: Mac, Link "This device", round trip,
+  protocol 14), VQ-055 (paywall opens over Settings), VQ-056, VQ-057,
+  VQ-059, VQ-064, VQ-068 (lock banner with Keyboard), VQ-071 (MUHAMMAD'S
+  in the strip), VQ-080 (Stage Manager controls clear of the pill).
+- **Fail: VQ-001** (see bug 1) and **VQ-065** (see bug 3).
+- Not checked here (need the owner, the Mac panel, a real device or a
+  long wait): VQ-003/005/029–031/037 pairing by code (blocked by VQ-001
+  for unpaired simulators), VQ-020–023, 027/028, 039–043, 047, 048, 052,
+  058, 060–063, 066, 067, 069, 070, 072–079, 082, VQ-004/018 on iPad.
+
+**Bugs found: 5**
+1. **VQ-001 still fails (P1).** An unpaired simulator is refused:
+   "not paired, and it arrived over a remote path (loopback)". The
+   simulator dials the Mac's Bonjour-resolved Wi-Fi address
+   (`192.168.0.121`), which the kernel routes over `lo0`. In
+   `RemoteAccessPolicy.pathClass` a `.loopback` link with a routable,
+   non-loopback `remoteHost` returns `.remote`, so it never reaches
+   `.sameMachine`. A packet over `lo0` can only come from this machine;
+   either treat `.loopback` as `.sameMachine` (overlay addresses aside)
+   or match `remoteHost` against this Mac's own interface addresses.
+   The iPad mini simulator showed "Pair Muhammad’s MacBook Pro first".
+   Simulators paired during the build 18 QA still connect.
+2. **The floating screen tile covers the deck header on iPhone (P2).**
+   iPhone 17 Pro, Deck tab with the mirror running: the tile sits over
+   the header's counter, pin and Edit (light and AX3). The walk records
+   `ph.deck.edit` as not hittable.
+3. **AX3 Mac pill hyphenates the name (P2, VQ-065).** iPhone 17 Pro at
+   AX3: "Muham- / mad’s Mac…". It should break at a word and truncate
+   the tail.
+4. **Mirror failure alert shows a raw error (P2).** With the Mac locked,
+   choosing Show screen on iPad gives "Live Screen Unavailable · Live
+   mirror unavailable: The operation couldn’t be completed.
+   (Pixel_Hand.ScreenCaptureService.CaptureError error 2.)". It should
+   say the Mac is locked (the lock banner already knows), in sentence
+   case.
+5. **Picker lists another iPad as a Mac (P3).** On the iPad mini
+   simulator the picker showed "iPad Pro 11-inch (M5) · Please update
+   Pixel Hand on your Mac" with a PRO badge and a laptop glyph; that was
+   the iPad Pro simulator still running build 18. iOS devices shouldn't
+   be listed as Macs. Possibly older than build 19.
+
+**Hands-on checks for the owner (build 19)**
+- **Protocol 14:** the iPad needs build 19 too (installed; open it by
+  hand).
+- Pairing by code on the real iPad: Pair on the Mac's request row, eight
+  digits shown "4821 0934", sends itself at the eighth digit; a 60 s wait
+  keeps the request alive.
+- Mac panel: no focus ring, one-request header with an iPad glyph,
+  Updates hidden, Last seen "now" after a disconnect.
+- Quit the Mac app mid-session: only the toast, then the card after
+  about 15 s.
+- Widgets and Control Center: dot-glyph controls tinted cobalt, Lock
+  Screen widgets, "MUHAMMAD'S" on the small widget, eight free keys.
+
+## Owner testing (build 19)
+
+(none reported yet)
+
+Status: BUILT (build 19) — 5 bugs
