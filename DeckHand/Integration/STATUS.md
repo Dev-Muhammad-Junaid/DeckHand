@@ -1728,4 +1728,46 @@ and the gallery are updated.
 simulator's windowing returns on rotation), widgets and Control Center
 (VQ-070…079, OR-14/15), transfers (OR-13), dark mode, iPad mini, Duo.
 
-Status: BUILT (build 23) — 3 bugs
+
+## Build 24 queued (2026-11-25): build 23 QA fixes and the final QA pass
+
+Build 24 is build 23 plus `LANE-qa23-fixes.md`, merged at `d1aaa06`. It
+addresses the 4 failed and 15 new IDs from `VISUAL-QA-build23.md`:
+
+- VQ-083 (P1): the deck header keep-out in edit mode.
+- VQ-058: auto-reconnect.
+- VQ-095: the pointer acceleration is capped and clamped to the display.
+- VQ-060, VQ-061, VQ-084…097. VQ-034 and VQ-088 are partly done: wider
+  fades.
+
+There is no protocol, `project.yml`, plist or Loom change.
+
+Linux: Core **1058 / 1058 pass** (190 suites); `linux-typecheck/run.sh`
+passes; the UI test braces balance.
+
+**New walk settings** (see `MAC-BUILD.md`):
+- `TEST_RUNNER_PH_QA_MAC_NAME=<this Mac's name>`, so `connect()` never taps
+  another Mac. "AH's Mac mini" is on the network.
+- `TEST_RUNNER_PH_QA_FULLSCREEN=1` on the iPad, for real landscape and the
+  Macs sidebar (VQ-092).
+
+**Mac should do:**
+1. The build and all tests. Loom isn't changed, so its full run is
+   optional.
+2. Install on the Mac and the iPad.
+3. With the owner's OK to use the Mac, run `caffeinate -dimsu`, put a
+   scratch TextEdit document in front, and run the walks on the iPad Pro
+   11", the iPhone 17 Pro, AX3 and the free plan.
+4. **Final QA pass:** re-check each ID in `LANE-qa23-fixes.md`'s table,
+   and the items build 23 couldn't reach:
+   - iPad landscape and the Macs sidebar (OR-04, OR-05);
+   - widgets, the Lock Screen and Control Center (VQ-070…079, OR-14/15);
+   - Transfers (OR-13);
+   - dark mode;
+   - iPad mini.
+
+   Update `VISUAL-QA-build23.md`'s statuses in a new
+   `VISUAL-QA-build24.md` (pass, fail or not checked; new findings from
+   VQ-098), with the gallery.
+
+Status: READY FOR MAC BUILD (build 24)
