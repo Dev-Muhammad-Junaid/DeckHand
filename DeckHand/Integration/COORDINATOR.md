@@ -1,6 +1,6 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Build 23 queued, with the full visual QA re-run** (`VISUAL-QA-build23.md`). No lanes running. If the re-run is clean (no P1, few P2): publish the review page and finish. Otherwise: one more fix round.
+> **Build 23 is green; visual QA done** (`VISUAL-QA-build23.md`: P1 1, P2 5, P3 13, plus 4 failed). The qa23-fixes lane is running. When it is ready: merge it, then queue build 24 with re-checks of those IDs and the still-unchecked items (landscape/sidebar, widgets, transfers, dark mode). If that comes back clean: publish the review page.
 
 > **Mac builds:** 15, 16, 18 and 19 built (19 with 5 bugs, fixed in build 21). The primary session or the owner's Mac session runs Mac builds.
 
@@ -29,6 +29,7 @@ weekly usage limit is close).
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Primary (cloud, owner-facing: the owner sends changes here) | "★ Pixel Hand · PRIMARY" | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac, Claude Desktop session "DeckHand MAC build loop", `/loop` every 30 min; the only Mac build loop since 2026-11-25) | local_d0e9b529 | claude/pixelhand-integration (worktree `pixelhand-build`) | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
+| Build 23 QA fixes (VQ-083 P1, VQ-058, VQ-095 and the rest) | session_01H5HwAVNh6jeSmt1zfTwoe9 | claude/pixelhand-lane-qa23-fixes | `LANE-qa23-fixes.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -226,3 +227,12 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
     passes; the UI tests' braces balance.
   - **Build 23 queued**, with the full VQ and OR visual QA re-run. Loom
     tests must run on the Mac.
+- 2026-11-25 17:10 UTC: build 23 built first time.
+  - Core 1031, Loom 480 (the new start suite passes), DeckHandTests 8.
+  - Visual QA re-run in two passes:
+    - VQ-001…082: 51 pass, 4 fail, 27 not checked.
+    - OR: 10 pass, 6 not checked.
+    - 15 new findings: VQ-083…097.
+  - Build 22's three bugs pass, and OR-16 passes by hand.
+  - Started the qa23-fixes lane (`BRIEF-qa23-fixes.md`) for the 19 failed
+    and new IDs.
