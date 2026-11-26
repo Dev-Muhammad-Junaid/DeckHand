@@ -1865,3 +1865,27 @@ Fix lane: `claude/pixelhand-lane-owner24` (primary session). All five
 fixed there, with Core tests and two UI walks (`test18`, `test19`); see
 `LANE-owner24.md` for the iPad checks to run on the next build.
 
+## Build 25 queued (2026-11-26): build 24 QA fixes + owner fixes OT-1…OT-5
+
+- **qa24-fixes** (`LANE-qa24-fixes.md`): VQ-098 (mirror tile off the empty
+  deck), VQ-099 (sidebar cards stack at AX sizes), VQ-100 (pairing chooser
+  defaults to the Mac that asked), VQ-066 (free-plan card buttons pinned),
+  VQ-101 Connecting… during reconnect, VQ-102 picker top-bar backdrop,
+  VQ-103 walks pair or skip unpaired simulators.
+- **owner24** (`LANE-owner24.md`): OT-1 transparent app icons (PNG/HEIC
+  with alpha) and a macOS-style dock with an accent dot; OT-2 the keyboard
+  no longer changes the arrangement (fixes the open/close loop); OT-3 the
+  new Type panel (Live and Compose, keys row, fn keys, sticky modifiers,
+  numpad, hardware-keyboard mode; `RemoteKeyboardPanel` deleted); OT-4 a
+  high-contrast right-column handle; OT-5 Ask's `AskFlow` (New request,
+  Run again, Save as key with Cancel, Edit).
+
+Mac should check: build all targets (compile risks in both handoffs);
+Core, Loom and app tests; the UI walks including the new landscape
+keyboard walk and the Ask loop walk; install on the Mac and the iPad (if
+the iPad is unreachable, say so plainly); then the final QA pass on the
+iPad Pro 11" simulator in landscape. The owner re-checks OT-1…OT-5 on the
+real iPad.
+
+Status: READY FOR MAC BUILD (build 25)
+
