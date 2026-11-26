@@ -2052,3 +2052,8 @@ orange annotations marking wasted space:
 
 Fix lane: `claude/pixelhand-lane-owner26` (primary session).
 
+Lane written: `LANE-owner26.md` (Type panel fills its width × height, numpad
+only with arrows, one-row arrows, target once, dock over the keyboard bar;
+zoom-to-input loupe, protocol 16; Accept ⇥ and OT-13 findings; Send sheet
+and capture preview redrawn). Needs an iPad and Mac re-check.
+

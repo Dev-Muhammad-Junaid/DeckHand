@@ -3,6 +3,29 @@
 Recorded by the coordinating session ("Deckhand project status review").
 Newest first. If a doc elsewhere disagrees, this file wins.
 
+## 2026-11-26 — Owner testing, build 26 (OT-9 … OT-13)
+From the owner's hands-on test of build 26 on the iPad Air 11" (M3),
+portrait and landscape, dark (`STATUS.md`, "Owner testing (build 26)");
+built on `claude/pixelhand-lane-owner26` (`LANE-owner26.md`):
+- **The Type panel fills itself:** it resizes in both directions and every
+  block is cut from its width and height (rows 44…72 pt, key rows across
+  the width, field as tall as the arrows). Numpad mode shows only the
+  arrows and the numpad; at its shortest the arrows go to one row. The
+  app is named once, by its icon in the header. The field's minimum drops
+  from 192 to 144 pt (it can show two lines now). The dock rides on the
+  iPadOS keyboard bar.
+- **Zoom to the input (Pro):** a loupe attached to the Type panel shows the
+  Mac's focused field, cut from the mirror and following the caret
+  (protocol 16: `system.watchFocus` / `system.focusState`). It needs the
+  mirror: no separate crop stream (one capture and encoder per iPad).
+  Electron apps get `AXManualAccessibility` only while a remote watches.
+- **Inline suggestions:** an **Accept ⇥** button in Live (Tab takes the
+  suggestion). Native fields' text shows in the loupe; suggestions
+  themselves can't be read reliably (not in AX for native predictions,
+  indistinguishable in web/Electron), so none is shown.
+- **Send sheet and capture preview** redrawn in the pixel identity and
+  sized to their content / the screen.
+
 ## 2026-11-26 — Owner testing, build 25 (OT-6 … OT-8)
 From the owner's hands-on test of build 25 on the iPad Air 11" (M3),
 landscape (`STATUS.md`, "Owner testing (build 25)"); built on
