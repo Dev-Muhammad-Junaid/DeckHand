@@ -234,7 +234,7 @@ struct TypePanel: View {
                 .accessibilityValue(zoom.isOn ? "Shown" : "Hidden")
                 .accessibilityAddTraits(zoom.isOn ? [.isButton, .isSelected] : .isButton)
                 .accessibilityIdentifier("ph.type.target")
-                .requiresPro(.mirror)
+                .requiresPro(.mirror, badge: .capsule(.bottomTrailing))
         } else {
             label
                 .accessibilityElement(children: .ignore)

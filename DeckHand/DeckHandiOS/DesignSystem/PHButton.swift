@@ -120,6 +120,9 @@ struct GlassCircleButton: View {
     let label: String
     var size: CGFloat = PixelHandTheme.ControlHeight.standard
     var isOn = false
+    /// A badge on the circle's rim (the unseen dot, a count): drawn above
+    /// the glass, never clipped (`ControlBadge`, OT-14).
+    var badge: ControlBadgeKind?
     let action: () -> Void
 
     var body: some View {
@@ -131,6 +134,7 @@ struct GlassCircleButton: View {
         }
         .buttonStyle(.plain)
         .phGlass(in: Circle(), interactive: true)
+        .controlBadge(badge, style: .circle())
         .phosphorFocusable(cornerRadius: size / 2)
         .frame(minWidth: PixelHandTheme.ControlHeight.hit, minHeight: PixelHandTheme.ControlHeight.hit)
         .accessibilityLabel(label)

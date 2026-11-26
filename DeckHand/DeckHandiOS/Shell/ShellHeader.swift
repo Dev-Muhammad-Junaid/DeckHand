@@ -14,7 +14,8 @@
 //  controls. The classic layout is a DEBUG-only item.
 //
 //  On iPad (UX-007) the header also carries the layout presets, and on
-//  wide windows the Ask field (⌘K) between them and capture. While the Macs
+//  wide windows the compact ⌘K button for Ask between them and capture
+//  (OT-18: it replaced the wide "Tell <Mac>…" field). While the Macs
 //  sidebar is hidden, its show button leads the row, before the Mac pill:
 //  the same spot the hide button takes in the sidebar's title row, so the
 //  button never jumps (OR-05, `SidebarTogglePlacement`). In the iPhone
@@ -47,8 +48,11 @@ struct ShellHeader: View {
     let onDisconnect: () -> Void
     /// iPad: the layout presets (UX-007).
     var presets: Binding<LayoutPreset>?
-    /// Wide: Ask as a field in the header (a circle when the row is tight).
+    /// Wide: the compact ⌘K button for Ask (OT-18; was the wide field).
     var onAsk: (() -> Void)?
+    /// What the ⌘K button shows: idle, Ask open in the column, or lit
+    /// while Ask's field has focus.
+    var askState: HeaderAskButton.State = .idle
     /// Wide, sidebar hidden: the button that shows it again. It leads the
     /// row and never folds into More (OR-05).
     var onShowSidebar: (() -> Void)?
@@ -76,7 +80,7 @@ struct ShellHeader: View {
 
     /// Room the presets and the Ask circle take in the row.
     private var reservedWidth: Double {
-        (presets == nil ? 0 : 168) + (onAsk == nil ? 0 : 52) + (linkBadge == nil ? 0 : 72)
+        (presets == nil ? 0 : 168) + (onAsk == nil ? 0 : HeaderAskButton.reservedWidth) + (linkBadge == nil ? 0 : 72)
             + (onShowSidebar == nil ? 0 : SidebarTogglePlacement.buttonSide + 8)
     }
 
@@ -114,22 +118,15 @@ struct ShellHeader: View {
             if fit == .full, let badge = linkBadge {
                 LinkBadge(kind: badge)
             }
+            // OT-18: the pill and its badge lead; everything else is one
+            // trailing cluster (presets, ⌘K, the circles, More) on one 8 pt
+            // rhythm, so nothing floats in the middle of the row.
+            Spacer(minLength: 0)
+            if fit == .full, let presets {
+                LayoutPresetPicker(selection: presets)
+            }
             if fit == .full, let onAsk {
-                if let presets {
-                    LayoutPresetPicker(selection: presets)
-                }
-                ViewThatFits(in: .horizontal) {
-                    AskField(macName: peerName, action: onAsk)
-                    HStack(spacing: 0) {
-                        Spacer(minLength: 0)
-                        AskCircleButton(size: PixelHandTheme.ControlHeight.standard, action: onAsk)
-                    }
-                }
-            } else {
-                Spacer(minLength: 0)
-                if fit == .full, let presets {
-                    LayoutPresetPicker(selection: presets)
-                }
+                AskShortcutButton(macName: peerName, state: askState, action: onAsk)
             }
             if fit == .full {
                 if showsMirrorToggle {
@@ -140,7 +137,7 @@ struct ShellHeader: View {
                         action: onToggleMirror
                     )
                     .accessibilityIdentifier("ph.header.screen")
-                    .requiresPro(.mirror)
+                    .requiresPro(.mirror, badge: .circle(.bottomTrailing))
                 }
             }
             if fit <= .captureAndMore {
@@ -237,7 +234,7 @@ struct ShellHeader: View {
         .accessibilityHint("Captures \(settings.defaultCapture.label.lowercased()). Touch and hold for full screen, window, region or text.")
         .accessibilityIdentifier("ph.header.capture")
         .phosphorFocusable(cornerRadius: PixelHandTheme.ControlHeight.standard / 2)
-        .requiresPro(.capture)
+        .requiresPro(.capture, badge: .circle(.bottomTrailing))
     }
 
     private func captureButton(_ mode: DefaultCapture) -> some View {

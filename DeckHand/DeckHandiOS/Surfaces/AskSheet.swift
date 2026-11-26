@@ -112,6 +112,9 @@ struct AskPanel: View {
     /// Bumped by the shell each time Ask is opened in the column (⌘K, the
     /// Ask field), to focus the field.
     var focusRequest: Int = 0
+    /// Told when the request field gains or loses focus, so the header's
+    /// ⌘K button can show Ask is being typed into (OT-18).
+    var onFieldFocus: ((Bool) -> Void)?
 
     @ObservedObject private var model = AskModel.shared
     @Environment(\.entitlements) private var entitlements
@@ -208,12 +211,14 @@ struct AskPanel: View {
         // ("nowTake a screenshot"). After the focus lands, so the field is
         // the first responder.
         .onChange(of: isFieldFocused) { _, focused in
+            onFieldFocus?(focused)
             guard focused, model.flow.selectsFieldOnFocus, !model.request.isEmpty else { return }
             DispatchQueue.main.async {
                 UIApplication.shared.sendAction(#selector(UIResponder.selectAll(_:)), to: nil, from: nil, for: nil)
             }
         }
         .onDisappear {
+            onFieldFocus?(false)
             if placement == .sheet { model.cancelRun() }
         }
         .confirmationDialog("Run this plan on \(macName)?", isPresented: $isConfirming, titleVisibility: .visible) {

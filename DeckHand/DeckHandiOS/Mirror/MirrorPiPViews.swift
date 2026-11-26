@@ -85,7 +85,7 @@ struct MirrorPiPToolButton: View {
                 action: { isExplainingUnavailable = true }
             )
             .accessibilityIdentifier("ph.mirror.pictureInPicture")
-            .requiresPro(.mirror)
+            .requiresPro(.mirror, badge: .capsule(.bottomTrailing))
             .alert("Picture in Picture isn’t available", isPresented: $isExplainingUnavailable) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -103,7 +103,7 @@ struct MirrorPiPToolButton: View {
                 action: tapped
             )
             .accessibilityIdentifier("ph.mirror.pictureInPicture")
-            .requiresPro(.mirror)
+            .requiresPro(.mirror, badge: .capsule(.bottomTrailing))
             .alert("Keep watching in Picture in Picture", isPresented: $isExplaining) {
                 Button("Turn on") {
                     settings.mirrorPiPAutoStart = true

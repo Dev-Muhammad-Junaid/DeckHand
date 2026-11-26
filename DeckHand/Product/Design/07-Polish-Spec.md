@@ -180,24 +180,26 @@ copy live in Core (`SendSheetLayout`, `SendTargetPlan`, `SendTargetCopy`,
 
 | Part | Spec |
 | --- | --- |
-| Sheet | As tall as its content: header + content, at least 240, at most the window less 48, on the 4 pt grid; the Large detent is offered only when the content is taller. iPad (iOS 18): a form sheet fitted to that height. Radius 36, `canvas` background, class margin (16 · 20 · 24) |
-| Header | 60: Send \| Inbox switch leading, Done trailing (semibold accent text, 44 target). No navigation title: the switch names the tab |
+| Sheet | As tall as its content: header + the **taller of the two tabs** (Send measured, Inbox estimated), so switching Send ↔ Inbox never resizes it (build 27, OT-15); at least 240, on the 4 pt grid. iPhone: the system sheet, at most the window less 48, the Large detent only when the content is taller, class margin (16 · 20 · 24). **iPad: a card centred on the window** (`SendSheetLayout.floatingFrame`): 560 wide at most, 24 clear of every window edge, centred on whole points over a 32 % black scrim, in the window above the keyboard (so it rises with it); 24 margin inside. Tap the scrim, Done or Escape to close. Radius 36, `canvas` background, hairline |
+| Header | 60: Send \| Inbox switch leading, Done trailing (semibold accent text, 44 target with the text at its trailing edge), both on the content margins and centred on one line, so the switch lines up with the chips' leading edge and Done with their trailing edge (OT-15). No navigation title: the switch names the tab |
 | Switch | The Type panel's mode switch: `fill` capsule with a 2 pt inset, 32 pt segments, the selected one accent with white text; selection by colour and fill only. Unseen Inbox items: a dot-matrix count (pitch 1.4) with a spoken label |
-| Sources | Photos · Files · Clipboard: three chips of one size (44 tall, `SendSheetLayout.chipWidth`: the row less two 8 pt gaps, split in three, whole points; build 27), the paste control filling its chip with the hairline drawn outside it, glyph (pitch 2, accent) + label, `raised` with a hairline, radius 14. Clipboard is a chip like the others, not the system paste circle |
+| Sources | Photos · Files · Paste: three chips of one size (44 tall, `SendSheetLayout.chipWidth`: the row less two 8 pt gaps, split in three, whole points; build 27) and **one face** (OT-17, `SendSheetLayout.SourceChip`): `raised` with a hairline, radius 14, icon and label both `ink` (no accent text), system symbols (`photo.on.rectangle`, `folder`, the paste control's own `doc.on.clipboard`), the label in the paste control's font as measured on the device (subheadline semibold until measured), 6 between icon and label. Paste is the system paste control (no "Allow Paste" prompt) filling its chip, the hairline drawn outside it; Photos and Files follow it because a paste control can't take a pixel glyph, a title or a font |
 | Field | One field for text or a link: the Ask field's shape (52, `raised`, radius 24, hairline), the Add button inside it (36 accent circle, add glyph, 44 target; ink3 while empty) |
 | Tray | Staged items as 52 rows (glyph, name, size; remove glyph with a 44 target), radius 14, 8 apart, under a footnote label |
-| Send to | Device cards in equal columns: `floor((w + 12) / (160 + 12))`, 1–3 (two on iPhone). A card is 64: a 44 navy tile (radius 14; Mac glyph lit while the Mac talks, lock glyph when locked, dot wave while connecting), the name over one status line, and at the trailing edge the dot-matrix readout (`42%` sending, a waiting count) or the status pixel. Card radius 24 (10 inset → 14). The focused Mac gets the 2 pt cobalt ring; a drop target the dashed accent ring |
+| Send to | Device cards in equal columns sized to the names (OT-16, `SendSheetLayout.cardGrid`): the most columns, up to `floor((w + 12) / (160 + 12))` and 3, in which every name (live and offline) wraps between words onto at most two lines in the card's text room (card width − 120); one column if none does (then the name truncates in the middle). A card is 64, or 80 when a name takes two lines (every card one height): a 44 navy tile (radius 14; Mac glyph lit while the Mac talks, lock glyph when locked, dot wave while connecting), the **whole name** over one status line, and a 32 slot at the trailing edge for the dot-matrix readout (`42%` sending, a waiting count) or the status pixel. Card radius 24 (10 inset → 14). The focused Mac gets the 2 pt cobalt ring; a drop target the dashed accent ring |
 | States | Ready · Sending N items (+ readout) · Waiting to accept · Locked · unlock to receive (amber) · Busy · sending you N items · Connecting… · N waiting · switch to send · Nearby / Remote · switch to send |
-| Offline | Not a card: a 44 row, `fill`, radius 14, unlit Mac glyph (pitch 1.6), name, "Seen 2 h ago" in ink3 (`MacGlanceCopy.age`, the same words as My Macs), most recently seen first, under the cards in the same columns. Tapping still queues a send for that Mac |
+| Offline | The same card, muted (OT-16; was a one-line row that truncated "AH's Mac mini …"): `fill`, no hairline, the tile on `fill2` with the Mac glyph in ink3, the name in ink2 (two lines like the others), "Seen 2 h ago" in ink3 (`MacGlanceCopy.age`, the same words as My Macs), no light; same grid and height as the live cards, most recently seen first, under them. Tapping still queues a send for that Mac |
 | Beam, Waiting | The dot beam on a navy plate (radius 24, device and Mac glyphs at pitch 2.6); waiting rows 44 with a small destructive Cancel |
-| Inbox | Rows on `raised`, pixel glyphs for link / text / photo / file, the unseen mark a 6 pt rounded square, ages in Core's words |
+| Inbox | Rows 56 on `raised` (radius 14, 8 apart) on the sheet's margins, pixel glyphs for link / text / photo / file, the unseen mark a 6 pt rounded square, ages in Core's words. Empty: "Nothing yet" centred both ways in the panel under the header (OT-15) |
 
 Checks (every size in §7, light and dark): chips equal size and on one
 line; no stock segmented control, `.roundedBorder` field or paste circle;
-cards equal width per row with their names on one leading edge; an
-offline Mac is a row, never a full card; no empty band under the last
-section, portrait and landscape, iPad and iPhone; at AX1+ the chip labels
-shrink to 80 % before they would truncate.
+cards equal width and height with their names on one leading edge and
+no name truncated at standard sizes; an offline Mac is the muted card;
+the switch and Done on the chips' margins; on iPad the card centred on
+the window within 2 pt and the same size on Send and Inbox; no empty band
+under the last section on Send, portrait and landscape, iPad and iPhone;
+at AX1+ the chip labels shrink to 80 % before they would truncate.
 
 Identifiers: `ph.transfer.send` (header), `ph.transfer.tab` (switch),
 `ph.send.tab.send`, `ph.send.tab.inbox`, `ph.send.done`,
@@ -205,7 +207,8 @@ Identifiers: `ph.transfer.send` (header), `ph.transfer.tab` (switch),
 `ph.send.source.clipboard`, `ph.send.field`, `ph.send.add`,
 `ph.send.trayItem`, `ph.transfer.macCard` (live card),
 `ph.send.offlineCard`, `ph.send.beam`, `ph.send.waiting.cancel`,
-`ph.inbox`, `ph.inbox.row`.
+`ph.inbox`, `ph.inbox.row`; build 27: `ph.send.sheet` (the card),
+`ph.send.header`, `ph.inbox.empty`.
 
 ## 9. Capture preview (owner testing, build 26, OT-10)
 
@@ -233,3 +236,38 @@ rail, under Ask), `ph.pairing.fieldCaption` (iPad, under the code field
 while the number pad is up). The connect toast (`ph.connect.toast`,
 `ph.connect.cancel`) stacks at AX1+ (text full width, wrapping at words,
 Cancel under it) and sits under the picker's Pair and Settings.
+
+## 10. Badges on controls (owner testing, build 27, OT-14)
+
+Every badge on a control (the unseen dot, the Pro lock, the PRO label, a
+count, a live or "needs you" light) is drawn **above the control's glass,
+outside its clip shape, never clipped**. One component does it
+(`DeckHandiOS/DesignSystem/ControlBadge.swift`); positions come from Core
+(`ControlBadgePlacement`).
+
+| Part | Spec |
+| --- | --- |
+| Layer | Inside a glass group (`phGlassGroup`: the header, the tab bar, the mirror toolbar) a badge reports its control's bounds and the group draws every badge in one overlay on top of the `GlassEffectContainer`. Outside a group the badge is the control's last overlay. Presented sheets reset this, so their badges draw on their own controls |
+| Anchor | `rim` on glass circles and pills: centred on the outline at 45° from the corner, half on the glass, half outside it. `inset` on tiles inside cards (so it never covers the name) and on dock icons (whose scroll view would clip anything hanging out) |
+| Grid | The badge's origin relative to its control is on the 4 pt grid; sizes are on it too: dot 8, live / needs-you / off light 12 (an 8 light in a 2 pt canvas ring), Pro lock 20 (16 on the sidebar's small tile), PRO label 40 × 20, count 20 or 28 × 20 |
+| Where | Header circles: Pro lock bottom-trailing on the rim; the Send circle's unseen dot top-trailing on the rim. Mirror toolbar and the Type panel's target chip: Pro lock on the capsule's bottom-trailing rim. Mac pill: the live light on its tile's top-trailing rim. Macs sidebar tile: the small lock on its bottom-trailing rim. Send / My Macs / picker tiles: PRO inset 4 in the top-trailing corner. Dock icon: the needs-you light inside its top-trailing corner. Other `.requiresPro` controls: the lock inside the bottom-trailing corner |
+
+Checks: `test25_BadgesAboveGlass` (free plan, landscape and portrait): each
+badge touches its control, is on the 4 pt grid relative to it, and its
+colour on screen is its own blue, not the glass's.
+
+## 11. Header Ask: the ⌘K button (owner testing, build 27, OT-18)
+
+Wide layouts' header has a compact **⌘K button** instead of the "Tell
+<Mac>…" field: a 44 pt glass capsule, at least 80 wide, the Ask glyph
+(pitch 2.2) and "⌘K" in the chord font, tooltip "Ask (⌘K)". It opens Ask
+exactly as the field did (the right column, expanded, else the Ask
+sheet); ⌘K still works. While Ask shows in the column it has a 2 pt
+accent ring at half strength and reads "Open"; while Ask's field has focus
+the glyph and chord turn accent with a full ring and it reads "Open,
+typing" (`HeaderAskButton.State`). The header is the Mac pill (and its
+link badge) leading, then one trailing cluster on an 8 pt rhythm: layout
+presets, ⌘K, the circles, More. No command palette yet; it would plug in
+at `HeaderAskButton.Command`.
+
+Identifier: `ph.ask` (the button). Check: `test26_HeaderAskButton`.

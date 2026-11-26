@@ -17,6 +17,9 @@ import SwiftUI
 import UIKit
 
 struct InboxPanel: View {
+    /// The sheet's content margin, so the rows line up with the header's
+    /// switch and Done (OT-15; the inset-grouped list used its own).
+    var margin: CGFloat = PixelHandTheme.Space.lg
     private let center = TransferCenter.shared
     @Environment(\.openURL) private var openURL
     @State private var shareURL: URL?
@@ -24,9 +27,44 @@ struct InboxPanel: View {
 
     var body: some View {
         let arriving = center.activities.values.filter { $0.direction == .incoming && $0.isActive }.sorted { $0.name < $1.name }
-        List {
+        Group {
+            if arriving.isEmpty && center.inbox.items.isEmpty {
+                // Nothing yet: the empty state centred in the panel, both
+                // ways (OT-15: inside a list row it sat high and to one side).
+                PHEmptyState(
+                    glyph: PixelGlyphs.send,
+                    title: "Nothing yet",
+                    message: TransferCopy.emptyInbox
+                )
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 420)
+                .padding(.horizontal, margin)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("ph.inbox.empty")
+            } else {
+                list(arriving: arriving)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ph.inbox")
+        .sheet(item: Binding(get: { shareURL.map(ShareTarget.init) }, set: { shareURL = $0?.url })) { target in
+            ShareSheet(items: [target.url])
+        }
+        .alert(saveMessage ?? "", isPresented: Binding(get: { saveMessage != nil }, set: { if !$0 { saveMessage = nil } })) {
+            Button("OK", role: .cancel) {}
+        }
+        .onDisappear { center.markAllSeen() }
+    }
+
+    /// Rows inset to the sheet's margin, 8 apart, on `raised` with radius
+    /// 14 (a plain list, so swipe to delete still works).
+    private func list(arriving: [TransferCenter.Activity]) -> some View {
+        let insets = EdgeInsets(top: 4, leading: margin, bottom: 4, trailing: margin)
+        let rowShape = RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous)
+        return List {
             if !arriving.isEmpty {
-                Section("Arriving") {
+                Section {
                     ForEach(arriving) { activity in
                         VStack(alignment: .leading, spacing: PixelHandTheme.Space.xs) {
                             HStack {
@@ -41,29 +79,35 @@ struct InboxPanel: View {
                                 .foregroundStyle(PixelHandTheme.ink2)
                         }
                         .padding(.vertical, PixelHandTheme.Space.xs)
-                        .listRowBackground(PixelHandTheme.raised)
+                        .padding(.horizontal, PixelHandTheme.Space.md)
+                        .listRowInsets(insets)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                        .background(PixelHandTheme.raised, in: rowShape)
                     }
+                } header: {
+                    Text("Arriving")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(PixelHandTheme.ink2)
+                        .padding(.leading, margin)
+                        .listRowInsets(EdgeInsets())
                 }
             }
-            if center.inbox.items.isEmpty {
-                Section {
-                    PHEmptyState(
-                        glyph: PixelGlyphs.send,
-                        title: "Nothing yet",
-                        message: TransferCopy.emptyInbox
-                    )
-                    .listRowBackground(Color.clear)
-                }
-            } else {
+            if !center.inbox.items.isEmpty {
                 Section {
                     ForEach(center.inbox.items) { item in
                         InboxRow(item: item)
+                            .padding(.horizontal, PixelHandTheme.Space.md)
+                            .padding(.vertical, PixelHandTheme.Space.xs + 2)
+                            .background(PixelHandTheme.raised, in: rowShape)
                             .contentShape(Rectangle())
                             .onTapGesture { open(item) }
                             .accessibilityAddTraits(.isButton)
                             .accessibilityHint(item.link != nil ? "Opens the link" : (item.text != nil ? "Copies the text" : "Opens the share sheet"))
                             .accessibilityIdentifier("ph.inbox.row")
-                            .listRowBackground(PixelHandTheme.raised)
+                            .listRowInsets(insets)
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
                             .contextMenu { menu(for: item) }
                             .swipeActions {
                                 Button("Delete", role: .destructive) { center.deleteInboxItem(item.id) }
@@ -71,19 +115,16 @@ struct InboxPanel: View {
                     }
                 } footer: {
                     Text("Also in Files: On My \(UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone") › Pixel Hand.")
+                        .font(.footnote)
+                        .foregroundStyle(PixelHandTheme.ink2)
+                        .padding(.horizontal, margin)
+                        .listRowInsets(EdgeInsets())
                 }
             }
         }
-        .listStyle(.insetGrouped)
+        .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .accessibilityIdentifier("ph.inbox")
-        .sheet(item: Binding(get: { shareURL.map(ShareTarget.init) }, set: { shareURL = $0?.url })) { target in
-            ShareSheet(items: [target.url])
-        }
-        .alert(saveMessage ?? "", isPresented: Binding(get: { saveMessage != nil }, set: { if !$0 { saveMessage = nil } })) {
-            Button("OK", role: .cancel) {}
-        }
-        .onDisappear { center.markAllSeen() }
+        .environment(\.defaultMinListRowHeight, CGFloat(SendSheetLayout.inboxRowHeight))
     }
 
     @ViewBuilder

@@ -11,6 +11,7 @@
 //  Spec: `02-Design-System.md` §7, board `.macpill`.
 //
 
+import PixelHandCore
 import SwiftUI
 
 struct MacPill: View {
@@ -97,18 +98,9 @@ struct MacPill: View {
                 RoundedRectangle(cornerRadius: PixelHandTheme.Radius.kbd, style: .continuous)
                     .strokeBorder(Color.white.opacity(0.12), lineWidth: PixelHandTheme.Stroke.hairline)
             )
-            .overlay(alignment: .topTrailing) {
-                Group {
-                    if status == .online {
-                        LivePixel(color: PixelHandTheme.Brand.mint, size: 8)
-                    } else {
-                        StatusPixel(state: .off, size: 8)
-                    }
-                }
-                .padding(2)
-                .background(PixelHandTheme.canvas, in: RoundedRectangle(cornerRadius: 3, style: .continuous))
-                .offset(x: 4, y: -4)
-            }
+            // The live light on the tile's top-trailing corner, in the
+            // header's badge layer above the glass (OT-14).
+            .controlBadge(status == .online ? .live : .offLight, style: .init(shape: .roundedRect(radius: Double(PixelHandTheme.Radius.kbd)), corner: .topTrailing, anchor: .rim))
     }
 
     private var accessibilityText: String {

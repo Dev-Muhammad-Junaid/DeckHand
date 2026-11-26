@@ -171,6 +171,10 @@ the mirror stats (Mirror lane), `LinkKind` (Network lane).
 
 ## 4. Badges and new-feature chrome
 
+A badge *on a control* (unseen dot, Pro lock, PRO, counts, live lights)
+always draws above the control's glass, outside its clip shape, on the
+4 pt grid: `07-Polish-Spec.md` §10 (build 27, OT-14).
+
 | Element | Spec | Data |
 | --- | --- | --- |
 | **Link badge** | 20 pt capsule, radius 6, glyph pitch 1.4 + dot-matrix label pitch 1.4. Wired = mint, VPN = cobalt tint, Wi-Fi / Direct = muted. Shown next to the Mac pill and on Mac cards; hidden on plain Wi-Fi in the header to keep it quiet. | `session.link(LinkKind)` |
