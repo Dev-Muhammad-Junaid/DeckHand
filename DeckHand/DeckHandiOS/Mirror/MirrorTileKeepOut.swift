@@ -32,6 +32,10 @@ enum MirrorTileKeepOutPart: Hashable {
     /// deck is being edited (VQ-083). Where it leaves no room, the tile
     /// steps aside until Done.
     case deckEditGrid
+    /// The empty page's glyph, "No keys yet", message and Add keys, for the
+    /// page on screen (VQ-098). At the Huge band, where it fills the page,
+    /// the tile steps aside when nothing is clear.
+    case deckEmptyState
 }
 
 @MainActor
@@ -59,8 +63,9 @@ final class MirrorTileKeepOut {
     /// The pad (the tile's home anchor), the areas to avoid, and whether
     /// the tile may step aside (deck editing), converted from window
     /// coordinates into the tile's container (whose window frame is
-    /// `container`).
-    func plan(for owner: AnyObject?, in container: CGRect) -> MirrorTileSurfacePlan {
+    /// `container`). `band` decides whether an empty deck page lets the
+    /// tile step aside (VQ-098).
+    func plan(for owner: AnyObject?, in container: CGRect, band: TypeBand = .standard) -> MirrorTileSurfacePlan {
         guard let owner else { return MirrorTileSurfacePlan(anchor: nil, keepOut: []) }
         let key = ObjectIdentifier(owner)
         guard frames.hasParts(owner: key) else { return MirrorTileSurfacePlan(anchor: nil, keepOut: []) }
@@ -80,7 +85,9 @@ final class MirrorTileKeepOut {
             caption: local(.caption),
             keyboard: local(.keyboard),
             deckHeader: local(.deckHeader),
-            deckEditGrid: local(.deckEditGrid)
+            deckEditGrid: local(.deckEditGrid),
+            deckEmptyState: local(.deckEmptyState),
+            band: band
         )
     }
 }
