@@ -2,7 +2,7 @@
 
 > **Owner: the next Mac pass needs your Mac.** Builds 27 and 28 still owe the walks that type and click on the Mac, the protocol 16 checks and the final QA pass. When you can spare the Mac, unlock it, keep a scratch TextEdit document in front, keep the iPad unlocked on Wi-Fi, and let the Mac build loop run them.
 
-> **Build 28 is being rebuilt** (owner27 folded in). The owner approved live sync: the docs are merged (`fb0fa77`) and the decisions are in DECISIONS.md. Phase 1 runs as the primary's lanes **caret-joystick** and **live-sync** (protocol 17). When they're ready: merge caret-joystick first, then live-sync, then queue build 29. Build 28 bugs go to one fix session, kept out of `LiveTypingField`, the arrow cluster and the new protocol messages. The Mac walks and the final QA pass still need the owner's Mac.
+> **Build 29 queued by the primary** (caret-joystick plus live-sync, protocol 17). Build 28's 8 bugs are with the primary's lane **build28-fixes**; don't start another. When it's ready: merge it, then queue build 30. Then the Mac walks and the live-sync measurement checklist (they need the owner's Mac), then the review page if there's no P1 or P2. After that: live-sync phase 2 (web and Electron opt-in), once build 30 is green.
 
 > **Mac builds:** 15, 16, 18 and 19 built (19 with 5 bugs, fixed in build 21). The primary session or the owner's Mac session runs Mac builds.
 
@@ -31,8 +31,7 @@ weekly usage limit is close).
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Primary (cloud, owner-facing: the owner sends changes here) | "★ Pixel Hand · PRIMARY" | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac, Claude Desktop session "DeckHand MAC build loop", `/loop` every 30 min; the only Mac build loop since 2026-11-25) | local_d0e9b529 | claude/pixelhand-integration (worktree `pixelhand-build`) | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
-| Live sync phase 1: caret joystick (started by the primary; merge first) | (primary's child) | claude/pixelhand-lane-caret-joystick | `LANE-caret-joystick.md` ends `Lane: READY TO MERGE` |
-| Live sync phase 1: live text sync, protocol 17 (started by the primary; merge second) | (primary's child) | claude/pixelhand-lane-live-sync | `LANE-live-sync.md` ends `Lane: READY TO MERGE` |
+| Build 28 bugs (8), started by the primary | (primary's child) | claude/pixelhand-lane-build28-fixes | `LANE-build28-fixes.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -287,3 +286,4 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
 - 2026-11-26 19:50 UTC: the primary merged build27-fixes (`b56c73c`) and queued build 28 (`d8ad7bd`). Confirmed in the repo. The owner's build 27 findings OT-14…18 are with the primary's lane owner27. Live-text-sync R&D is design only: not to merge.
 - 2026-11-26 21:00 UTC: the primary folded owner27 into build 28 (`7fc7d2f`). The Mac is rebuilding (compile fix `5348ee6`). Nothing to merge here.
 - 2026-11-26 21:05 UTC: the owner approved live-sync R&D. The primary merged the docs (`fb0fa77`) and recorded the decisions (`1fbd090`), and started lanes caret-joystick and live-sync. Neither branch is pushed yet. Merge order: joystick, then live-sync, then build 29.
+- 2026-11-26 22:05 UTC: the primary merged caret-joystick and live-sync and queued build 29 (protocol 17). Build 28 had 8 bugs; the primary started lane build28-fixes for them. Next: merge it, then build 30.
