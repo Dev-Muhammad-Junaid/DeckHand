@@ -1,6 +1,6 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Build 25 queued by the primary** (`c9b87da`: qa24-fixes plus owner24). No lanes are running. Waiting on the Mac results and the final QA pass. If there are no P1 or P2 bugs: publish the review page, write `PROGRAMME COMPLETE`, and stop ticks. Otherwise: one more fix round.
+> **Build 25 built with 2 bugs, plus owner refinements OT-6…8.** The primary's lane owner25 (session_01H5HwATTz3WtwqhypMmq5NP) also takes both build 25 bugs, because they're in its files: the Type panel hidden in portrait (P1) and Ask keeping the old request (P3). I added the front-app guard to the walk tooling. When owner25 is ready: merge it, then queue build 26 with the final QA pass, then the review page.
 
 > **Mac builds:** 15, 16, 18 and 19 built (19 with 5 bugs, fixed in build 21). The primary session or the owner's Mac session runs Mac builds.
 
@@ -29,6 +29,7 @@ weekly usage limit is close).
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Primary (cloud, owner-facing: the owner sends changes here) | "★ Pixel Hand · PRIMARY" | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac, Claude Desktop session "DeckHand MAC build loop", `/loop` every 30 min; the only Mac build loop since 2026-11-25) | local_d0e9b529 | claude/pixelhand-integration (worktree `pixelhand-build`) | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
+| Owner refinements build 25 (OT-6 movable Type panel, OT-7 compact keys and numpad, OT-8 typed steps in keys) plus build 25 bugs 1 and 2; started by the primary | session_01H5HwATTz3WtwqhypMmq5NP | claude/pixelhand-lane-owner25 | `LANE-owner25.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -261,3 +262,14 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   the braces balance. Build 25 waits for owner24, then gets queued as one
   build.
 - 2026-11-26 13:45 UTC: the primary merged owner24 (`eec7022`) and queued build 25 (`c9b87da`). Confirmed in the repo. Waiting on the Mac.
+- 2026-11-26 14:50 UTC: build 25 built first time.
+  - Core 1133, Loom 480, DeckHandTests 8.
+  - The iPad got it this time.
+  - OT-1…5 pass, and VQ-066/098/099 pass.
+  - Bugs: 1, the Type panel hidden behind the keyboard in portrait (P1);
+    2, Ask keeping the old text (P3).
+  - The owner added OT-6…8. The primary started owner25 for them.
+  - I couldn't message the primary (untrusted device), so I sent both bugs
+    to the owner25 session directly, because they're in its files.
+  - I added the walk guard myself (`58d9204`): it checks the Mac's front
+    app before typing.

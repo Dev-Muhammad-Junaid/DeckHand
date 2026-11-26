@@ -123,7 +123,7 @@ final class PixelHandUITests: XCTestCase {
         if tapIfExists("ph.dock.keyboard") || tapIfExists("ph.trackpad.keyboard") {
             sleep(1)
             snap("keyboard")
-            if app.keyboards.count > 0 {
+            if app.keyboards.count > 0, ensureScratchFrontmost() {
                 app.typeText("hello")
                 sleep(1)
                 snap("keyboard-typed")
@@ -527,7 +527,7 @@ final class PixelHandUITests: XCTestCase {
             }
         }
         snap("type-panel-after-5s")
-        if field.exists {
+        if field.exists, ensureScratchFrontmost() {
             field.typeText("hello")
             snap("type-panel-typed")
         }
@@ -1024,6 +1024,22 @@ final class PixelHandUITests: XCTestCase {
 
     /// Records why a walk is skipped: a snapshot, a named activity in the
     /// result bundle, and a line in the log.
+    /// True when the Mac's front app is the scratch app the walks may type
+    /// into (`PH_QA_SCRATCH_APP`, default TextEdit), read from the Type
+    /// panel's "Typing into …" line. Checked before every step that types
+    /// on the Mac: in build 25 the front app changed mid-run and a walk typed
+    /// into another app. When the line isn't shown, the step is allowed
+    /// (nothing reaches the Mac without the Type panel).
+    private func ensureScratchFrontmost() -> Bool {
+        let scratch = ProcessInfo.processInfo.environment["PH_QA_SCRATCH_APP"] ?? "TextEdit"
+        let target = element("ph.type.target")
+        guard target.waitForExistence(timeout: 2) else { return true }
+        if target.label.localizedCaseInsensitiveContains(scratch) { return true }
+        snap("skipped-typing-front-app-not-\(slug(scratch))")
+        print("PixelHandUITests: skipped a typing step because the Mac's front app isn't \(scratch) (\(target.label)).")
+        return false
+    }
+
     private func skipConnect(_ reason: String) {
         snap("skipped-unpaired")
         XCTContext.runActivity(named: "SKIPPED: \(reason)") { _ in }
