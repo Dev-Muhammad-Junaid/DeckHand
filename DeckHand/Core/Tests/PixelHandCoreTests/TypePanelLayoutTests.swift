@@ -276,6 +276,9 @@ struct KeyboardBarLiftTests {
         #expect(KeyboardKind.barLift(overlap: 69.5) == 70)
         #expect(KeyboardKind.barLift(overlap: 400) == 0)
         #expect(KeyboardKind.barLift(overlap: .nan) == 0)
+        // The dock already clears the home indicator: only the rest lifts.
+        #expect(KeyboardKind.barLift(overlap: 69, bottomInset: 20) == 49)
+        #expect(KeyboardKind.barLift(overlap: 15, bottomInset: 20) == 0)
     }
 }
 

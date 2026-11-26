@@ -582,9 +582,12 @@ public enum KeyboardKind: String, Sendable, Hashable {
     /// it. A full on-screen keyboard covers the dock by design (the shell
     /// never moves under the keyboard, OT-2; the Type panel rides on it),
     /// so it lifts nothing.
-    public static func barLift(overlap: Double) -> Double {
+    /// `bottomInset` is the window's bottom safe area (the home indicator),
+    /// which the dock already clears.
+    public static func barLift(overlap: Double, bottomInset: Double = 0) -> Double {
         guard overlap.isFinite, overlap > 0, overlap < softwareMinimumOverlap else { return 0 }
-        return overlap.rounded(.up)
+        let inset = bottomInset.isFinite ? max(0, bottomInset) : 0
+        return max(0, overlap - inset).rounded(.up)
     }
 
     /// The overlap of a keyboard frame with the window, in window space:

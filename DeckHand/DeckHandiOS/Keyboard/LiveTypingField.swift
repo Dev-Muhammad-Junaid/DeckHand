@@ -42,6 +42,9 @@ struct LiveTypingField: UIViewRepresentable {
     var focusRequest = 0
     /// Lines Compose may grow to before it scrolls.
     var composeLines = 2
+    /// Take the height the parent proposes (the Type panel's field fills
+    /// its band, OT-11) instead of sizing to the text; scrolls past it.
+    var fillsHeight = false
     var onEdit: (TypingEdit) -> Void
     var onKey: (RemoteKey, [KeyModifier]) -> Void
     var onChord: ([String]) -> Void
@@ -71,6 +74,11 @@ struct LiveTypingField: UIViewRepresentable {
 
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: LiveTypingTextView, context: Context) -> CGSize? {
         let width = proposal.width ?? 320
+        if fillsHeight, let height = proposal.height, height.isFinite, height > 0 {
+            let fitted = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude)).height
+            uiView.isScrollEnabled = fitted > height + 0.5
+            return CGSize(width: width, height: height)
+        }
         let lineHeight = uiView.font?.lineHeight ?? 20
         let lines = mode == .compose ? CGFloat(max(1, composeLines)) : 1
         let fitted = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude)).height
