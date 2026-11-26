@@ -2504,4 +2504,4 @@ Air 11" (M3) was installed and launched; both run protocol 17.
 queued. Build 29's own features haven't been checked yet, because they
 need the Mac.
 
-Status: BUILT (build 29) — build 28's 8 bugs open; live-sync checks need the Mac
+Status: BUILT (build 29) — 8 bugs
