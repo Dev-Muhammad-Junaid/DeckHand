@@ -99,6 +99,35 @@ connects without a prompt.
   `TEST_RUNNER_PH_QA_MAC_NAME="Muhammad’s MacBook Pro"` (the start of the
   name is enough). `connect()` then taps that Mac's row, and never sends
   another Mac a request. Unset, it taps the first Mac, as before.
+- **Unpaired simulators (VQ-103).** `connect()` never taps a Mac whose
+  picker row doesn't say "paired", so the Mac is never left with an Allow
+  prompt nobody answers:
+  - With `TEST_RUNNER_PH_QA_PAIRCODE_FILE=<file>`, the walk pairs by code
+    from the picker's Pair sheet (choosing the Mac on its "Pair with" row
+    when several are listed). Open Pair a device on the Mac first and put
+    its code in the file (any text; the digits after "Pairing code" are
+    used, or the file's digits). The code goes out with the request, so the
+    Mac doesn't ask. Later runs connect without a code.
+  - Without it, each connect walk is skipped: a `skipped-unpaired`
+    snapshot and a "SKIPPED: …" activity in the result bundle say why and
+    how to fix it. The Mac-free walks (`test01`, `test03`, `test11`,
+    `test13`) still run.
+  - `TEST_RUNNER_PH_QA_ALLOW_PROMPT=1` keeps the old behaviour (tap the row
+    and wait up to 90 s for someone to click Allow).
+  - In every case, a request still waiting when `connect()` gives up is
+    withdrawn (the approval card's Disconnect, or the toast's Cancel), and
+    a `request-withdrawn` snapshot records it.
+
+  To pair a fresh simulator (the iPad mini in build 24) once:
+
+  ```sh
+  echo "Pairing code 3523 2608" > /tmp/ph-code.txt   # from Pair a device
+  TEST_RUNNER_PH_QA_PAIRCODE_FILE=/tmp/ph-code.txt \
+  TEST_RUNNER_PH_QA_MAC_NAME="Muhammad’s MacBook" \
+  xcodebuild test-without-building -project DeckHand.xcodeproj -scheme DeckHandiOS \
+    -destination 'platform=iOS Simulator,name=iPad mini (A17 Pro)' \
+    -only-testing:PixelHandUITests/PixelHandUITests/test15_PairUnpairedSimulatorByCode
+  ```
 
 Example:
 

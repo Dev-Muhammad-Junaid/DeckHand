@@ -26,9 +26,18 @@
 //    PH_QA_FREE=1      run with "Unlock Pro for testing" off (free plan).
 //    PH_QA_TAG=<tag>   suffix for the output folder (e.g. "dark", "ax3").
 //    PH_QA_PAIRCODE_FILE=<path>  a file the QA script fills with the Mac's
-//                      pairing code (from its "Pair a device" window). When the
-//                      approval card offers "Enter pairing code", the walk
-//                      pairs with it, so later runs connect without asking.
+//                      pairing code (from its "Pair a device" window). An
+//                      unpaired simulator pairs with it from the picker's
+//                      Pair sheet, and when the approval card offers "Enter
+//                      pairing code" the walk uses it there too, so later
+//                      runs connect without asking.
+//    PH_QA_MAC_NAME=<name>  the start of the Mac's name: the walks use only
+//                      that Mac (VQ-096).
+//    PH_QA_ALLOW_PROMPT=1  tap an unpaired Mac anyway and wait for someone
+//                      to click Allow. Without it, and without a code file,
+//                      the connect walks on an unpaired simulator are
+//                      skipped (`skipped-unpaired`), and no request reaches
+//                      the Mac (VQ-103).
 //
 //  Pass these as environment variables of xcodebuild itself, e.g.
 //  `TEST_RUNNER_PH_QA_OUT=/tmp/shots xcodebuild test-without-building …`;
@@ -570,8 +579,19 @@ final class PixelHandUITests: XCTestCase {
         return true
     }
 
-    /// Picks the first Mac in the list and waits for the shell. Returns
-    /// false (with a screenshot) if no Mac shows up or it never allows us.
+    /// Picks the Mac (`macRow()`) and waits for the shell. Returns false
+    /// (with a screenshot) if no Mac shows up or it never allows us.
+    ///
+    /// VQ-103: a Mac this simulator isn't paired with is never tapped, so
+    /// the Mac is never left showing an Allow prompt nobody answers:
+    /// - with PH_QA_PAIRCODE_FILE, the walk pairs by code from the picker's
+    ///   Pair sheet (the code goes out with the request, so the Mac
+    ///   doesn't ask);
+    /// - without it, the walk is skipped with a `skipped-unpaired` snapshot
+    ///   and a "SKIPPED" activity naming the fix.
+    /// PH_QA_ALLOW_PROMPT=1 keeps the old behaviour (tap and wait for a
+    /// person to click Allow). Whatever happens, a request still waiting
+    /// at the deadline is withdrawn.
     @discardableResult
     private func connect(timeout: TimeInterval = 90) -> Bool {
         let pill = element("ph.header.macPill")
@@ -586,9 +606,21 @@ final class PixelHandUITests: XCTestCase {
             snap("no-mac-found")
             return false
         }
-        row.tap()
-        sleep(1)
-        snap("waiting-for-allow")
+        let name = rowName(row)
+        let allowsPrompt = ProcessInfo.processInfo.environment["PH_QA_ALLOW_PROMPT"] == "1"
+        if isPairedRow(row) || allowsPrompt {
+            row.tap()
+            sleep(1)
+            snap("waiting-for-allow")
+        } else if let code = pairingCode() {
+            guard pairFromPicker(code, macName: name) else {
+                withdrawRequest()
+                return false
+            }
+        } else {
+            skipConnect("This simulator isn’t paired with \(name), so the connect walks are skipped and no request was sent to the Mac. Set TEST_RUNNER_PH_QA_PAIRCODE_FILE to a file holding the Mac’s pairing code (Pair a device on the Mac) to pair it, or TEST_RUNNER_PH_QA_ALLOW_PROMPT=1 if someone will click Allow.")
+            return false
+        }
         let deadline = Date().addingTimeInterval(timeout)
         var triedCode = false
         while Date() < deadline {
@@ -601,10 +633,91 @@ final class PixelHandUITests: XCTestCase {
         }
         guard isConnected() else {
             snap("never-allowed")
+            withdrawRequest()
             return false
         }
         sleep(2)
         return true
+    }
+
+    /// Whether the picker row says this device is paired with the Mac. Rows
+    /// read "<name>, my Mac, paired, nearby" to VoiceOver.
+    private func isPairedRow(_ row: XCUIElement) -> Bool {
+        row.label.components(separatedBy: ", ").dropFirst().contains { $0.lowercased() == "paired" }
+    }
+
+    /// The Mac's name from its picker row's label.
+    private func rowName(_ row: XCUIElement) -> String {
+        row.label.components(separatedBy: ", ").first ?? row.label
+    }
+
+    /// VQ-103: pairs with `macName` by code from the picker's Pair sheet,
+    /// without tapping its row. Picks the Mac on the "Pair with" row when
+    /// several are listed (VQ-100); a full code sends itself, the sheet
+    /// closes and the app connects with the code.
+    private func pairFromPicker(_ code: String, macName: String) -> Bool {
+        guard tapIfExists("ph.connect.pair") else { return false }
+        let field = element("ph.pairing.codeField")
+        guard field.waitForExistence(timeout: 3) else {
+            snap("missing-ph.pairing.codeField")
+            dismissSheet()
+            return false
+        }
+        let chooser = element("ph.pairing.macChooser")
+        if chooser.exists, !chooser.label.localizedCaseInsensitiveContains(macName) {
+            chooser.tap()
+            let option = app.buttons.matching(NSPredicate(
+                format: "label BEGINSWITH[c] %@ AND identifier != %@", macName, "ph.connect.macRow"
+            )).firstMatch
+            guard option.waitForExistence(timeout: 2) else {
+                snap("pair-chooser-missing-mac")
+                dismissMenu()
+                dismissSheet()
+                return false
+            }
+            option.tap()
+            sleep(1)
+        }
+        snap("pair-sheet-from-picker")
+        field.tap()
+        field.typeText(code)
+        snap("pairing-code-typed")
+        sleep(2)
+        // Still open: the code didn't send itself (no Mac chosen, or a
+        // typo the check digit caught).
+        if field.exists {
+            if !tapIfExists("ph.pairing.reconnect", timeout: 1) {
+                snap("pair-sheet-stuck")
+                dismissSheet()
+                return false
+            }
+            sleep(1)
+        }
+        snap("pairing-sent")
+        return true
+    }
+
+    /// Withdraws a request this walk left waiting, so the Mac isn't left
+    /// showing an Allow prompt (VQ-103): the approval card's Disconnect, or
+    /// the connecting toast's Cancel.
+    private func withdrawRequest() {
+        for id in ["ph.authorization.disconnect", "ph.authorization.dismiss", "ph.connect.cancel"] {
+            let button = element(id)
+            if button.exists, button.isHittable {
+                button.tap()
+                sleep(1)
+                snap("request-withdrawn")
+                return
+            }
+        }
+    }
+
+    /// Records why a walk is skipped: a snapshot, a named activity in the
+    /// result bundle, and a line in the log.
+    private func skipConnect(_ reason: String) {
+        snap("skipped-unpaired")
+        XCTContext.runActivity(named: "SKIPPED: \(reason)") { _ in }
+        print("PH_QA SKIPPED \(name): \(reason)")
     }
 
     /// VQ-092: with the iPad simulator's windowing on, the app stays a
