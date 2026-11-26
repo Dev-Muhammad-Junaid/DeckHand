@@ -651,7 +651,7 @@ final class PixelHandUITests: XCTestCase {
         if grip.waitForExistence(timeout: 2) {
             let start = panel.frame
             let window = app.windows.firstMatch.frame
-            grip.press(forDuration: 0.1, thenDragTo: app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.08)))
+            grip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.1, thenDragTo: app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.08)))
             sleep(1)
             snap("type-panel-dragged")
             let moved = panel.frame
@@ -667,7 +667,7 @@ final class PixelHandUITests: XCTestCase {
         let handle = element("ph.type.resize.trailing")
         if handle.exists {
             let before = panel.frame.width
-            handle.press(forDuration: 0.1, thenDragTo: handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).withOffset(CGVector(dx: -600, dy: 0)))
+            handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.1, thenDragTo: handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).withOffset(CGVector(dx: -600, dy: 0)))
             sleep(1)
             snap("type-panel-narrow")
             let after = panel.frame.width
