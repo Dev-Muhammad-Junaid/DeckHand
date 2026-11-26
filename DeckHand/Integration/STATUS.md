@@ -2249,5 +2249,10 @@ Mac should check: build all targets, tests, the walks including `test22`,
 `test23`, `test24`; the Mac walks and protocol 16 checks need the owner's
 Mac free with a scratch TextEdit document in front.
 
-Status: READY FOR MAC BUILD (build 28)
+Also in build 28: **owner27** (`LANE-owner27.md`): badges and dots drawn
+above glass buttons everywhere (OT-14), Send/Inbox sheet centred with an
+even header and stable size (OT-15), full Mac names in Send to (OT-16),
+matching Photos/Files/Paste chips (OT-17), header Ask field replaced by a
+compact ⌘K button (OT-18).
 
+Status: READY FOR MAC BUILD (build 28)
