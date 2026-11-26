@@ -228,11 +228,11 @@ untouched), Phase 2 (web/Electron opt-in, "Allow for Claude",
 - **UI walks** (`PixelHandUITests`), only with `PH_QA_LIVE_SYNC=1` and
   TextEdit in front on the Mac with an empty plain-text document (they
   type into the Mac):
-  - `test27_LiveSyncTypeOnMac`: the badge reaches SYNC; the QA script types
+  - `test28_LiveSyncTypeOnMac`: the badge reaches SYNC; the QA script types
     `PH_QA_LIVE_SYNC_MARKER` on the Mac; the field shows it within 30 s.
-  - `test28_LiveSyncTabAccept`: type, tap Accept ⇥, the field's value
+  - `test29_LiveSyncTabAccept`: type, tap Accept ⇥, the field's value
     changes (TextEdit inserts a tab) within 3 s.
-  - `test29_LiveSyncEditFromIPad`: type "pixel hand" on the iPad (shows,
+  - `test30_LiveSyncEditFromIPad`: type "pixel hand" on the iPad (shows,
     badge back to SYNC), tap at the field's start and type "X" (the caret
     is free: the field starts with "X"); with `PH_QA_LIVE_SYNC_OUT` the
     expected text is written for the script to compare with TextEdit's

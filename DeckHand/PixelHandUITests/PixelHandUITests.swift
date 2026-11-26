@@ -1694,7 +1694,7 @@ final class PixelHandUITests: XCTestCase {
     }
 
     /// Typing on the Mac shows in the iPad's Live field.
-    func test27_LiveSyncTypeOnMac() {
+    func test28_LiveSyncTypeOnMac() {
         guard let (field, badge) = openSyncedLiveField("type-on-mac") else { return }
         let marker = ProcessInfo.processInfo.environment["PH_QA_LIVE_SYNC_MARKER"] ?? "typed on the Mac"
         let shows = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value CONTAINS %@", marker), object: field)
@@ -1708,7 +1708,7 @@ final class PixelHandUITests: XCTestCase {
     /// Accept ⇥ stays in Live; what Tab puts in the Mac's field shows in
     /// the iPad's from the Mac's next value change (TextEdit has no
     /// suggestion, so Tab inserts a tab).
-    func test28_LiveSyncTabAccept() {
+    func test29_LiveSyncTabAccept() {
         guard let (field, _) = openSyncedLiveField("tab-accept") else { return }
         app.typeText("accept")
         sleep(1)
@@ -1723,7 +1723,7 @@ final class PixelHandUITests: XCTestCase {
 
     /// Editing on the iPad lands on the Mac: typed text, then a caret moved
     /// to the start with a tap and a letter typed there.
-    func test29_LiveSyncEditFromIPad() {
+    func test30_LiveSyncEditFromIPad() {
         guard let (field, badge) = openSyncedLiveField("edit-from-ipad") else { return }
         let start = fieldText(field)
         app.typeText("pixel hand")
