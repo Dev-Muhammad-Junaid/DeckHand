@@ -1,6 +1,6 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Build 26 queued with the final QA pass** (owner25 plus the walk guard; protocol 15). No lanes are running. If the QA comes back with no P1 or P2: publish the review page and finish. Otherwise: one more fix round.
+> **Build 26 is on the Mac** (no results yet), and the owner has tested it on the iPad: OT-9…13. The primary's lane owner26 is running. Any fix round for build 26's Mac bugs stays out of the Type panel, Sharing/Send and capture-preview files, and the new protocol message. When both are ready: merge them, then queue build 27 with the final QA pass, then the review page.
 
 > **Mac builds:** 15, 16, 18 and 19 built (19 with 5 bugs, fixed in build 21). The primary session or the owner's Mac session runs Mac builds.
 
@@ -29,6 +29,7 @@ weekly usage limit is close).
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Primary (cloud, owner-facing: the owner sends changes here) | "★ Pixel Hand · PRIMARY" | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac, Claude Desktop session "DeckHand MAC build loop", `/loop` every 30 min; the only Mac build loop since 2026-11-25) | local_d0e9b529 | claude/pixelhand-integration (worktree `pixelhand-build`) | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
+| Owner testing build 26 (OT-9 Send sheet theme, OT-10 capture preview in portrait, OT-11 Type panel space, numpad-only mode and arrow row, OT-12 zoom to the Mac's input field, OT-13 inline suggestions question), started by the primary | (primary's child) | claude/pixelhand-lane-owner26 | `LANE-owner26.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -276,3 +277,4 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   protocol 15). Merged it (`45e9e7d`). Core has 1180 tests, all passing; the
   type check passes; the UI tests parse and balance. **Build 26 queued**,
   with the final QA pass.
+- 2026-11-26 16:20 UTC: the primary reported that the owner tested build 26 on the iPad (OT-9…13; confirmed in STATUS.md) and started lane owner26. The Mac's build 26 results haven't arrived; it pushed one walk fix, `a2f4adf`.
