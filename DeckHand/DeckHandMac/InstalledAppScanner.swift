@@ -74,6 +74,11 @@ final class InstalledAppScanner {
 
         var seen = Set<String>()   // deduplicate by bundleID
         var apps: [InstalledAppInfo] = []
+        // Running apps always get full-size icons (they're the dock); the
+        // rest drop to the fallback size once the list's byte budget is
+        // spent (`AppIconPolicy`, OT-1).
+        let running = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+        var iconBytes = 0
 
         for dir in appDirs {
             guard let contents = try? FileManager.default.contentsOfDirectory(
@@ -83,10 +88,12 @@ final class InstalledAppScanner {
             ) else { continue }
 
             for url in contents where url.pathExtension == "app" {
-                guard let info = appInfo(at: url), !seen.contains(info.bundleID) else {
+                guard let info = appInfo(at: url, running: running, iconBytes: iconBytes),
+                      !seen.contains(info.bundleID) else {
                     continue
                 }
                 seen.insert(info.bundleID)
+                iconBytes += info.iconData?.count ?? 0
                 apps.append(info)
             }
         }
@@ -110,11 +117,12 @@ final class InstalledAppScanner {
             apps.append(info)
         }
 
-        // No artificial cap — even with ~500 apps, 64×64 JPEG icons keep the
-        // payload around 1.5 MB, which streams across Loom in well under a
-        // second on local Wi-Fi. If this ever becomes a bottleneck we should
-        // paginate via a `requestAppListPage(offset:)` message rather than
-        // silently truncate the alphabet.
+        // No artificial cap. Icons carry transparency now (PNG or HEIC with
+        // alpha at 2× the dock's size, `AppIconPolicy`); the per-icon and
+        // list budgets keep ~500 apps to a few MB, which streams across
+        // Loom in about a second on local Wi-Fi. If this ever becomes a
+        // bottleneck, paginate via a `requestAppListPage(offset:)` message
+        // rather than silently truncate the alphabet.
         return apps.sorted {
             $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
         }
@@ -122,7 +130,7 @@ final class InstalledAppScanner {
 
     /// Reads bundle metadata and extracts a small icon for the given .app URL.
     /// Returns `nil` for background-only apps and system frameworks.
-    private func appInfo(at url: URL) -> InstalledAppInfo? {
+    private func appInfo(at url: URL, running: Set<String>, iconBytes: Int) -> InstalledAppInfo? {
         guard let bundle = Bundle(url: url),
               let bundleID = bundle.bundleIdentifier else {
             return nil
@@ -141,8 +149,9 @@ final class InstalledAppScanner {
         // Skip apps with no meaningful name
         if displayName.isEmpty { return nil }
 
-        // Get icon as compressed JPEG data
-        let iconData = compressedIcon(for: url)
+        // The icon with transparency, full size while the list is in budget.
+        let side = AppIconPolicy.pixelSide(usedBytes: iconBytes, isRunning: running.contains(bundleID))
+        let iconData = AppIconEncoder.icon(for: url, pixelSide: side)
 
         return InstalledAppInfo(
             bundleID: bundleID,
@@ -164,34 +173,11 @@ final class InstalledAppScanner {
             ?? (info["CFBundleName"] as? String)
             ?? app.localizedName
             ?? bundleURL.deletingPathExtension().lastPathComponent
-        let iconData = compressedIcon(for: bundleURL)
+        let iconData = AppIconEncoder.icon(for: bundleURL)
         return InstalledAppInfo(
             bundleID: bundleID,
             displayName: displayName,
             iconData: iconData
         )
-    }
-
-    /// Reads the app icon via NSWorkspace, resizes to 64×64, and returns JPEG data.
-    private func compressedIcon(for appURL: URL) -> Data? {
-        let icon = NSWorkspace.shared.icon(forFile: appURL.path)
-        let targetSize = NSSize(width: 64, height: 64)
-
-        let resized = NSImage(size: targetSize)
-        resized.lockFocus()
-        NSGraphicsContext.current?.imageInterpolation = .high
-        icon.draw(
-            in: NSRect(origin: .zero, size: targetSize),
-            from: NSRect(origin: .zero, size: icon.size),
-            operation: .copy,
-            fraction: 1.0
-        )
-        resized.unlockFocus()
-
-        guard let tiff = resized.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiff) else {
-            return nil
-        }
-        return bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.8])
     }
 }

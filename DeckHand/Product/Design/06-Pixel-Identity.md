@@ -179,9 +179,11 @@ the mirror stats (Mirror lane), `LinkKind` (Network lane).
   (owner review of build 18, OR-02). A refusal tints the outline danger
   for 1.4 s and VoiceOver hears why (`ChromeRule.pressFeedback`).
 - **Selection.** By colour and fill only: the selected tab is accent on a
-  `fill2` capsule, cards get the 2 pt cobalt ring, the front app in the
-  dock its accent ring. No dot or indicator under a selected tab, chip or
-  row (OR-01). No filled pills for selection inside navy chrome.
+  `fill2` capsule, cards get the 2 pt cobalt ring. The front app in the
+  dock is the one exception: a 4 pt accent dot under its icon, like the
+  macOS Dock (owner testing, build 24, OT-1; it was an accent ring box).
+  Dock icons are the real icon shape with nothing behind them. No dot or
+  indicator under a selected tab, chip or row (OR-01). No filled pills for selection inside navy chrome.
 - **Panels and status rows** fade in and out over 180 ms, ease-out, and
   never slide in from the bottom; Reduce Motion changes them at once
   (`ChromeRule.panelFade`). The dot-matrix loader is only for real waiting:

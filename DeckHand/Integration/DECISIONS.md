@@ -3,6 +3,21 @@
 Recorded by the coordinating session ("Deckhand project status review").
 Newest first. If a doc elsewhere disagrees, this file wins.
 
+## 2026-11-26 — Owner testing, build 24 (OT-1 … OT-5)
+From the owner's hands-on test on the iPad Air 11" (M3), landscape
+(`STATUS.md`, "Owner testing (build 24)"); fixed on
+`claude/pixelhand-lane-owner24` (`LANE-owner24.md`):
+- **Dock looks like the macOS Dock:** real icon shapes with no tile or
+  plate behind them (the Mac sends icons with transparency), and the front
+  app gets a small accent dot under its icon instead of the ring box. This
+  replaces the "front app = accent ring" line in `06-Pixel-Identity.md` §5.
+- **Typing is a Type panel** (the owner was open to ideas; we built the
+  recommended shape): Live and Compose modes, a keys row with fn keys,
+  sticky modifier chips, a dot-matrix numpad, keys-only with a hardware
+  keyboard. The keyboard never changes the arrangement.
+- **Ask never strands the person:** after a run, New request, Run again,
+  Save as key (Name · Save · Cancel) and Edit; the field always starts over.
+
 ## 2026-11-25 — OR-16 answers: pointer control on the mirror picture
 The owner chose the recommendations ("go with the recommendations"):
 1. Off the first time the screen-only arrangement opens, then remember the

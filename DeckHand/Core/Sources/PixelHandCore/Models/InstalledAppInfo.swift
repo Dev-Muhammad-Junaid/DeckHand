@@ -11,7 +11,11 @@ public struct InstalledAppInfo: Codable, Identifiable, Hashable, Sendable {
     public var id: String { bundleID }
     public let bundleID: String
     public let displayName: String
-    /// 64×64 JPEG icon data (~2-5 KB per app). `nil` if the icon couldn't be read.
+    /// The app's icon with transparency: PNG, or HEIC with alpha when
+    /// smaller, at `AppIconPolicy.pixelSide` (72 px, 2× the dock's icon;
+    /// 48 px past the list's byte budget). Decodes with `UIImage(data:)`.
+    /// Builds before 25 sent 64 × 64 JPEG, which decodes the same way.
+    /// `nil` if the icon couldn't be read.
     public let iconData: Data?
 
     public init(bundleID: String, displayName: String, iconData: Data?) {

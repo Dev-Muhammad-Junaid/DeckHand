@@ -18,6 +18,13 @@
 //  shows the dot wave. Those are real waits, so they get the loader; no
 //  sparkles.
 //
+//  Every stage keeps a way on (owner testing, build 24, OT-5; the flow is
+//  Core's `AskFlow`): the request field is always there to start over;
+//  after a run the result line ("Done on Studio.") comes with New request,
+//  Run again, Save as key and Edit; Save as key is a short Name · Save ·
+//  Cancel flow that returns to the plan or result; Edit returns to the
+//  plan with Done. Under an empty field: recent requests, then "Try".
+//
 //  `AskPanel` is the content, one view for both places Ask runs: the sheet
 //  (compact windows, and arrangements without a right column) and the
 //  right column's Ask switch (OR-06). Both read `AskModel.shared`, so a
@@ -110,9 +117,8 @@ struct AskPanel: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @FocusState private var isFieldFocused: Bool
 
-    @State private var isEditing = false
     @State private var isConfirming = false
-    @State private var saveNote: String?
+    @FocusState private var isNameFocused: Bool
 
     private var isUnlocked: Bool { entitlements.allows(.ai) }
     private var isMacLocked: Bool { session.macLockState.isLocked }
@@ -146,6 +152,10 @@ struct AskPanel: View {
         }
         .onChange(of: focusRequest) { _, _ in
             if isUnlocked, !model.isRunning { isFieldFocused = true }
+        }
+        // New request: the cleared field takes focus.
+        .onChange(of: model.flow.fieldResetRequest) { _, _ in
+            if isUnlocked { isFieldFocused = true }
         }
         .onDisappear {
             if placement == .sheet { model.cancelRun() }
@@ -197,14 +207,14 @@ struct AskPanel: View {
         .requiresPro(.ai)
     }
 
+    /// The field plans a new request from every stage but planning; a
+    /// run in progress stops for it.
     private var canSubmit: Bool {
-        !model.request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && model.phase != .planning && !model.isRunning
+        !model.request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && model.flow.canSubmitRequest
     }
 
     private func submit() {
         guard canSubmit else { return }
-        isEditing = false
-        saveNote = nil
         isFieldFocused = false
         model.submit(apps: session.installedApps, frontApp: session.activeBundleID)
     }
@@ -213,8 +223,8 @@ struct AskPanel: View {
 
     @ViewBuilder
     private var content: some View {
-        switch model.phase {
-        case .idle:
+        switch model.flow.stage {
+        case .request:
             examples
         case .planning:
             VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
@@ -222,8 +232,11 @@ struct AskPanel: View {
                 DotScan(columns: 25, rows: 5, pitch: 7, plateCornerRadius: PixelHandTheme.Radius.card, platePadding: 12)
                     .frame(maxWidth: .infinity)
                     .accessibilityLabel("Planning")
+                Button(AskFlow.Action.cancel.title) { model.cancelPlanning() }
+                    .buttonStyle(.ph(.secondary, size: .small))
+                    .accessibilityIdentifier(AskFlow.Action.cancel.accessibilityID)
             }
-        case .ready, .running, .finished:
+        case .plan, .editing, .running, .result, .naming:
             if let plan = model.plan {
                 planView(plan)
             } else {
@@ -234,6 +247,14 @@ struct AskPanel: View {
 
     private var examples: some View {
         VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
+            if !model.flow.recent.isEmpty {
+                label("Recent")
+                FlowChips(items: model.flow.recent, identifier: "ph.ask.recent") { request in
+                    model.request = request
+                    submit()
+                }
+                .padding(.bottom, PixelHandTheme.Space.sm)
+            }
             label("Try")
             FlowChips(items: AskModel.examples) { example in
                 model.request = example
@@ -258,7 +279,11 @@ struct AskPanel: View {
                     stepRow(index: index, step: step, plan: plan)
                 }
                 if isEditing { addStepMenu }
-                actions(plan)
+                if let name = model.flow.namingName {
+                    namingRow(name)
+                } else {
+                    actions(plan)
+                }
             }
             .padding(PixelHandTheme.Space.md)
             .background(PixelHandTheme.elevated, in: RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous))
@@ -269,11 +294,16 @@ struct AskPanel: View {
                     .foregroundStyle(PixelHandTheme.ink2)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if case let .finished(outcome) = model.phase {
+            if case .result = model.flow.stage, let outcome = model.outcome {
                 banner(outcome.message(macName: macName), tint: outcomeTint(outcome))
+                    .accessibilityIdentifier("ph.ask.result")
+            } else if case let .naming(_, back) = model.flow.stage, case .result = back, let outcome = model.outcome {
+                banner(outcome.message(macName: macName), tint: outcomeTint(outcome))
+                    .accessibilityIdentifier("ph.ask.result")
             }
-            if let saveNote {
-                banner(saveNote, tint: PixelHandTheme.accentTint)
+            if let note = model.flow.note {
+                banner(note, tint: model.flow.namingName == nil ? PixelHandTheme.accentTint : PixelHandTheme.warningTint)
+                    .accessibilityIdentifier("ph.ask.note")
             }
         }
     }
@@ -395,37 +425,108 @@ struct AskPanel: View {
         .frame(minHeight: 36)
     }
 
-    private func actions(_ plan: AskPlan) -> some View {
-        HStack(spacing: PixelHandTheme.Space.sm) {
-            if model.isRunning {
-                Button("Stop") { model.cancelRun() }
-                    .buttonStyle(.ph(.secondary, size: .small))
-            } else {
-                Button {
-                    requestRun()
-                } label: {
-                    Label("Run", systemImage: "play.fill")
-                }
-                .buttonStyle(.ph(.primary, size: .small))
-                .disabled(!plan.canRun || isMacLocked || isEditing)
-                .accessibilityHint(isMacLocked ? "\(macName) is locked" : "")
+    private var isEditing: Bool { model.flow.isEditing }
 
-                Button("Save as key") { save() }
-                    .buttonStyle(.ph(.secondary, size: .small))
-                    .disabled(plan.isEmpty || isEditing)
+    /// The stage's buttons (Core's `AskFlow.actions`): the first is the
+    /// primary, the rest secondary; New request sits at the trailing end.
+    private func actions(_ plan: AskPlan) -> some View {
+        let actions = model.flow.actions
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: PixelHandTheme.Space.sm) {
+                actionButtons(actions, plan: plan)
             }
-            Spacer(minLength: 0)
-            Button(isEditing ? "Done" : "Edit") { isEditing.toggle() }
-                .buttonStyle(.ph(.secondary, size: .small))
-                .disabled(model.isRunning)
+            // The narrow column: two rows.
+            VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
+                HStack(spacing: PixelHandTheme.Space.sm) {
+                    actionButtons(Array(actions.prefix(2)), plan: plan)
+                }
+                HStack(spacing: PixelHandTheme.Space.sm) {
+                    actionButtons(Array(actions.dropFirst(2)), plan: plan)
+                }
+            }
         }
         .padding(.top, PixelHandTheme.Space.xs)
+    }
+
+    @ViewBuilder
+    private func actionButtons(_ actions: [AskFlow.Action], plan: AskPlan) -> some View {
+        ForEach(Array(actions.enumerated()), id: \.element) { index, action in
+            let isPrimary = index == 0 && action != .stop
+            Button {
+                perform(action)
+            } label: {
+                if action == .run || action == .runAgain {
+                    Label(action.title, systemImage: "play.fill")
+                } else {
+                    Text(action.title)
+                }
+            }
+            .buttonStyle(.ph(isPrimary ? .primary : .secondary, size: .small))
+            .disabled(!isEnabled(action, plan: plan))
+            .accessibilityHint(action == .run || action == .runAgain ? (isMacLocked ? "\(macName) is locked" : "") : "")
+            .accessibilityIdentifier(action.accessibilityID)
+        }
+    }
+
+    private func isEnabled(_ action: AskFlow.Action, plan: AskPlan) -> Bool {
+        switch action {
+        case .run, .runAgain: plan.canRun && !isMacLocked
+        case .saveAsKey: !plan.isEmpty
+        case .save: model.flow.canSaveName
+        default: true
+        }
+    }
+
+    private func perform(_ action: AskFlow.Action) {
+        switch action {
+        case .run, .runAgain: requestRun()
+        case .stop: model.cancelRun()
+        case .newRequest: model.newRequest()
+        case .saveAsKey:
+            model.beginSave(apps: session.installedApps)
+            isNameFocused = true
+        case .edit: model.beginEditing()
+        case .doneEditing: model.endEditing()
+        case .save: save()
+        case .cancel:
+            if model.flow.namingName != nil { model.cancelSave() } else { model.cancelPlanning() }
+        }
+    }
+
+    /// Save as key: the key's name, then Save or Cancel.
+    private func namingRow(_ name: String) -> some View {
+        VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
+            label("Save as key")
+            TextField("Name", text: Binding(get: { model.flow.namingName ?? name }, set: { model.rename($0) }))
+                .focused($isNameFocused)
+                .submitLabel(.done)
+                .onSubmit { if model.flow.canSaveName { save() } }
+                .font(.body)
+                .padding(.horizontal, PixelHandTheme.Space.md)
+                .frame(minHeight: PixelHandTheme.ControlHeight.standard)
+                .background(PixelHandTheme.fill, in: RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous))
+                .accessibilityLabel("Key name")
+                .accessibilityIdentifier("ph.ask.name")
+            HStack(spacing: PixelHandTheme.Space.sm) {
+                ForEach(model.flow.actions, id: \.self) { action in
+                    Button(action.title) { perform(action) }
+                        .buttonStyle(.ph(action == .save ? .primary : .secondary, size: .small))
+                        .disabled(!isEnabledInNaming(action))
+                        .accessibilityIdentifier(action.accessibilityID)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(.top, PixelHandTheme.Space.xs)
+    }
+
+    private func isEnabledInNaming(_ action: AskFlow.Action) -> Bool {
+        action == .save ? model.flow.canSaveName : true
     }
 
     // MARK: Run and save
 
     private func requestRun() {
-        saveNote = nil
         if model.confirmationReasons.isEmpty {
             startRun()
         } else {
@@ -441,12 +542,8 @@ struct AskPanel: View {
     }
 
     private func save() {
-        switch model.saveAsKey(deck: DeckSurfaceModel.shared, apps: session.installedApps) {
-        case let .saved(pageTitle):
-            saveNote = "Saved as a key on \(pageTitle)."
-        case let .blocked(message):
-            saveNote = message
-        }
+        isNameFocused = false
+        model.saveAsKey(deck: DeckSurfaceModel.shared, apps: session.installedApps)
     }
 
     // MARK: Pieces
@@ -474,9 +571,10 @@ struct AskPanel: View {
     }
 }
 
-/// Example requests as wrapping chips.
+/// Example (or recent) requests as chips.
 private struct FlowChips: View {
     let items: [String]
+    var identifier = "ph.ask.example"
     let onTap: (String) -> Void
 
     var body: some View {
@@ -492,7 +590,7 @@ private struct FlowChips: View {
                 }
                 .buttonStyle(.plain)
                 .phosphorFocusable(cornerRadius: 18)
-                .accessibilityIdentifier("ph.ask.example")
+                .accessibilityIdentifier(identifier)
             }
         }
     }

@@ -90,6 +90,10 @@ public struct RightColumnPlan: Sendable, Hashable {
     public static let handleWidth: Double = 20
     /// The handle's touch target, centred on it.
     public static let handleHitWidth: Double = 44
+    /// The handle's visible height: tall enough to find at a glance.
+    public static let handleHeight: Double = 88
+    /// The handle's edge stroke (`accent`, 3:1 or better on the canvas).
+    public static let handleStroke: Double = 1.5
 
     public let arrangement: ArrangementPreset
     /// The column's full width in this arrangement; 0 when there is none.

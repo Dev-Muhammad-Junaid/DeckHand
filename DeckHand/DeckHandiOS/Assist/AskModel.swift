@@ -2,7 +2,10 @@
 //  AskModel.swift
 //  DeckHandiOS – Assist
 //
-//  Ask (UX-022, A1): a request → a plan → Run or Save as key. Plans come
+//  Ask (UX-022, A1): a request → a plan → Run or Save as key. Where Ask is
+//  and what each button does is Core's `AskFlow` (owner testing, build 24,
+//  OT-5: after one run the column was stuck on a Name field); this model
+//  feeds it the planner's and the run's events. Plans come
 //  from the on-device model when Apple Intelligence can run
 //  (`OnDeviceAskPlanner`, resolved and validated by Core's
 //  `AskPlanResolver`), else from Core's deterministic `AskCommandParser`.
@@ -73,6 +76,8 @@ final class AskModel: ObservableObject {
 
     @Published var request = ""
     @Published private(set) var phase: Phase = .idle
+    /// Where Ask is and what it offers (Core). The panel draws this.
+    @Published private(set) var flow: AskFlow
     @Published var plan: AskPlan?
     /// What became of each step of the last run, by index.
     @Published private(set) var deliveries: [Int: CommandDelivery] = [:]
@@ -86,15 +91,33 @@ final class AskModel: ObservableObject {
     private var planTask: Task<Void, Never>?
     private var runTask: Task<Void, Never>?
     private var planGeneration = 0
+    private var runGeneration = 0
+
+    static let recentKey = "pixelhand.ask.recent"
+
+    init() {
+        flow = AskFlow(recent: UserDefaults.standard.stringArray(forKey: Self.recentKey) ?? [])
+    }
+
+    private func apply(_ event: AskFlow.Event) {
+        let before = flow.recent
+        flow.apply(event)
+        if flow.recent != before {
+            UserDefaults.standard.set(flow.recent, forKey: Self.recentKey)
+        }
+    }
 
     // MARK: Planning
 
     /// Plans `request` (or the field's text). Shows the plan when ready.
     func submit(_ text: String? = nil, apps: [InstalledAppInfo], frontApp: String?) {
         let text = (text ?? request).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty, flow.canSubmitRequest else { return }
         request = text
-        cancelRun()
+        stopRunQuietly()
+        if case .naming = flow.stage { apply(.cancelNaming) }
+        if flow.isEditing { apply(.doneEditing) }
+        apply(.submit(text))
         planTask?.cancel()
         planGeneration += 1
         let generation = planGeneration
@@ -108,6 +131,7 @@ final class AskModel: ObservableObject {
             guard let self, !Task.isCancelled, generation == self.planGeneration else { return }
             self.plan = plan
             self.phase = .ready
+            self.apply(.planReady)
         }
     }
 
@@ -126,13 +150,25 @@ final class AskModel: ObservableObject {
         return resolved.isEmpty ? parsed : resolved
     }
 
-    /// Back to the empty field.
-    func reset() {
+    /// New request: an empty field, focused, ready to start over. Stops
+    /// planning or a run first.
+    func newRequest() {
         planTask?.cancel()
-        cancelRun()
+        planGeneration += 1
+        stopRunQuietly()
+        request = ""
         plan = nil
         deliveries = [:]
         phase = .idle
+        apply(.newRequest)
+    }
+
+    /// Cancel while the plan is being made: back to the request, text kept.
+    func cancelPlanning() {
+        planTask?.cancel()
+        planGeneration += 1
+        phase = .idle
+        apply(.cancelPlanning)
     }
 
     // MARK: Editing
@@ -144,6 +180,21 @@ final class AskModel: ObservableObject {
         deliveries = [:]
         phase = .ready
     }
+
+    /// Edit: the plan's steps can be changed (from the plan or a result).
+    func beginEditing() {
+        guard !isRunning else { return }
+        deliveries = [:]
+        phase = plan == nil ? .idle : .ready
+        apply(.edit)
+    }
+
+    /// Done editing: back to the plan.
+    func endEditing() {
+        apply(.doneEditing)
+    }
+
+    var isEditing: Bool { flow.isEditing }
 
     var isRunning: Bool {
         if case .running = phase { return true }
@@ -163,23 +214,31 @@ final class AskModel: ObservableObject {
     /// before every step.
     func run(sender: TrackpadSender, isMacLocked: @escaping @MainActor () -> Bool) {
         guard let plan, plan.canRun, !isRunning else {
-            if plan?.canRun == false { phase = .finished(.invalid) }
+            if plan?.canRun == false {
+                phase = .finished(.invalid)
+                apply(.runStarted)
+                apply(.runEnded(succeeded: false))
+            }
             return
         }
         deliveries = [:]
+        apply(.runStarted)
+        runGeneration += 1
+        let generation = runGeneration
         runTask = Task { [weak self] in
             for (index, step) in plan.steps.enumerated() {
-                guard let self, !Task.isCancelled else { return }
+                guard let self, !Task.isCancelled, generation == self.runGeneration else { return }
                 if isMacLocked() {
-                    self.phase = .finished(.locked(index: index))
+                    self.finish(.locked(index: index))
                     return
                 }
                 self.phase = .running(index: index)
+                self.apply(.stepStarted(index))
                 let delivery = await Self.send(step, sender: sender)
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled, generation == self.runGeneration else { return }
                 self.deliveries[index] = delivery
                 if delivery == .failed || delivery == .timedOut {
-                    self.phase = .finished(.stopped(index: index, delivery: delivery))
+                    self.finish(.stopped(index: index, delivery: delivery))
                     return
                 }
                 if index < plan.steps.count - 1 {
@@ -188,14 +247,39 @@ final class AskModel: ObservableObject {
                     try? await Task.sleep(for: pause)
                 }
             }
-            self?.phase = .finished(.done(steps: plan.steps.count))
+            guard let self, generation == self.runGeneration else { return }
+            self.finish(.done(steps: plan.steps.count))
         }
     }
 
+    private func finish(_ outcome: RunOutcome) {
+        phase = .finished(outcome)
+        if case .done = outcome {
+            apply(.runEnded(succeeded: true))
+        } else {
+            apply(.runEnded(succeeded: false))
+        }
+    }
+
+    /// Stop: the run ends where it is, back to the plan.
     func cancelRun() {
+        let wasRunning = isRunning
+        stopRunQuietly()
+        if wasRunning { apply(.stopped) }
+    }
+
+    /// Ends a run without moving the flow (a new request replaces it).
+    private func stopRunQuietly() {
         runTask?.cancel()
         runTask = nil
+        runGeneration += 1
         if isRunning { phase = .ready }
+    }
+
+    /// The result's outcome, while the flow shows one.
+    var outcome: RunOutcome? {
+        if case let .finished(outcome) = phase { return outcome }
+        return nil
     }
 
     nonisolated static func send(_ step: AskStep, sender: TrackpadSender) async -> CommandDelivery {
@@ -218,16 +302,46 @@ final class AskModel: ObservableObject {
         case blocked(String)
     }
 
-    /// Saves the plan as one key (Core's `saveAskPlan`), as one undo step
-    /// in the deck editor.
+    /// Save as key, step 1: the short naming flow, with the plan's own
+    /// label suggested.
+    func beginSave(apps: [InstalledAppInfo]) {
+        guard let plan, !isRunning else { return }
+        let catalog = AskAppCatalog(installed: apps)
+        apply(.saveAsKey(suggestedName: plan.suggestedKeyName { catalog.name(for: $0) }))
+    }
+
+    /// The name being typed in Save as key.
+    func rename(_ name: String) {
+        apply(.rename(name))
+    }
+
+    /// Cancel: back to the plan or result naming came from.
+    func cancelSave() {
+        apply(.cancelNaming)
+    }
+
+    /// Save as key, step 2: saves the plan as one key with the given name
+    /// (Core's `saveAskPlan`), as one undo step in the deck editor, and
+    /// goes back to the plan or result with a note. A failure keeps the
+    /// name field with the reason.
+    @discardableResult
     func saveAsKey(deck: DeckSurfaceModel, apps: [InstalledAppInfo]) -> SaveOutcome {
+        let outcome = save(deck: deck, apps: apps, label: flow.namingName)
+        switch outcome {
+        case let .saved(pageTitle): apply(.saved(note: "Saved as a key on \(pageTitle)."))
+        case let .blocked(message): apply(.saveFailed(message))
+        }
+        return outcome
+    }
+
+    private func save(deck: DeckSurfaceModel, apps: [InstalledAppInfo], label: String?) -> SaveOutcome {
         guard let plan else { return .blocked("Nothing to save.") }
         if let blocker = plan.saveBlocker { return .blocked(blocker.message) }
         let catalog = AskAppCatalog(installed: apps)
         let name: (String) -> String? = { catalog.name(for: $0) }
         var result: DeckDocument.AskSaveResult?
         deck.edit { document in
-            result = document.saveAskPlan(plan, appName: name)
+            result = document.saveAskPlan(plan, appName: name, label: label)
         }
         guard let result, let page = deck.document.page(id: result.pageID) else {
             return .blocked("The deck is full. Remove a key or add a page, then try again.")
@@ -241,7 +355,7 @@ extension AskModel.RunOutcome {
     func message(macName: String) -> String {
         switch self {
         case let .done(steps):
-            steps == 1 ? "Done on \(macName)." : "Ran \(steps) steps on \(macName)."
+            steps == 1 ? "Done on \(macName)." : "Done on \(macName): \(steps) steps."
         case let .stopped(index, delivery):
             delivery == .timedOut
                 ? "Step \(index + 1) wasn’t confirmed by \(macName). The rest didn’t run."

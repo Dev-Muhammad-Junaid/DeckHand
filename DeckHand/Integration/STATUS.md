@@ -1861,5 +1861,7 @@ session; landscape, Pro unlocked):
   column ends in a state that only offers a Name field (rename and save);
   there's no way back, no new request and no other actions.
 
-Fix lane: `claude/pixelhand-lane-owner24` (primary session).
+Fix lane: `claude/pixelhand-lane-owner24` (primary session). All five
+fixed there, with Core tests and two UI walks (`test18`, `test19`); see
+`LANE-owner24.md` for the iPad checks to run on the next build.
 

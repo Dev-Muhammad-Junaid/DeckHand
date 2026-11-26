@@ -482,23 +482,9 @@ final class ScreenCaptureService {
         return data as Data
     }
 
+    /// The app's icon with transparency (OT-1: JPEG drew a square behind
+    /// it). The window picker draws it at 48 pt or less.
     private static func compressedIcon(for appURL: URL, side: CGFloat) -> Data? {
-        let icon = NSWorkspace.shared.icon(forFile: appURL.path)
-        let target = NSSize(width: side, height: side)
-        let resized = NSImage(size: target)
-        resized.lockFocus()
-        NSGraphicsContext.current?.imageInterpolation = .high
-        icon.draw(
-            in: NSRect(origin: .zero, size: target),
-            from: NSRect(origin: .zero, size: icon.size),
-            operation: .copy,
-            fraction: 1.0
-        )
-        resized.unlockFocus()
-        guard let tiff = resized.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiff) else {
-            return nil
-        }
-        return bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.8])
+        AppIconEncoder.icon(for: appURL, pixelSide: Int(side * 2))
     }
 }

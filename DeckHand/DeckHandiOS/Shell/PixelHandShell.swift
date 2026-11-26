@@ -37,6 +37,14 @@
 //  place in the column wherever there is one, and in its sheet elsewhere.
 //  Panels fade; nothing slides in.
 //
+//  The keyboard (owner testing, build 24, OT-2): the shell plans its form
+//  from the window and lays out under the on-screen keyboard (it ignores
+//  the keyboard's safe area), so the keyboard never changes the
+//  arrangement. The Type panel has one owner (`TypePanelModel`, in the
+//  environment for the pad's keyboard button) and one place on screen
+//  (`TypePanelHost`, laid over every form above the keyboard or the dock),
+//  so its text field keeps the keyboard through rotation and resizes.
+//
 //  The surfaces keep their reserved areas: the pad's click strip and
 //  caption sit at its own foot, and the floating screen tile is laid over
 //  the pad alone, so its 120 pt band lines up with the pad's foot.
@@ -55,7 +63,6 @@ struct PixelHandShell: View {
     let onDisconnect: () -> Void
 
     @EnvironmentObject private var settings: DeckHandSettings
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.entitlements) private var entitlements
@@ -75,7 +82,8 @@ struct PixelHandShell: View {
     @State private var askFocusRequest = 0
     @State private var isAskPresented = false
     @State private var isMyMacsPresented = false
-    @State private var isKeyboardShown = false
+    /// The Type panel: open/closed, mode, tab (OT-2, OT-3). One per window.
+    @State private var typePanel = TypePanelModel()
     @State private var shortcutsApp: InstalledAppInfo?
     /// A pane split while its handle is dragged (screen height or deck
     /// panel height), committed to scene storage on release.
@@ -101,9 +109,12 @@ struct PixelHandShell: View {
     var body: some View {
         GeometryReader { proxy in
             let crease = DuoPoseMachine.band(for: DuoCrease.input(proxy: proxy, hingeStatus: hingeStatus))
+            // The window's size: this reader ignores the keyboard's safe
+            // area, so the keyboard can't change the form (OT-2).
+            let size = ShellPlanningSize.size(measuredWidth: Double(proxy.size.width), measuredHeight: Double(proxy.size.height))
             let base = CanvasPlan(
-                width: Double(proxy.size.width),
-                height: Double(proxy.size.height),
+                width: size.width,
+                height: size.height,
                 sidebarCollapsed: sidebarCollapsed,
                 crease: crease
             )
@@ -111,8 +122,8 @@ struct PixelHandShell: View {
             // is made again with it (the arrangement key needs the form).
             let plan = base.form == .columns && rightColumn(base).isCollapsed
                 ? CanvasPlan(
-                    width: Double(proxy.size.width),
-                    height: Double(proxy.size.height),
+                    width: size.width,
+                    height: size.height,
                     sidebarCollapsed: sidebarCollapsed,
                     rightColumnCollapsed: true,
                     crease: crease
@@ -136,6 +147,15 @@ struct PixelHandShell: View {
                         duoLayout(plan: plan, panes: panes)
                     }
                 }
+
+                // One place for the Type panel in every form: its field
+                // keeps its identity, so the keyboard stays up (OT-2).
+                TypePanelHost(
+                    session: session,
+                    model: typePanel,
+                    windowSize: proxy.size,
+                    showsDock: showsDock(plan)
+                )
             }
             .animation(PixelHandMotion.reduced(PixelHandMotion.spring, reduceMotion: reduceMotion), value: plan.form)
             // The sidebar fades in and out; it never slides (OR-06 motion rule).
@@ -150,6 +170,10 @@ struct PixelHandShell: View {
             // windows "Trackpad" also opens the Pointer arrangement (VQ-079).
             .intentSurfaceRequests(selection: selection, preset: plan.usesPresets ? presetBinding(plan) : nil)
         }
+        // The shell lays out under the on-screen keyboard; the Type panel
+        // rides on top of it (OT-2).
+        .ignoresSafeArea(.keyboard, edges: .bottom)
+        .environment(\.typePanel, typePanel)
         .duoHingeStatus($hingeStatus)
         .sheet(isPresented: $isAskPresented) {
             AskSheet(session: session, macName: peerName)
@@ -206,17 +230,15 @@ struct PixelHandShell: View {
         .safeAreaInset(edge: .bottom, spacing: PixelHandTheme.Space.sm) {
             VStack(spacing: PixelHandTheme.Space.sm) {
                 bottomChrome(metrics: metrics, foldsDock: height < Self.foldedDockHeight)
-                // While typing, the tab bar steps aside so the pad stays
-                // usable above the keyboard (VQ-033).
-                if !isKeyboardShown {
-                    SurfaceTabBar(
-                        selection: selection,
-                        tabs: ControlSurface.tabs(includeDeck: true),
-                        onAsk: { openAsk(plan) }
-                    )
-                    .padding(.horizontal, CGFloat(metrics.margin))
-                    .transition(.opacity)
-                }
+                // The tab bar stays put while typing: the keyboard covers
+                // the shell's foot and the Type panel rides above it, so
+                // nothing here moves (OT-2).
+                SurfaceTabBar(
+                    selection: selection,
+                    tabs: ControlSurface.tabs(includeDeck: true),
+                    onAsk: { openAsk(plan) }
+                )
+                .padding(.horizontal, CGFloat(metrics.margin))
             }
         }
     }
@@ -312,7 +334,6 @@ struct PixelHandShell: View {
         }
         .safeAreaInset(edge: .bottom, spacing: PixelHandTheme.Space.sm) {
             VStack(spacing: PixelHandTheme.Space.sm) {
-                keyboardPanel(margin: margin)
                 stripOnly(metrics: metrics, foldedDock: false, margin: margin)
                 HStack(spacing: PixelHandTheme.Space.md) {
                     dock
@@ -320,7 +341,6 @@ struct PixelHandShell: View {
                 }
                 .padding(.horizontal, margin)
             }
-            .animation(PixelHandMotion.reduced(PixelHandMotion.spring, reduceMotion: reduceMotion), value: isKeyboardShown)
         }
     }
 
@@ -359,13 +379,9 @@ struct PixelHandShell: View {
                 centreCanvas(preset: preset.wrappedValue)
                     .padding(.bottom, CGFloat(CanvasPlan.floatingDockReserve))
                     .overlay(alignment: .bottom) {
-                        VStack(spacing: PixelHandTheme.Space.sm) {
-                            keyboardPanel(margin: 0)
-                            dock
-                                .frame(maxWidth: CGFloat(CanvasPlan.floatingDockMaximumWidth))
-                                .padding(.bottom, PixelHandTheme.Space.lg)
-                        }
-                        .animation(PixelHandMotion.reduced(PixelHandMotion.spring, reduceMotion: reduceMotion), value: isKeyboardShown)
+                        dock
+                            .frame(maxWidth: CGFloat(CanvasPlan.floatingDockMaximumWidth))
+                            .padding(.bottom, PixelHandTheme.Space.lg)
                     }
             }
             .frame(maxWidth: .infinity)
@@ -418,7 +434,6 @@ struct PixelHandShell: View {
             .offset(x: CGFloat(panes.second.x), y: CGFloat(panes.second.y))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .animation(PixelHandMotion.reduced(PixelHandMotion.spring, reduceMotion: reduceMotion), value: isKeyboardShown)
     }
 
     /// Book, leading pane: the selected tab picks the lead. Screen docks
@@ -443,7 +458,6 @@ struct PixelHandShell: View {
                 }
             }
             .frame(maxHeight: .infinity)
-            keyboardPanel(margin: 0)
             dock
                 .padding(.horizontal, -PixelHandTheme.Space.md)
         }
@@ -499,7 +513,6 @@ struct PixelHandShell: View {
         let outer = CGFloat(DuoPanes.outerMargin)
         let showsDeck = DuoArrangement.laptopBottomShowsDeck(selected: selection.wrappedValue.rawValue)
         VStack(spacing: PixelHandTheme.Space.sm) {
-            keyboardPanel(margin: outer)
             stripOnly(metrics: panes.secondMetrics, foldedDock: true, margin: outer)
             Group {
                 if showsDeck, let sender = session.sender {
@@ -805,28 +818,25 @@ struct PixelHandShell: View {
     /// the dock folded into it on short windows).
     @ViewBuilder
     private func bottomChrome(metrics: LayoutMetrics, foldsDock: Bool) -> some View {
+        // The strip and dock stay put while typing: the Type panel is laid
+        // over the shell, above the keyboard (OT-2).
         VStack(spacing: PixelHandTheme.Space.sm) {
-            keyboardPanel(margin: CGFloat(metrics.margin))
-            // While typing the strip collapses (the keyboard panel has the
-            // keys it would offer); the dock stays, it holds the keyboard
-            // toggle. A folded dock lives in the strip, so it stays then.
-            if !isKeyboardShown || foldsDock {
-                stripOnly(metrics: metrics, foldedDock: foldsDock, margin: CGFloat(metrics.margin))
-            }
+            stripOnly(metrics: metrics, foldedDock: foldsDock, margin: CGFloat(metrics.margin))
             if !foldsDock {
                 dock
             }
         }
         .frame(maxWidth: 720)
-        .animation(PixelHandMotion.reduced(PixelHandMotion.spring, reduceMotion: reduceMotion), value: isKeyboardShown)
     }
 
-    @ViewBuilder
-    private func keyboardPanel(margin: CGFloat) -> some View {
-        if isKeyboardShown, let sender = session.sender {
-            RemoteKeyboardPanel(sender: sender, clipboard: session.clipboard, colorScheme: colorScheme)
-                .padding(.horizontal, margin)
-                .transition(.opacity) // Glyph rule: panels fade, never slide.
+    /// Whether this form shows the app dock (the Type panel sits above it
+    /// when no keyboard covers it). The rail and the Duo laptop pose fold
+    /// it into the strip, and so do short single and stacked windows.
+    private func showsDock(_ plan: CanvasPlan) -> Bool {
+        switch plan.form {
+        case .rail, .laptop: false
+        case .single, .stacked: CGFloat(plan.metrics.height) >= Self.foldedDockHeight
+        case .sideBySide, .columns, .book: true
         }
     }
 
@@ -879,17 +889,16 @@ struct PixelHandShell: View {
             AppDock(
                 entries: dockEntries,
                 apps: appsByID,
-                isKeyboardShown: isKeyboardShown,
+                isKeyboardShown: typePanel.isShown,
                 onActivate: { app in Task { await sender.sendLaunchApp(app.bundleID) } },
                 onShortcuts: { shortcutsApp = $0 },
                 onHide: { app in Task { _ = await sender.sendConfirmed(.appShortcut(bundleID: app.bundleID, keys: ["cmd", "h"])) } },
                 onQuit: { app in Task { _ = await sender.sendConfirmed(.appShortcut(bundleID: app.bundleID, keys: ["cmd", "q"])) } },
-                onKeyboard: {
-                    GestureHaptic.light.trigger()
-                    isKeyboardShown.toggle()
-                }
+                onKeyboard: { typePanel.toggle() }
             )
             .padding(.horizontal, PixelHandTheme.Space.md)
+            // The Type panel sits above the dock when no keyboard covers it.
+            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { typePanel.dockMinY = $0 }
         }
     }
 
@@ -957,7 +966,7 @@ struct PixelHandShell: View {
                 if offersKeyboard, session.macLockState == .screenLocked {
                     StatusPill(kind: .locked, message: lockText, fixTitle: "Keyboard") {
                         GestureHaptic.light.trigger()
-                        isKeyboardShown = true
+                        typePanel.open()
                     }
                 } else {
                     StatusPill(kind: .locked, message: lockText)

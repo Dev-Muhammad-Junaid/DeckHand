@@ -3,10 +3,13 @@
 //  DeckHandiOS – Shell
 //
 //  The app dock (UX-005): the Mac's running apps on a glass capsule, 56 pt,
-//  with the Mac Dock's running dots (4 pt, `ink3`; the front app's lit mint
-//  with a 2 pt accent ring around its icon) and a warning dot on an app
-//  that's showing a dialog. A hairline, then the keyboard button, which sits
-//  in the dock so the keyboard can never cover its own toggle.
+//  drawn like the macOS Dock (owner testing, build 24, OT-1): each app is
+//  its real icon shape with nothing behind it (the Mac now sends icons
+//  with transparency, `AppIconPolicy`), the front app has a small accent
+//  dot under its icon instead of a ring box, a press dips the icon
+//  slightly, and an app that's showing a dialog has a warning dot. A
+//  hairline, then the keyboard button, which sits in the dock so the
+//  keyboard can never cover its own toggle.
 //
 //  The row shows whole icons only (`AppDockFit`): it snaps its width to a
 //  whole number of slots, rests on whole icons when scrolled, and fades
@@ -45,7 +48,7 @@ struct AppDock: View {
         HStack(spacing: PixelHandTheme.Space.xs) {
             ScrollViewReader { reader in
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: PixelHandTheme.Space.sm) {
+                    HStack(spacing: CGFloat(AppIconPolicy.dockSpacing)) {
                         // UX-018: never an empty capsule. The dot wave until
                         // the Mac's app list arrives, then a quiet line.
                         if !entries.contains(where: { apps[$0.bundleID] != nil }) {
@@ -125,8 +128,8 @@ struct AppDock: View {
     }
 }
 
-/// One app: 36 pt icon, 44 pt target. The front app shows by its accent
-/// ring only; no dot under it (owner's glyph rule).
+/// One app: the 36 pt icon with no plate, a 44 pt target, and the
+/// macOS-style indicator: a 4 pt accent dot under the front app.
 private struct DockApp: View {
     let app: InstalledAppInfo
     let entry: AppDockEntry
@@ -135,7 +138,7 @@ private struct DockApp: View {
     let onHide: () -> Void
     let onQuit: () -> Void
 
-    private let iconSide: CGFloat = 36
+    private let iconSide = CGFloat(AppIconPolicy.dockIconSide)
 
     var body: some View {
         Button {
@@ -143,14 +146,6 @@ private struct DockApp: View {
             onActivate()
         } label: {
             AppIconTile(app: app, side: iconSide)
-                .overlay {
-                    if entry.isFront {
-                        // 2 pt of canvas, then a 2 pt accent ring.
-                        RoundedRectangle(cornerRadius: PixelHandTheme.Radius.kbd + 4, style: .continuous)
-                            .strokeBorder(PixelHandTheme.accent, lineWidth: PixelHandTheme.Stroke.selection)
-                            .padding(-4)
-                    }
-                }
                 .overlay(alignment: .topTrailing) {
                     if entry.hasDialog {
                         StatusPixel(state: .needsYou, size: 8)
@@ -159,11 +154,22 @@ private struct DockApp: View {
                             .offset(x: 5, y: -5)
                     }
                 }
-            .frame(minWidth: PixelHandTheme.ControlHeight.hit, minHeight: PixelHandTheme.ControlHeight.hit)
-            .contentShape(Rectangle())
+                // The front app: a small dot under the icon in the accent
+                // colour, like the Mac's own Dock (OT-1).
+                .overlay(alignment: .bottom) {
+                    Circle()
+                        .fill(PixelHandTheme.accent)
+                        .frame(width: CGFloat(AppIconPolicy.frontDotSide), height: CGFloat(AppIconPolicy.frontDotSide))
+                        .offset(y: CGFloat(AppIconPolicy.frontDotGap + AppIconPolicy.frontDotSide))
+                        .opacity(entry.isFront ? 1 : 0)
+                        .accessibilityHidden(true)
+                }
+                .frame(minWidth: PixelHandTheme.ControlHeight.hit, minHeight: PixelHandTheme.ControlHeight.hit)
+                .contentShape(Rectangle())
         }
-        .buttonStyle(ChipPressStyle())
+        .buttonStyle(DockIconPressStyle())
         .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.kbd + 4)
+        .animation(PixelHandMotion.standard, value: entry.isFront)
         .contextMenu {
             Button("Bring to front", action: onActivate)
             Button("Shortcuts", action: onShortcuts)
@@ -197,8 +203,20 @@ private struct DockApp: View {
     }
 }
 
-/// The Mac's icon for an app, or a neutral tile with its initial when the
-/// Mac didn't send one.
+/// A dock icon's press: a small dip in scale and a touch of fade, with no
+/// plate appearing behind the icon (OT-1).
+private struct DockIconPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? CGFloat(AppIconPolicy.pressedScale) : 1)
+            .opacity(configuration.isPressed ? 0.85 : 1)
+            .animation(PixelHandMotion.quick, value: configuration.isPressed)
+    }
+}
+
+/// The Mac's icon for an app, drawn as its own shape with nothing behind
+/// it (the Mac sends it with transparency, OT-1), or, when the Mac didn't
+/// send one, an icon-shaped stand-in with its initial.
 struct AppIconTile: View {
     let app: InstalledAppInfo
     var side: CGFloat = 36
@@ -209,9 +227,12 @@ struct AppIconTile: View {
                 Image(uiImage: image)
                     .resizable()
                     .interpolation(.high)
+                    .antialiased(true)
                     .scaledToFit()
             } else {
-                RoundedRectangle(cornerRadius: PixelHandTheme.Radius.kbd, style: .continuous)
+                // macOS icons sit on a 22 % rounded square inside a small
+                // margin; the stand-in follows that shape.
+                RoundedRectangle(cornerRadius: side * 0.22, style: .continuous)
                     .fill(PixelHandTheme.Brand.screenGradient)
                     .overlay(
                         Text(String(app.displayName.prefix(1)).uppercased())

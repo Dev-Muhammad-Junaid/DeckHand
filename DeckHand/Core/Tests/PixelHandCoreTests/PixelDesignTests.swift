@@ -85,9 +85,9 @@ struct PixelGlyphTests {
 
 @Suite("Dot-matrix font")
 struct DotMatrixFontTests {
-    @Test("Covers A–Z, 0–9 and the listed punctuation, apostrophes included; every pattern is 35 cells")
+    @Test("Covers A–Z, 0–9 and the listed punctuation (apostrophes and the numpad's = × ÷ included); every pattern is 35 cells")
     func coverage() {
-        let expected = Set("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ·:/%-.+<>'’,&()?!")
+        let expected = Set("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ·:/%-.+<>'’,&()?!=×÷")
         #expect(DotMatrixFont.characters == expected)
         for (character, pattern) in DotMatrixFont.table {
             #expect(pattern.count == 35, "\(character)")
