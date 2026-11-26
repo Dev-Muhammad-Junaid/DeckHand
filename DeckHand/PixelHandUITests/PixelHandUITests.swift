@@ -686,10 +686,11 @@ final class PixelHandUITests: XCTestCase {
             sleep(1)
             let numpad = element("ph.type.numpad")
             XCTAssertTrue(numpad.waitForExistence(timeout: 2), "The numpad didn't show")
-            XCTAssertTrue(element("ph.type.field").exists, "The numpad replaced the field instead of docking")
+            // OT-11 (build 26): only the arrows and the numpad.
+            XCTAssertFalse(element("ph.type.modifier.command").isHittable, "The modifier row stayed with the numpad")
             if numpad.exists {
-                XCTAssertTrue(panel.frame.contains(numpad.frame), "The numpad isn't inside the panel")
-                XCTAssertLessThanOrEqual(numpad.frame.width, 222, "The numpad is wider than its compact 5 × 4 grid")
+                XCTAssertTrue(panel.frame.insetBy(dx: -1, dy: -1).contains(numpad.frame), "The numpad isn't inside the panel")
+                XCTAssertGreaterThan(numpad.frame.width, panel.frame.width * 0.5, "The numpad doesn't fill the panel")
             }
             snap("type-numpad-docked")
             if ensureScratchFrontmost() { tapIfExists("ph.type.numpad.seven") }
@@ -720,6 +721,67 @@ final class PixelHandUITests: XCTestCase {
             snap("type-panel-remembered")
             tapIfExists("ph.type.close")
         }
+    }
+
+    /// OT-11 (owner testing, build 26): the Type panel uses its space.
+    /// Resizing taller grows the arrows and keys; the field is as tall as
+    /// the arrows; the key rows span the panel; at its shortest the arrows
+    /// go to one row; the app is named once. Portrait and landscape.
+    func test22_TypePanelFillsItsSpace() {
+        useFullScreenAppsIfAsked()
+        for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {
+            XCUIDevice.shared.orientation = orientation
+            launch()
+            guard connect() else { return }
+            sleep(1)
+            guard tapIfExists("ph.dock.keyboard") || tapIfExists("ph.trackpad.keyboard") else { return }
+            let panel = element("ph.type.panel")
+            XCTAssertTrue(panel.waitForExistence(timeout: 3), "The Type panel didn't open")
+            sleep(1)
+            let tag = orientation == .portrait ? "portrait" : "landscape"
+            snap("type-fill-\(tag)-default")
+
+            let field = element("ph.type.field"), up = element("ph.type.key.up"), down = element("ph.type.key.down")
+            let command = element("ph.type.modifier.command"), fn = element("ph.type.fn")
+            // The target shows once: no "Typing into" placeholder in the field.
+            let typingInto = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@ OR placeholderValue BEGINSWITH %@", "Typing into", "Typing into"))
+            XCTAssertLessThanOrEqual(typingInto.count, 1, "The target is named twice")
+            XCTAssertTrue(element("ph.type.target").exists, "The header has no target")
+            XCTAssertTrue(element("ph.type.accept").exists, "Live has no Accept (Tab) action")
+
+            // Taller: drag a corner down.
+            let handle = element("ph.type.resize.trailing")
+            if handle.exists, up.exists, down.exists {
+                let before = down.frame.height
+                handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.1, thenDragTo: handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).withOffset(CGVector(dx: -200, dy: 400)))
+                sleep(1)
+                snap("type-fill-\(tag)-tall")
+                XCTAssertGreaterThan(down.frame.height, before + 4, "The arrows didn't grow with the panel")
+                // Field and arrows share their band's height.
+                if field.exists, up.frame.minY < down.frame.minY {
+                    XCTAssertEqual(field.frame.minY, up.frame.minY, accuracy: 6, "The field doesn't start with the arrows")
+                    XCTAssertEqual(field.frame.maxY, down.frame.maxY, accuracy: 6, "Empty strip under the field")
+                }
+                // The key rows span the panel.
+                if command.exists, fn.exists {
+                    XCTAssertLessThan(command.frame.minX - panel.frame.minX, 20, "The key rows don't start at the edge")
+                    XCTAssertLessThan(panel.frame.maxX - fn.frame.maxX, 20, "Empty block right of the keys")
+                }
+                // Shortest: drag far up; on panels wide enough the arrows
+                // go to one row.
+                handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.1, thenDragTo: handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).withOffset(CGVector(dx: 0, dy: -800)))
+                sleep(1)
+                snap("type-fill-\(tag)-short")
+                if panel.frame.width >= 448, command.exists, command.frame.minY > up.frame.maxY {
+                    XCTAssertEqual(up.frame.midY, down.frame.midY, accuracy: 2, "The shortest stacked panel didn't put the arrows in one row")
+                }
+            } else {
+                snap("missing-ph.type.resize.trailing-\(tag)")
+            }
+            tapIfExists("ph.type.close")
+            sleep(1)
+        }
+        XCUIDevice.shared.orientation = .portrait
     }
 
     /// OT-8 (owner testing, build 25): Ask's "Open Safari · Type “youtube”
