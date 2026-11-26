@@ -97,7 +97,17 @@ only the loupe's own frame (`ph.type.loupe`) is. Blocks are 8 pt apart, 12 pt fr
 card's edge; the header is 44 pt (two rows under 456 pt wide). Legends
 scale with the cell, up to 1.5×. Every band runs edge to edge: no strip
 under the field, no block under the arrows, no gap right of the keys
-(`TypePanelLayoutTests.noDeadAreas`).
+(`TypePanelLayoutTests.noDeadAreas`). Numpad mode draws only the arrows
+and the numpad (the key rows and Live's actions leave the view tree, not
+just fade; build 28). With a hardware keyboard Live keeps Accept ⇥ alone,
+spanning the action column; Compose has no actions there. Wherever the
+panel's frame comes from (the remembered place, a drag in flight, a frame
+from before the keyboard rose or the window turned) it is kept in the free
+room above the keyboard, moved and never resized; the keyboard's frame is
+read in the window as it is now (`KeyboardFrameReading`, build 28 bug 6).
+The iPhone rail's keyboard circle is its own 62 pt glass outside the tabs'
+glass group, and the rail's spacing tightens (12 → 4) so the whole stack
+fits the window (`CanvasPlan.railSpacing`).
 
 ## 5. Alignment rules
 
@@ -186,7 +196,7 @@ copy live in Core (`SendSheetLayout`, `SendTargetPlan`, `SendTargetCopy`,
 | Sources | Photos · Files · Paste: three chips of one size (44 tall, `SendSheetLayout.chipWidth`: the row less two 8 pt gaps, split in three, whole points; build 27) and **one face** (OT-17, `SendSheetLayout.SourceChip`): `raised` with a hairline, radius 14, icon and label both `ink` (no accent text), system symbols (`photo.on.rectangle`, `folder`, the paste control's own `doc.on.clipboard`), the label in the paste control's font as measured on the device (subheadline semibold until measured), 6 between icon and label. Paste is the system paste control (no "Allow Paste" prompt) filling its chip, the hairline drawn outside it; Photos and Files follow it because a paste control can't take a pixel glyph, a title or a font |
 | Field | One field for text or a link: the Ask field's shape (52, `raised`, radius 24, hairline), the Add button inside it (36 accent circle, add glyph, 44 target; ink3 while empty) |
 | Tray | Staged items as 52 rows (glyph, name, size; remove glyph with a 44 target), radius 14, 8 apart, under a footnote label |
-| Send to | Device cards in equal columns sized to the names (OT-16, `SendSheetLayout.cardGrid`): the most columns, up to `floor((w + 12) / (160 + 12))` and 3, in which every name (live and offline) wraps between words onto at most two lines in the card's text room (card width − 120); one column if none does (then the name truncates in the middle). A card is 64, or 80 when a name takes two lines (every card one height): a 44 navy tile (radius 14; Mac glyph lit while the Mac talks, lock glyph when locked, dot wave while connecting), the **whole name** over one status line, and a 32 slot at the trailing edge for the dot-matrix readout (`42%` sending, a waiting count) or the status pixel. Card radius 24 (10 inset → 14). The focused Mac gets the 2 pt cobalt ring; a drop target the dashed accent ring |
+| Send to | Device cards in equal columns sized to the names (OT-16, `SendSheetLayout.cardGrid`): the most columns, up to `floor((w + 12) / (160 + 12))` and 3, in which every name (live and offline) wraps between words onto at most two lines in the card's text room (card width − 120); one column if none does (then the name truncates in the middle). A card is 64, or taller when a name takes two lines (80 by the grid, about 90 measured at the default text size; OT-16 wins over compactness; every card one height): a 44 navy tile (radius 14; Mac glyph lit while the Mac talks, lock glyph when locked, dot wave while connecting), the **whole name** over one status line, and a 32 slot at the trailing edge for the dot-matrix readout (`42%` sending, a waiting count) or the status pixel. Card radius 24 (10 inset → 14). The focused Mac gets the 2 pt cobalt ring; a drop target the dashed accent ring |
 | States | Ready · Sending N items (+ readout) · Waiting to accept · Locked · unlock to receive (amber) · Busy · sending you N items · Connecting… · N waiting · switch to send · Nearby / Remote · switch to send |
 | Offline | The same card, muted (OT-16; was a one-line row that truncated "AH's Mac mini …"): `fill`, no hairline, the tile on `fill2` with the Mac glyph in ink3, the name in ink2 (two lines like the others), "Seen 2 h ago" in ink3 (`MacGlanceCopy.age`, the same words as My Macs), no light; same grid and height as the live cards, most recently seen first, under them. Tapping still queues a send for that Mac |
 | Beam, Waiting | The dot beam on a navy plate (radius 24, device and Mac glyphs at pitch 2.6); waiting rows 44 with a small destructive Cancel |
@@ -220,7 +230,7 @@ whole stage. Maths in Core (`CapturePreviewLayout`).
 | Layout | Header (close · status strip), the picture's room, the dock, 12 apart. Every step takes the room between header and dock; the dock is anchored at the bottom, 8 above the home indicator, in both orientations and on iPhone |
 | Picture | Aspect-fit into the room less 16 each side, centred, on whole points; the black well (radius 24, hairline) hugs the picture. A wide capture fills the width in portrait; a tall one fills the height in landscape. Replaces VQ-051's "dock right under the picture", which left half the screen empty in portrait |
 | Zoom | Pinch 1×–6× (the pan scales with it); double-tap zooms to 2.5× on the tapped point, again back to 1×; a drag pans while zoomed and never shows past the picture's edges; at 1× a downward swipe closes. VoiceOver: a "Zoom in / Zoom out" action |
-| Dock | Raised navy, radius 24, at most 560 wide and centred (iPad keeps the five actions together); annotate's toolbar keeps the full width. As tall as its row (never stretched); `ph.capture.dock` names the card itself (build 27) |
+| Dock | Raised navy, radius 24, at most 560 wide and centred (iPad keeps the five actions together); annotate's toolbar keeps the full width. As tall as its row (never stretched); `ph.capture.dock` names the card itself (build 27), on an element of the card's own shape, not the `.contain` container whose frame grew from its children (build 28) |
 
 Checks: iPad 11″ portrait and landscape, iPhone portrait and landscape;
 the picture's gaps to the header and to the dock are equal within 1 pt;
