@@ -44,6 +44,11 @@ struct PeerPickerView: View {
     /// starts over (build 22: Try again joins a start still in flight, or
     /// refreshes discovery, and the card comes back if still no Mac).
     @State private var checksRound = 0
+    /// The top of the scrolling column, relative to the scroll view: below
+    /// zero once it scrolls under the Pair and Settings buttons (VQ-102).
+    @State private var contentTop: CGFloat = 0
+    /// The bottom of the Pair and Settings row, in global coordinates.
+    @State private var topBarBottom: CGFloat = 0
     private let pairing = PairedMacsStore.shared
 
     private enum PickerSheet: String, Identifiable {
@@ -69,6 +74,15 @@ struct PeerPickerView: View {
                 GeometryReader { proxy in
                     ScrollView {
                         VStack(spacing: 0) {
+                            // Tracks how far the column has scrolled, for
+                            // the top bar's backdrop (VQ-102).
+                            Color.clear
+                                .frame(height: 0)
+                                .onGeometryChange(for: CGFloat.self) { geometry in
+                                    geometry.frame(in: .named(Self.scrollSpace)).minY
+                                } action: { top in
+                                    contentTop = top
+                                }
                             header(isShort: proxy.size.height < 520)
                             if let startError, peers.isEmpty {
                                 startFailedState(startError)
@@ -82,6 +96,7 @@ struct PeerPickerView: View {
                         .frame(maxWidth: .infinity, minHeight: proxy.size.height, alignment: .center)
                     }
                     .scrollIndicators(.hidden)
+                    .coordinateSpace(.named(Self.scrollSpace))
                 }
 
                 if let error = errorMessage {
@@ -90,6 +105,12 @@ struct PeerPickerView: View {
 
                 footer
             }
+
+            // VQ-102: once the column scrolls under the Pair and Settings
+            // buttons, the bar gets a scroll-edge backdrop (the picker's own
+            // background, opaque to just under the buttons, then fading), so
+            // the subtitle no longer runs under them at AX5.
+            topBarBackdrop
 
             // Reachable before connecting: appearance, pointer feel and the
             // welcome tour are all worth changing without a Mac in range.
@@ -106,9 +127,13 @@ struct PeerPickerView: View {
             case .settings:
                 SettingsView()
             case .pair:
+                // VQ-100: no default by list order. Core picks the Mac that
+                // asked, the only Mac, or the only paired or recently used
+                // one; otherwise the sheet asks on a "Pair with" row.
                 PairingCodeEntryView(
-                    macName: pairTargets.count == 1 ? pairTargets[0].name : "your Mac",
-                    choices: pairTargets
+                    macName: "your Mac",
+                    choices: pairTargets,
+                    askingDeviceID: pairing.askingMacDeviceID
                 )
             }
         }
@@ -168,10 +193,39 @@ struct PeerPickerView: View {
                 }
                 .accessibilityIdentifier("ph.connect.settings")
             }
+            .onGeometryChange(for: CGFloat.self) { geometry in
+                geometry.frame(in: .global).maxY
+            } action: { bottom in
+                topBarBottom = bottom
+            }
             Spacer()
         }
         .padding(.horizontal, PixelHandTheme.Space.lg)
         .padding(.top, PixelHandTheme.Space.sm)
+    }
+
+    private static let scrollSpace = "ph.picker.scroll"
+
+    /// The picker's background, masked to the top bar: drawn full screen so
+    /// its gradients line up with the background under it exactly.
+    private var topBarBackdrop: some View {
+        let showsBackdrop = PickerTopBarPlan.showsBackdrop(contentTop: Double(contentTop))
+        return PixelHandTheme.brandBackground()
+            .ignoresSafeArea()
+            .mask(alignment: .top) {
+                VStack(spacing: 0) {
+                    Rectangle()
+                        .frame(height: CGFloat(PickerTopBarPlan.opaqueBottom(buttonRowBottom: Double(topBarBottom))))
+                    LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
+                        .frame(height: CGFloat(PickerTopBarPlan.fadeHeight))
+                    Spacer(minLength: 0)
+                }
+                .ignoresSafeArea()
+            }
+            .opacity(showsBackdrop ? 1 : 0)
+            .animation(.easeOut(duration: 0.15), value: showsBackdrop)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 
     // MARK: - Header
@@ -230,11 +284,14 @@ struct PeerPickerView: View {
 
         return VStack(spacing: PixelHandTheme.Space.md) {
             ForEach(orderedPeers, id: \.id) { peer in
+                // VQ-101: the launch reconnect (and a switcher dial) shows
+                // on its card too, not just the tapped one.
+                let busy = connecting ?? MacSwitcher.shared.connectingDeviceID
                 PeerCard(
                     peer: peer,
                     isPaired: pairing.isPaired(deviceID: peer.deviceID),
-                    isConnecting: connecting == peer.deviceID,
-                    isDimmed: connecting != nil && connecting != peer.deviceID
+                    isConnecting: busy == peer.deviceID,
+                    isDimmed: busy != nil && busy != peer.deviceID
                 ) {
                     connectTo(peer)
                 }
@@ -380,8 +437,15 @@ struct PeerPickerView: View {
     }
 
     /// Macs in reach that a typed code could be for.
-    private var pairTargets: [PairingCodeEntryView.Target] {
-        peers.filter(\.isNearby).map { .init(id: $0.deviceID, name: $0.name) }
+    private var pairTargets: [PairingTargetCandidate] {
+        peers.filter(\.isNearby).map { peer in
+            PairingTargetCandidate(
+                deviceID: peer.deviceID,
+                name: peer.name,
+                isPaired: pairing.isPaired(deviceID: peer.deviceID),
+                lastUsedAt: MacSwitcher.shared.memory(for: peer.deviceID)?.lastUsedAt
+            )
+        }
     }
 
     /// Shows `next`, or queues it while another sheet is still closing
@@ -412,6 +476,7 @@ struct PeerPickerView: View {
 
         connecting = peer.deviceID
         errorMessage = nil
+        pairing.noteConnectAttempt(to: peer.deviceID)
 
         DeckHandLog.connection.info("📡 Connecting to \(peer.name, privacy: .public) id=\(peer.deviceID, privacy: .public) nearby=\(peer.isNearby)")
         Task {

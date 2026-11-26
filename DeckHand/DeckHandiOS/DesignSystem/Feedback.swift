@@ -303,15 +303,48 @@ struct PHEmptyState: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        // Scrolls when it can't fit (AX3+, short panes), so the message
-        // never truncates and the buttons never clip (VQ-066).
+        // When it can't fit (AX3+, short panes) the glyph, title and message
+        // scroll and the buttons stay pinned at the bottom, so the message
+        // never truncates and a button is never cut by the card's edge.
+        // Build 24 (VQ-066): everything scrolled together, so at AX3 in the
+        // free plan Show screen sat below the card's bottom edge and read
+        // as clipped.
         ViewThatFits(in: .vertical) {
             content
-            ScrollView(showsIndicators: false) { content }
+            pinnedActionsLayout
         }
     }
 
     private var content: some View {
+        VStack(spacing: PixelHandTheme.Space.lg) {
+            texts
+            actionRow
+        }
+        .padding(PixelHandTheme.Space.xl)
+        .pixelOnNavy()
+    }
+
+    /// The fallback: the texts scroll (with the indicator flashed, so it
+    /// reads as more to see), the buttons sit under them in full.
+    private var pinnedActionsLayout: some View {
+        VStack(spacing: PixelHandTheme.Space.md) {
+            ScrollView(showsIndicators: true) {
+                texts
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, PixelHandTheme.Space.xl)
+                    .padding(.horizontal, PixelHandTheme.Space.xl)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollIndicatorsFlash(onAppear: true)
+            actionRow
+                .padding(.horizontal, PixelHandTheme.Space.lg)
+                .padding(.bottom, PixelHandTheme.Space.lg)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .pixelOnNavy()
+    }
+
+    private var texts: some View {
         VStack(spacing: PixelHandTheme.Space.lg) {
             PHGlyph(glyph: glyph, pitch: PixelPitch.emptyState, showsUnlit: true)
                 .foregroundStyle(PixelHandTheme.Brand.phosphor)
@@ -330,15 +363,16 @@ struct PHEmptyState: View {
             }
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
-            // Side by side, or stacked when the pane is too narrow, so a
-            // button is never clipped (VQ-045).
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: PixelHandTheme.Space.sm) { actions }
-                VStack(spacing: PixelHandTheme.Space.sm) { actions }
-            }
         }
-        .padding(PixelHandTheme.Space.xl)
-        .pixelOnNavy()
+    }
+
+    /// Side by side, or stacked when the pane is too narrow, so a button is
+    /// never clipped (VQ-045).
+    private var actionRow: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: PixelHandTheme.Space.sm) { actions }
+            VStack(spacing: PixelHandTheme.Space.sm) { actions }
+        }
     }
 
     @ViewBuilder

@@ -69,6 +69,22 @@ final class PairedMacsStore {
     /// it ends so the code sheet can reconnect to it.
     private(set) var lastMacDeviceID: UUID?
 
+    /// The Mac last tapped in the picker, and when: the Mac that asked, for
+    /// the code sheet's default (VQ-100). Kept here because the picker is
+    /// rebuilt after a refused or cancelled request.
+    private(set) var lastConnectAttempt: UUID?
+    private(set) var lastConnectAttemptAt: Date?
+
+    func noteConnectAttempt(to deviceID: UUID) {
+        lastConnectAttempt = deviceID
+        lastConnectAttemptAt = Date()
+    }
+
+    /// The Mac that asked, while that is recent.
+    var askingMacDeviceID: UUID? {
+        PairingTargetChoice.askingDeviceID(lastAttempt: lastConnectAttempt, at: lastConnectAttemptAt, now: Date())
+    }
+
     /// Whether a code can go out right now on a live session with
     /// `deviceID` (or with any Mac when `deviceID` is `nil`).
     func canSendNow(to deviceID: UUID?) -> Bool {

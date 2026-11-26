@@ -67,6 +67,11 @@ final class MacSwitcher {
     var notice: String?
     /// Set while a dropped Mac is being redialled.
     private(set) var reconnectingDeviceID: UUID?
+    /// The Mac the launch reconnect will dial once Loom has started (VQ-101:
+    /// after a cold boot that took 7–15 s with no sign of it). Shown as
+    /// "Connecting to <Mac>…" with Cancel.
+    private(set) var pendingLaunchDeviceID: UUID?
+    @ObservationIgnored private var pendingLaunchTimeout: Task<Void, Never>?
 
     /// "iPhone" or "iPad", for "Please update Pixel Hand on your …".
     @ObservationIgnored var thisDeviceKind = "iPhone"
@@ -109,7 +114,7 @@ final class MacSwitcher {
             },
             memory: book,
             activeDeviceID: machine.focusedDeviceID,
-            connectingDeviceID: machine.dialingDeviceID ?? reconnectingDeviceID
+            connectingDeviceID: machine.dialingDeviceID ?? reconnectingDeviceID ?? pendingLaunchDeviceID
         )
         // The live link and lock state for the focused Mac come with its
         // glance; nothing else to merge.
@@ -156,6 +161,7 @@ final class MacSwitcher {
         redialTask?.cancel()
         reconnectingDeviceID = nil
         triedLaunchReconnect = true
+        clearPendingLaunch()
         machine.adopted(deviceID)
         self.handle = handle
         entered(deviceID, name: name)
@@ -265,12 +271,20 @@ final class MacSwitcher {
         request(deviceID)
     }
 
-    /// Stops a dial in flight or an automatic reconnect (the toast's
-    /// Cancel, VQ-058).
+    /// The Mac being dialled, redialled or waited for at launch: the
+    /// picker's card shows it connecting (VQ-101).
+    var connectingDeviceID: UUID? {
+        machine.dialingDeviceID ?? reconnectingDeviceID ?? pendingLaunchDeviceID
+    }
+
+    /// Stops a dial in flight, an automatic reconnect, or the launch
+    /// reconnect still waiting for the network (the toast's Cancel, VQ-058,
+    /// VQ-101).
     func cancelDial() {
         redialTask?.cancel()
         machine.cancelDial()
         reconnectingDeviceID = nil
+        clearPendingLaunch()
         // Don't dial the last Mac again at this launch.
         triedLaunchReconnect = true
     }
@@ -395,7 +409,11 @@ final class MacSwitcher {
     }
 
     private func reconnectAtLaunchIfNeeded() {
-        guard machine.focusedDeviceID == nil, machine.dialingDeviceID == nil, handle == nil else { return }
+        guard machine.focusedDeviceID == nil, machine.dialingDeviceID == nil, handle == nil else {
+            clearPendingLaunch()
+            return
+        }
+        notePendingLaunch()
         guard let target = MacReconnectPolicy.launchTarget(
             isEnabled: reconnectAutomatically,
             hasCompletedOnboarding: defaults.bool(forKey: MultiMacSettingsKey.hasCompletedOnboarding),
@@ -407,8 +425,42 @@ final class MacSwitcher {
             isLockedByFreePlan: { SubscriptionStore.shared.isLockedMac(deviceID: $0) }
         ) else { return }
         triedLaunchReconnect = true
+        clearPendingLaunch()
         DeckHandLog.connection.info("📡 Reconnecting to the last Mac at launch")
         request(target)
+    }
+
+    /// Records the Mac the launch reconnect waits for while Loom starts, and
+    /// gives up showing it after `launchWaitLimit` (VQ-101).
+    private func notePendingLaunch() {
+        let pending = MacReconnectPolicy.pendingLaunchTarget(
+            isEnabled: reconnectAutomatically,
+            hasCompletedOnboarding: defaults.bool(forKey: MultiMacSettingsKey.hasCompletedOnboarding),
+            alreadyTried: triedLaunchReconnect,
+            hasSession: handle != nil,
+            isNetworkReady: context != nil,
+            lastActiveDeviceID: book.lastActiveDeviceID,
+            listings: listings,
+            isLockedByFreePlan: { SubscriptionStore.shared.isLockedMac(deviceID: $0) }
+        )
+        guard pending != pendingLaunchDeviceID else { return }
+        guard let pending else {
+            clearPendingLaunch()
+            return
+        }
+        pendingLaunchDeviceID = pending
+        pendingLaunchTimeout?.cancel()
+        pendingLaunchTimeout = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(MacReconnectPolicy.launchWaitLimit))
+            guard let self, !Task.isCancelled, self.pendingLaunchDeviceID == pending else { return }
+            self.pendingLaunchDeviceID = nil
+        }
+    }
+
+    private func clearPendingLaunch() {
+        pendingLaunchTimeout?.cancel()
+        pendingLaunchTimeout = nil
+        pendingLaunchDeviceID = nil
     }
 
     private func show(_ message: String) {

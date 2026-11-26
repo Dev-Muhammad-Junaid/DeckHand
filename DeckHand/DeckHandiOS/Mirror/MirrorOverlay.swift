@@ -30,6 +30,7 @@ struct MirrorOverlay: View {
     let containerSize: CGSize
 
     @EnvironmentObject private var settings: DeckHandSettings
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         // Reads its own window frame so the surface's reserved areas
@@ -42,7 +43,7 @@ struct MirrorOverlay: View {
 
     private func tile(container: CGRect) -> some View {
         let strip = session.mirrorSpaceStrip
-        let placement = MirrorTileKeepOut.shared.plan(for: session.sender, in: container)
+        let placement = MirrorTileKeepOut.shared.plan(for: session.sender, in: container, band: typeSize.typeBand)
         return MirrorThumbnailView(
             image: session.mirrorImage,
             containerSize: containerSize,

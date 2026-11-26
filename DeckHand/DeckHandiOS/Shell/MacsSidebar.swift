@@ -12,6 +12,7 @@
 //  room. My Macs keeps the full `MacCard`. Board: `v2PadLand` `.side`.
 //
 
+import PixelHandCore
 import SwiftUI
 
 struct MacsSidebar: View {
@@ -92,7 +93,8 @@ struct MacsSidebar: View {
 
 /// A Mac in the narrow sidebar (OR-04): a 16:10 tile 44 pt wide with the
 /// Mac glyph (the lock glyph while locked) and the live pixel, then the name
-/// and one status line, each on one line. The focused Mac gets the cobalt
+/// and one status line, each on one line. At the Huge band the tile sits
+/// on top and the name and status wrap in whole words under it (VQ-099). The focused Mac gets the cobalt
 /// ring and a filled row; selection is colour and fill only. A Mac the free
 /// plan doesn't cover shows the small Pro lock inside the tile's corner.
 struct CompactMacCard: View {
@@ -107,23 +109,23 @@ struct CompactMacCard: View {
         !entitlements.isPro && SubscriptionStore.shared.isLockedMac(deviceID: listing.deviceID)
     }
 
+    /// The name and status sizes at the current Dynamic Type size.
+    @ScaledMetric(relativeTo: .subheadline) private var nameSize: CGFloat = 15
+    @ScaledMetric(relativeTo: .caption) private var statusSize: CGFloat = 12
+
+    private var band: TypeBand { typeSize.typeBand }
+
     var body: some View {
-        HStack(spacing: PixelHandTheme.Space.sm) {
+        // VQ-099: at AX3 the row left ~96 pt beside the tile and cut names
+        // mid-word ("Muh / am…"). At the Huge band the card stacks and the
+        // text gets the card's whole width (`SidebarCardPlan`).
+        let layout = SidebarCardPlan.arrangement(band: band) == .stacked
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: PixelHandTheme.Space.xs))
+            : AnyLayout(HStackLayout(spacing: PixelHandTheme.Space.sm))
+        layout {
             tile
-            VStack(alignment: .leading, spacing: 2) {
-                Text(listing.name)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(PixelHandTheme.ink)
-                    .lineLimit(typeSize.isAccessibilitySize ? 2 : 1)
-                    .truncationMode(.tail)
-                Text(statusLine)
-                    .font(.caption)
-                    .foregroundStyle(isLocked && listing.isActive ? PixelHandTheme.warning : PixelHandTheme.ink2)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .contentTransition(.opacity)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            texts
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(PixelHandTheme.Space.xs + 2)
         .background(
@@ -135,6 +137,37 @@ struct CompactMacCard: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
         .accessibilityHint(isFreeLocked ? "Needs \(SubscriptionCopy.productName): the free plan works with one Mac" : "")
+        .accessibilityShowsLargeContentViewer {
+            Text("\(listing.name)\n\(statusLine)")
+        }
+    }
+
+    /// The name and the status line. From AX1 each is laid out in whole
+    /// words (`WholeWordName`), shrinking before it would cut one.
+    @ViewBuilder
+    private var texts: some View {
+        let statusColor = isLocked && listing.isActive ? PixelHandTheme.warning : PixelHandTheme.ink2
+        if SidebarCardPlan.usesWholeWords(band: band) {
+            VStack(alignment: .leading, spacing: 2) {
+                WholeWordName(name: listing.name, lines: SidebarCardPlan.nameLines(band: band), size: nameSize)
+                WholeWordName(name: statusLine, lines: SidebarCardPlan.statusLines(band: band), size: statusSize, weight: .regular, color: statusColor)
+                    .contentTransition(.opacity)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(listing.name)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(PixelHandTheme.ink)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Text(statusLine)
+                    .font(.caption)
+                    .foregroundStyle(statusColor)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .contentTransition(.opacity)
+            }
+        }
     }
 
     private var statusLine: String {

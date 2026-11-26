@@ -639,6 +639,10 @@ struct DeckSurface: View {
                     isLibraryPresented = true
                 }
             )
+            // VQ-098: the floating tile covered "No keys yet" at AX3 and
+            // most of this at AX5. Only the page on screen reports (the
+            // pager keeps its neighbours alive off screen).
+            .mirrorTileKeepOut(.deckEmptyState, owner: sender, isActive: page.id == shownPage?.id)
         }
     }
 

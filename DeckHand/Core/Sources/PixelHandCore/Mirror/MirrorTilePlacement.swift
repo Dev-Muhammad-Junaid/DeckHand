@@ -100,7 +100,14 @@ public enum MirrorTilePlacement {
     }
 
     /// `surfaceLayout` plus whether the tile may step aside (hide) when it
-    /// has no clear spot: only while the deck is being edited.
+    /// has no clear spot: while the deck is being edited, and over an empty
+    /// deck page at the Huge band.
+    ///
+    /// - deckEmptyState: the empty page's glyph, "No keys yet", message and
+    ///   Add keys (build 24, VQ-098: the tile covered the title at AX3 and
+    ///   most of the card at AX5). Always kept clear; at the Huge band,
+    ///   where it fills the page, the tile steps aside when nothing is
+    ///   clear (`emptyStateStepsAside`).
     public static func surfacePlan(
         bounds: MirrorRect,
         pad: MirrorRect? = nil,
@@ -108,12 +115,16 @@ public enum MirrorTilePlacement {
         caption: MirrorRect? = nil,
         keyboard: MirrorRect? = nil,
         deckHeader: MirrorRect? = nil,
-        deckEditGrid: MirrorRect? = nil
+        deckEditGrid: MirrorRect? = nil,
+        deckEmptyState: MirrorRect? = nil,
+        band: TypeBand = .standard
     ) -> MirrorTileSurfacePlan {
         var keepOut = pointerKeepOut(pad: pad, clickStrip: clickStrip, caption: caption, keyboard: keyboard)
         if let deckHeader { keepOut.append(deckHeader) }
         if let deckEditGrid { keepOut.append(deckEditGrid) }
+        if let deckEmptyState { keepOut.append(deckEmptyState) }
         let stepsAside = deckEditGrid != nil
+            || (deckEmptyState != nil && emptyStateStepsAside(band: band))
         if let pad { return MirrorTileSurfacePlan(anchor: pad, keepOut: keepOut, stepsAsideWhenCrowded: stepsAside) }
         if let deckHeader {
             let top = min(max(deckHeader.y + deckHeader.height, bounds.y), bounds.y + bounds.height)
@@ -121,6 +132,14 @@ public enum MirrorTilePlacement {
             return MirrorTileSurfacePlan(anchor: below, keepOut: keepOut, stepsAsideWhenCrowded: stepsAside)
         }
         return MirrorTileSurfacePlan(anchor: nil, keepOut: keepOut, stepsAsideWhenCrowded: stepsAside)
+    }
+
+    /// Whether an empty deck page lets the tile step aside when it has no
+    /// clear spot: only at the Huge band (AX3–AX5), where the empty state
+    /// fills the page. At smaller sizes the tile stays, shrunk and moved to
+    /// cover as little as it can.
+    public static func emptyStateStepsAside(band: TypeBand) -> Bool {
+        band == .huge
     }
 
     /// Whether the tile is drawn. It always is, except while the deck is
