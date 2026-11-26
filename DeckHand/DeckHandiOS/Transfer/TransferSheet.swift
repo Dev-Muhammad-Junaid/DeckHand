@@ -354,13 +354,9 @@ private struct SendPanel: View {
             .accessibilityLabel("Files")
             .accessibilityIdentifier("ph.send.source.files")
 
-            Button(action: stageClipboard) {
-                SendSourceChipLabel(glyph: PixelGlyphs.paste, title: "Clipboard")
-            }
-            .buttonStyle(ChipPressStyle())
-            .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.chip)
-            .accessibilityLabel("Paste text or a link")
-            .accessibilityIdentifier("ph.send.source.clipboard")
+            // The system paste control (`SendPasteChip`), so iOS never
+            // asks "Allow Paste"; it carries `ph.send.source.clipboard`.
+            SendPasteChip(onPaste: stagePasted)
         }
     }
 
@@ -582,20 +578,22 @@ private struct SendPanel: View {
         typedText = ""
     }
 
-    /// The Clipboard chip: a link first, then text. Reading the pasteboard
-    /// is the person's own tap, so iOS may ask once to allow pasting.
-    private func stageClipboard() {
-        let board = UIPasteboard.general
-        guard board.hasURLs || board.hasStrings else {
-            showFieldNote("The clipboard has no text or link.")
+    /// The Clipboard chip (the system paste control): links and text are
+    /// staged as text, as the chip always did; images as photo files, as
+    /// the Photos chip stages them. Nothing usable leaves a field note.
+    private func stagePasted(_ items: [SendPastedItem]) {
+        guard !items.isEmpty else {
+            showFieldNote(SendPastePlan.nothingToSendNote)
             return
         }
-        if let url = board.url, !url.isFileURL {
-            stageText(url.absoluteString)
-        } else if let text = board.string {
-            stageText(text)
-        } else {
-            showFieldNote("The clipboard has no text or link.")
+        for item in items {
+            switch item {
+            case let .text(text):
+                stageText(text)
+            case let .image(url, contentType):
+                fieldNote = nil
+                staged.append(StagedTransferItem(payload: .file(url: url, kind: .photo, contentType: contentType)))
+            }
         }
     }
 
