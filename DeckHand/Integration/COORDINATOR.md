@@ -1,6 +1,6 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Build 24 is green, and the final QA pass is done** (`VISUAL-QA-build24.md`: 0 P1, 4 P2, 3 P3). The last fix lane, qa24-fixes, is running. When it is ready: merge it, then queue build 25 with re-checks of just those IDs. If they pass: publish the review page and finish.
+> **Build 24 is green; QA and owner testing are done.** Two lanes are running: qa24-fixes (mine: VQ-100/098/099/066 and P3s) and owner24 (the primary's: OT-1…5). When **both** are ready: merge them, then queue **one combined build 25** with a final QA pass. That pass adds a landscape keyboard walk and the new Ask walk. Then the review page.
 
 > **Mac builds:** 15, 16, 18 and 19 built (19 with 5 bugs, fixed in build 21). The primary session or the owner's Mac session runs Mac builds.
 
@@ -30,6 +30,7 @@ weekly usage limit is close).
 | Primary (cloud, owner-facing: the owner sends changes here) | "★ Pixel Hand · PRIMARY" | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac, Claude Desktop session "DeckHand MAC build loop", `/loop` every 30 min; the only Mac build loop since 2026-11-25) | local_d0e9b529 | claude/pixelhand-integration (worktree `pixelhand-build`) | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
 | Build 24 QA fixes (VQ-100, 098, 099, 066, 101…103) | session_01H5HwARd99V3QTVg2XFJdYa | claude/pixelhand-lane-qa24-fixes | `LANE-qa24-fixes.md` ends `Lane: READY TO MERGE` |
+| Owner testing build 24 (OT-1 dock icons, OT-2 keyboard loop, OT-3 typing, OT-4 handle, OT-5 Ask stuck), started by the primary | (primary's child) | claude/pixelhand-lane-owner24 | `LANE-owner24.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -253,3 +254,7 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   - Open: VQ-100, 098, 099, 066 (P2) and VQ-101…103 (P3).
   - The real iPad isn't reachable (CoreDevice 4016), so transfers (OR-13)
     are still unchecked. Started the last fix lane, qa24-fixes.
+- 2026-11-26 12:55 UTC: the primary reported that the owner tested build 24
+  on the iPad and found OT-1…5 (now in STATUS.md). The primary started lane
+  owner24 for them. I told qa24-fixes to stay out of the dock, keyboard,
+  Type, Ask and handle files. Both lanes merge into one build 25.
