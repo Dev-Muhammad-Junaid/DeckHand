@@ -1948,3 +1948,28 @@ Built from `c9b87da` (build 25) on Xcode 27.2, Release, team `DD5AWPLT2V`.
   should check the front app before every step that types into the Mac.
 
 Status: BUILT (build 25) — 2 bugs
+
+## Owner testing (build 25) — 2026-11-26
+
+The owner says build 25 is much better (layout and overall). Refinements,
+from two iPad landscape screenshots (dark mode):
+
+- **OT-6 Type panel can't move or resize (P1 usability):** it's a wide
+  fixed card over the middle of the screen, so it hides where you're
+  typing on the Mac. It should be **draggable** (put it anywhere, remembered)
+  and **resizable** down to a sensible minimum width.
+- **OT-7 Type panel and numpad too big (P2):** everything sits in one long
+  row (field, then a full-width keys row: ⌘ ⌥ ⌃ ⇧ esc tab ⌫ ⏎ ← ↓ ↑ → home
+  end pg fn). Use the space better: a shorter field (about 30% narrower)
+  with an **inverted-T arrow cluster** beside it (↑ above ← ↓ →), keys in
+  two compact rows instead of one stretched row. The numpad is also too
+  large and should be compact, ideally docking beside the type keys
+  instead of adding another tall block.
+- **OT-8 Ask plan with a typed step can't be saved as a key (P2):** Ask
+  plan "Open Safari · Type “youtube” · Press ⏎" ran fine, but Save as key
+  shows "Keys can't type text yet. Remove the Type step to save this plan
+  as a key." Deck keys should support typed-text steps (with the same
+  "asks first" Return guard), so any plan Ask can run can be saved.
+
+Fix lane: `claude/pixelhand-lane-owner25` (primary session).
+
