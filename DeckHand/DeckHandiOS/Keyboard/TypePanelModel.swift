@@ -50,7 +50,7 @@ final class TypePanelModel {
     /// The on-screen keyboard's top in window coordinates (SwiftUI's
     /// `.global`), while it covers the window.
     private(set) var keyboardMinY: Double?
-    private(set) var hardwareKeyboardAttached = GCKeyboard.coalesced != nil
+    private(set) var hardwareKeyboardAttached = false
     /// The app dock's top in global coordinates, while it shows under the
     /// panel; the panel sits above it when no keyboard covers the dock.
     var dockMinY: CGFloat?
@@ -61,6 +61,7 @@ final class TypePanelModel {
 
     init() {
         presence = TypePanelPresence(mode: TypeMode.restored(UserDefaults.standard.string(forKey: Self.modeKey)))
+        hardwareKeyboardAttached = GCKeyboard.coalesced != nil
         let center = NotificationCenter.default
         observers.append(center.addObserver(forName: UIResponder.keyboardWillChangeFrameNotification, object: nil, queue: .main) { [weak self] note in
             let frame = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue

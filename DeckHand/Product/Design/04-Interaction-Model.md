@@ -82,11 +82,22 @@ three-finger gestures.
 - An app with a dialog shows a warning dot on its icon.
 - Apps that aren't running: Ask ("open Figma") or the action library.
 
-### Keyboard
-- The keyboard button sits in the app dock, above the system keyboard's top,
-  so the keyboard can never cover its own toggle (Sill's lesson).
-- Modifier bar above the keyboard: ⌘ ⌥ ⌃ ⇧ (tap = once, double-tap = lock),
-  esc, tab, arrows, and a **Type** field that sends text on Return (PH-032).
+### Keyboard (Type panel, owner testing build 24, OT-2/OT-3)
+- The keyboard button sits in the app dock; the pad has its own where the
+  dock is folded. Both open the one **Type panel**, which floats above the
+  system keyboard (or above the dock when no keyboard covers it) and has
+  its own close button. The keyboard never changes the arrangement: the
+  shell plans from the window and lays out under the keyboard.
+- **Live** (each key goes to the Mac at once) or **Compose** (type or
+  dictate a draft, then **Send**, optionally with Return); Paste from this
+  device; the last mode is remembered. "Typing into <App>" always shows.
+- Keys row: esc, tab, ⌫, ⏎, arrows, home/end, page up/down; **fn** swaps in
+  F1–F12. Sticky ⌘ ⌥ ⌃ ⇧ chips: tap = once, again = lock, again = off;
+  lit while latched.
+- **Numpad** tab: 0–9, the point, + − × ÷ =, ⌫ and Enter in dot-matrix
+  numerals; the system keyboard steps down while it shows.
+- Hardware keyboard: one line (the field, naming the target), the keys
+  row with the chips, and close.
 
 ## 3. Apple Intelligence
 
