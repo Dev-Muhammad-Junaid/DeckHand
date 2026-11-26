@@ -2017,3 +2017,38 @@ passes; the UI tests parse and their braces balance.
      owner's review page.
 
 Status: READY FOR MAC BUILD (build 26)
+
+## Owner testing (build 26) — 2026-11-26
+
+From the owner on the real iPad (portrait, dark), five screenshots, with
+orange annotations marking wasted space:
+
+- **OT-9 Send sheet off-theme (P2):** the Send/Inbox sheet doesn't follow
+  the design system: stock segmented control and text field, oversized
+  "Send to" cards (an offline Mac shown as a big dim card), labels not
+  aligned under the cards, the lone blue clipboard circle, lots of empty
+  space. Redesign it in the pixel identity with proper sizing and
+  alignment.
+- **OT-10 Capture preview in portrait (P2):** the full-screen capture shows a
+  small image at the top, the action bar (Save, Copy, Share, Annotate,
+  Read text) under it, and half the screen empty. Fit the image to the
+  available space, actions anchored at the bottom, in both orientations.
+- **OT-11 Type panel wastes space (P2):** the row beside the arrows under
+  the text field is empty; the area under the arrow cluster is empty; the
+  arrow keys stay one size whatever the panel's width and height. Make
+  every block size to the panel. **In numpad mode show only the arrows and
+  the numpad** (drop the modifier and special-key rows). When the panel is
+  minimal, put the arrows in **one row** to save height. "Typing into
+  Claude" appears twice (header label and field placeholder): keep one,
+  ideally just the app icon in the header.
+- **OT-12 Zoom to the input (idea from the owner):** a button on the Type
+  panel that shows the Mac's focused text field up close, so you can see
+  what you type without hunting for it on the mirror.
+- **OT-13 Question:** can Live mode surface the Mac app's inline
+  suggestions (e.g. Claude's ghost text accepted with Tab)?
+- Also seen: with a hardware/minimised keyboard, the iPadOS keyboard bar
+  (EN US · Paste from Screenshots · mic) sits over the app dock; the panel
+  and dock should respect that frame.
+
+Fix lane: `claude/pixelhand-lane-owner26` (primary session).
+
