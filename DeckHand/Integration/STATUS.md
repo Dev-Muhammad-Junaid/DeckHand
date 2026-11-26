@@ -1770,4 +1770,66 @@ passes; the UI test braces balance.
    `VISUAL-QA-build24.md` (pass, fail or not checked; new findings from
    VQ-098), with the gallery.
 
-Status: READY FOR MAC BUILD (build 24)
+## Mac build results (build 24) — 2026-11-26
+
+Built from `b0212de` (build 24) on Xcode 27.2, Release, team `DD5AWPLT2V`,
+in the shared `pixelhand-build` worktree.
+
+**Build**
+- Mac app: builds first time.
+- iOS app: builds after 1 fix, `7b205ca`: `MirrorOverlay` passed the
+  mirror tile's `stepsAsideWhenCrowded` before `belowAccessoryHeight`, but
+  the memberwise init declares them the other way round (the VQ-083 change).
+
+**Tests**
+- `swift test --package-path DeckHand/Core`: **1058 / 1058 pass** (190 suites).
+- `swift test --scratch-path .build-local`: **480 / 480 pass**.
+- `DeckHandTests`: **8 / 8 pass**.
+
+**Install**
+- Mac: `/Applications/Pixel Hand.app` replaced and launched with `open`.
+- iPad Air 11" (M3): **not installed**. CoreDevice error 4016 ("not able to
+  fulfill the requested usage assertion"): the iPad isn't reachable over
+  Wi-Fi. It needs a USB cable or Xcode › Devices › "Connect via network".
+
+**Final QA pass** (owner gave the Mac; scratch TextEdit in front).
+Report: `DeckHand/Integration/VISUAL-QA-build24.md`. Gallery (private):
+https://claude.ai/artifact/GqAPQEFb6QVVixc8KkaufT
+- `PixelHandUITests`, all passed:
+  - iPad Pro 11": 17 / 17, with `PH_QA_FULLSCREEN=1` (real landscape).
+  - iPhone 17 Pro: 17 / 17.
+  - AX3: iPhone 5, iPad 3. Dark mode: iPad 5.
+  - iPad mini: 4 (Mac-free set).
+  - `PH_QA_MAC_NAME` kept every walk on the MacBook.
+- **qa23 fix lane: 20 / 20 IDs pass** (VQ-058, 060, 061, 034, 088,
+  083…097). OR-16's flick now moves ~630 pt (was ~3,250) and stops at the
+  display edge.
+- **Totals:** VQ-001…097 74 pass · 1 fail · 22 not checked;
+  OR-01…16 12 pass · 4 not checked.
+- **Newly checked:** iPad landscape and the Macs sidebar (OR-04 pass),
+  Home Screen widgets (VQ-070…073 pass), dark mode (clean).
+
+**Open bugs**
+1. **VQ-100 (P2):** the pairing sheet's unlabelled Mac chooser defaults to
+   the first Mac in the list. On the iPad mini it read "AH's Mac mini" under
+   "Type the code showing on your Mac". On iPhone the footer runs under the
+   keypad.
+2. **VQ-098 (P2):** the mirror tile covers the empty deck's "No keys yet" at
+   AX3, and most of the card at AX5 (outside edit mode).
+3. **VQ-099 (P2):** iPad AX3 landscape: the Macs sidebar cards cut names
+   mid-word.
+4. **VQ-066 (still failing):** iPhone AX3 free plan: Show screen is cut by
+   its card's bottom edge.
+
+P3: VQ-101 (no "Connecting…" during a slow reconnect), VQ-102 (AX5 picker
+text slides under the header buttons), VQ-103 (iPad mini simulator isn't
+paired, so its connect walks wait and put an Allow prompt on the Mac).
+
+**Notes**
+- **Front app changed mid-run.** The Mac's front app became Universal
+  Control, then Chrome, partway through the iPhone run. Only `test04`
+  types, and it ran while TextEdit was in front.
+- **Not checked:** Lock Screen and Control Center (VQ-074…079), transfers
+  (OR-13, needs the real iPad), the sidebar's hidden state (OR-05), Duo.
+
+Status: BUILT (build 24) — 4 bugs
