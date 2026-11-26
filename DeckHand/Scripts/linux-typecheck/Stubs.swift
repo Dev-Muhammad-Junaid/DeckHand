@@ -265,11 +265,33 @@ final class FocusReader: @unchecked Sendable {
         let pid: Int32
         let name: String?
         let bundlePath: String?
+        let bundleID: String?
     }
     @MainActor static func frontmost() -> Frontmost? { nil }
     static func nothing() -> FocusedFieldSnapshot { .nothing(displayID: 1, displayWidth: 1, displayHeight: 1) }
     func read(front: Frontmost?) async -> FocusedFieldSnapshot { Self.nothing() }
     func endWatch() {}
+}
+// Live text sync: FocusTextObserver.swift (Accessibility glue; FocusTextSync.swift is checked)
+final class FocusTextObserver: @unchecked Sendable {
+    struct Front: Sendable, Equatable {
+        let pid: Int32
+        let name: String?
+        let bundleID: String?
+    }
+    struct Reading: Sendable {
+        let elementKey: UInt64?
+        let reading: TextRevisionTracker.Reading
+    }
+    var onChange: (@Sendable () -> Void)?
+    func start(front: Front?) {}
+    func stop() {}
+    func read(front: Front?, lock: MacLockState, previousStart: Int?) async -> Reading {
+        Reading(elementKey: nil, reading: .init(readable: .noField, window: nil, length: 0, selection: .caret(0), canSetSelection: false, canEdit: false))
+    }
+    func span(_ range: TextRange) async -> [UInt16]? { nil }
+    func select(_ range: TextRange) async -> Bool { false }
+    static func secureInputEnabled() -> Bool { false }
 }
 @MainActor final class DisplayWake {
     static let shared = DisplayWake()
@@ -282,6 +304,11 @@ final class NSWorkspace: @unchecked Sendable {
 }
 
 // MARK: iOS
+// Live text sync: LiveTextSync.swift is checked; the haptic is TrackpadView's.
+enum GestureHaptic {
+    case light, medium, heavy, double, selection, success
+    @MainActor func trigger() {}
+}
 func CACurrentMediaTime() -> Double { 0 }
 final class UIImage: @unchecked Sendable {
     init?(data: Data) {}

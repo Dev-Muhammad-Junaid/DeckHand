@@ -304,10 +304,29 @@ actor TrackpadSender {
     }
 
     /// Starts (`true`) or stops following the Mac's focused text field
-    /// (OT-12). While on, `ControlSessionModel.focusedField` updates. The
-    /// Mac also stops when the connection ends.
-    func watchFocus(_ on: Bool) async {
-        await send(.system(.watchFocus(on: on)))
+    /// (OT-12). While on, `ControlSessionModel.focusedField` updates. With
+    /// `wantsText` (protocol 17, the Live field is open) the Mac also sends
+    /// `textState`. The Mac also stops when the connection ends.
+    func watchFocus(_ on: Bool, wantsText: Bool) async {
+        await send(.system(.watchFocus(on: on, wantsText: wantsText)))
+    }
+
+    // MARK: - Live text sync (protocol 17)
+
+    /// An anchored edit of the Mac's focused field.
+    func sendTextEdit(_ edit: TextEditRequest) async {
+        await send(.input(.textEdit(edit: edit)))
+    }
+
+    /// Moves the Mac's caret or selection in its focused field.
+    func sendTextSelect(_ selection: TextSelectRequest) async {
+        await send(.input(.textSelect(selection: selection)))
+    }
+
+    /// Arrow presses the Mac coalesces (the arrow joystick, the blind
+    /// trackpad).
+    func sendCaretMove(_ move: CaretMove) async {
+        await send(.input(.caretMove(move: move)))
     }
 
     /// Runs a Mac-wide action (Mission Control, Show Desktop, …).

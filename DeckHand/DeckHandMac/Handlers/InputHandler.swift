@@ -43,6 +43,16 @@ final class InputHandler: DomainHandler {
         case let .typeText(text):
             TypingQueue.shared.type(text)
 
+        case let .textEdit(edit):
+            // Live text sync (protocol 17): select, then type; never AXValue.
+            FocusTextSync.shared.edit(edit, from: connection)
+
+        case let .textSelect(selection):
+            FocusTextSync.shared.select(selection, from: connection)
+
+        case let .caretMove(move):
+            FocusTextSync.shared.caretMove(move)
+
         case let .media(key):
             switch key {
             case .playPause: injector.sendMediaKey(NX_KEYTYPE_PLAY)

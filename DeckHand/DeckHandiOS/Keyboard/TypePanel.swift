@@ -56,6 +56,12 @@ struct TypePanel: View {
     var zoom: TypePanelZoom?
     /// A key or text went to the Mac (forgets what a gesture opened).
     var onActivity: () -> Void = {}
+    /// Live text sync (protocol 17): the Mac's focused field in the Live
+    /// field. `nil` keeps Live blind (the classic layout).
+    var liveSync: LiveTextSync? = nil
+    /// The Live field opened (`true`) or closed: the Mac sends text only
+    /// while it's open (`ControlSessionModel.setLiveTextWanted`).
+    var onLiveTextWanted: ((Bool) -> Void)? = nil
 
     @EnvironmentObject private var settings: DeckHandSettings
     @Environment(\.entitlements) private var entitlements
@@ -90,6 +96,14 @@ struct TypePanel: View {
         }
         .padding(CGFloat(TypePanelLayout.padding))
         .frame(width: CGFloat(layout.panelWidth), height: CGFloat(layout.panelHeight), alignment: .topLeading)
+        // Live text sync: the Mac reads its field's text only while Live
+        // is open on screen.
+        .onAppear {
+            liveSync?.confirmReturn = { send in guardReturn(if: true, send: send) }
+            onLiveTextWanted?(presence.mode == .live)
+        }
+        .onDisappear { onLiveTextWanted?(false) }
+        .onChange(of: presence.mode) { _, mode in onLiveTextWanted?(mode == .live) }
         .background(
             RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous)
                 .fill(PixelHandTheme.raised)
@@ -311,7 +325,9 @@ struct TypePanel: View {
             // The target chip names the app, in the header or, with no
             // header, beside the field (`targetPlace`): the placeholder
             // stays neutral, so the target shows exactly once.
-            placeholder: presence.mode.placeholder,
+            // Blind Live says why it can't show the Mac's text ("Password
+            // field: the text stays on the Mac").
+            placeholder: (presence.mode == .live ? liveSync?.reasonLine : nil) ?? presence.mode.placeholder,
             latchedModifiers: presence.modifiers.held,
             draft: $model.draft,
             wantsFocus: presence.wantsFocus || layout.body == .keysOnly,
@@ -336,10 +352,17 @@ struct TypePanel: View {
             },
             onModifiersUsed: { _ = model.presence.modifiers.consume() },
             onSubmit: { sendDraft() },
-            onFocus: { model.presence.fieldFocused() }
+            onFocus: { model.presence.fieldFocused() },
+            sync: liveSync
         )
         .padding(.horizontal, PixelHandTheme.Space.md)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay(alignment: .topTrailing) {
+            if presence.mode == .live, let liveSync {
+                SyncBadgeView(badge: liveSync.badge, reason: liveSync.reasonLine)
+                    .padding(PixelHandTheme.Space.xs)
+            }
+        }
         .background(
             RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous)
                 .fill(PixelHandTheme.fill)
@@ -377,6 +400,8 @@ struct TypePanel: View {
     /// Accept (⇥): presses Tab on the Mac, which is how Claude, Xcode,
     /// Mail and most editors take their grey inline suggestion. The loupe
     /// shows the suggestion; this makes taking it one obvious tap (OT-13).
+    /// With live text sync the accepted text then shows in the field from
+    /// the Mac's next value change (no edit is sent for it).
     private var acceptButton: some View {
         Button {
             onActivity()
@@ -628,6 +653,59 @@ struct TypePanel: View {
 struct TypePanelZoom {
     var isOn: Bool
     var toggle: () -> Void
+}
+
+// MARK: - Sync badge (live text sync)
+
+/// The Live field's sync badge, dot-matrix in its top-trailing corner:
+/// SYNC with a mint pixel (live), SENDING with a glow pixel (an edit in
+/// flight), MAC WINS in amber for 1.4 s after a conflict, BLIND dim when
+/// the field can't be read. Decorative for touch (it takes none); VoiceOver
+/// reads the state and, when blind, the reason.
+struct SyncBadgeView: View {
+    let badge: SyncBadge
+    var reason: String?
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Rectangle()
+                .fill(pixelColor)
+                .frame(width: 3, height: 3)
+                .shadow(color: badge == .sending ? PixelHandTheme.Brand.glow : .clear, radius: 2)
+            DotMatrixText(badge.label, pitch: 1.3, label: badge.spokenLabel, glows: false, stepsWithType: false)
+                .foregroundStyle(wordColor)
+        }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 3)
+        .background(
+            RoundedRectangle(cornerRadius: PixelHandTheme.Radius.badge, style: .continuous)
+                .fill(badge == .macWins ? PixelHandTheme.warningTint : PixelHandTheme.fill2)
+        )
+        .opacity(badge == .blind ? 0.6 : 1)
+        .allowsHitTesting(false)
+        .animation(.easeInOut(duration: 0.15), value: badge)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(badge.spokenLabel)
+        .accessibilityValue(badge == .blind ? (reason ?? "") : "")
+        .accessibilityIdentifier("ph.type.sync")
+    }
+
+    private var pixelColor: Color {
+        switch badge {
+        case .sync: PixelHandTheme.Brand.mint
+        case .sending: PixelHandTheme.Brand.phosphor
+        case .macWins: PixelHandTheme.warning
+        case .blind: PixelHandTheme.ink3
+        }
+    }
+
+    private var wordColor: Color {
+        switch badge {
+        case .macWins: PixelHandTheme.warning
+        case .blind: PixelHandTheme.ink3
+        default: PixelHandTheme.ink2
+        }
+    }
 }
 
 // MARK: - Mode switch
@@ -1049,7 +1127,9 @@ struct TypePanelHost: View {
                                 targetIcon: session.activeBundleID.flatMap { id in
                                     DeckAppIcons.image(for: id, in: Dictionary(session.installedApps.map { ($0.bundleID, $0) }, uniquingKeysWith: { first, _ in first }))
                                 },
-                                zoom: TypePanelZoom(isOn: showsLoupe) { showsLoupe.toggle() }
+                                zoom: TypePanelZoom(isOn: showsLoupe) { showsLoupe.toggle() },
+                                liveSync: session.liveText,
+                                onLiveTextWanted: { session.setLiveTextWanted($0) }
                             )
                                 .overlay(alignment: .bottomLeading) {
                                     if geometry.canResize { resizeHandle(.leading, geometry: geometry, frame: frame) }

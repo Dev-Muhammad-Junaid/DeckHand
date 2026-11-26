@@ -183,6 +183,11 @@ final class ControlSessionModel {
     /// this remote watches it (`TrackpadSender.watchFocus(true)`). `nil`
     /// until the Mac sends one; the last value stays after watching stops.
     var focusedField: FocusedFieldSnapshot?
+    /// Live text sync (protocol 17): the Type panel's Live field shows the
+    /// Mac's focused field while it's open (`setLiveTextWanted`).
+    let liveText = LiveTextSync()
+    /// The Live field is open and on screen: watch the focus with text.
+    @ObservationIgnored var liveTextWanted = false
 
     // MARK: iOS interaction
     // Clipboard sync (S10). Logic: ControlSessionModel+Input.swift.
@@ -206,6 +211,10 @@ final class ControlSessionModel {
         sender = s
         mirrorSettings = settings
         capture.sender = s
+        liveText.sender = s
+        // The panel's Live field (or the loupe) asked before the session
+        // ran: ask the Mac now.
+        if liveTextWanted || mirrorLoupeActive { updateFocusWatch() }
         await s.setSendRate(hz: settings.inputSendRate.rawValue)
         // Load cached app list for instant display
         if let cached = Self.loadCachedAppList() {

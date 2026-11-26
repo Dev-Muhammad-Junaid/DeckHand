@@ -1530,6 +1530,106 @@ final class PixelHandUITests: XCTestCase {
         snap("after-pair")
     }
 
+    // MARK: - Live text sync (protocol 17)
+
+    /// Live text sync walks. They type into the Mac's front app, so they
+    /// run only with `PH_QA_LIVE_SYNC=1`, and expect the QA script to have
+    /// TextEdit in front on the Mac with a new, empty plain-text document
+    /// (`open -a TextEdit`, ⌘N, ⇧⌘T). Optional:
+    ///   PH_QA_LIVE_SYNC_MARKER=<text>  text the QA script types on the Mac
+    ///     while test27 waits (e.g. `osascript -e 'tell application
+    ///     "System Events" to keystroke "<text>"'`).
+    ///   PH_QA_LIVE_SYNC_OUT=<path>  test29 writes what the Mac's document
+    ///     should hold there, for the script to compare with TextEdit's
+    ///     text afterwards.
+    private func openSyncedLiveField(_ tag: String) -> (field: XCUIElement, badge: XCUIElement)? {
+        guard ProcessInfo.processInfo.environment["PH_QA_LIVE_SYNC"] == "1" else {
+            snap("skipped-live-sync")
+            XCTContext.runActivity(named: "SKIPPED: set PH_QA_LIVE_SYNC=1 with TextEdit in front on the Mac") { _ in }
+            return nil
+        }
+        launch()
+        guard connect() else { return nil }
+        sleep(1)
+        guard openTypePanel() else { return nil }
+        let field = element("ph.type.field")
+        guard field.waitForExistence(timeout: 3) else {
+            snap("missing-ph.type.field")
+            return nil
+        }
+        let badge = element("ph.type.sync")
+        XCTAssertTrue(badge.waitForExistence(timeout: 3), "Live has no sync badge")
+        // The Mac's state arrives within a moment of opening Live.
+        let synced = NSPredicate(format: "label == %@", "In sync with the Mac")
+        let wait = XCTNSPredicateExpectation(predicate: synced, object: badge)
+        if XCTWaiter.wait(for: [wait], timeout: 5) != .completed {
+            snap("\(tag)-not-synced")
+            XCTFail("The badge never said SYNC (label: \(badge.label), value: \(badge.value ?? "")). Is TextEdit in front on the Mac?")
+            return nil
+        }
+        field.tap()
+        sleep(1)
+        snap("\(tag)-synced")
+        return (field, badge)
+    }
+
+    private func fieldText(_ field: XCUIElement) -> String {
+        (field.value as? String) ?? ""
+    }
+
+    /// Typing on the Mac shows in the iPad's Live field.
+    func test27_LiveSyncTypeOnMac() {
+        guard let (field, badge) = openSyncedLiveField("type-on-mac") else { return }
+        let marker = ProcessInfo.processInfo.environment["PH_QA_LIVE_SYNC_MARKER"] ?? "typed on the Mac"
+        let shows = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value CONTAINS %@", marker), object: field)
+        let result = XCTWaiter.wait(for: [shows], timeout: 30)
+        snap("type-on-mac-after")
+        XCTAssertEqual(result, .completed, "The field never showed the Mac's “\(marker)” (it shows “\(fieldText(field))”)")
+        XCTAssertEqual(badge.label, "In sync with the Mac")
+        tapIfExists("ph.type.close")
+    }
+
+    /// Accept ⇥ stays in Live; what Tab puts in the Mac's field shows in
+    /// the iPad's from the Mac's next value change (TextEdit has no
+    /// suggestion, so Tab inserts a tab).
+    func test28_LiveSyncTabAccept() {
+        guard let (field, _) = openSyncedLiveField("tab-accept") else { return }
+        app.typeText("accept")
+        sleep(1)
+        let before = fieldText(field)
+        XCTAssertTrue(tapIfExists("ph.type.accept"), "Live has no Accept (Tab)")
+        let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value != %@", before), object: field)
+        let result = XCTWaiter.wait(for: [changed], timeout: 3)
+        snap("tab-accept-after")
+        XCTAssertEqual(result, .completed, "The accepted text never showed in the field (still “\(before)”)")
+        tapIfExists("ph.type.close")
+    }
+
+    /// Editing on the iPad lands on the Mac: typed text, then a caret moved
+    /// to the start with a tap and a letter typed there.
+    func test29_LiveSyncEditFromIPad() {
+        guard let (field, badge) = openSyncedLiveField("edit-from-ipad") else { return }
+        let start = fieldText(field)
+        app.typeText("pixel hand")
+        sleep(2)
+        snap("edit-typed")
+        XCTAssertTrue(fieldText(field).contains("pixel hand"), "The typed text isn't in the field: “\(fieldText(field))”")
+        XCTAssertEqual(badge.label, "In sync with the Mac", "The badge didn't settle back to SYNC")
+        // The caret is free: tap at the very start and type there.
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.0, dy: 0.0)).withOffset(CGVector(dx: 2, dy: 14)).tap()
+        sleep(1)
+        app.typeText("X")
+        sleep(2)
+        snap("edit-caret-moved")
+        let text = fieldText(field)
+        XCTAssertTrue(text.hasPrefix("X"), "The caret didn't move to the start (field: “\(text)”)")
+        if let out = ProcessInfo.processInfo.environment["PH_QA_LIVE_SYNC_OUT"] {
+            try? text.write(toFile: out, atomically: true, encoding: .utf8)
+        }
+        XCTAssertNotEqual(text, start)
+        tapIfExists("ph.type.close")
+    }
+
     private func element(_ id: String) -> XCUIElement {
         app.descendants(matching: .any).matching(identifier: id).firstMatch
     }

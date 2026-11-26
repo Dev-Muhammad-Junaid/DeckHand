@@ -42,8 +42,11 @@ final class FocusTracker {
 
     private init() {}
 
-    /// `system.watchFocus(on:)` from `connection`.
-    func watch(_ on: Bool, connection: LoomConnectionHandle) {
+    /// `system.watchFocus(on:wantsText:)` from `connection`. `wantsText`
+    /// (protocol 17) also starts live text sync for it (`FocusTextSync`);
+    /// the geometry poll keeps running for both.
+    func watch(_ on: Bool, wantsText: Bool = false, connection: LoomConnectionHandle) {
+        FocusTextSync.shared.watch(on && wantsText, connection: connection)
         if on {
             let isNew = watchers[connection.id] == nil
             watchers[connection.id] = connection
@@ -61,10 +64,12 @@ final class FocusTracker {
     /// The remote disconnected.
     func removeConnection(id: UUID) {
         remove(id)
+        FocusTextSync.shared.removeConnection(id: id)
     }
 
     /// The lock changed: withhold at once, or look again at once.
     func lockStateChanged(_ state: MacLockState) {
+        FocusTextSync.shared.lockStateChanged(state)
         guard !watchers.isEmpty else { return }
         if LockPolicy.withholdsFocus(state) {
             publish(FocusReader.nothing())
@@ -107,6 +112,8 @@ final class FocusTracker {
             if publish(snapshot) {
                 lastChange = .now
             }
+            // Live text sync's safety net: notifications can be missed.
+            FocusTextSync.shared.pollTick()
             let quiet = ContinuousClock.now - lastChange
             let seconds = Double(quiet.components.seconds) + Double(quiet.components.attoseconds) / 1e18
             try? await Task.sleep(for: .seconds(FocusReading.pollInterval(unchangedFor: seconds)))
