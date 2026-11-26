@@ -85,8 +85,15 @@ it, so they never take a tap meant for ⌫ or fn.
 
 Type panel sizing (owner testing, build 26, OT-11): cells are cut from the
 panel, not fixed. Rows run 44…72 pt tall; the key rows' cells are the
-panel's inner width ÷ 7 wide; arrows and actions are square with the row
-while the field keeps 144 pt. Blocks are 8 pt apart, 12 pt from the
+panel's inner width ÷ 7 wide; arrows and actions are at least square with
+the row and, on wide panels, wider: they take what's left once the field
+has half the band, up to 72 pt (build 27), while the field keeps 144 pt.
+A corner drag on a panel sitting on the keyboard or the dock grows it
+upward (its bottom stays put); with room below, the top holds. Without a
+header (iPhone landscape, keyboard up) the target chip sits beside the
+field with the grip and close; the placeholder stays neutral either way.
+The loupe's picture takes no touches and isn't an accessibility element:
+only the loupe's own frame (`ph.type.loupe`) is. Blocks are 8 pt apart, 12 pt from the
 card's edge; the header is 44 pt (two rows under 456 pt wide). Legends
 scale with the cell, up to 1.5×. Every band runs edge to edge: no strip
 under the field, no block under the arrows, no gap right of the keys
@@ -176,7 +183,7 @@ copy live in Core (`SendSheetLayout`, `SendTargetPlan`, `SendTargetCopy`,
 | Sheet | As tall as its content: header + content, at least 240, at most the window less 48, on the 4 pt grid; the Large detent is offered only when the content is taller. iPad (iOS 18): a form sheet fitted to that height. Radius 36, `canvas` background, class margin (16 · 20 · 24) |
 | Header | 60: Send \| Inbox switch leading, Done trailing (semibold accent text, 44 target). No navigation title: the switch names the tab |
 | Switch | The Type panel's mode switch: `fill` capsule with a 2 pt inset, 32 pt segments, the selected one accent with white text; selection by colour and fill only. Unseen Inbox items: a dot-matrix count (pitch 1.4) with a spoken label |
-| Sources | Photos · Files · Clipboard: three chips of one size (44 tall, a third of the row each, 8 apart), glyph (pitch 2, accent) + label, `raised` with a hairline, radius 14. Clipboard is a chip like the others, not the system paste circle |
+| Sources | Photos · Files · Clipboard: three chips of one size (44 tall, `SendSheetLayout.chipWidth`: the row less two 8 pt gaps, split in three, whole points; build 27), the paste control filling its chip with the hairline drawn outside it, glyph (pitch 2, accent) + label, `raised` with a hairline, radius 14. Clipboard is a chip like the others, not the system paste circle |
 | Field | One field for text or a link: the Ask field's shape (52, `raised`, radius 24, hairline), the Add button inside it (36 accent circle, add glyph, 44 target; ink3 while empty) |
 | Tray | Staged items as 52 rows (glyph, name, size; remove glyph with a 44 target), radius 14, 8 apart, under a footnote label |
 | Send to | Device cards in equal columns: `floor((w + 12) / (160 + 12))`, 1–3 (two on iPhone). A card is 64: a 44 navy tile (radius 14; Mac glyph lit while the Mac talks, lock glyph when locked, dot wave while connecting), the name over one status line, and at the trailing edge the dot-matrix readout (`42%` sending, a waiting count) or the status pixel. Card radius 24 (10 inset → 14). The focused Mac gets the 2 pt cobalt ring; a drop target the dashed accent ring |
@@ -210,11 +217,19 @@ whole stage. Maths in Core (`CapturePreviewLayout`).
 | Layout | Header (close · status strip), the picture's room, the dock, 12 apart. Every step takes the room between header and dock; the dock is anchored at the bottom, 8 above the home indicator, in both orientations and on iPhone |
 | Picture | Aspect-fit into the room less 16 each side, centred, on whole points; the black well (radius 24, hairline) hugs the picture. A wide capture fills the width in portrait; a tall one fills the height in landscape. Replaces VQ-051's "dock right under the picture", which left half the screen empty in portrait |
 | Zoom | Pinch 1×–6× (the pan scales with it); double-tap zooms to 2.5× on the tapped point, again back to 1×; a drag pans while zoomed and never shows past the picture's edges; at 1× a downward swipe closes. VoiceOver: a "Zoom in / Zoom out" action |
-| Dock | Raised navy, radius 24, at most 560 wide and centred (iPad keeps the five actions together); annotate's toolbar keeps the full width |
+| Dock | Raised navy, radius 24, at most 560 wide and centred (iPad keeps the five actions together); annotate's toolbar keeps the full width. As tall as its row (never stretched); `ph.capture.dock` names the card itself (build 27) |
 
 Checks: iPad 11″ portrait and landscape, iPhone portrait and landscape;
 the picture's gaps to the header and to the dock are equal within 1 pt;
 nothing under the home indicator; a double-tap on a corner keeps that
 corner in view.
 
-Identifiers: `ph.capture.well`, `ph.capture.preview`, `ph.capture.dock`.
+Identifiers: `ph.capture.well`, `ph.capture.preview` (both the well's
+frame: the zoomed picture inside is hidden from accessibility and takes no
+touches), `ph.capture.dock` (the dock's card).
+
+Also from the build 27 fix round: `ph.rail.keyboard` (iPhone landscape's
+rail, under Ask), `ph.pairing.fieldCaption` (iPad, under the code field
+while the number pad is up). The connect toast (`ph.connect.toast`,
+`ph.connect.cancel`) stacks at AX1+ (text full width, wrapping at words,
+Cancel under it) and sits under the picker's Pair and Settings.

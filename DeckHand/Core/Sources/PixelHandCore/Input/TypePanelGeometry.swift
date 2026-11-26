@@ -287,9 +287,15 @@ public struct TypePanelGeometry: Sendable, Hashable {
 
     /// A resize in flight from a bottom corner (OT-11): the width as
     /// `resized(_:edge:translation:)`, and the bottom edge moved by `dy`
-    /// (positive = down, the top holds), the height clamped to `heights`
-    /// (the layout's range for the new width) and to the room below the
-    /// panel's top.
+    /// (positive = taller), the height clamped to `heights` (the layout's
+    /// range for the new width) and to the room's height.
+    ///
+    /// A panel sitting on the room's bottom (the usual case: it rides on
+    /// the keyboard or the dock) keeps its bottom there, so it grows and
+    /// shrinks from its top (build 27 bug 2: there was no room below it,
+    /// so dragging its corner changed nothing and the arrows never grew).
+    /// Anywhere else the top holds, and a panel that would pass the room's
+    /// bottom rises instead.
     public func resized(
         _ start: PanelRect,
         edge: ResizeEdge,
@@ -299,9 +305,17 @@ public struct TypePanelGeometry: Sendable, Hashable {
     ) -> PanelRect {
         var frame = resized(start, edge: edge, translation: dx)
         let range = heights(frame.width)
-        let below = room.maxY - start.minY
         let wanted = (start.height + (dy.isFinite ? dy : 0)).rounded()
-        frame.height = max(range.lowerBound, min(min(range.upperBound, max(range.lowerBound, below)), wanted))
+        let tallest = min(range.upperBound, max(range.lowerBound, room.height))
+        let height = max(range.lowerBound, min(tallest, wanted))
+        frame.height = height
+        let onBottom = start.maxY >= room.maxY - 1
+        if onBottom || start.minY + height > room.maxY {
+            // The bottom holds on the room's bottom; never above its top.
+            frame.y = max(room.minY, room.maxY - height)
+        } else {
+            frame.y = start.minY
+        }
         return frame
     }
 

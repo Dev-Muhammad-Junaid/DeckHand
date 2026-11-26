@@ -167,10 +167,13 @@ struct CapturePressStyle<S: Shape>: ButtonStyle {
 /// `CapturePreviewLayout.dockMaximumWidth`); `nil` spans the stage.
 struct CaptureDock<Content: View>: View {
     var maxWidth: CGFloat?
+    /// The card's accessibility identifier (its visible frame), if any.
+    var identifier: String?
     @ViewBuilder let content: () -> Content
 
-    init(maxWidth: CGFloat? = nil, @ViewBuilder content: @escaping () -> Content) {
+    init(maxWidth: CGFloat? = nil, identifier: String? = nil, @ViewBuilder content: @escaping () -> Content) {
         self.maxWidth = maxWidth
+        self.identifier = identifier
         self.content = content
     }
 
@@ -180,6 +183,9 @@ struct CaptureDock<Content: View>: View {
         }
         .padding(PixelHandTheme.Space.sm)
         .frame(maxWidth: maxWidth)
+        // As tall as its row, never stretched by the stage (build 27 bug 4
+        // measured the dock's frame running 1,169 pt past the window).
+        .fixedSize(horizontal: false, vertical: true)
         .background(
             PixelHandTheme.Brand.screenRaised.opacity(0.94),
             in: RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous)
@@ -188,6 +194,9 @@ struct CaptureDock<Content: View>: View {
             RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous)
                 .strokeBorder(PixelHandTheme.Brand.tileStroke, lineWidth: PixelHandTheme.Stroke.hairline)
         )
+        .contentShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(identifier ?? "")
         .padding(.horizontal, PixelHandTheme.Space.lg)
         .padding(.bottom, PixelHandTheme.Space.sm)
         .frame(maxWidth: .infinity)

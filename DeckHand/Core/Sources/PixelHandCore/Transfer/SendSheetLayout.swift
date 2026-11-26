@@ -23,6 +23,19 @@ public enum SendSheetLayout {
     public static let headerHeight = 60.0
     /// Source chips (Photos, Files, Clipboard): one size, 44 pt.
     public static let chipHeight = 44.0
+    /// The source chips in their row.
+    public static let chipCount = 3
+    public static let chipGap = 8.0
+
+    /// One source chip's width in a row `rowWidth` wide: the row less its
+    /// gaps, split evenly and rounded down to whole points, so the three
+    /// chips are exactly one width (build 27 bug 3: a stack splitting the
+    /// row measured them 174.5, 175 and 173.5 pt). At least 44.
+    public static func chipWidth(rowWidth: Double, count: Int = chipCount, gap: Double = chipGap) -> Double {
+        guard count > 0, rowWidth.isFinite, rowWidth > 0 else { return chipHeight }
+        let share = (rowWidth - gap * Double(count - 1)) / Double(count)
+        return max(chipHeight, share.rounded(.down))
+    }
     /// The text-or-link field with its Add button.
     public static let fieldHeight = 52.0
     /// A full device card: 44 pt tile, 10 pt inset (card radius 24 →

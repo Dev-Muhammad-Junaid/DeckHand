@@ -294,6 +294,10 @@ struct TypePanel: View {
     private var fieldColumn: some View {
         HStack(spacing: PixelHandTheme.Space.xs) {
             if !layout.showsHeader { gripHandle }
+            // No header (iPhone landscape, keyboard up): the target chip
+            // comes with the grip, so the app (and the loupe's button) is
+            // still shown once (build 27 bug 5, VQ-105).
+            if layout.targetPlace == .fieldRow { targetChip(showsName: false) }
             field
             if !layout.showsHeader { closeButton }
         }
@@ -304,12 +308,10 @@ struct TypePanel: View {
     private var field: some View {
         LiveTypingField(
             mode: presence.mode,
-            // The header names the target; without one (short room), or
-            // with a hardware keyboard and no header, the field does: the
-            // target always shows exactly once.
-            placeholder: !layout.showsHeader && presence.mode == .live
-                ? TypingTargetGuard.caption(frontApp: target.frontApp)
-                : presence.mode.placeholder,
+            // The target chip names the app, in the header or, with no
+            // header, beside the field (`targetPlace`): the placeholder
+            // stays neutral, so the target shows exactly once.
+            placeholder: presence.mode.placeholder,
             latchedModifiers: presence.modifiers.held,
             draft: $model.draft,
             wantsFocus: presence.wantsFocus || layout.body == .keysOnly,

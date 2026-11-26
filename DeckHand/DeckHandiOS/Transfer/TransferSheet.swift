@@ -336,11 +336,18 @@ private struct SendPanel: View {
     // MARK: Picking
 
     /// Photos · Files · Clipboard: three chips of one size, glyph + label.
+    /// Each gets Core's whole-point width and the 44 pt height outright,
+    /// not a share of a stack (build 27 bug 3: 174.5 / 175 / 173.5 pt wide,
+    /// and the paste control 43 pt tall inside its hairline).
     private var sources: some View {
-        HStack(spacing: PixelHandTheme.Space.sm) {
+        let width = CGFloat(SendSheetLayout.chipWidth(rowWidth: Double(contentWidth)))
+        let height = CGFloat(SendSheetLayout.chipHeight)
+        return HStack(spacing: CGFloat(SendSheetLayout.chipGap)) {
             PhotosPicker(selection: $photoSelection, maxSelectionCount: 20, matching: .any(of: [.images, .videos])) {
                 SendSourceChipLabel(glyph: TransferGlyphs.photos, title: "Photos")
+                    .frame(width: width, height: height)
             }
+            .frame(width: width, height: height)
             .buttonStyle(ChipPressStyle())
             .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.chip)
             .accessibilityLabel("Photos")
@@ -348,7 +355,9 @@ private struct SendPanel: View {
 
             Button { showsFileImporter = true } label: {
                 SendSourceChipLabel(glyph: TransferGlyphs.files, title: "Files")
+                    .frame(width: width, height: height)
             }
+            .frame(width: width, height: height)
             .buttonStyle(ChipPressStyle())
             .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.chip)
             .accessibilityLabel("Files")
@@ -357,7 +366,9 @@ private struct SendPanel: View {
             // The system paste control (`SendPasteChip`), so iOS never
             // asks "Allow Paste"; it carries `ph.send.source.clipboard`.
             SendPasteChip(onPaste: stagePasted)
+                .frame(width: width, height: height)
         }
+        .frame(maxWidth: .infinity)
     }
 
     /// One field for text or a link, with its Add button inside: the Ask
@@ -693,7 +704,7 @@ private struct SendSourceChipLabel: View {
                 .minimumScaleFactor(0.8)
         }
         .padding(.horizontal, PixelHandTheme.Space.sm)
-        .frame(maxWidth: .infinity, minHeight: CGFloat(SendSheetLayout.chipHeight))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(PixelHandTheme.raised, in: RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous)

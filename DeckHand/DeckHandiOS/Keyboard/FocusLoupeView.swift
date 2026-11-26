@@ -34,6 +34,9 @@ struct FocusLoupeView: View {
                 content(size: size)
                     .clipShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous))
             }
+            // The loupe is exactly the frame the host gives it.
+            .frame(width: size.width, height: size.height)
+            .clipped()
             .onAppear { update(size: size) }
             .onChange(of: session.focusedField) { _, _ in update(size: size) }
             .onChange(of: size) { _, newSize in update(size: newSize) }
@@ -43,11 +46,30 @@ struct FocusLoupeView: View {
                 .strokeBorder(PixelHandTheme.hairline, lineWidth: PixelHandTheme.Stroke.hairline)
         )
         .shadow(color: .black.opacity(0.12), radius: 12, y: 3)
+        // Build 27 bug 1: the picture inside is the whole mirror frame
+        // scaled up and offset (about 4,536 pt wide on iPad), and neither
+        // `.clipped()` nor `.clipShape` trims hit-testing or the
+        // accessibility frame. The loupe's own shape is now the only thing
+        // that takes touches, so the Type panel's target chip and close
+        // button next to it stay hittable.
+        .contentShape(Rectangle())
         .onAppear { session.setMirrorLoupe(active: true) }
         .onDisappear { session.setMirrorLoupe(active: false) }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Zoomed view of the Mac's text field")
+        // One container at the loupe's own frame: its text line and the
+        // Start the mirror button inside stay reachable; the picture is
+        // hidden from VoiceOver (it would report the scaled frame).
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(loupeDescription)
         .accessibilityIdentifier("ph.type.loupe")
+    }
+
+    /// What VoiceOver says for the loupe: what it shows, by state.
+    private var loupeDescription: String {
+        if !session.isMirrorActive { return "Zoom to the input. The mirror is off." }
+        guard let field = session.focusedField else { return "Zoom to the input. Looking for the text field." }
+        if field.source == FocusedFieldSnapshot.Source.none { return "Zoom to the input. No text field in focus on the Mac." }
+        if crop?.mode == .pointer { return "Zoom to the input, around the pointer in \(field.app ?? "the Mac app")." }
+        return "Zoom to the input: the text field in \(field.app ?? "the Mac app"), up close."
     }
 
     // MARK: Content
@@ -99,8 +121,14 @@ struct FocusLoupeView: View {
         }
         .frame(width: full.width, height: full.height)
         .offset(x: origin.x, y: origin.y)
+        // Build 27 bug 1: the scaled frame reaches far outside the loupe.
+        // It takes no touches and isn't an accessibility element, so only
+        // the loupe's own rectangle counts.
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
         .frame(width: size.width, height: size.height, alignment: .topLeading)
         .clipped()
+        .contentShape(Rectangle())
         .animation(PixelHandMotion.quick, value: crop.rect)
     }
 

@@ -222,6 +222,13 @@ public struct CanvasPlan: Sendable, Hashable {
     /// leading app chip, and the keyboard button moves to the rail.
     public var foldsDockIntoStrip: Bool { form == .rail || form == .laptop }
 
+    /// The rail carries the keyboard button, under Ask (build 27 bug 5,
+    /// VQ-105): iPhone landscape has no dock, and on the Screen tab the
+    /// mirror takes the whole pad, so neither the dock's nor the pad's
+    /// keyboard button showed and the Type panel couldn't be opened. The
+    /// pad then leaves its own button out, so there's one per window.
+    public var railCarriesKeyboard: Bool { form == .rail }
+
     /// The surfaces the tab bar offers: the deck goes when it has a column.
     public var tabSurfacesIncludeDeck: Bool { !hasDeckColumn }
 
