@@ -196,6 +196,11 @@ struct ScreenshotPreviewView: View {
             ))
             let size = frame.size
             ZStack {
+                // Zoomed, the picture is scaled and offset far past the
+                // well. Like the loupe (build 27 bug 1), it takes no
+                // touches and isn't the accessibility element: the clipped
+                // well-sized frame around it is, so `ph.capture.preview`
+                // measures what's on screen at every zoom.
                 Image(uiImage: current)
                     .resizable()
                     .scaledToFit()
@@ -203,15 +208,20 @@ struct ScreenshotPreviewView: View {
                     .scaleEffect(zoom)
                     .offset(pan)
                     .mirrorScanline(on: revealed)
-                    .accessibilityLabel("Capture")
-                    .accessibilityHint("Pinch or double-tap to zoom.")
-                    .accessibilityAddTraits(.isImage)
-                    .accessibilityAction(named: CapturePreviewLayout.isZoomed(Double(zoom)) ? "Zoom out" : "Zoom in") {
-                        doubleTap(at: CGPoint(x: size.width / 2, y: size.height / 2), size: size)
-                    }
-                    .accessibilityIdentifier("ph.capture.preview")
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
             }
             .frame(width: size.width, height: size.height)
+            .clipped()
+            .contentShape(Rectangle())
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Capture")
+            .accessibilityHint("Pinch or double-tap to zoom.")
+            .accessibilityAddTraits(.isImage)
+            .accessibilityAction(named: CapturePreviewLayout.isZoomed(Double(zoom)) ? "Zoom out" : "Zoom in") {
+                doubleTap(at: CGPoint(x: size.width / 2, y: size.height / 2), size: size)
+            }
+            .accessibilityIdentifier("ph.capture.preview")
             .background(Color.black)
             .clipShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous))
             .overlay(
@@ -334,7 +344,10 @@ struct ScreenshotPreviewView: View {
     private var dock: some View {
         switch step {
         case .preview:
-            CaptureDock(maxWidth: CGFloat(CapturePreviewLayout.dockMaximumWidth)) {
+            // Build 27 bug 4: `ph.capture.dock` names the dock's card (its
+            // visible edge), not the row inside its 8 pt padding, which put
+            // the picture 8 pt "nearer the header" in the walk.
+            CaptureDock(maxWidth: CGFloat(CapturePreviewLayout.dockMaximumWidth), identifier: "ph.capture.dock") {
                 HStack(spacing: 0) {
                     CaptureActionButton(glyph: CaptureGlyphs.save, title: "Save", isBusy: isSaving) {
                         toastTask?.cancel()
@@ -351,8 +364,6 @@ struct ScreenshotPreviewView: View {
                     }
                     CaptureActionButton(glyph: PixelGlyphs.readText, title: "Read text") { step = .readText }
                 }
-                .accessibilityElement(children: .contain)
-                .accessibilityIdentifier("ph.capture.dock")
             }
         case .annotate:
             CaptureDock {

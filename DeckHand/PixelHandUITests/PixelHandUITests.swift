@@ -120,7 +120,7 @@ final class PixelHandUITests: XCTestCase {
         checkBannerBelowHeader()
         tapIfExists("ph.trackpad.click")
         snap("after-click-strip")
-        if tapIfExists("ph.dock.keyboard") || tapIfExists("ph.trackpad.keyboard") {
+        if openTypePanel(required: false) {
             sleep(1)
             snap("keyboard")
             if app.keyboards.count > 0, ensureScratchFrontmost() {
@@ -507,7 +507,7 @@ final class PixelHandUITests: XCTestCase {
         sleep(1)
         let dock = element("ph.dock")
         let dockFrame = dock.exists ? dock.frame : .zero
-        guard tapIfExists("ph.dock.keyboard") || tapIfExists("ph.trackpad.keyboard") else { return }
+        guard openTypePanel() else { return }
         let panel = element("ph.type.panel")
         XCTAssertTrue(panel.waitForExistence(timeout: 3), "The Type panel didn't open")
         sleep(1)
@@ -620,7 +620,7 @@ final class PixelHandUITests: XCTestCase {
         launch()
         guard connect() else { return }
         sleep(1)
-        guard tapIfExists("ph.dock.keyboard") || tapIfExists("ph.trackpad.keyboard") else { return }
+        guard openTypePanel() else { return }
         let panel = element("ph.type.panel")
         XCTAssertTrue(panel.waitForExistence(timeout: 3), "The Type panel didn't open")
         sleep(1)
@@ -714,7 +714,7 @@ final class PixelHandUITests: XCTestCase {
         let remembered = panel.frame
         tapIfExists("ph.type.close")
         sleep(1)
-        if tapIfExists("ph.dock.keyboard") || tapIfExists("ph.trackpad.keyboard") {
+        if openTypePanel() {
             XCTAssertTrue(panel.waitForExistence(timeout: 3))
             sleep(1)
             XCTAssertEqual(panel.frame.minX, remembered.minX, accuracy: 2, "The panel didn't come back where it was")
@@ -734,7 +734,7 @@ final class PixelHandUITests: XCTestCase {
             launch()
             guard connect() else { return }
             sleep(1)
-            guard tapIfExists("ph.dock.keyboard") || tapIfExists("ph.trackpad.keyboard") else { return }
+            guard openTypePanel() else { return }
             let panel = element("ph.type.panel")
             XCTAssertTrue(panel.waitForExistence(timeout: 3), "The Type panel didn't open")
             sleep(1)
@@ -749,14 +749,22 @@ final class PixelHandUITests: XCTestCase {
             XCTAssertTrue(element("ph.type.target").exists, "The header has no target")
             XCTAssertTrue(element("ph.type.accept").exists, "Live has no Accept (Tab) action")
 
-            // Taller: drag a corner down.
+            // Taller: drag a corner down. Build 27 bug 2: the panel rides
+            // on the keyboard (iPad) or docks above it (iPhone), so there's
+            // no room below; the top rises instead and the arrows grow.
             let handle = element("ph.type.resize.trailing")
             if handle.exists, up.exists, down.exists {
                 let before = down.frame.height
+                let panelBefore = panel.frame
                 handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.1, thenDragTo: handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).withOffset(CGVector(dx: -200, dy: 400)))
                 sleep(1)
                 snap("type-fill-\(tag)-tall")
+                XCTAssertGreaterThan(panel.frame.height, panelBefore.height + 20, "The corner drag didn't make the panel taller: \(panelBefore) → \(panel.frame)")
                 XCTAssertGreaterThan(down.frame.height, before + 4, "The arrows didn't grow with the panel")
+                XCTAssertGreaterThan(down.frame.height, 48, "The arrows are still \(down.frame.height) pt tall")
+                if app.keyboards.count > 0, let keyboard = app.keyboards.allElementsBoundByIndex.first {
+                    XCTAssertLessThanOrEqual(panel.frame.maxY, keyboard.frame.minY + 1, "The taller panel went under the keyboard")
+                }
                 // Field and arrows share their band's height.
                 if field.exists, up.frame.minY < down.frame.minY {
                     XCTAssertEqual(field.frame.minY, up.frame.minY, accuracy: 6, "The field doesn't start with the arrows")
@@ -786,8 +794,15 @@ final class PixelHandUITests: XCTestCase {
                 if loupe.waitForExistence(timeout: 3) {
                     XCTAssertEqual(loupe.frame.width, panel.frame.width, accuracy: 2, "The loupe isn't as wide as the panel")
                     XCTAssertTrue(loupe.frame.maxY <= panel.frame.minY + 1 || loupe.frame.minY >= panel.frame.maxY - 1, "The loupe covers the panel")
+                    // Build 27 bug 1: the loupe's scaled picture made its
+                    // frame ~4,536 pt wide and took the panel's taps.
+                    XCTAssertLessThanOrEqual(loupe.frame.height, 201, "The loupe's frame is bigger than the loupe: \(loupe.frame)")
+                    XCTAssertTrue(element("ph.type.target").isHittable, "The target chip isn't hittable with the loupe open")
+                    XCTAssertTrue(element("ph.type.close").isHittable, "Close isn't hittable with the loupe open")
                     snap("type-loupe-\(tag)")
                     tapIfExists("ph.type.target")
+                    sleep(1)
+                    XCTAssertFalse(loupe.exists, "The target chip didn't close the loupe")
                 } else {
                     snap("type-loupe-paywall-\(tag)")
                 }
@@ -831,10 +846,22 @@ final class PixelHandUITests: XCTestCase {
         XCTAssertTrue(name.waitForExistence(timeout: 3), "Save as key didn't ask for a name")
         let keyName = "YT \(Int.random(in: 100...999))"
         name.tap()
+        // VQ-106: clear the whole default name, not just its first part.
         if let current = name.value as? String, !current.isEmpty, current != name.placeholderValue {
-            name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count))
+            name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count + 8))
         }
         name.typeText(keyName)
+        sleep(1)
+        // VQ-104: with the keyboard up, Save and Cancel scroll into view
+        // above it (iPad portrait put them under it).
+        let save = element("ph.ask.save")
+        XCTAssertTrue(save.isHittable, "Save as key's Save is under the keyboard")
+        XCTAssertTrue(element("ph.ask.cancel").isHittable, "Save as key's Cancel is under the keyboard")
+        if app.keyboards.count > 0, let keyboard = app.keyboards.allElementsBoundByIndex.first, keyboard.frame.height > 100 {
+            XCTAssertLessThanOrEqual(save.frame.maxY, keyboard.frame.minY + 1, "Save sits under the keyboard: \(save.frame)")
+            XCTAssertLessThanOrEqual(name.frame.maxY, keyboard.frame.minY + 1, "The name field sits under the keyboard")
+        }
+        snap("ask-typed-naming")
         tapIfExists("ph.ask.save")
         let note = element("ph.ask.note")
         XCTAssertTrue(note.waitForExistence(timeout: 3), "Saving didn't confirm")
@@ -865,7 +892,14 @@ final class PixelHandUITests: XCTestCase {
             sleep(3)
             snap("deck-typed-key-ran")
         } else {
-            app.buttons["Cancel"].firstMatch.tap()
+            // VQ-106: the iPhone shows a popover with only Run; tapping
+            // outside it dismisses it.
+            let cancel = app.buttons["Cancel"].firstMatch
+            if cancel.exists, cancel.isHittable {
+                cancel.tap()
+            } else {
+                dismissMenu()
+            }
             sleep(1)
         }
 
@@ -993,6 +1027,10 @@ final class PixelHandUITests: XCTestCase {
             if orientation == .portrait, well.width >= well.height {
                 XCTAssertTrue(fillsWidth, "A wide capture fills the width in portrait: \(well.width) of \(window.width)")
             }
+            // Build 27 bug 4: `ph.capture.dock` is the dock's card, a row
+            // of actions tall, not a frame running past the window.
+            XCTAssertLessThan(dock.frame.height, 160, "The dock's frame is the card (\(tag)): \(dock.frame)")
+            XCTAssertEqual(picture.frame.width, well.width, accuracy: 1, "ph.capture.preview is the well's frame (\(tag))")
             // The dock is at the bottom, under the picture, clear of the
             // home indicator.
             XCTAssertGreaterThanOrEqual(dock.frame.minY, well.maxY, "Dock under the picture (\(tag))")
@@ -1131,6 +1169,7 @@ final class PixelHandUITests: XCTestCase {
         }
         let row = macRow()
         acceptSystemAlerts(timeout: 1)
+        checkConnectToastClearOfPair()
         guard row.waitForExistence(timeout: 45) else {
             snap("no-mac-found")
             return false
@@ -1167,6 +1206,20 @@ final class PixelHandUITests: XCTestCase {
         }
         sleep(2)
         return true
+    }
+
+    /// VQ-107: while the launch reconnect waits, "Connecting to <Mac>…"
+    /// and its Cancel sit under the picker's Pair and Settings, never over
+    /// them, and the text isn't squeezed (at AX3 it read "Con- / necti…").
+    private func checkConnectToastClearOfPair() {
+        let toast = element("ph.connect.toast"), cancel = element("ph.connect.cancel"), pair = element("ph.connect.pair")
+        guard toast.exists, pair.exists else { return }
+        snap("picker-connecting")
+        XCTAssertFalse(toast.frame.intersects(pair.frame), "The connecting toast covers Pair: \(toast.frame) / \(pair.frame)")
+        if cancel.exists {
+            XCTAssertFalse(cancel.frame.intersects(pair.frame), "The toast's Cancel covers Pair: \(cancel.frame) / \(pair.frame)")
+        }
+        XCTAssertGreaterThan(toast.frame.width, 120, "The connecting toast is squeezed: \(toast.frame)")
     }
 
     /// Whether the picker row says this device is paired with the Mac. Rows
@@ -1376,6 +1429,22 @@ final class PixelHandUITests: XCTestCase {
         }
         app.swipeDown(velocity: .fast)
         sleep(1)
+    }
+
+    /// Opens the Type panel from whichever keyboard button this window
+    /// has: the dock's, the rail's (iPhone landscape, VQ-105) or the pad's.
+    /// `required`: no button at all is a failure (VQ-105 had the walks
+    /// return early and pass), with a `missing-keyboard-button` snapshot.
+    @discardableResult
+    private func openTypePanel(required: Bool = true) -> Bool {
+        for id in ["ph.dock.keyboard", "ph.rail.keyboard", "ph.trackpad.keyboard"] where tapIfExists(id, timeout: 1) {
+            return true
+        }
+        if required {
+            snap("missing-keyboard-button")
+            XCTFail("No keyboard button (ph.dock.keyboard, ph.rail.keyboard or ph.trackpad.keyboard) to open the Type panel")
+        }
+        return false
     }
 
     private func dismissMenu() {

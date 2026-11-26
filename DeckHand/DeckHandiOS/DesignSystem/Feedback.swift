@@ -143,22 +143,37 @@ struct PHToast: View {
     /// Overrides the pixel: `.off` while disconnected (a disconnected state
     /// never shows a lit mint dot, 04 §7, VQ-028).
     var pixel: StatusPixel.Kind?
+    /// Two lines by default; `nil` wraps as far as the text needs (the
+    /// connect toast stacked at the accessibility sizes, VQ-107), and the
+    /// capsule becomes a rounded card so the lines aren't clipped.
+    var lineLimit: Int? = 2
 
     var body: some View {
+        Group {
+            if lineLimit == nil {
+                row.phGlass(in: RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous))
+            } else {
+                row.phGlass(in: Capsule())
+            }
+        }
+        .onAppear {
+            AccessibilityNotification.Announcement(message).post()
+        }
+    }
+
+    private var row: some View {
         HStack(spacing: PixelHandTheme.Space.sm) {
             StatusPixel(state: pixel ?? (isFailure ? .needsYou : .live), size: 8)
             Text(message)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(PixelHandTheme.ink)
-                .lineLimit(2)
+                .lineLimit(lineLimit)
+                .fixedSize(horizontal: false, vertical: lineLimit == nil)
         }
         .padding(.leading, PixelHandTheme.Space.md)
         .padding(.trailing, 14)
+        .padding(.vertical, lineLimit == nil ? PixelHandTheme.Space.sm : 0)
         .frame(minHeight: 40)
-        .phGlass(in: Capsule())
-        .onAppear {
-            AccessibilityNotification.Announcement(message).post()
-        }
     }
 }
 

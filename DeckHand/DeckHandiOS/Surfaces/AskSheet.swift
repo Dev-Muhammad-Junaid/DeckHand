@@ -120,6 +120,24 @@ struct AskPanel: View {
 
     @State private var isConfirming = false
     @FocusState private var isNameFocused: Bool
+    /// VQ-104: the Type panel's model reads the keyboard's frame for the
+    /// window; the shell lays out under the keyboard (OT-2), so the column
+    /// gets no keyboard safe area of its own.
+    @Environment(\.typePanel) private var keyboardFrame
+    /// The scroll view's bottom edge, in the window's coordinates.
+    @State private var scrollMaxY: CGFloat = 0
+
+    /// Where Save as key's row scrolls to (VQ-104).
+    private static let namingAnchor = "ph.ask.namingAnchor"
+
+    /// The bottom margin that lets the last row scroll above the keyboard
+    /// where the system doesn't lift the view (the column).
+    private var keyboardInset: CGFloat {
+        CGFloat(KeyboardAvoidance.bottomInset(
+            viewMaxY: Double(scrollMaxY),
+            keyboardMinY: keyboardFrame?.keyboardMinY
+        ))
+    }
 
     private var isUnlocked: Bool { entitlements.allows(.ai) }
     private var isMacLocked: Bool { session.macLockState.isLocked }
@@ -127,6 +145,12 @@ struct AskPanel: View {
     private var padding: CGFloat { placement == .sheet ? PixelHandTheme.Space.lg : PixelHandTheme.Space.md }
 
     var body: some View {
+        ScrollViewReader { scroller in
+            scrollingBody(scroller)
+        }
+    }
+
+    private func scrollingBody(_ scroller: ScrollViewProxy) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: PixelHandTheme.Space.lg) {
                 if placement == .column, isUnlocked, model.planner != nil {
@@ -142,6 +166,26 @@ struct AskPanel: View {
                 }
             }
             .padding(padding)
+        }
+        // VQ-104: room to scroll the last row above the keyboard in the
+        // column (the sheet gets it from the system, and this is 0 there).
+        .contentMargins(.bottom, keyboardInset, for: .scrollContent)
+        .onGeometryChange(for: CGFloat.self) { geometry in
+            geometry.frame(in: .global).maxY
+        } action: { maxY in
+            scrollMaxY = maxY
+        }
+        // VQ-104: Save as key's name, Save and Cancel scroll into view
+        // above the keyboard: when the name takes focus, and again once
+        // the keyboard has finished moving (its frame changes the inset).
+        .onChange(of: isNameFocused) { _, focused in
+            if focused { revealNaming(scroller, delay: true) }
+        }
+        .onChange(of: model.flow.namingName != nil) { _, naming in
+            if naming { revealNaming(scroller, delay: true) }
+        }
+        .onChange(of: keyboardFrame?.keyboardMinY) { _, _ in
+            if model.flow.namingName != nil { revealNaming(scroller, delay: false) }
         }
         .scrollDismissesKeyboard(.interactively)
         .onAppear {
@@ -537,8 +581,27 @@ struct AskPanel: View {
                 }
                 Spacer(minLength: 0)
             }
+            // The row's bottom: scrolled to so Save and Cancel sit above
+            // the keyboard, the name field right over them (VQ-104).
+            Color.clear
+                .frame(height: 1)
+                .id(Self.namingAnchor)
+                .accessibilityHidden(true)
         }
         .padding(.top, PixelHandTheme.Space.xs)
+    }
+
+    /// Scrolls Save as key's Save and Cancel into view (VQ-104). With
+    /// `delay`, once the keyboard's own animation has settled too.
+    private func revealNaming(_ scroller: ScrollViewProxy, delay: Bool) {
+        let scroll = {
+            withAnimation(.easeOut(duration: 0.2)) {
+                scroller.scrollTo(Self.namingAnchor, anchor: .bottom)
+            }
+        }
+        guard delay else { scroll(); return }
+        DispatchQueue.main.async(execute: scroll)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45, execute: scroll)
     }
 
     private func isEnabledInNaming(_ action: AskFlow.Action) -> Bool {

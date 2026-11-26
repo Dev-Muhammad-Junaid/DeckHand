@@ -19,6 +19,10 @@ struct SurfaceTabBar: View {
     @Binding var selection: ControlSurface
     var tabs: [ControlSurface] = ControlSurface.allCases
     var axis: Axis = .horizontal
+    /// The keyboard button under Ask: iPhone landscape's rail, where
+    /// there's no dock to carry it (`CanvasPlan.railCarriesKeyboard`,
+    /// VQ-105). `nil` elsewhere.
+    var keyboard: RailKeyboardButton.Config?
     let onAsk: () -> Void
 
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -33,6 +37,9 @@ struct SurfaceTabBar: View {
         layout {
             tabGroup
             askButton
+            if let keyboard {
+                RailKeyboardButton(state: keyboard)
+            }
         }
         .phGlassGroup(spacing: PixelHandTheme.Space.md)
     }
@@ -109,6 +116,40 @@ struct SurfaceTabBar: View {
         .accessibilityHint("Type what you want your Mac to do")
         .accessibilityShowsLargeContentViewer {
             Label { Text("Ask") } icon: { PHGlyph(glyph: PixelGlyphs.ask, pitch: PixelPitch.tabBar) }
+        }
+    }
+}
+
+/// The rail's keyboard button (VQ-105): opens and closes the Type panel,
+/// like the dock's. A 62 pt glass circle, as Ask above it.
+struct RailKeyboardButton: View {
+    struct Config {
+        var isShown: Bool
+        var toggle: () -> Void
+    }
+
+    let state: Config
+
+    var body: some View {
+        Button {
+            state.toggle() // the model plays the tap's haptic
+        } label: {
+            PHGlyph(glyph: PixelGlyphs.keyboard, pitch: PixelPitch.tabBar)
+                .foregroundStyle(state.isShown ? PixelHandTheme.accent : PixelHandTheme.ink)
+                .frame(width: 62, height: 62)
+                .background {
+                    if state.isShown { Circle().fill(PixelHandTheme.accentTint) }
+                }
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .phGlass(in: Circle(), interactive: true)
+        .phosphorFocusable(cornerRadius: 31)
+        .accessibilityLabel(state.isShown ? "Hide keyboard" : "Show keyboard")
+        .accessibilityAddTraits(state.isShown ? [.isButton, .isSelected] : .isButton)
+        .accessibilityIdentifier("ph.rail.keyboard")
+        .accessibilityShowsLargeContentViewer {
+            Label { Text("Keyboard") } icon: { PHGlyph(glyph: PixelGlyphs.keyboard, pitch: PixelPitch.tabBar) }
         }
     }
 }

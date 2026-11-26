@@ -118,6 +118,11 @@ struct MirrorPane: View {
                 zoom = .identity
             }
             .clipShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous))
+            // Zoomed, the picture is scaled and offset past the pane, and
+            // the clip doesn't trim hit-testing (build 27 bug 1's pattern):
+            // only the pane's own shape takes touches, so the controls
+            // around it stay hittable.
+            .contentShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous)
                     .strokeBorder(Color.white.opacity(0.2), lineWidth: PixelHandTheme.Stroke.hairline)

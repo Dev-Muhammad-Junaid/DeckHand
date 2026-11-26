@@ -40,13 +40,16 @@ struct SendPasteChip: View {
     var onPaste: @MainActor ([SendPastedItem]) -> Void
 
     var body: some View {
+        // The control fills the chip's whole 44 pt frame (build 27 bug 3:
+        // inset by its hairline it measured 43 pt). The hairline is drawn
+        // just outside it, behind, so nothing covers the system control.
         SendPasteControl(onPaste: onPaste)
-            .padding(PixelHandTheme.Stroke.hairline)
-            .background(
-                PixelHandTheme.hairline,
-                in: RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip + PixelHandTheme.Stroke.hairline, style: .continuous)
-            )
-            .frame(maxWidth: .infinity, minHeight: CGFloat(SendSheetLayout.chipHeight), maxHeight: CGFloat(SendSheetLayout.chipHeight))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background {
+                RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip + PixelHandTheme.Stroke.hairline, style: .continuous)
+                    .fill(PixelHandTheme.hairline)
+                    .padding(-PixelHandTheme.Stroke.hairline)
+            }
             .accessibilityElement(children: .contain)
     }
 }

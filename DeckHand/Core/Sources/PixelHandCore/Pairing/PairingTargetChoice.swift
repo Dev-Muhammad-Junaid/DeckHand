@@ -162,4 +162,19 @@ public enum PairingSheetLayout {
     public static func keepsFooterVisible(isKeypadUp: Bool, band: TypeBand) -> Bool {
         isKeypadUp && band != .huge
     }
+
+    /// Whether the sheet repeats where the code comes from under the code
+    /// field (build 26, VQ-108): on iPad the number pad floats over the
+    /// sheet and covered its title ("Type the code showing on …") while
+    /// typing. Under the field the line stays readable; on iPhone the pad
+    /// docks at the bottom and the heading stays in view.
+    public static func showsFieldCaption(isPhone: Bool, isKeypadUp: Bool) -> Bool {
+        !isPhone && isKeypadUp
+    }
+
+    /// The line under the code field: names the Mac, or asks for one.
+    public static func fieldCaption(targetName: String?) -> String {
+        guard let targetName, !targetName.isEmpty else { return "Choose the Mac that shows the code." }
+        return "The code showing on \(targetName)"
+    }
 }

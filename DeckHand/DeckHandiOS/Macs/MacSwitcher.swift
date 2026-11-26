@@ -80,6 +80,9 @@ final class MacSwitcher {
     @ObservationIgnored private var context: LoomContext?
     @ObservationIgnored private var handle: LoomConnectionHandle?
     @ObservationIgnored private var triedLaunchReconnect = false
+    /// The Mac the launch reconnect dialled, until that dial settles: a
+    /// failure redials on the drop schedule instead of giving up (VQ-107).
+    @ObservationIgnored private var launchDialDeviceID: UUID?
     @ObservationIgnored private var redialTask: Task<Void, Never>?
     @ObservationIgnored private var noticeTask: Task<Void, Never>?
     @ObservationIgnored private let defaults: UserDefaults
@@ -281,6 +284,7 @@ final class MacSwitcher {
     /// reconnect still waiting for the network (the toast's Cancel, VQ-058,
     /// VQ-101).
     func cancelDial() {
+        launchDialDeviceID = nil
         redialTask?.cancel()
         machine.cancelDial()
         reconnectingDeviceID = nil
@@ -331,6 +335,7 @@ final class MacSwitcher {
                 let newHandle = try await RemoteConnect.connect(peer, using: context)
                 switch machine.dialSucceeded(target, attempt: attempt) {
                 case let .adopt(deviceID, release):
+                    if launchDialDeviceID == target { launchDialDeviceID = nil }
                     adopt(newHandle, deviceID: deviceID, name: peer.name, releasing: release)
                 case .discard:
                     DeckHandLog.connection.info("📡 Late connection to \(peer.name, privacy: .public) closed (superseded)")
@@ -338,9 +343,19 @@ final class MacSwitcher {
                 }
             } catch {
                 DeckHandLog.connection.error("📡 Switch to \(peer.name, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+                let wasLaunch = launchDialDeviceID == target
+                if wasLaunch { launchDialDeviceID = nil }
                 if machine.dialFailed(target, attempt: attempt) {
                     if reconnectingDeviceID == target {
                         scheduleRedial(target, attempt: redialAttempt + 1, isVerdict: false)
+                    } else if MacReconnectPolicy.redialsFailedDial(
+                        isEnabled: reconnectAutomatically, isRedial: false, isLaunchReconnect: wasLaunch
+                    ) {
+                        // VQ-107: one failed launch dial (a busy device, a
+                        // Mac still waking) used to leave the picker waiting
+                        // for a tap. It redials like a drop, with Cancel.
+                        DeckHandLog.connection.info("📡 Launch reconnect to \(peer.name, privacy: .public) failed; redialling")
+                        scheduleRedial(target, attempt: 0, isVerdict: false)
                     } else {
                         show(UserFacingError.connectFailure(macName: peer.name, detail: error.localizedDescription))
                     }
@@ -427,6 +442,7 @@ final class MacSwitcher {
         triedLaunchReconnect = true
         clearPendingLaunch()
         DeckHandLog.connection.info("📡 Reconnecting to the last Mac at launch")
+        launchDialDeviceID = target
         request(target)
     }
 

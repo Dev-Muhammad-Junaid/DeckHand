@@ -226,6 +226,17 @@ public enum MacReconnectPolicy {
         "Connecting to \(macName)…"
     }
 
+    /// Whether a dial that failed is tried again on the redial schedule
+    /// (build 26, VQ-107). A redial of a dropped Mac always was. The launch
+    /// reconnect wasn't: one failed dial (a slow or busy device, a Mac
+    /// still waking) showed "Couldn't reach …" and left the picker waiting
+    /// for a tap, so at AX3 the walks never reached the shell. It now
+    /// redials like a drop. A dial the person started reports its error
+    /// and stops: they're looking at the picker and can tap again.
+    public static func redialsFailedDial(isEnabled: Bool, isRedial: Bool, isLaunchReconnect: Bool) -> Bool {
+        isEnabled && (isRedial || isLaunchReconnect)
+    }
+
     /// The wait before redial number `attempt` (0-based) after the focused
     /// Mac dropped, or `nil` to stop. Approval verdicts (denied, revoked,
     /// forgotten) and the person's own Disconnect never redial.

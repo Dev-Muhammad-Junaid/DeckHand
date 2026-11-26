@@ -106,6 +106,10 @@ public struct TypePanelLayout: Sendable, Hashable {
     /// The field never gets narrower than this (about 13 characters of
     /// body text, two lines when the band is tall enough).
     public static let fieldMinimumWidth: Double = 144
+    /// The share of a band's width the field keeps before the arrows and
+    /// actions beside it widen past square (build 27): on a wide panel the
+    /// cells take the rest, up to `maximumRowHeight` wide.
+    public static let fieldShare: Double = 0.5
     /// The panel never grows past this wide: a block of keys, not a bar.
     public static let wideMaximumWidth: Double = 760
     /// Below this much room above the keyboard the header row goes.
@@ -142,6 +146,17 @@ public struct TypePanelLayout: Sendable, Hashable {
     public let headerRows: Int
     /// The header names the app beside its icon (else the icon alone).
     public let showsAppName: Bool
+
+    /// Where the target chip (the Mac app's icon, and the loupe's button)
+    /// sits: in the header, or, with no header (iPhone landscape with the
+    /// keyboard up), in the field's row beside the grip and the close
+    /// button (build 27 bug 5, VQ-105). Either way the field's placeholder
+    /// stays neutral, so the target shows exactly once.
+    public enum TargetPlace: String, Sendable, Hashable {
+        case header, fieldRow
+    }
+
+    public var targetPlace: TargetPlace { showsHeader ? .header : .fieldRow }
     /// The widest the panel may be in this window when no width is given.
     public let maximumWidth: Double
     public let panelWidth: Double
@@ -369,12 +384,19 @@ extension TypePanelLayout {
             return (blocks, cells, shape)
         }
 
-        /// The cell width a band gives its arrows and actions: square with
-        /// the row while the field keeps its minimum, never under 44 (or
-        /// the narrowest windows' floor).
+        /// The cell width a band gives its arrows and actions. At least
+        /// square with the row (so taller rows grow them), and on wide
+        /// panels wider still: the cells take what's left once the field
+        /// has `fieldShare` of the band, up to the tallest row (build 27
+        /// bug 2: the owner asked for arrows that grow with the panel's
+        /// width as well as its height, OT-11). Never so wide that the
+        /// field drops under its minimum, never under 44 (or the narrowest
+        /// windows' floor).
         private func bandCell(rowHeight: Double, columns: Int, gaps: Double) -> Double {
             let room = (inner - fieldMin - gaps) / Double(columns)
-            return max(floorCell, min(rowHeight, room))
+            let fieldKeeps = max(fieldMin, inner * TypePanelLayout.fieldShare)
+            let share = min(maxRow, (inner - fieldKeeps - gaps) / Double(columns))
+            return max(floorCell, min(room, max(rowHeight, share)))
         }
 
         private func oneBlockPlan(_ h: Double) -> Plan {

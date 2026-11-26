@@ -256,6 +256,11 @@ struct PixelHandShell: View {
                 selection: selection,
                 tabs: ControlSurface.tabs(includeDeck: plan.tabSurfacesIncludeDeck),
                 axis: .vertical,
+                // VQ-105: no dock here, and the Screen tab's mirror takes
+                // the whole pad, so the rail carries the keyboard button.
+                keyboard: plan.railCarriesKeyboard
+                    ? RailKeyboardButton.Config(isShown: typePanel.isShown) { typePanel.toggle() }
+                    : nil,
                 onAsk: { openAsk(plan) }
             )
             .padding(.leading, PixelHandTheme.Space.sm)
@@ -1047,9 +1052,12 @@ struct PixelHandShell: View {
         // its own Quick Actions bar and edit buttons.)
     }
 
-    /// Whether the app dock shows (and so carries the keyboard button).
+    /// Whether the app dock shows (and so carries the keyboard button), or
+    /// the rail does (iPhone landscape, VQ-105): either way the pad leaves
+    /// its own button out, so there's one per window.
     private func dockCarriesKeyboard(_ plan: CanvasPlan) -> Bool {
-        !plan.foldsDockIntoStrip && CGFloat(plan.metrics.height) >= Self.foldedDockHeight
+        plan.railCarriesKeyboard
+            || (!plan.foldsDockIntoStrip && CGFloat(plan.metrics.height) >= Self.foldedDockHeight)
     }
 
     // MARK: - Deck

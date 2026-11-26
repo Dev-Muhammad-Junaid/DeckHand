@@ -178,6 +178,20 @@ struct PairingCodeEntryView: View {
 
                 codeField
 
+                // VQ-108: on iPad the number pad floats over the sheet and
+                // covered the heading while typing; the line under the
+                // field says again where the code comes from.
+                if PairingSheetLayout.showsFieldCaption(isPhone: isPhone, isKeypadUp: isKeypadUp) {
+                    Text(PairingSheetLayout.fieldCaption(targetName: chosenName))
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity)
+                        .transition(.opacity)
+                        .accessibilityIdentifier("ph.pairing.fieldCaption")
+                }
+
                 // Right under the field, so it stays above the number pad
                 // on iPhone (VQ-030).
                 actions

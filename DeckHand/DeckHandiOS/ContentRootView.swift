@@ -21,6 +21,7 @@ import UIKit
 struct ContentRootView: View {
     @Environment(\.loomContext) private var loomContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var typeSize
     @EnvironmentObject private var settings: DeckHandSettings
     @LoomQuery(.peers(sort: .name)) private var discoveredPeers: [LoomPeerSnapshot]
     /// Only Macs: other iPads and iPhones running Pixel Hand advertise the
@@ -216,7 +217,12 @@ struct ContentRootView: View {
             }
         }
         .padding(.horizontal, PixelHandTheme.Space.xl)
-        .padding(.top, activeConnection == nil ? PixelHandTheme.Space.sm : Self.headerClearance)
+        // VQ-107: on the picker the toast sits under Pair and Settings, not
+        // over them.
+        .padding(.top, CGFloat(ConnectToastPlan.topInset(
+            hasSession: activeConnection != nil,
+            headerClearance: Double(Self.headerClearance)
+        )))
         .transition(.opacity)
         .animation(.easeOut(duration: 0.2), value: switcher.notice)
         .animation(.easeOut(duration: 0.2), value: dialing?.deviceID)
@@ -227,14 +233,43 @@ struct ContentRootView: View {
     /// Room for the shell's header row above the toast.
     private static let headerClearance: CGFloat = PixelHandTheme.ControlHeight.standard + PixelHandTheme.Space.xl
 
+    /// The toast and its Cancel. In a row when that fits; at the
+    /// accessibility sizes, or when the row doesn't fit, the text gets the
+    /// full width and wraps at words, with Cancel under it (VQ-107: at AX3
+    /// the row squeezed it to "Con- / necti…").
+    @ViewBuilder
     private func cancellableToast(_ message: String) -> some View {
-        HStack(spacing: PixelHandTheme.Space.sm) {
-            PHToast(message: message, pixel: .off)
-                .accessibilityIdentifier("ph.connect.toast")
-            Button("Cancel") { switcher.cancelDial() }
-                .buttonStyle(.ph(.secondary, size: .regular))
-                .accessibilityIdentifier("ph.connect.cancel")
+        let inline = HStack(spacing: PixelHandTheme.Space.sm) {
+            connectToast(message, arrangement: .inline)
+                .layoutPriority(1)
+            connectCancel
+                .fixedSize()
         }
+        let stacked = VStack(spacing: PixelHandTheme.Space.sm) {
+            connectToast(message, arrangement: .stacked)
+            connectCancel
+        }
+        .frame(maxWidth: 480)
+        switch ConnectToastPlan.arrangement(band: typeSize.typeBand) {
+        case .stacked:
+            stacked
+        case .inline:
+            ViewThatFits(in: .horizontal) {
+                inline
+                stacked
+            }
+        }
+    }
+
+    private func connectToast(_ message: String, arrangement: ConnectToastPlan.Arrangement) -> some View {
+        PHToast(message: message, pixel: .off, lineLimit: ConnectToastPlan.lineLimit(arrangement))
+            .accessibilityIdentifier("ph.connect.toast")
+    }
+
+    private var connectCancel: some View {
+        Button("Cancel") { switcher.cancelDial() }
+            .buttonStyle(.ph(.secondary, size: .regular))
+            .accessibilityIdentifier("ph.connect.cancel")
     }
 
     // MARK: - Lifecycle
