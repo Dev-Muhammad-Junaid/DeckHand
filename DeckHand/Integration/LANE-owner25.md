@@ -362,6 +362,11 @@ the field holds only it (it typed " now" to append before).
   type youtube and press return" → Run → Save as key with a name → "Saved
   as a key" → the key on the deck → tap → asks first with "Types into …" →
   Run → the inspector shows "Ask before running".
+- `test20` taps the ↑ key and numpad 7 only when the coordinator's
+  `ensureScratchFrontmost()` passes. `test21` runs the plan and the key
+  (which type "youtube" and Return into Safari on the Mac) only with
+  `PH_QA_TYPE_IN_SAFARI=1`; without it, it saves from the plan and cancels
+  the key's confirmation after checking it.
 - `test19`: the last step types a new request and asserts it replaced the
   old one (bug 2).
 - `test18`: the numpad is a toggle now (`ph.type.tab.numpad` twice; the

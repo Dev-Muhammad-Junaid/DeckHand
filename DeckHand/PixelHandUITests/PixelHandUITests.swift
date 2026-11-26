@@ -637,7 +637,7 @@ final class PixelHandUITests: XCTestCase {
             XCTAssertGreaterThan(right.frame.midX, down.frame.midX, "→ isn't right of ↓")
             XCTAssertEqual(left.frame.midY, down.frame.midY, accuracy: 2, "← ↓ → aren't one row")
             XCTAssertGreaterThanOrEqual(up.frame.height, 43.5, "Arrow keys lost their 44 pt target")
-            up.tap()
+            if ensureScratchFrontmost() { up.tap() }
         }
         // The keys: two rows, modifiers with esc and tab first.
         let command = element("ph.type.modifier.command"), delete = element("ph.type.key.delete")
@@ -692,7 +692,7 @@ final class PixelHandUITests: XCTestCase {
                 XCTAssertLessThanOrEqual(numpad.frame.width, 222, "The numpad is wider than its compact 5 × 4 grid")
             }
             snap("type-numpad-docked")
-            tapIfExists("ph.type.numpad.seven")
+            if ensureScratchFrontmost() { tapIfExists("ph.type.numpad.seven") }
             tapIfExists("ph.type.tab.numpad")
             sleep(1)
             XCTAssertFalse(element("ph.type.numpad").exists, "The numpad didn't go away")
@@ -725,8 +725,11 @@ final class PixelHandUITests: XCTestCase {
     /// OT-8 (owner testing, build 25): Ask's "Open Safari · Type “youtube”
     /// · Press ⏎" ran, but Save as key refused it. Walks Ask → Run → Save
     /// as key → the key on the deck → run it (it asks first, naming
-    /// Safari).
+    /// Safari). The two runs type "youtube" and Return into Safari on the
+    /// Mac, so they only happen with `PH_QA_TYPE_IN_SAFARI=1`; without it
+    /// the walk saves from the plan and cancels the key's confirmation.
     func test21_AskTypedPlanSavesAsKey() {
+        let runs = ProcessInfo.processInfo.environment["PH_QA_TYPE_IN_SAFARI"] == "1"
         launch()
         guard connect() else { return }
         guard openAsk() else { return }
@@ -739,11 +742,13 @@ final class PixelHandUITests: XCTestCase {
         snap("ask-typed-plan")
         XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "can’t type text yet")).firstMatch.exists, "The old refusal is back")
 
-        tapIfExists("ph.ask.run")
-        let confirm = app.buttons["Run"].firstMatch
-        if confirm.waitForExistence(timeout: 2), confirm.isHittable, !element("ph.ask.run").isHittable { confirm.tap() }
-        XCTAssertTrue(element("ph.ask.saveAsKey").waitForExistence(timeout: 15), "No Save as key after the run")
-        snap("ask-typed-result")
+        if runs {
+            tapIfExists("ph.ask.run")
+            let confirm = app.buttons["Run"].firstMatch
+            if confirm.waitForExistence(timeout: 2), confirm.isHittable, !element("ph.ask.run").isHittable { confirm.tap() }
+            XCTAssertTrue(element("ph.ask.saveAsKey").waitForExistence(timeout: 15), "No Save as key after the run")
+            snap("ask-typed-result")
+        }
 
         tapIfExists("ph.ask.saveAsKey")
         let name = element("ph.ask.name")
@@ -779,9 +784,14 @@ final class PixelHandUITests: XCTestCase {
         let message = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Types into")).firstMatch
         XCTAssertTrue(message.exists, "The confirmation doesn't say where the text goes")
         snap("deck-typed-key-confirm")
-        run.tap()
-        sleep(3)
-        snap("deck-typed-key-ran")
+        if runs {
+            run.tap()
+            sleep(3)
+            snap("deck-typed-key-ran")
+        } else {
+            app.buttons["Cancel"].firstMatch.tap()
+            sleep(1)
+        }
 
         // The key editor shows the typed step as editable text.
         if tapIfExists("ph.deck.edit") {
