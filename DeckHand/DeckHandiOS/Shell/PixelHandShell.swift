@@ -80,6 +80,8 @@ struct PixelHandShell: View {
     @SceneStorage("pixelhand.layout.rightColumnMode") private var columnModeRawValue = RightColumnMode.deck.rawValue
     /// Bumped to focus Ask's field when Ask opens in the column.
     @State private var askFocusRequest = 0
+    /// Ask's field in the column has focus (the header's ⌘K button lights).
+    @State private var askFieldFocused = false
     @State private var isAskPresented = false
     @State private var isMyMacsPresented = false
     /// The Type panel: open/closed, mode, tab (OT-2, OT-3). One per window.
@@ -372,6 +374,7 @@ struct PixelHandShell: View {
                 header(
                     presets: preset,
                     onAsk: { openAsk(plan) },
+                    askState: askButtonState(plan),
                     onShowSidebar: showSidebarAction(plan),
                     showsMirrorToggle: false,
                     horizontalPadding: 0
@@ -580,9 +583,19 @@ struct PixelHandShell: View {
         }
     }
 
+    /// The header's ⌘K button: open while the column shows Ask, lit while
+    /// Ask's field has focus (OT-18).
+    private func askButtonState(_ plan: CanvasPlan) -> HeaderAskButton.State {
+        let column = rightColumn(plan)
+        let showsAsk = column.askRoute == .column && !column.isCollapsed && columnMode.wrappedValue == .ask
+        return HeaderAskButton.state(columnShowsAsk: showsAsk, fieldFocused: askFieldFocused)
+    }
+
     /// Ask in the column: the same panel and model as the sheet.
     private func askColumn(framed: Bool) -> some View {
-        AskPanel(session: session, macName: peerName, placement: .column, focusRequest: askFocusRequest)
+        AskPanel(session: session, macName: peerName, placement: .column, focusRequest: askFocusRequest, onFieldFocus: { focused in
+            if askFieldFocused != focused { askFieldFocused = focused }
+        })
             .frame(maxHeight: .infinity, alignment: .top)
             .background(
                 framed ? PixelHandTheme.raised.opacity(0.5) : Color.clear,
@@ -928,6 +941,7 @@ struct PixelHandShell: View {
     private func header(
         presets: Binding<LayoutPreset>? = nil,
         onAsk: (() -> Void)? = nil,
+        askState: HeaderAskButton.State = .idle,
         onShowSidebar: (() -> Void)? = nil,
         showsMirrorToggle: Bool = true,
         horizontalPadding: CGFloat = PixelHandTheme.Space.lg
@@ -952,6 +966,7 @@ struct PixelHandShell: View {
             onDisconnect: onDisconnect,
             presets: presets,
             onAsk: onAsk,
+            askState: askState,
             onShowSidebar: onShowSidebar,
             showsMirrorToggle: showsMirrorToggle,
             horizontalPadding: horizontalPadding

@@ -961,14 +961,37 @@ final class PixelHandUITests: XCTestCase {
 
             let cards = app.descendants(matching: .any).matching(identifier: "ph.transfer.macCard").allElementsBoundByIndex
             let offline = app.descendants(matching: .any).matching(identifier: "ph.send.offlineCard").allElementsBoundByIndex
-            for card in cards {
-                XCTAssertLessThanOrEqual(card.frame.height, 72, "Device cards are compact (\(tag)): \(card.frame)")
+            // OT-16: cards sized to the names (64, or 80 with two-line
+            // names), offline Macs the same muted card, one height for all,
+            // one width per grid, inside the chips' row.
+            let allCards = cards + offline
+            let cardHeights = allCards.map(\.frame.height)
+            for card in allCards {
+                XCTAssertLessThanOrEqual(card.frame.height, 84, "Device cards are compact (\(tag)): \(card.frame)")
             }
-            for row in offline {
-                XCTAssertLessThanOrEqual(row.frame.height, 48, "An offline Mac is a small row (\(tag)): \(row.frame)")
-                if let card = cards.first {
-                    XCTAssertLessThan(row.frame.height, card.frame.height, "Offline Macs are smaller than live cards (\(tag))")
+            if let low = cardHeights.min(), let high = cardHeights.max() {
+                XCTAssertLessThanOrEqual(high - low, 1, "Live and offline cards share one height (\(tag)): \(cardHeights)")
+            }
+            let cardWidths = allCards.map(\.frame.width)
+            if let low = cardWidths.min(), let high = cardWidths.max() {
+                XCTAssertLessThanOrEqual(high - low, 1, "Cards share one column width (\(tag)): \(cardWidths)")
+            }
+            if chips.allSatisfy({ $0.exists }) {
+                let row = chips[0].frame.union(chips[2].frame)
+                for card in allCards {
+                    XCTAssertGreaterThanOrEqual(card.frame.minX, row.minX - 1, "Card inside the margins (\(tag))")
+                    XCTAssertLessThanOrEqual(card.frame.maxX, row.maxX + 1, "Card inside the margins (\(tag))")
                 }
+                // OT-15: the switch and Done sit on the same margins as the
+                // chips, centred on one line.
+                let tabSwitch = element("ph.transfer.tab").frame
+                let doneFrame = element("ph.send.done").frame
+                XCTAssertLessThanOrEqual(abs(tabSwitch.minX - row.minX), 2, "Switch on the leading margin (\(tag)): \(tabSwitch.minX) vs \(row.minX)")
+                XCTAssertLessThanOrEqual(abs(doneFrame.maxX - row.maxX), 2, "Done's target on the trailing margin (\(tag)): \(doneFrame.maxX) vs \(row.maxX)")
+                XCTAssertLessThanOrEqual(abs(tabSwitch.midY - doneFrame.midY), 1, "Switch and Done centred on one line (\(tag))")
+                // OT-17: the three chips have one face. Their fill, sampled
+                // at both ends (clear of icon and label), matches.
+                checkChipsLookAlike(chips, tag: tag)
             }
 
             // Sized to the content: with no more than a row of cards and no
@@ -979,13 +1002,119 @@ final class PixelHandUITests: XCTestCase {
                 XCTAssertGreaterThan(done.frame.minY, window.minY + window.height * 0.25, "Sheet sized to its content (\(tag)): Done at \(done.frame.minY)")
             }
 
+            // OT-15: on iPad the sheet is a card centred on the window, and
+            // Send and Inbox are one size (switching doesn't move it).
+            let sheet = element("ph.send.sheet")
+            let sendFrame = sheet.exists ? sheet.frame : .zero
+            if sheet.exists, UIDevice.current.userInterfaceIdiom == .pad {
+                let window = app.windows.firstMatch.frame
+                XCTAssertLessThanOrEqual(abs(sendFrame.midX - window.midX), 2, "Sheet centred across the window (\(tag)): \(sendFrame) in \(window)")
+                XCTAssertLessThanOrEqual(abs(sendFrame.midY - window.midY), 2, "Sheet centred down the window (\(tag)): \(sendFrame) in \(window)")
+                XCTAssertLessThanOrEqual(sendFrame.width, 561, "Sheet at most 560 wide (\(tag))")
+            }
             if tapIfExists("ph.send.tab.inbox") {
                 sleep(1)
                 snap("inbox-\(tag)")
+                if sheet.exists {
+                    let inboxFrame = sheet.frame
+                    XCTAssertLessThanOrEqual(abs(inboxFrame.height - sendFrame.height), 1, "Send and Inbox one height (\(tag)): \(sendFrame.height) / \(inboxFrame.height)")
+                    XCTAssertLessThanOrEqual(abs(inboxFrame.midX - sendFrame.midX), 1, "Inbox doesn't move the sheet (\(tag))")
+                    let empty = element("ph.inbox.empty")
+                    if empty.exists {
+                        let header = element("ph.send.header").frame
+                        let panel = CGRect(x: inboxFrame.minX, y: header.maxY, width: inboxFrame.width, height: inboxFrame.maxY - header.maxY)
+                        XCTAssertLessThanOrEqual(abs(empty.frame.midX - panel.midX), 2, "Nothing yet centred across (\(tag)): \(empty.frame) in \(panel)")
+                        XCTAssertLessThanOrEqual(abs(empty.frame.midY - panel.midY), 4, "Nothing yet centred down (\(tag)): \(empty.frame) in \(panel)")
+                    }
+                }
                 tapIfExists("ph.send.tab.send")
             }
             if !tapIfExists("ph.send.done") { dismissSheet() }
             sleep(1)
+        }
+        XCUIDevice.shared.orientation = .portrait
+        sleep(1)
+    }
+
+    /// OT-14: badges draw above their controls' glass, never clipped.
+    /// Runs on the free plan, where the header's Pro circles carry the lock
+    /// (and the Send circle its unseen dot when the Inbox has new items).
+    /// For each badge (`ph.badge.*`, exposed by `-qa.exposeBadges`): it
+    /// touches its control, sits on the 4 pt grid relative to it, and its
+    /// colour on screen is the badge's own (sampled from a screenshot), not
+    /// the glass's: a badge under the glass reads washed out.
+    func test25_BadgesAboveGlass() {
+        launch(free: true)
+        guard connect() else { return }
+        for orientation in [UIDeviceOrientation.landscapeLeft, .portrait] {
+            let tag = orientation == .portrait ? "portrait" : "landscape"
+            XCUIDevice.shared.orientation = orientation
+            sleep(2)
+            snap("badges-\(tag)")
+            let controls = ["ph.header.screen", "ph.header.capture", "ph.transfer.send"].map(element).filter(\.exists)
+            let badges = ["proLock", "dot"].flatMap { kind in
+                app.descendants(matching: .any).matching(identifier: "ph.badge.\(kind)").allElementsBoundByIndex.map { (kind, $0) }
+            }
+            if badges.isEmpty { snap("no-badges-\(tag)") }
+            let shot = XCUIScreen.main.screenshot()
+            for (kind, badge) in badges {
+                let frame = badge.frame
+                guard let control = controls.first(where: { $0.frame.insetBy(dx: -12, dy: -12).intersects(frame) }) else { continue }
+                XCTAssertTrue(control.frame.intersects(frame), "\(kind) touches its control (\(tag)): \(frame) / \(control.frame)")
+                let dx = (frame.minX - control.frame.minX).truncatingRemainder(dividingBy: 4)
+                let dy = (frame.minY - control.frame.minY).truncatingRemainder(dividingBy: 4)
+                XCTAssertLessThanOrEqual(min(abs(dx), 4 - abs(dx)), 0.5, "\(kind) on the 4 pt grid (\(tag))")
+                XCTAssertLessThanOrEqual(min(abs(dy), 4 - abs(dy)), 0.5, "\(kind) on the 4 pt grid (\(tag))")
+                // The lock tile's left edge (clear of its glyph); the dot's centre.
+                let point = kind == "proLock" ? CGPoint(x: frame.minX + 3, y: frame.midY) : CGPoint(x: frame.midX, y: frame.midY)
+                if let colour = pixel(at: point, in: shot) {
+                    XCTAssertGreaterThan(colour.b - colour.r, 60, "\(kind) drawn above the glass, in its own blue (\(tag)): rgb \(colour)")
+                }
+            }
+        }
+        XCUIDevice.shared.orientation = .portrait
+        sleep(1)
+    }
+
+    /// OT-18: the header's compact ⌘K button. In iPad landscape: about 80
+    /// pt wide, 44 tall, centred on the header's line; a tap opens Ask in
+    /// the column with its field focused, and the button then reads open;
+    /// with Ask back to the deck, ⌘K opens it again.
+    func test26_HeaderAskButton() {
+        launch()
+        guard connect() else { return }
+        XCUIDevice.shared.orientation = .landscapeLeft
+        sleep(2)
+        let ask = element("ph.ask")
+        guard ask.waitForExistence(timeout: 3) else {
+            snap("no-ask-button")
+            XCUIDevice.shared.orientation = .portrait
+            return
+        }
+        snap("header-ask-button")
+        XCTAssertLessThanOrEqual(ask.frame.width, 96, "Compact ⌘K button, not a field: \(ask.frame)")
+        XCTAssertLessThanOrEqual(abs(ask.frame.height - 44), 1, "44 pt tall: \(ask.frame)")
+        let more = element("ph.header.more")
+        if more.exists {
+            XCTAssertLessThanOrEqual(abs(ask.frame.midY - more.frame.midY), 1, "On the header's line with More")
+            XCTAssertLessThan(ask.frame.maxX, more.frame.minX, "In the trailing cluster, before More")
+        }
+        ask.tap()
+        sleep(1)
+        snap("header-ask-open")
+        XCTAssertTrue(element("ph.ask.field").waitForExistence(timeout: 3), "⌘K button opens Ask")
+        if element("ph.column.deck").exists {
+            let value = ask.value as? String ?? ""
+            XCTAssertTrue(value.hasPrefix("Open"), "The button shows Ask is open: \(value)")
+            element("ph.column.deck").tap()
+            sleep(1)
+            app.typeKey("k", modifierFlags: .command)
+            sleep(1)
+            snap("header-ask-cmd-k")
+            XCTAssertTrue(element("ph.ask.field").waitForExistence(timeout: 3), "⌘K still opens Ask")
+            closeAsk()
+        } else {
+            closeAsk()
         }
         XCUIDevice.shared.orientation = .portrait
         sleep(1)
@@ -1109,6 +1238,8 @@ final class PixelHandUITests: XCTestCase {
         app.launchArguments += [
             "-settings.hasCompletedOnboarding", onboarded ? "YES" : "NO",
             "-store.developerUnlock", isFree ? "NO" : "YES",
+            // OT-14: badges become findable (`ph.badge.<kind>`) for test25.
+            "-qa.exposeBadges", "YES",
         ]
         app.launch()
         acceptSystemAlerts()
@@ -1454,6 +1585,56 @@ final class PixelHandUITests: XCTestCase {
 
     private func slug(_ text: String) -> String {
         String(text.lowercased().map { $0.isLetter || $0.isNumber ? $0 : "-" })
+    }
+
+    /// OT-17: the three source chips have one face: their fill, sampled
+    /// just inside each end (clear of icon and label), matches within a
+    /// few levels, and so does the label's colour band (the darkest or
+    /// lightest pixel across the chip's middle line).
+    private func checkChipsLookAlike(_ chips: [XCUIElement], tag: String) {
+        let shot = XCUIScreen.main.screenshot()
+        var fills: [(r: Int, g: Int, b: Int)] = []
+        for chip in chips {
+            let f = chip.frame
+            for x in [f.minX + 5, f.maxX - 5] {
+                if let colour = pixel(at: CGPoint(x: x, y: f.midY), in: shot) { fills.append(colour) }
+            }
+        }
+        guard let first = fills.first else { return }
+        for colour in fills {
+            let diff = max(abs(colour.r - first.r), abs(colour.g - first.g), abs(colour.b - first.b))
+            XCTAssertLessThanOrEqual(diff, 12, "Source chips share one fill (\(tag)): \(fills)")
+        }
+        // No accent text: a chip whose ink is blue (b ≫ r) is the odd one.
+        for chip in chips {
+            let f = chip.frame
+            var bluest = 0
+            for step in stride(from: f.minX + 12, through: f.maxX - 12, by: 2) {
+                if let colour = pixel(at: CGPoint(x: step, y: f.midY), in: shot) { bluest = max(bluest, colour.b - colour.r) }
+            }
+            XCTAssertLessThan(bluest, 90, "\(chip.identifier): icon and label in ink, not accent (\(tag))")
+        }
+    }
+
+    /// The colour at `point` (points, in the app's orientation) in a
+    /// screenshot, 0–255 per channel.
+    private func pixel(at point: CGPoint, in shot: XCUIScreenshot) -> (r: Int, g: Int, b: Int)? {
+        let image = shot.image
+        guard point.x >= 0, point.y >= 0, point.x < image.size.width, point.y < image.size.height else { return nil }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let one = UIGraphicsImageRenderer(size: CGSize(width: 1, height: 1), format: format).image { _ in
+            image.draw(at: CGPoint(x: -point.x, y: -point.y))
+        }
+        guard let cg = one.cgImage else { return nil }
+        var bytes = [UInt8](repeating: 0, count: 4)
+        guard let context = CGContext(
+            data: &bytes, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+        context.draw(cg, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+        return (Int(bytes[0]), Int(bytes[1]), Int(bytes[2]))
     }
 
     private func snap(_ name: String) {

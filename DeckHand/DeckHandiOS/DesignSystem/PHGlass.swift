@@ -78,9 +78,17 @@ extension View {
         modifier(PHGlassBackground(shape: shape, interactive: interactive, tint: tint))
     }
 
-    /// Groups neighbouring glass so it morphs together on iOS 26.
-    @ViewBuilder
+    /// Groups neighbouring glass so it morphs together on iOS 26. The
+    /// group also draws its controls' badges in one layer above the glass
+    /// (OT-14: inside the container an overlay on a control sat under the
+    /// combined glass and was cut off), so a badge in a glass group is
+    /// never clipped or covered.
     func phGlassGroup(spacing: CGFloat = PixelHandTheme.Space.sm) -> some View {
+        glassContainer(spacing: spacing).controlBadgeLayer()
+    }
+
+    @ViewBuilder
+    private func glassContainer(spacing: CGFloat) -> some View {
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
             GlassEffectContainer(spacing: spacing) { self }

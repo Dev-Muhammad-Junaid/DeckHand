@@ -146,14 +146,10 @@ private struct DockApp: View {
             onActivate()
         } label: {
             AppIconTile(app: app, side: iconSide)
-                .overlay(alignment: .topTrailing) {
-                    if entry.hasDialog {
-                        StatusPixel(state: .needsYou, size: 8)
-                            .padding(2)
-                            .background(PixelHandTheme.canvas, in: RoundedRectangle(cornerRadius: 3, style: .continuous))
-                            .offset(x: 5, y: -5)
-                    }
-                }
+                // A dialog waiting: the amber pixel inside the icon's corner
+                // (OT-14: hung 5 pt past the icon it was clipped by the
+                // dock's scroll view).
+                .controlBadge(entry.hasDialog ? .needsYou : nil, style: .inset(0, radius: 10))
                 // The front app: a small dot under the icon in the accent
                 // colour, like the Mac's own Dock (OT-1).
                 .overlay(alignment: .bottom) {

@@ -201,13 +201,8 @@ struct CompactMacCard: View {
                         .padding(-2)
                 }
             }
-            .overlay(alignment: .bottomTrailing) {
-                if isFreeLocked {
-                    ProLockBadge()
-                        .scaleEffect(0.8)
-                        .offset(x: 4, y: 4)
-                }
-            }
+            // On the tile's bottom-trailing corner, above it (OT-14).
+            .controlBadge(isFreeLocked ? .proLockSmall : nil, style: .init(shape: .roundedRect(radius: 8), corner: .bottomTrailing, anchor: .rim))
             .pixelOnNavy()
     }
 
@@ -220,39 +215,57 @@ struct CompactMacCard: View {
     }
 }
 
-/// Ask as a glass field on wide windows (`03-Layout-Strategy.md`: "Ask
-/// field ⌘K"): the Ask glyph, "Tell <Mac>…" and the shortcut. Opens the Ask
-/// sheet; ⌘K works from a hardware keyboard.
-struct AskField: View {
+/// The header's compact ⌘K button on wide windows (owner testing, build
+/// 27, OT-18; it replaces the wide "Tell <Mac>…" field): a 44 pt glass
+/// capsule with the Ask glyph and the chord, tooltip "Ask (⌘K)". It opens
+/// Ask exactly as the field did (the shell's `openAsk`: the right column,
+/// expanded, else the sheet), and ⌘K still works from a hardware keyboard.
+/// While Ask shows in the column it reads as open; while Ask's field has
+/// focus it is lit (`HeaderAskButton.State`). A command palette would plug
+/// in at `HeaderAskButton.Command` (see there).
+struct AskShortcutButton: View {
     let macName: String
+    var state: HeaderAskButton.State = .idle
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: PixelHandTheme.Space.sm) {
-                PHGlyph(glyph: PixelGlyphs.ask, pitch: PixelPitch.chip)
-                    .foregroundStyle(PixelHandTheme.ink)
-                Text("Tell \(macName)…")
-                    .font(.subheadline)
-                    .foregroundStyle(PixelHandTheme.ink3)
-                    .lineLimit(1)
-                Spacer(minLength: PixelHandTheme.Space.sm)
-                Text("⌘K")
+                PHGlyph(glyph: PixelGlyphs.ask, pitch: PixelPitch.header)
+                Text(HeaderAskButton.chord)
                     .font(.phChord)
-                    .foregroundStyle(PixelHandTheme.ink3)
+                    .lineLimit(1)
+                    .fixedSize()
                     .accessibilityHidden(true)
             }
-            .padding(.horizontal, PixelHandTheme.Space.lg)
-            .frame(maxWidth: .infinity, minHeight: PixelHandTheme.ControlHeight.standard)
+            .foregroundStyle(state.isLit ? PixelHandTheme.accent : PixelHandTheme.ink)
+            .padding(.horizontal, PixelHandTheme.Space.md)
+            .frame(minWidth: CGFloat(HeaderAskButton.width), minHeight: PixelHandTheme.ControlHeight.standard)
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .phGlass(in: Capsule(), interactive: true)
-        .keyboardShortcut("k", modifiers: .command)
+        .overlay {
+            // Open in the column: the 2 pt accent ring, like a focused card.
+            if state != .idle {
+                Capsule()
+                    .strokeBorder(PixelHandTheme.accent.opacity(state.isLit ? 1 : 0.5), lineWidth: PixelHandTheme.Stroke.selection)
+                    .allowsHitTesting(false)
+            }
+        }
+        .fixedSize()
+        .keyboardShortcut(KeyEquivalent(HeaderAskButton.key), modifiers: .command)
+        .help(HeaderAskButton.tooltip)
         .phosphorFocusable(cornerRadius: PixelHandTheme.ControlHeight.standard / 2)
         .accessibilityLabel("Ask")
-        .accessibilityHint("Type what you want \(macName) to do")
+        .accessibilityValue(state.spokenValue)
+        .accessibilityHint("Type what you want \(macName) to do. Command K.")
+        .accessibilityAddTraits(state.isSelected ? .isSelected : [])
         .accessibilityIdentifier("ph.ask")
+        .accessibilityShowsLargeContentViewer {
+            Label { Text(HeaderAskButton.tooltip) } icon: { PHGlyph(glyph: PixelGlyphs.ask, pitch: PixelPitch.tabBar) }
+        }
+        .animation(PixelHandMotion.quick, value: state)
     }
 }
 

@@ -14,7 +14,7 @@
 //  `.requiresPro` leaves the control as it is when the feature is unlocked
 //  (Pro, the free trial, grace and billing retry, or a free feature). When
 //  it's locked, the control is dimmed and can't be used, a small lock sits
-//  inside its bottom-trailing corner, and a tap anywhere on it opens the paywall for that
+//  on its bottom-trailing corner, above its glass (`ControlBadge`), and a tap anywhere on it opens the paywall for that
 //  feature. VoiceOver reads it as "<label>, Pixel Hand Pro" with the hint
 //  "Opens Pixel Hand Pro".
 //
@@ -40,14 +40,18 @@ extension EnvironmentValues {
 
 extension View {
     /// Locks this control behind Pixel Hand Pro when `feature` isn't
-    /// unlocked; a tap opens the paywall.
-    func requiresPro(_ feature: ProFeature) -> some View {
-        modifier(RequiresProModifier(feature: feature))
+    /// unlocked; a tap opens the paywall. `badge` places the lock: inside
+    /// the bottom-trailing corner by default, on the rim for glass circles
+    /// (`.circle(.bottomTrailing)`). Either way it is drawn above the
+    /// control's glass, never clipped (OT-14).
+    func requiresPro(_ feature: ProFeature, badge: ControlBadgeStyle = .inset(0, corner: .bottomTrailing)) -> some View {
+        modifier(RequiresProModifier(feature: feature, badge: badge))
     }
 }
 
 private struct RequiresProModifier: ViewModifier {
     let feature: ProFeature
+    let badge: ControlBadgeStyle
 
     @Environment(\.entitlements) private var entitlements
     @State private var isPaywallPresented = false
@@ -60,12 +64,9 @@ private struct RequiresProModifier: ViewModifier {
                 .disabled(true)
                 .opacity(0.45)
                 .accessibilityHidden(true)
-                // Anchored inside the control's bottom-trailing corner, so
-                // it never hangs off a header circle's edge (VQ-026).
-                .overlay(alignment: .bottomTrailing) {
-                    ProLockBadge()
-                        .allowsHitTesting(false)
-                }
+                // Above the glass, at Core's frame on the 4 pt grid (OT-14:
+                // a plain overlay sat under the header's glass group).
+                .controlBadge(.proLock, style: badge)
                 .overlay {
                     // Outside `.disabled`, so it still takes the tap.
                     Button {
@@ -79,6 +80,7 @@ private struct RequiresProModifier: ViewModifier {
                 }
                 .sheet(isPresented: $isPaywallPresented) {
                     PaywallView(reason: .feature(feature))
+                        .controlBadgeScope()
                 }
         }
     }
@@ -87,10 +89,14 @@ private struct RequiresProModifier: ViewModifier {
 /// The small lock on a locked control: the lock glyph in dots on the
 /// icon's sky → cobalt tile.
 struct ProLockBadge: View {
+    /// 20, or 16 on small tiles: on the 4 pt grid (`ControlBadgeKind
+    /// .proLock` / `.proLockSmall`, OT-14).
+    var side: CGFloat = 20
+
     var body: some View {
-        PHGlyph(glyph: PixelGlyphs.lock, pitch: 1.4)
+        PHGlyph(glyph: PixelGlyphs.lock, pitch: side < 20 ? 1.2 : 1.4)
             .foregroundStyle(.white)
-            .frame(width: 18, height: 18)
+            .frame(width: side, height: side)
             .background(
                 RoundedRectangle(cornerRadius: 5, style: .continuous)
                     .fill(PixelHandTheme.Brand.tileGradient)

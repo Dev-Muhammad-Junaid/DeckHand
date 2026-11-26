@@ -133,8 +133,10 @@ public enum SendSheetLayout {
     /// The Send tab's content height (under the header) for a content
     /// width, from the component sizes above. The app replaces it with the
     /// measured height once laid out.
-    public static func estimatedSendHeight(_ content: SendContent, width: Double) -> Double {
-        let columns = columns(width: width)
+    public static func estimatedSendHeight(_ content: SendContent, width: Double, grid: CardGrid? = nil) -> Double {
+        let columns = grid?.columns ?? columns(width: width)
+        let cardHeight = grid?.cardHeight ?? cardHeight
+        let offlineHeight = grid?.cardHeight ?? offlineHeight
         var sections: [Double] = []
         sections.append(chipHeight)
         var field = fieldHeight
@@ -150,7 +152,7 @@ public enum SendSheetLayout {
             targets += stack(rows: rows(count: content.cardCount, columns: columns), rowHeight: cardHeight, gap: cardGap)
             if content.offlineCount > 0 {
                 if content.cardCount > 0 { targets += cardGap }
-                targets += stack(rows: rows(count: content.offlineCount, columns: columns), rowHeight: offlineHeight, gap: rowGap)
+                targets += stack(rows: rows(count: content.offlineCount, columns: columns), rowHeight: offlineHeight, gap: grid == nil ? rowGap : cardGap)
             }
         }
         sections.append(targets)
@@ -176,6 +178,176 @@ public enum SendSheetLayout {
             height += stack(rows: items, rowHeight: inboxRowHeight, gap: rowGap) + rowGap + labelHeight
         }
         return height + bottomPadding
+    }
+
+    // MARK: Source chips look alike (owner testing, build 27, OT-17)
+
+    /// Photos, Files and Paste share one face. Paste is the system paste
+    /// control (`UIPasteControl`, no "Allow Paste" prompt), which draws its
+    /// own icon and "Paste" label in one foreground colour and its own
+    /// font; so the other two follow it: the icon and the label in the same
+    /// colour (`ink`, not the accent glyph build 26 gave Photos and Files),
+    /// on `raised` with a hairline, radius 14, 44 tall, and the label in the
+    /// paste control's font as measured on the device.
+    public enum SourceChip {
+        /// Icon and label, all three chips (the paste control's
+        /// `baseForegroundColor`).
+        public static let foreground = PaletteTokens.ink
+        /// The chip (the paste control's `baseBackgroundColor`).
+        public static let background = PaletteTokens.raised
+        public static let height = chipHeight
+        public static let cornerRadius = 14.0
+        /// Between the icon and the label.
+        public static let iconGap = 6.0
+        /// The system symbols that stand in for the pixel glyphs, so all
+        /// three icons are drawn the same way (the paste control's is
+        /// `doc.on.clipboard`).
+        public static let photosSymbol = "photo.on.rectangle"
+        public static let filesSymbol = "folder"
+        public static let pasteSymbol = "doc.on.clipboard"
+    }
+
+    // MARK: Cards sized to the names (owner testing, build 27, OT-16)
+
+    /// A Mac's name as the card's font sets it: each word's width and a
+    /// space's, so the card can wrap it between words exactly as the text
+    /// will (a line never breaks inside a word).
+    public struct NameMeasure: Equatable, Sendable {
+        public var words: [Double]
+        public var space: Double
+        public init(words: [Double], space: Double) {
+            self.words = words.map { max(0, $0) }
+            self.space = max(0, space)
+        }
+        /// The whole name on one line.
+        public var width: Double {
+            words.reduce(0, +) + space * Double(max(0, words.count - 1))
+        }
+        public var longestWord: Double { words.max() ?? 0 }
+    }
+
+    /// What a card spends beside its name: 10 inset, the 44 tile, a 12 gap
+    /// on the leading side; a 12 gap, the 32 trailing readout or light and
+    /// 10 inset on the trailing side.
+    public static let cardTextReserve = 120.0
+    /// The trailing readout's (or light's) slot.
+    public static let cardTrailingWidth = 32.0
+    /// A card whose name takes two lines: the 44 tile still fits, the two
+    /// name lines and the status line need 58 + 2 × 10 → 80 on the grid.
+    public static let cardTwoLineHeight = 80.0
+    /// Names wrap to at most this many lines; a column is dropped before a
+    /// name would need more.
+    public static let maximumNameLines = 2
+
+    /// The name's room in a card this wide.
+    public static func cardTextWidth(cardWidth: Double) -> Double {
+        max(0, cardWidth - cardTextReserve)
+    }
+
+    /// One card's width with `columns` in `width` (whole points).
+    public static func cardWidth(width: Double, columns: Int) -> Double {
+        let columns = max(1, columns)
+        guard width > 0 else { return 0 }
+        return ((width - cardGap * Double(columns - 1)) / Double(columns)).rounded(.down)
+    }
+
+    /// Lines the name takes in `textWidth`, wrapping between words the way
+    /// the text does (greedy). Never less than 1; `maximumNameLines + 1`
+    /// means it won't fit (too many lines, or a word wider than a line).
+    public static func nameLines(_ name: NameMeasure, textWidth: Double) -> Int {
+        let tooMany = maximumNameLines + 1
+        guard textWidth > 0 else { return tooMany }
+        guard !name.words.isEmpty else { return 1 }
+        var lines = 1
+        var line = 0.0
+        for word in name.words {
+            if word > textWidth { return tooMany }
+            if line == 0 {
+                line = word
+            } else if line + name.space + word <= textWidth {
+                line += name.space + word
+            } else {
+                lines += 1
+                line = word
+                if lines > maximumNameLines { return tooMany }
+            }
+        }
+        return lines
+    }
+
+    /// The "Send to" grid: how many columns, each card's width and height,
+    /// and how many lines the longest name takes.
+    public struct CardGrid: Equatable, Sendable {
+        public var columns: Int
+        public var cardWidth: Double
+        public var cardHeight: Double
+        public var nameLines: Int
+    }
+
+    /// The most columns (up to `columns(width:)`) in which every name, live
+    /// or offline, fits on two lines; one column when even that doesn't (the
+    /// name then truncates in the middle, the last resort). Cards are one
+    /// height: 64, or 80 when any name takes two lines. Offline Macs use the
+    /// same grid and height, so they read as the same kind of card (muted).
+    public static func cardGrid(width: Double, names: [NameMeasure]) -> CardGrid {
+        let most = columns(width: width)
+        for count in stride(from: most, through: 1, by: -1) {
+            let cardWidth = cardWidth(width: width, columns: count)
+            let textWidth = cardTextWidth(cardWidth: cardWidth)
+            let lines = names.map { nameLines($0, textWidth: textWidth) }.max() ?? 1
+            if lines <= maximumNameLines || count == 1 {
+                let shown = min(lines, maximumNameLines)
+                return CardGrid(
+                    columns: count,
+                    cardWidth: cardWidth,
+                    cardHeight: shown > 1 ? cardTwoLineHeight : cardHeight,
+                    nameLines: shown
+                )
+            }
+        }
+        return CardGrid(columns: 1, cardWidth: max(0, width), cardHeight: cardHeight, nameLines: 1)
+    }
+
+    // MARK: Both tabs one size (OT-15)
+
+    /// The content height both tabs use, so switching Send ↔ Inbox never
+    /// resizes the sheet: the taller of the two.
+    public static func sharedContentHeight(send: Double, inbox: Double) -> Double {
+        max(0, send.isFinite ? send : 0, inbox.isFinite ? inbox : 0)
+    }
+
+    // MARK: Floating card on iPad (OT-15)
+
+    /// On iPad the sheet is a card centred on the window: this wide at most.
+    public static let floatingWidth = 560.0
+    /// Its margin inside the card (the wide class margin).
+    public static let floatingMargin = 24.0
+    /// Kept clear around the card on every side of the window (the wide
+    /// class margin).
+    public static let floatingClearance = 24.0
+
+    /// The card's frame in a window `container` wide and tall (the window
+    /// above the keyboard): `floatingWidth` (less when the window is
+    /// narrower), as tall as `sheetHeight` allows within the clearance,
+    /// centred on the window on whole points. Width and height on the grid.
+    public static func floatingFrame(
+        content: Double,
+        containerWidth: Double,
+        containerHeight: Double
+    ) -> ControlBadgePlacement.Frame {
+        let roomWidth = max(0, containerWidth - 2 * floatingClearance)
+        let width = max(minimumHeight, min(floatingWidth, (roomWidth / 4).rounded(.down) * 4))
+        let roomHeight = max(minimumHeight, ((containerHeight - 2 * floatingClearance) / 4).rounded(.down) * 4)
+        let wanted = onGrid(headerHeight + max(0, content))
+        let height = min(max(wanted, minimumHeight), roomHeight)
+        let x = ((containerWidth - width) / 2).rounded(.down)
+        let y = ((containerHeight - height) / 2).rounded(.down)
+        return .init(x: x, y: y, width: width, height: height)
+    }
+
+    /// Whether the floating card's content scrolls (taller than its frame).
+    public static func floatingOverflows(content: Double, containerHeight: Double) -> Bool {
+        headerHeight + max(0, content) > max(minimumHeight, ((containerHeight - 2 * floatingClearance) / 4).rounded(.down) * 4)
     }
 
     // MARK: Sheet

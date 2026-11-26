@@ -24,6 +24,7 @@
 //  the same folder ("On My iPhone › Pixel Hand › Pixel Hand Inbox").
 //
 
+import CoreText
 import Photos
 import PhotosUI
 import SwiftUI
@@ -33,25 +34,92 @@ import UniformTypeIdentifiers
 struct TransferSheet: View {
     enum Tab: String, CaseIterable { case send = "Send", inbox = "Inbox" }
 
+    /// How the sheet is shown.
+    enum Presentation {
+        /// The system sheet (iPhone), sized to the content by detents.
+        case sheet
+        /// iPad: a card centred on the window (OT-15), in a window this
+        /// big (above the keyboard); `close` dismisses it.
+        case floating(container: CGSize, close: () -> Void)
+    }
+
     @State private var tab: Tab
-    /// The Send tab's measured content height; `nil` until laid out.
+    private let presentation: Presentation
+    /// The Send tab's measured content height; `nil` until laid out. Kept
+    /// while Inbox shows, so both tabs share one height (OT-15).
     @State private var sendContentHeight: CGFloat?
     @State private var sheetWidth: CGFloat = 0
     /// The window's height; read on appear and on rotation.
     @State private var containerHeight: CGFloat = 800
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var typeSize
     private let center = TransferCenter.shared
     private let switcher = MacSwitcher.shared
 
-    init(tab: Tab = .send) {
+    init(tab: Tab = .send, presentation: Presentation = .sheet) {
         _tab = State(initialValue: tab)
+        self.presentation = presentation
     }
 
+    private var isFloating: Bool {
+        if case .floating = presentation { return true }
+        return false
+    }
+
+    /// The floating card's frame, from Core: centred on the window, 560
+    /// wide at most, as tall as the taller tab.
+    private var floatingFrame: CGRect? {
+        guard case let .floating(container, _) = presentation else { return nil }
+        let f = SendSheetLayout.floatingFrame(
+            content: Double(contentHeight),
+            containerWidth: Double(container.width),
+            containerHeight: Double(container.height)
+        )
+        return CGRect(x: f.x, y: f.y, width: f.width, height: f.height)
+    }
+
+    /// The class margin (16 · 20 · 24); the floating card uses the wide
+    /// one, 24 (`07-Polish-Spec.md` §8).
     private var margin: CGFloat {
-        CGFloat(LayoutMetrics(width: Double(sheetWidth), height: Double(containerHeight)).margin)
+        if isFloating { return CGFloat(SendSheetLayout.floatingMargin) }
+        return CGFloat(LayoutMetrics(width: Double(sheetWidth), height: Double(containerHeight)).margin)
     }
 
     var body: some View {
+        switch presentation {
+        case .sheet:
+            card
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.width
+                } action: { width in
+                    sheetWidth = width
+                }
+                .modifier(TransferSheetSizing(
+                    height: CGFloat(SendSheetLayout.sheetHeight(content: Double(contentHeight), container: Double(containerHeight))),
+                    allowsLarge: SendSheetLayout.overflows(content: Double(contentHeight), container: Double(containerHeight))
+                ))
+                .onAppear { containerHeight = Self.windowHeight() }
+                .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
+                    containerHeight = Self.windowHeight()
+                }
+        case .floating:
+            let frame = floatingFrame ?? .zero
+            card
+                .frame(width: frame.width, height: frame.height)
+                .clipShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.sheet, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: PixelHandTheme.Radius.sheet, style: .continuous)
+                        .strokeBorder(PixelHandTheme.hairline, lineWidth: PixelHandTheme.Stroke.hairline)
+                )
+                .shadow(color: .black.opacity(0.28), radius: 24, y: 12)
+                .position(x: frame.midX, y: frame.midY)
+                .onAppear { sheetWidth = frame.width }
+                .onChange(of: frame.width) { _, width in sheetWidth = width }
+                .animation(.easeOut(duration: 0.18), value: frame)
+        }
+    }
+
+    private var card: some View {
         VStack(spacing: 0) {
             header
             Group {
@@ -63,76 +131,87 @@ struct TransferSheet: View {
                         }
                     }
                 case .inbox:
-                    InboxPanel()
+                    InboxPanel(margin: margin)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .background(PixelHandTheme.canvas)
-        .onGeometryChange(for: CGFloat.self) { proxy in
-            proxy.size.width
-        } action: { width in
-            sheetWidth = width
-        }
-        .modifier(TransferSheetSizing(
-            height: CGFloat(SendSheetLayout.sheetHeight(content: Double(contentHeight), container: Double(containerHeight))),
-            allowsLarge: SendSheetLayout.overflows(content: Double(contentHeight), container: Double(containerHeight))
-        ))
-        .onAppear {
-            center.refresh()
-            containerHeight = Self.windowHeight()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
-            containerHeight = Self.windowHeight()
-        }
+        .onAppear { center.refresh() }
         .transferPromptAlert()
         .transferNoticeAlert()
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ph.send.sheet")
+    }
+
+    private func close() {
+        if case let .floating(_, close) = presentation {
+            close()
+        } else {
+            dismiss()
+        }
     }
 
     // MARK: Header
 
     /// Switch · Done, 44 pt with 8 above and below (`SendSheetLayout
     /// .headerHeight`). The switch names the tab; no navigation title.
+    /// Both sit on the content's margins: the switch's leading edge and
+    /// Done's trailing text edge line up with the chips and cards below
+    /// (OT-15: Done centred in its 44 pt target sat inset from the margin).
     private var header: some View {
-        HStack(spacing: PixelHandTheme.Space.md) {
+        HStack(alignment: .center, spacing: PixelHandTheme.Space.md) {
             SendInboxSwitch(tab: $tab, unseen: center.inbox.unseenCount)
             Spacer(minLength: PixelHandTheme.Space.sm)
             Button {
-                dismiss()
+                close()
             } label: {
                 Text("Done")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(PixelHandTheme.accent)
-                    .frame(minWidth: PixelHandTheme.ControlHeight.hit, minHeight: PixelHandTheme.ControlHeight.hit)
+                    .lineLimit(1)
+                    .frame(minWidth: PixelHandTheme.ControlHeight.hit, minHeight: PixelHandTheme.ControlHeight.hit, alignment: .trailing)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .keyboardShortcut(.cancelAction)
             .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.chip)
             .accessibilityIdentifier("ph.send.done")
         }
-        .frame(minHeight: PixelHandTheme.ControlHeight.standard)
+        .frame(height: CGFloat(SendSheetLayout.headerHeight - 2 * SendSheetLayout.rowGap))
         .padding(.horizontal, margin)
-        .padding(.vertical, PixelHandTheme.Space.sm)
+        .padding(.vertical, CGFloat(SendSheetLayout.rowGap))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ph.send.header")
     }
 
     // MARK: Sizing
 
-    /// The open tab's content height: measured for Send once laid out,
-    /// otherwise estimated from what's in it.
+    /// Both tabs' content height: the taller of Send (measured once laid
+    /// out, else estimated) and Inbox (estimated), so switching tabs never
+    /// resizes the sheet (OT-15).
     private var contentHeight: CGFloat {
-        let width = Double(max(0, sheetWidth - 2 * margin))
-        switch tab {
-        case .send:
-            if let sendContentHeight { return sendContentHeight }
-            let (cards, offline) = SendTargetPlan.targets(listings: switcher.listings, outgoing: [])
-            return CGFloat(SendSheetLayout.estimatedSendHeight(
-                .init(cardCount: cards.count, offlineCount: offline.count, waitingCount: center.outbox.items.count),
-                width: width
-            ))
-        case .inbox:
-            let arriving = center.activities.values.filter { $0.direction == .incoming && $0.isActive }.count
-            return CGFloat(SendSheetLayout.estimatedInboxHeight(arriving: arriving, items: center.inbox.items.count))
-        }
+        CGFloat(SendSheetLayout.sharedContentHeight(send: Double(sendHeight), inbox: Double(inboxHeight)))
+    }
+
+    private var contentWidth: Double {
+        Double(max(0, sheetWidth - 2 * margin))
+    }
+
+    private var sendHeight: CGFloat {
+        if let sendContentHeight { return sendContentHeight }
+        let (cards, offline) = SendTargetPlan.targets(listings: switcher.listings, outgoing: [])
+        let grid = SendCardNames.grid(width: contentWidth, names: (cards + offline).map(\.listing.name), typeSize: typeSize)
+        return CGFloat(SendSheetLayout.estimatedSendHeight(
+            .init(cardCount: cards.count, offlineCount: offline.count, waitingCount: center.outbox.items.count),
+            width: contentWidth,
+            grid: grid
+        ))
+    }
+
+    private var inboxHeight: CGFloat {
+        let arriving = center.activities.values.filter { $0.direction == .incoming && $0.isActive }.count
+        return CGFloat(SendSheetLayout.estimatedInboxHeight(arriving: arriving, items: center.inbox.items.count))
     }
 
     /// The window the sheet sits in (Stage Manager and Split View aware).
@@ -141,6 +220,78 @@ struct TransferSheet: View {
         let scene = scenes.first { $0.activationState == .foregroundActive } ?? scenes.first
         let window = scene?.windows.first { $0.isKeyWindow } ?? scene?.windows.first
         return window?.bounds.height ?? 800
+    }
+}
+
+/// iPad: the Send / Inbox card centred on the window over a dimmed scrim
+/// (OT-15). Shown in a full-screen cover with a clear background, so the
+/// card's place is Core's (`SendSheetLayout.floatingFrame`), not the form
+/// sheet's. The window above the keyboard is the container, so the card
+/// rises with the keyboard and stays centred in what's left. A tap on the
+/// scrim, Done, Escape or the VoiceOver escape gesture closes it.
+struct TransferSheetHost: View {
+    let tab: TransferSheet.Tab
+    let onDismiss: () -> Void
+
+    @State private var isShown = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                Color.black
+                    .opacity(isShown ? 0.32 : 0)
+                    .contentShape(Rectangle())
+                    .onTapGesture { close() }
+                    .accessibilityHidden(true)
+                TransferSheet(tab: tab, presentation: .floating(container: proxy.size, close: close))
+                    .opacity(isShown ? 1 : 0)
+                    .scaleEffect(isShown || reduceMotion ? 1 : 0.96)
+                    .accessibilityAddTraits(.isModal)
+                    .accessibilityAction(.escape) { close() }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+        }
+        // The whole window (not the status bar's or home indicator's safe
+        // area), less the keyboard: centred on the window.
+        .ignoresSafeArea(.container)
+        .presentationBackground(.clear)
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.2)) { isShown = true }
+        }
+    }
+
+    private func close() {
+        withAnimation(.easeIn(duration: 0.16)) { isShown = false }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(170))
+            onDismiss()
+        }
+    }
+}
+
+/// Measures Mac names the way the cards set them (subheadline semibold at
+/// the current text size), word by word, for `SendSheetLayout.cardGrid`
+/// (OT-16).
+enum SendCardNames {
+    static func font(typeSize: DynamicTypeSize) -> UIFont {
+        let traits = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(typeSize))
+        let base = UIFont.preferredFont(forTextStyle: .subheadline, compatibleWith: traits)
+        return UIFont.systemFont(ofSize: base.pointSize, weight: .semibold)
+    }
+
+    static func measure(_ name: String, font: UIFont) -> SendSheetLayout.NameMeasure {
+        let attributes: [NSAttributedString.Key: Any] = [.font: font]
+        let words = name.split(whereSeparator: \.isWhitespace).map { word in
+            Double((String(word) as NSString).size(withAttributes: attributes).width.rounded(.up))
+        }
+        let space = Double((" " as NSString).size(withAttributes: attributes).width)
+        return .init(words: words, space: space)
+    }
+
+    static func grid(width: Double, names: [String], typeSize: DynamicTypeSize) -> SendSheetLayout.CardGrid {
+        let measuring = Self.font(typeSize: typeSize)
+        return SendSheetLayout.cardGrid(width: width, names: names.map { measure($0, font: measuring) })
     }
 }
 
@@ -294,6 +445,10 @@ private struct SendPanel: View {
     /// A passing line under the field ("The clipboard is empty.").
     @State private var fieldNote: String?
     @State private var contentWidth: CGFloat = 0
+    /// The paste control's label font, so Photos and Files match it.
+    @State private var chipFont: UIFont?
+
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     private let center = TransferCenter.shared
     private let switcher = MacSwitcher.shared
@@ -335,7 +490,7 @@ private struct SendPanel: View {
 
     // MARK: Picking
 
-    /// Photos · Files · Clipboard: three chips of one size, glyph + label.
+    /// Photos · Files · Paste: three chips of one size and one face (OT-17).
     /// Each gets Core's whole-point width and the 44 pt height outright,
     /// not a share of a stack (build 27 bug 3: 174.5 / 175 / 173.5 pt wide,
     /// and the paste control 43 pt tall inside its hairline).
@@ -344,7 +499,7 @@ private struct SendPanel: View {
         let height = CGFloat(SendSheetLayout.chipHeight)
         return HStack(spacing: CGFloat(SendSheetLayout.chipGap)) {
             PhotosPicker(selection: $photoSelection, maxSelectionCount: 20, matching: .any(of: [.images, .videos])) {
-                SendSourceChipLabel(glyph: TransferGlyphs.photos, title: "Photos")
+                SendSourceChipLabel(symbol: SendSheetLayout.SourceChip.photosSymbol, title: "Photos", labelFont: chipFont)
                     .frame(width: width, height: height)
             }
             .frame(width: width, height: height)
@@ -354,7 +509,7 @@ private struct SendPanel: View {
             .accessibilityIdentifier("ph.send.source.photos")
 
             Button { showsFileImporter = true } label: {
-                SendSourceChipLabel(glyph: TransferGlyphs.files, title: "Files")
+                SendSourceChipLabel(symbol: SendSheetLayout.SourceChip.filesSymbol, title: "Files", labelFont: chipFont)
                     .frame(width: width, height: height)
             }
             .frame(width: width, height: height)
@@ -365,8 +520,10 @@ private struct SendPanel: View {
 
             // The system paste control (`SendPasteChip`), so iOS never
             // asks "Allow Paste"; it carries `ph.send.source.clipboard`.
-            SendPasteChip(onPaste: stagePasted)
-                .frame(width: width, height: height)
+            SendPasteChip(onPaste: stagePasted) { font in
+                if chipFont != font { chipFont = font }
+            }
+            .frame(width: width, height: height)
         }
         .frame(maxWidth: .infinity)
     }
@@ -474,12 +631,20 @@ private struct SendPanel: View {
     }
 
     /// "Send to": the device cards in a grid of equal columns, then the
-    /// offline Macs small and muted in the same columns.
+    /// offline Macs, muted, in the same columns. The grid is sized to the
+    /// names (OT-16): the most columns in which every name, live or
+    /// offline, fits on two lines, and every card one height (64, or 80
+    /// when a name takes two lines).
     private var targets: some View {
         let plan = targetPlan
+        let grid = SendCardNames.grid(
+            width: Double(contentWidth),
+            names: (plan.cards + plan.offline).map(\.listing.name),
+            typeSize: typeSize
+        )
         let columns = Array(
             repeating: GridItem(.flexible(), spacing: CGFloat(SendSheetLayout.cardGap), alignment: .top),
-            count: SendSheetLayout.columns(width: Double(contentWidth))
+            count: grid.columns
         )
         return VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
             SendSectionLabel("Send to")
@@ -494,14 +659,14 @@ private struct SendPanel: View {
                         if !plan.cards.isEmpty {
                             LazyVGrid(columns: columns, alignment: .leading, spacing: CGFloat(SendSheetLayout.cardGap)) {
                                 ForEach(plan.cards) { target in
-                                    dropTarget(target, now: context.date)
+                                    dropTarget(target, now: context.date, grid: grid)
                                 }
                             }
                         }
                         if !plan.offline.isEmpty {
-                            LazyVGrid(columns: columns, alignment: .leading, spacing: CGFloat(SendSheetLayout.rowGap)) {
+                            LazyVGrid(columns: columns, alignment: .leading, spacing: CGFloat(SendSheetLayout.cardGap)) {
                                 ForEach(plan.offline) { target in
-                                    dropTarget(target, now: context.date)
+                                    dropTarget(target, now: context.date, grid: grid)
                                 }
                             }
                         }
@@ -511,8 +676,8 @@ private struct SendPanel: View {
         }
     }
 
-    private func dropTarget(_ target: SendTarget, now: Date) -> some View {
-        SendTargetButton(target: target, now: now, canSend: !staged.isEmpty) {
+    private func dropTarget(_ target: SendTarget, now: Date, grid: SendSheetLayout.CardGrid) -> some View {
+        SendTargetButton(target: target, now: now, canSend: !staged.isEmpty, grid: grid) {
             send(staged, to: target.listing)
         } onDropStaged: { ids in
             send(staged.filter { ids.contains($0.id.uuidString) }, to: target.listing)
@@ -687,30 +852,37 @@ private struct SendSectionLabel: View {
     }
 }
 
-/// A source chip's face: glyph + label, 44 pt, the full third of the row,
-/// raised with a hairline (the context chip's look, `ContextChip`).
+/// A source chip's face, made to look like the paste control beside it
+/// (OT-17): a system symbol and the label, both in `ink`, in the paste
+/// control's label font (`labelFont`, measured; `.subheadline` semibold
+/// until then), 44 pt, the full third of the row, `raised` with a hairline,
+/// radius 14.
 private struct SendSourceChipLabel: View {
-    let glyph: GlyphBitmap
+    let symbol: String
     let title: String
+    var labelFont: UIFont?
+
+    private var font: Font {
+        labelFont.map { Font($0 as CTFont) } ?? .subheadline.weight(.semibold)
+    }
 
     var body: some View {
-        HStack(spacing: 6) {
-            PHGlyph(glyph: glyph, pitch: PixelPitch.chip)
-                .foregroundStyle(PixelHandTheme.accent)
+        let shape = RoundedRectangle(cornerRadius: CGFloat(SendSheetLayout.SourceChip.cornerRadius), style: .continuous)
+        HStack(spacing: CGFloat(SendSheetLayout.SourceChip.iconGap)) {
+            Image(systemName: symbol)
+                .imageScale(.medium)
+                .accessibilityHidden(true)
             Text(title)
-                .font(.phChip)
-                .foregroundStyle(PixelHandTheme.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
+        .font(font)
+        .foregroundStyle(Color(token: SendSheetLayout.SourceChip.foreground))
         .padding(.horizontal, PixelHandTheme.Space.sm)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(PixelHandTheme.raised, in: RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous)
-                .strokeBorder(PixelHandTheme.hairline, lineWidth: PixelHandTheme.Stroke.hairline)
-        )
-        .contentShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous))
+        .background(Color(token: SendSheetLayout.SourceChip.background), in: shape)
+        .overlay(shape.strokeBorder(PixelHandTheme.hairline, lineWidth: PixelHandTheme.Stroke.hairline))
+        .contentShape(shape)
     }
 }
 
@@ -767,33 +939,28 @@ private struct SendTargetButton: View {
     let target: SendTarget
     let now: Date
     let canSend: Bool
+    let grid: SendSheetLayout.CardGrid
     let onTap: () -> Void
     let onDropStaged: ([String]) -> Void
     let onDropExternal: ([StagedTransferItem]) -> Void
     @State private var isTargeted = false
 
-    init(target: SendTarget, now: Date, canSend: Bool, onTap: @escaping () -> Void, onDropStaged: @escaping ([String]) -> Void, onDropExternal: @escaping ([StagedTransferItem]) -> Void) {
+    init(target: SendTarget, now: Date, canSend: Bool, grid: SendSheetLayout.CardGrid, onTap: @escaping () -> Void, onDropStaged: @escaping ([String]) -> Void, onDropExternal: @escaping ([StagedTransferItem]) -> Void) {
         self.target = target
         self.now = now
         self.canSend = canSend
+        self.grid = grid
         self.onTap = onTap
         self.onDropStaged = onDropStaged
         self.onDropExternal = onDropExternal
     }
 
-    private var radius: CGFloat {
-        target.state.isCompact ? PixelHandTheme.Radius.chip : PixelHandTheme.Radius.card
-    }
+    /// Offline Macs are cards too now (OT-16), muted, with the same radius.
+    private var radius: CGFloat { PixelHandTheme.Radius.card }
 
     var body: some View {
         Button(action: onTap) {
-            Group {
-                if target.state.isCompact {
-                    SendOfflineRow(target: target, now: now)
-                } else {
-                    SendTargetCard(target: target, now: now)
-                }
-            }
+            SendTargetCard(target: target, now: now, height: CGFloat(grid.cardHeight), nameLines: grid.nameLines)
             .overlay {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
                     .strokeBorder(PixelHandTheme.accent, style: StrokeStyle(lineWidth: 2, dash: [5, 4]))
@@ -844,17 +1011,27 @@ private struct SendTargetButton: View {
     }
 }
 
-/// A compact device card, 64 pt: a 44 pt navy tile with the Mac glyph
-/// (lit while the Mac is talking; the lock while locked; the dot wave
-/// while connecting), the name over one status line, and at the trailing
-/// edge the dot-matrix readout (`42%`, a waiting count) or the status
-/// light. The focused Mac gets the 2 pt cobalt ring. Card radius 24 with
-/// a 10 pt inset → tile radius 14 (`07-Polish-Spec.md` §3).
+/// A device card: a 44 pt navy tile with the Mac glyph (lit while the Mac
+/// is talking; the lock while locked; the dot wave while connecting), the
+/// whole name (up to two lines, OT-16: build 27 showed "Mu…Pro") over one
+/// status line, and at the trailing edge the dot-matrix readout (`42%`, a
+/// waiting count) or the status light in a fixed 32 pt slot. 64 pt, or 80
+/// when the grid's names take two lines. The focused Mac gets the 2 pt
+/// cobalt ring. Card radius 24 with a 10 pt inset → tile radius 14
+/// (`07-Polish-Spec.md` §3).
+///
+/// An offline Mac is the same card, muted (OT-16: it was a one-line row,
+/// "AH's Mac mini …"): `fill` instead of `raised`, no hairline, the tile
+/// unlit on `fill2`, the name in ink2 and "Seen 2 h ago" in ink3, no
+/// trailing light. A tap still queues a send for it.
 private struct SendTargetCard: View {
     let target: SendTarget
     let now: Date
+    let height: CGFloat
+    let nameLines: Int
 
     private var listing: MacListing { target.listing }
+    private var isOffline: Bool { target.state.isCompact }
 
     var body: some View {
         HStack(spacing: PixelHandTheme.Space.md) {
@@ -862,39 +1039,53 @@ private struct SendTargetCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(listing.name)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(PixelHandTheme.ink)
-                    .lineLimit(1)
+                    .foregroundStyle(isOffline ? PixelHandTheme.ink2 : PixelHandTheme.ink)
+                    .lineLimit(max(1, nameLines))
                     .truncationMode(.middle)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(target.statusLine(now: now))
                     .font(.caption)
-                    .foregroundStyle(target.state.light == .needsYou ? PixelHandTheme.warning : PixelHandTheme.ink2)
+                    .foregroundStyle(statusColor)
                     .lineLimit(1)
                     .contentTransition(.opacity)
             }
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
             trailing
+                .frame(width: CGFloat(SendSheetLayout.cardTrailingWidth), alignment: .trailing)
         }
         .padding(.horizontal, 10)
-        .frame(maxWidth: .infinity, minHeight: CGFloat(SendSheetLayout.cardHeight), alignment: .leading)
-        .background(PixelHandTheme.raised, in: RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous))
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, minHeight: height, alignment: .leading)
+        .background(isOffline ? PixelHandTheme.fill : PixelHandTheme.raised, in: RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous)
-                .strokeBorder(
-                    listing.isActive ? PixelHandTheme.accent : PixelHandTheme.hairline,
-                    lineWidth: listing.isActive ? PixelHandTheme.Stroke.selection : PixelHandTheme.Stroke.hairline
-                )
+            if !isOffline {
+                RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous)
+                    .strokeBorder(
+                        listing.isActive ? PixelHandTheme.accent : PixelHandTheme.hairline,
+                        lineWidth: listing.isActive ? PixelHandTheme.Stroke.selection : PixelHandTheme.Stroke.hairline
+                    )
+            }
         }
         .contentShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous))
         .animation(.easeOut(duration: 0.18), value: target.state)
     }
 
+    private var statusColor: Color {
+        if isOffline { return PixelHandTheme.ink3 }
+        return target.state.light == .needsYou ? PixelHandTheme.warning : PixelHandTheme.ink2
+    }
+
     private var tile: some View {
         RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous)
-            .fill(PixelHandTheme.Brand.screenSurface)
+            .fill(isOffline ? PixelHandTheme.fill2 : PixelHandTheme.Brand.screenSurface)
             .frame(width: PixelHandTheme.ControlHeight.standard, height: PixelHandTheme.ControlHeight.standard)
             .overlay {
                 if target.state == .connecting {
                     DotWave(pitch: 2, label: "Connecting to \(listing.name)")
+                } else if isOffline {
+                    PHGlyph(glyph: PixelGlyphs.mac, pitch: PixelPitch.chip)
+                        .foregroundStyle(PixelHandTheme.ink3)
                 } else {
                     PHGlyph(
                         glyph: target.state == .busy(.locked) ? PixelGlyphs.lock : PixelGlyphs.mac,
@@ -910,7 +1101,9 @@ private struct SendTargetCard: View {
 
     @ViewBuilder
     private var trailing: some View {
-        if let readout = target.readout {
+        if isOffline {
+            Color.clear.frame(width: 0, height: 0)
+        } else if let readout = target.readout {
             DotMatrixText(readout, pitch: 1.6, label: target.spoken(now: now))
                 .foregroundStyle(PixelHandTheme.accent)
                 .accessibilityHidden(true)
@@ -921,35 +1114,6 @@ private struct SendTargetCard: View {
             case .off: StatusPixel(state: .off, size: 8)
             }
         }
-    }
-}
-
-/// An offline Mac: one 44 pt row, small and muted. The Mac glyph unlit,
-/// the name, "Seen 2 h ago". A send to it waits for it in the outbox.
-private struct SendOfflineRow: View {
-    let target: SendTarget
-    let now: Date
-
-    var body: some View {
-        HStack(spacing: PixelHandTheme.Space.sm) {
-            PHGlyph(glyph: PixelGlyphs.mac, pitch: 1.6)
-                .foregroundStyle(PixelHandTheme.ink3)
-            Text(target.listing.name)
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(PixelHandTheme.ink2)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .layoutPriority(1)
-            Spacer(minLength: PixelHandTheme.Space.xs)
-            Text(target.statusLine(now: now))
-                .font(.caption)
-                .foregroundStyle(PixelHandTheme.ink3)
-                .lineLimit(1)
-        }
-        .padding(.horizontal, PixelHandTheme.Space.md)
-        .frame(maxWidth: .infinity, minHeight: CGFloat(SendSheetLayout.offlineHeight), alignment: .leading)
-        .background(PixelHandTheme.fill, in: RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous))
     }
 }
 

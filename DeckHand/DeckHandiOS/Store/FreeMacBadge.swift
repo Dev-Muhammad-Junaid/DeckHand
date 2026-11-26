@@ -27,16 +27,10 @@ private struct FreeMacBadgeModifier: ViewModifier {
     func body(content: Content) -> some View {
         // Reading `entitlements` ties the badge to Pro starting or ending.
         let locked = !entitlements.isPro && store.isLockedMac(deviceID: deviceID)
+        // The PRO badge, as on the board's My Macs: inside the tile's
+        // top-trailing corner, above everything, never clipped (OT-14).
         content
-            .overlay(alignment: .topTrailing) {
-                if locked {
-                    // The PRO badge, as on the board's My Macs.
-                    ProBadge()
-                        .offset(x: -12, y: 10)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
-                }
-            }
+            .controlBadge(locked ? .proLabel : nil, style: .inset(4))
             .accessibilityHint(locked ? "Needs \(SubscriptionCopy.productName): the free plan works with one Mac" : "")
     }
 }

@@ -11,9 +11,15 @@
 //  `UIPasteControl` rather than SwiftUI `PasteButton`: only the UIKit
 //  control takes a background colour, a foreground colour and a fixed
 //  corner radius, which is what the chip spec needs (`07-Polish-Spec.md`,
-//  Sources: 44 tall, a third of the row, `raised`, hairline, radius 14,
-//  accent glyph). The system draws its own icon and "Paste" label: no
-//  pixel glyph and no custom title are possible on a paste control.
+//  Sources: 44 tall, a third of the row, `raised`, hairline, radius 14).
+//  The system draws its own icon and "Paste" label in one foreground
+//  colour and its own font: no pixel glyph, no custom title and no font
+//  can be set on a paste control. So the other two chips follow it (owner
+//  testing, build 27, OT-17: Paste had accent text and looked different):
+//  all three draw icon and label in `ink` (`SendSheetLayout.SourceChip`),
+//  Photos and Files use system symbols like Paste's, and their labels use
+//  the paste control's own label font, read from the control once it has
+//  laid out (`onLabelFont`; reading a font covers nothing).
 //
 //  What to load from each pasted provider is `SendPastePlan` (Core):
 //  a web link, then text, then an image (an image first when there is no
@@ -38,12 +44,15 @@ struct SendPasteChip: View {
     /// Called once per paste with everything that loaded, in clipboard
     /// order; empty when nothing usable was there.
     var onPaste: @MainActor ([SendPastedItem]) -> Void
+    /// The font the paste control set its "Paste" label in, once laid out,
+    /// so Photos and Files can use the same (OT-17).
+    var onLabelFont: @MainActor (UIFont) -> Void = { _ in }
 
     var body: some View {
         // The control fills the chip's whole 44 pt frame (build 27 bug 3:
         // inset by its hairline it measured 43 pt). The hairline is drawn
         // just outside it, behind, so nothing covers the system control.
-        SendPasteControl(onPaste: onPaste)
+        SendPasteControl(onPaste: onPaste, onLabelFont: onLabelFont)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background {
                 RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip + PixelHandTheme.Stroke.hairline, style: .continuous)
@@ -56,22 +65,26 @@ struct SendPasteChip: View {
 
 private struct SendPasteControl: UIViewRepresentable {
     var onPaste: @MainActor ([SendPastedItem]) -> Void
+    var onLabelFont: @MainActor (UIFont) -> Void
 
     func makeUIView(context: Context) -> SendPasteTargetView {
         let target = SendPasteTargetView()
         target.onPaste = onPaste
+        target.onLabelFont = onLabelFont
         let configuration = UIPasteControl.Configuration()
         configuration.displayMode = .iconAndLabel
         configuration.cornerStyle = .fixed
-        configuration.cornerRadius = PixelHandTheme.Radius.chip
-        configuration.baseBackgroundColor = UIColor(token: PaletteTokens.raised)
-        configuration.baseForegroundColor = UIColor(token: PaletteTokens.accent)
+        configuration.cornerRadius = CGFloat(SendSheetLayout.SourceChip.cornerRadius)
+        configuration.baseBackgroundColor = UIColor(token: SendSheetLayout.SourceChip.background)
+        // Ink, like the other chips' icon and label (OT-17; was accent).
+        configuration.baseForegroundColor = UIColor(token: SendSheetLayout.SourceChip.foreground)
         let control = UIPasteControl(configuration: configuration)
         control.target = target
         control.translatesAutoresizingMaskIntoConstraints = false
         // The identifier the old chip had, so UI tests still find it.
         control.accessibilityIdentifier = "ph.send.source.clipboard"
         target.addSubview(control)
+        target.control = control
         NSLayoutConstraint.activate([
             control.leadingAnchor.constraint(equalTo: target.leadingAnchor),
             control.trailingAnchor.constraint(equalTo: target.trailingAnchor),
@@ -83,6 +96,7 @@ private struct SendPasteControl: UIViewRepresentable {
 
     func updateUIView(_ view: SendPasteTargetView, context: Context) {
         view.onPaste = onPaste
+        view.onLabelFont = onLabelFont
     }
 }
 
@@ -90,6 +104,10 @@ private struct SendPasteControl: UIViewRepresentable {
 /// (falling through when one yields nothing) and reports once all are in.
 final class SendPasteTargetView: UIView {
     var onPaste: @MainActor ([SendPastedItem]) -> Void = { _ in }
+    var onLabelFont: @MainActor (UIFont) -> Void = { _ in }
+    weak var control: UIView?
+    /// The last font reported, so a re-layout doesn't report it again.
+    private var reportedFont: UIFont?
 
     /// The paste in progress; a newer paste replaces it.
     private var batch = UUID()
@@ -100,10 +118,36 @@ final class SendPasteTargetView: UIView {
     override init(frame: CGRect) {
         super.init(frame: frame)
         pasteConfiguration = UIPasteConfiguration(acceptableTypeIdentifiers: SendPastePlan.acceptedTypeIdentifiers)
+        // A text size change: measure the paste control's label again.
+        registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (view: SendPasteTargetView, _: UITraitCollection) in
+            view.reportedFont = nil
+            view.setNeedsLayout()
+        }
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    /// After the paste control lays out, finds its label and reports the
+    /// label's font (OT-17). Reads only; nothing is added to or drawn over
+    /// the control. When the label can't be found the chips keep their
+    /// fallback font.
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        guard let control, let label = Self.firstLabel(in: control), let font = label.font else { return }
+        guard font != reportedFont else { return }
+        reportedFont = font
+        // Next turn of the main actor: not inside SwiftUI's update.
+        Task { @MainActor [weak self] in self?.onLabelFont(font) }
+    }
+
+    private static func firstLabel(in view: UIView) -> UILabel? {
+        if let label = view as? UILabel, !(label.text ?? "").isEmpty { return label }
+        for child in view.subviews {
+            if let found = firstLabel(in: child) { return found }
+        }
+        return nil
+    }
 
     override func paste(itemProviders: [NSItemProvider]) {
         let plan = SendPastePlan.plan(providers: itemProviders.map(\.registeredTypeIdentifiers))
