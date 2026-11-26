@@ -5,9 +5,12 @@
 //  The capture sheet (UX-009): one presentation from Control with three
 //  steps inside it, never a sheet on a sheet:
 //
-//    preview   → the capture in a black well under a scanline, pinch and
-//                double-tap to zoom, swipe down to close; dock: Save, Copy,
-//                Share, Annotate, Read text.
+//    preview   → the capture fitted into all the room between the header
+//                and the dock (`CapturePreviewLayout`, OT-10), in a black
+//                well under a scanline; pinch, double-tap to zoom on a
+//                point or back out, pan while zoomed, swipe down to close;
+//                dock anchored at the bottom: Save, Copy, Share, Annotate,
+//                Read text.
 //    annotate  → pen on the capture (`AnnotationView.swift`); Done bakes
 //                the marks in at native resolution, Cancel and Clear ask
 //                before throwing marks away.
@@ -45,6 +48,11 @@ struct ScreenshotPreviewView: View {
     @State private var pan: CGSize = .zero
     @State private var lastPan: CGSize = .zero
     @State private var dismissDrag: CGFloat = 0
+    /// While two fingers pinch, the drag that comes with them doesn't pan.
+    @State private var isPinching = false
+    @State private var lastDragTranslation: CGSize = .zero
+    /// The drag's translation when a pinch ended mid-drag.
+    @State private var dragBase: CGSize = .zero
     @State private var revealed = false
 
     // Annotate.
@@ -79,15 +87,14 @@ struct ScreenshotPreviewView: View {
                     case .readText: OCRResultView(state: textState, onRetry: { Task { await readText(force: true) } })
                     }
                 }
-                // The preview hugs the picture (fitted to the width), with
-                // the dock right under it rather than at the foot of an
-                // empty black area (VQ-051).
-                .frame(maxWidth: .infinity, maxHeight: step == .preview ? nil : .infinity)
+                // Every step takes the room between the header and the dock;
+                // the dock is anchored at the bottom (owner testing, build 26,
+                // OT-10). The preview fits the picture into that room and
+                // hugs it with its well, so there's no black band (VQ-051)
+                // and no empty half screen under the dock either.
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .transition(.opacity)
                 dock
-                if step == .preview {
-                    Spacer(minLength: 0)
-                }
             }
             .overlay(alignment: .bottom) { toastView }
         }
@@ -174,59 +181,108 @@ struct ScreenshotPreviewView: View {
 
     // MARK: Preview
 
+    /// The picture fitted (aspect-fit, centred, whole points) into all the
+    /// room the stage gives it, its black well hugging it
+    /// (`CapturePreviewLayout.pictureFrame`). Gestures sit on the well,
+    /// which doesn't move, so a double-tap lands in picture points.
     private var previewStage: some View {
-        CapturePictureWell {
-            GeometryReader { proxy in
+        GeometryReader { proxy in
+            let inset = CGFloat(CapturePreviewLayout.sideInset)
+            let area = MirrorRect(x: Double(inset), y: 0, width: Double(max(0, proxy.size.width - 2 * inset)), height: Double(proxy.size.height))
+            let frame = CGRect(CapturePreviewLayout.pictureFrame(
+                imageWidth: Double(current.size.width),
+                imageHeight: Double(current.size.height),
+                in: area
+            ))
+            let size = frame.size
+            ZStack {
                 Image(uiImage: current)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .frame(width: size.width, height: size.height)
                     .scaleEffect(zoom)
                     .offset(pan)
                     .mirrorScanline(on: revealed)
-                    .gesture(zoomGesture.simultaneously(with: panGesture))
-                    .onTapGesture(count: 2) { toggleZoom() }
                     .accessibilityLabel("Capture")
                     .accessibilityHint("Pinch or double-tap to zoom.")
                     .accessibilityAddTraits(.isImage)
-                    .accessibilityAction(named: zoom > 1.01 ? "Zoom out" : "Zoom in") { toggleZoom() }
+                    .accessibilityAction(named: CapturePreviewLayout.isZoomed(Double(zoom)) ? "Zoom out" : "Zoom in") {
+                        doubleTap(at: CGPoint(x: size.width / 2, y: size.height / 2), size: size)
+                    }
                     .accessibilityIdentifier("ph.capture.preview")
             }
-            .clipped()
+            .frame(width: size.width, height: size.height)
+            .background(Color.black)
+            .clipShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous)
+                    .strokeBorder(PixelHandTheme.Brand.tileStroke, lineWidth: PixelHandTheme.Stroke.hairline)
+            )
+            .contentShape(Rectangle())
+            .gesture(zoomGesture(size: size).simultaneously(with: panGesture(size: size)))
+            .onTapGesture(count: 2, coordinateSpace: .local) { location in
+                doubleTap(at: location, size: size)
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("ph.capture.well")
+            .position(x: frame.midX, y: frame.midY)
         }
-        .aspectRatio(pictureAspect, contentMode: .fit)
     }
 
-    /// Width ÷ height of the capture, for the preview's well.
-    private var pictureAspect: CGFloat {
-        let size = current.size
-        guard size.width > 0, size.height > 0 else { return 16.0 / 10.0 }
-        return size.width / size.height
-    }
-
-    private var zoomGesture: some Gesture {
+    /// Pinch between 1× and 6×, the pan scaling with it and kept inside
+    /// the picture; under 1× it snaps back.
+    private func zoomGesture(size: CGSize) -> some Gesture {
         MagnifyGesture()
-            .onChanged { value in zoom = max(1, lastZoom * value.magnification) }
+            .onChanged { value in
+                isPinching = true
+                let next = CapturePreviewLayout.pinch(
+                    startZoom: Double(lastZoom),
+                    magnification: Double(value.magnification),
+                    startPan: (Double(lastPan.width), Double(lastPan.height)),
+                    width: Double(size.width),
+                    height: Double(size.height)
+                )
+                zoom = CGFloat(next.zoom)
+                pan = CGSize(width: next.pan.x, height: next.pan.y)
+            }
             .onEnded { _ in
+                isPinching = false
                 lastZoom = zoom
-                if zoom <= 1.01 { resetZoom() }
+                lastPan = pan
+                // A drag still going on carries on from here, not from
+                // where it started.
+                dragBase = lastDragTranslation
             }
     }
 
-    /// Zoomed: pans the picture. At 1×: a downward swipe closes the sheet.
-    private var panGesture: some Gesture {
+    /// Zoomed: pans the picture, never past its edges. At 1×: a downward
+    /// swipe closes the sheet.
+    private func panGesture(size: CGSize) -> some Gesture {
         DragGesture()
             .onChanged { value in
-                if zoom > 1.01 {
-                    pan = CGSize(width: lastPan.width + value.translation.width, height: lastPan.height + value.translation.height)
+                lastDragTranslation = value.translation
+                guard !isPinching else { return }
+                if CapturePreviewLayout.isZoomed(Double(zoom)) {
+                    let clamped = CapturePreviewLayout.clampedPan(
+                        x: Double(lastPan.width + value.translation.width - dragBase.width),
+                        y: Double(lastPan.height + value.translation.height - dragBase.height),
+                        zoom: Double(zoom),
+                        width: Double(size.width),
+                        height: Double(size.height)
+                    )
+                    pan = CGSize(width: clamped.x, height: clamped.y)
                 } else {
                     dismissDrag = max(0, value.translation.height)
                 }
             }
             .onEnded { value in
-                if zoom > 1.01 {
+                defer {
+                    dragBase = .zero
+                    lastDragTranslation = .zero
+                }
+                if CapturePreviewLayout.isZoomed(Double(zoom)) {
                     lastPan = pan
-                } else if value.translation.height > 120 || value.predictedEndTranslation.height > 260 {
+                } else if !isPinching, value.translation.height > 120 || value.predictedEndTranslation.height > 260 {
                     onDismiss()
                 } else {
                     withAnimation(.snappy(duration: 0.2)) { dismissDrag = 0 }
@@ -234,15 +290,20 @@ struct ScreenshotPreviewView: View {
             }
     }
 
-    private func toggleZoom() {
+    /// Double-tap: zoom in on the tapped point, or back out to 1×.
+    private func doubleTap(at location: CGPoint, size: CGSize) {
+        let next = CapturePreviewLayout.doubleTap(
+            at: (Double(location.x), Double(location.y)),
+            zoom: Double(zoom),
+            width: Double(size.width),
+            height: Double(size.height)
+        )
         withAnimation(reduceMotion ? nil : .snappy(duration: 0.25)) {
-            if zoom > 1.01 {
-                resetZoom()
-            } else {
-                zoom = 2.5
-                lastZoom = 2.5
-            }
+            zoom = CGFloat(next.zoom)
+            pan = CGSize(width: next.pan.x, height: next.pan.y)
         }
+        lastZoom = zoom
+        lastPan = pan
     }
 
     private func resetZoom() {
@@ -273,7 +334,7 @@ struct ScreenshotPreviewView: View {
     private var dock: some View {
         switch step {
         case .preview:
-            CaptureDock {
+            CaptureDock(maxWidth: CGFloat(CapturePreviewLayout.dockMaximumWidth)) {
                 HStack(spacing: 0) {
                     CaptureActionButton(glyph: CaptureGlyphs.save, title: "Save", isBusy: isSaving) {
                         toastTask?.cancel()
@@ -290,6 +351,8 @@ struct ScreenshotPreviewView: View {
                     }
                     CaptureActionButton(glyph: PixelGlyphs.readText, title: "Read text") { step = .readText }
                 }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("ph.capture.dock")
             }
         case .annotate:
             CaptureDock {
@@ -302,7 +365,7 @@ struct ScreenshotPreviewView: View {
                 )
             }
         case .readText:
-            CaptureDock {
+            CaptureDock(maxWidth: CGFloat(CapturePreviewLayout.dockMaximumWidth)) {
                 HStack(spacing: 0) {
                     CaptureActionButton(glyph: CaptureGlyphs.copy, title: "Copy all", isEnabled: textState.text != nil) {
                         UIPasteboard.general.string = textState.text

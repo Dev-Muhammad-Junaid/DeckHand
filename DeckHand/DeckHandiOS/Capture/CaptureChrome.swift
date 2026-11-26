@@ -162,15 +162,24 @@ struct CapturePressStyle<S: Shape>: ButtonStyle {
 // MARK: - Dock
 
 /// The bottom tool panel: raised navy, radius 24, hairline rim, 16 pt from
-/// the edges. Sits above the home indicator.
+/// the edges. Sits above the home indicator. `maxWidth` keeps a row of
+/// actions together and centred on wide windows (the capture preview,
+/// `CapturePreviewLayout.dockMaximumWidth`); `nil` spans the stage.
 struct CaptureDock<Content: View>: View {
+    var maxWidth: CGFloat?
     @ViewBuilder let content: () -> Content
+
+    init(maxWidth: CGFloat? = nil, @ViewBuilder content: @escaping () -> Content) {
+        self.maxWidth = maxWidth
+        self.content = content
+    }
 
     var body: some View {
         VStack(spacing: PixelHandTheme.Space.sm) {
             content()
         }
         .padding(PixelHandTheme.Space.sm)
+        .frame(maxWidth: maxWidth)
         .background(
             PixelHandTheme.Brand.screenRaised.opacity(0.94),
             in: RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous)
@@ -181,6 +190,7 @@ struct CaptureDock<Content: View>: View {
         )
         .padding(.horizontal, PixelHandTheme.Space.lg)
         .padding(.bottom, PixelHandTheme.Space.sm)
+        .frame(maxWidth: .infinity)
     }
 }
 
