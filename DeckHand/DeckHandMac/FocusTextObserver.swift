@@ -361,7 +361,7 @@ final class FocusTextObserver: @unchecked Sendable {
     }
 
     private static func key(_ element: AXUIElement, pid: pid_t) -> UInt64 {
-        (UInt64(UInt32(bitPattern: pid)) << 32) ^ UInt64(UInt(bitPattern: CFHash(element)))
+        (UInt64(UInt32(bitPattern: pid)) << 32) ^ UInt64(CFHash(element))
     }
 
     // MARK: AX helpers
