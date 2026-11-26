@@ -129,6 +129,18 @@ public struct AskFlow: Sendable, Hashable {
     /// taking a new plan while the current one is being made.
     public var canSubmitRequest: Bool { stage != .planning }
 
+    /// Whether focusing the field selects its text, so what's typed next
+    /// replaces the last request instead of joining it (build 25 bug: after
+    /// Save as key › Cancel, typing made "nowTake a screenshot"). True
+    /// whenever a plan or result shows: the field still holds the request
+    /// that made it. While composing a request, focus leaves the caret.
+    public var selectsFieldOnFocus: Bool {
+        switch stage {
+        case .request, .planning: false
+        case .plan, .editing, .running, .result, .naming: true
+        }
+    }
+
     /// Whether the plan shows (with its steps) in this stage.
     public var showsPlan: Bool {
         switch stage {

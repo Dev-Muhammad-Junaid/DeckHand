@@ -82,22 +82,57 @@ three-finger gestures.
 - An app with a dialog shows a warning dot on its icon.
 - Apps that aren't running: Ask ("open Figma") or the action library.
 
-### Keyboard (Type panel, owner testing build 24, OT-2/OT-3)
+### Keyboard (Type panel, owner testing builds 24–25, OT-2/OT-3/OT-6/OT-7)
 - The keyboard button sits in the app dock; the pad has its own where the
   dock is folded. Both open the one **Type panel**, which floats above the
-  system keyboard (or above the dock when no keyboard covers it) and has
-  its own close button. The keyboard never changes the arrangement: the
-  shell plans from the window and lays out under the keyboard.
+  system keyboard and the dock and has its own close button. The keyboard
+  never changes the arrangement: the shell plans from the window and lays
+  out under the keyboard.
+- **Move it** (OT-6): drag the ⠿ grip in its header anywhere in the free
+  room (the window's safe area above the keyboard and the dock). A soft
+  magnet (24 pt) snaps it to the leading or trailing edge, the centre line,
+  the top or the bottom, so two at once make a corner. The place is
+  remembered per arrangement and orientation, as fractions of the free
+  room: parked bottom-right, it rides on the keyboard and drops back to
+  the dock when the keyboard goes. VoiceOver: Move to the top, bottom,
+  left, centre or right.
+- **Resize it** from either bottom corner (the other edge holds), from
+  **360 pt** to 760 pt; the width is remembered with the place. VoiceOver
+  adjusts the width in 40 pt steps.
+- **Fold it** with – to a pill ("⌨ Safari · Live"); one tap opens it again
+  in the same corner, on the same tab. Folding lets the keyboard go.
+- iPhone (and any window under 500 pt either way): the panel is docked to
+  the top or the bottom of the free room, full width; a drag on the grip
+  moves it between the two. In landscape it can be narrowed from the
+  centre.
 - **Live** (each key goes to the Mac at once) or **Compose** (type or
   dictate a draft, then **Send**, optionally with Return); Paste from this
   device; the last mode is remembered. "Typing into <App>" always shows.
-- Keys row: esc, tab, ⌫, ⏎, arrows, home/end, page up/down; **fn** swaps in
-  F1–F12. Sticky ⌘ ⌥ ⌃ ⇧ chips: tap = once, again = lock, again = off;
-  lit while latched.
-- **Numpad** tab: 0–9, the point, + − × ÷ =, ⌫ and Enter in dot-matrix
-  numerals; the system keyboard steps down while it shows.
-- Hardware keyboard: one line (the field, naming the target), the keys
-  row with the chips, and close.
+- **Compact layout** (OT-7), following the panel's own width: the field
+  (about 30 % narrower than build 25's) with an **inverted-T** arrow
+  cluster beside it (↑ over ← ↓ →), and the keys in **two rows**: ⌘ ⌥ ⌃ ⇧
+  esc tab, then ⌫ ⏎ home end pg↑ pg↓ fn. From 680 pt wide it's one block
+  (field, arrows and keys side by side); narrower, the keys go under the
+  field. **fn** swaps the second row for a strip of F1–F12. Sticky ⌘ ⌥ ⌃ ⇧:
+  tap = once, again = lock, again = off; lit while latched.
+- **Numpad**: the header's numpad button docks a 5 × 4 keypad (7 8 9 ÷ ⌫ /
+  4 5 6 × / 1 2 3 − / 0 . = +, Enter three rows tall) beside the keys in
+  the same panel, or under them below 564 pt; the field stays. The system
+  keyboard steps down while it shows; tapping the field brings it back.
+- Keys are 40 pt caps on 44 pt cells (44 pt targets that never overlap),
+  legends in the dot-matrix font for words (ESC, HOME, F5) and pixel glyphs
+  for the arrows.
+- Hardware keyboard: the field is one line naming the target, with no
+  paste or Compose actions under it; the arrows and keys stay.
+
+### Keys that type (OT-8)
+- A deck key, or a step of a sequence, can **type text** (the action
+  library's "Type text": the text, multi-line, and "Press Return after").
+  Ask's plans with a Type step save as keys.
+- A key that types **always asks first**: "Run “YouTube”?" naming where the
+  text will land ("Types into Safari, then presses Return."). The inspector
+  shows "Ask before running" on and locked, with why. Widgets leave such
+  keys out (a widget can't ask); Shortcuts and Siri list them and ask.
 
 ## 3. Apple Intelligence
 

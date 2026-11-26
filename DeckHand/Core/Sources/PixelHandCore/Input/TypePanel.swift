@@ -11,11 +11,13 @@
 //    Compose   type or dictate into a local field, read it, then Send it,
 //              with or without a Return after it.
 //
-//  Under both: a keys row (esc, tab, ⌫, ⏎, arrows, home/end, page up/down,
-//  F1–F12 behind the fn toggle), sticky ⌘ ⌥ ⌃ ⇧ chips, and a Numpad tab.
-//  The panel's open/closed state has one owner (`TypePanelPresence`), and
-//  where it sits is decided from the keyboard, never by moving the shell
-//  (`TypePanelLayout`, OT-2).
+//  Beside the field: the inverted-T arrows. Under it (or beside it on wide
+//  panels): two compact rows of keys, sticky ⌘ ⌥ ⌃ ⇧ first, F1–F12 behind
+//  fn (`TypeKeyBlock`, OT-7), and a 5 × 4 numpad that docks beside the
+//  keys. The panel's open/closed state has one owner (`TypePanelPresence`);
+//  its layout follows its own width (`TypePanelLayout`), and where it sits
+//  is the person's choice (`TypePanelGeometry`, OT-6), never decided by
+//  moving the shell (OT-2).
 //
 
 import Foundation
@@ -147,6 +149,25 @@ public enum TypeKey: Sendable, Hashable, Identifiable {
         KeyModifier.pressOrder.filter(modifiers.contains).map(\.wireName) + [wireName]
     }
 
+    /// The cap's legend in the dot-matrix font (OT-7), for keys named in
+    /// words: "ESC", "HOME", "PGUP", "F5". `nil` for keys drawn as a
+    /// symbol (⌫ ⏎) or a pixel arrow.
+    public var dotMatrixLegend: String? {
+        switch self {
+        case let .remote(key):
+            switch key {
+            case .escape: "ESC"
+            case .tab: "TAB"
+            case .home: "HOME"
+            case .end: "END"
+            case .pageUp: "PGUP"
+            case .pageDown: "PGDN"
+            default: nil
+            }
+        case let .function(number): "F\(number)"
+        }
+    }
+
     /// Whether this key is Return (Return to another app asks first, VQ-036).
     public var isReturn: Bool { self == .remote(.return) }
 }
@@ -260,11 +281,10 @@ extension KeyModifier {
 /// go as typed text, so they land the same on every keyboard layout; Enter
 /// is the keypad's Enter and ⌫ is Delete.
 public enum NumpadKey: String, Sendable, Hashable, CaseIterable, Identifiable {
-    case delete, equals, divide, multiply
-    case seven, eight, nine, minus
-    case four, five, six, plus
-    case one, two, three, enter
-    case zero, point
+    case seven, eight, nine, divide, delete
+    case four, five, six, multiply, enter
+    case one, two, three, minus
+    case zero, point, equals, plus
 
     public var id: String { rawValue }
 
@@ -338,38 +358,47 @@ public enum NumpadKey: String, Sendable, Hashable, CaseIterable, Identifiable {
         }
     }
 
-    /// Where the key sits on the 4 × 5 grid: column, row and spans.
-    /// 0 spans two columns; Enter spans two rows.
+    /// Where the key sits on the 5 × 4 grid (OT-7): column, row and
+    /// spans. Rows 7 8 9 ÷ ⌫ / 4 5 6 × / 1 2 3 − / 0 . = +, and Enter
+    /// fills the last column under ⌫ (three rows tall), like the keypad
+    /// of a full-size keyboard turned compact.
     public struct Cell: Sendable, Hashable {
         public let column: Int
         public let row: Int
         public let columnSpan: Int
         public let rowSpan: Int
+
+        init(_ column: Int, _ row: Int, rowSpan: Int = 1) {
+            self.column = column
+            self.row = row
+            self.columnSpan = 1
+            self.rowSpan = rowSpan
+        }
     }
 
-    public static let columns = 4
-    public static let rows = 5
+    public static let columns = 5
+    public static let rows = 4
 
     public var cell: Cell {
         switch self {
-        case .delete: Cell(column: 0, row: 0, columnSpan: 1, rowSpan: 1)
-        case .equals: Cell(column: 1, row: 0, columnSpan: 1, rowSpan: 1)
-        case .divide: Cell(column: 2, row: 0, columnSpan: 1, rowSpan: 1)
-        case .multiply: Cell(column: 3, row: 0, columnSpan: 1, rowSpan: 1)
-        case .seven: Cell(column: 0, row: 1, columnSpan: 1, rowSpan: 1)
-        case .eight: Cell(column: 1, row: 1, columnSpan: 1, rowSpan: 1)
-        case .nine: Cell(column: 2, row: 1, columnSpan: 1, rowSpan: 1)
-        case .minus: Cell(column: 3, row: 1, columnSpan: 1, rowSpan: 1)
-        case .four: Cell(column: 0, row: 2, columnSpan: 1, rowSpan: 1)
-        case .five: Cell(column: 1, row: 2, columnSpan: 1, rowSpan: 1)
-        case .six: Cell(column: 2, row: 2, columnSpan: 1, rowSpan: 1)
-        case .plus: Cell(column: 3, row: 2, columnSpan: 1, rowSpan: 1)
-        case .one: Cell(column: 0, row: 3, columnSpan: 1, rowSpan: 1)
-        case .two: Cell(column: 1, row: 3, columnSpan: 1, rowSpan: 1)
-        case .three: Cell(column: 2, row: 3, columnSpan: 1, rowSpan: 1)
-        case .enter: Cell(column: 3, row: 3, columnSpan: 1, rowSpan: 2)
-        case .zero: Cell(column: 0, row: 4, columnSpan: 2, rowSpan: 1)
-        case .point: Cell(column: 2, row: 4, columnSpan: 1, rowSpan: 1)
+        case .seven: Cell(0, 0)
+        case .eight: Cell(1, 0)
+        case .nine: Cell(2, 0)
+        case .divide: Cell(3, 0)
+        case .delete: Cell(4, 0)
+        case .four: Cell(0, 1)
+        case .five: Cell(1, 1)
+        case .six: Cell(2, 1)
+        case .multiply: Cell(3, 1)
+        case .enter: Cell(4, 1, rowSpan: 3)
+        case .one: Cell(0, 2)
+        case .two: Cell(1, 2)
+        case .three: Cell(2, 2)
+        case .minus: Cell(3, 2)
+        case .zero: Cell(0, 3)
+        case .point: Cell(1, 3)
+        case .equals: Cell(2, 3)
+        case .plus: Cell(3, 3)
         }
     }
 
@@ -377,6 +406,93 @@ public enum NumpadKey: String, Sendable, Hashable, CaseIterable, Identifiable {
     public static func row(_ index: Int) -> [NumpadKey] {
         allCases.filter { $0.cell.row == index }.sorted { $0.cell.column < $1.cell.column }
     }
+}
+
+// MARK: - Compact key block and arrows (OT-7)
+
+/// The keys under (or beside) the field, in two compact rows on a 7-column
+/// grid of `TypePanelLayout.keyPitch` cells (OT-7; build 25 had one long
+/// stretched row):
+///
+///     ⌘  ⌥  ⌃  ⇧  esc  tab─────
+///     ⌫  ⏎  home end pg↑ pg↓ fn
+///
+/// The modifiers and the two keys you reach for with them; then editing
+/// and navigation, with fn at the end. Tab is two cells wide, as on a real
+/// keyboard. With fn on, the second row's keys before fn give way to a
+/// strip of F1–F12 that scrolls.
+public enum TypeKeyBlock {
+    public enum Item: Sendable, Hashable {
+        case modifier(KeyModifier)
+        case key(TypeKey)
+        /// The fn toggle (F1–F12).
+        case fn
+
+        /// The accessibility identifier, matching build 25's.
+        public var identifier: String {
+            switch self {
+            case let .modifier(modifier): "ph.type.modifier.\(modifier.rawValue)"
+            case let .key(key): "ph.type.key.\(key.wireName)"
+            case .fn: "ph.type.fn"
+            }
+        }
+    }
+
+    public struct Cell: Sendable, Hashable {
+        public let item: Item
+        public let column: Int
+        public let row: Int
+        public let columnSpan: Int
+    }
+
+    public static let columns = 7
+    public static let rows = 2
+
+    public static let cells: [Cell] = {
+        var cells: [Cell] = []
+        for (index, modifier) in ModifierLatch.chips.enumerated() {
+            cells.append(Cell(item: .modifier(modifier), column: index, row: 0, columnSpan: 1))
+        }
+        cells.append(Cell(item: .key(.remote(.escape)), column: 4, row: 0, columnSpan: 1))
+        cells.append(Cell(item: .key(.remote(.tab)), column: 5, row: 0, columnSpan: 2))
+        let second: [RemoteKey] = [.delete, .return, .home, .end, .pageUp, .pageDown]
+        for (index, key) in second.enumerated() {
+            cells.append(Cell(item: .key(.remote(key)), column: index, row: 1, columnSpan: 1))
+        }
+        cells.append(Cell(item: .fn, column: 6, row: 1, columnSpan: 1))
+        return cells
+    }()
+
+    /// The cells in `row`, left to right.
+    public static func row(_ index: Int) -> [Cell] {
+        cells.filter { $0.row == index }.sorted { $0.column < $1.column }
+    }
+
+    /// The columns the F1–F12 strip takes when fn is on (the second row
+    /// before fn).
+    public static let functionStripColumns = 6
+}
+
+/// The inverted-T arrow cluster beside the field (OT-7): ↑ over ← ↓ →,
+/// three cells wide and two tall, shaped like the arrow keys of a Mac
+/// keyboard.
+public enum ArrowCluster {
+    public static let columns = 3
+    public static let rows = 2
+
+    public struct Cell: Sendable, Hashable {
+        public let key: TypeKey
+        public let column: Int
+        public let row: Int
+    }
+
+    /// Each arrow and its cell.
+    public static let cells: [Cell] = [
+        Cell(key: .remote(.up), column: 1, row: 0),
+        Cell(key: .remote(.left), column: 0, row: 1),
+        Cell(key: .remote(.down), column: 1, row: 1),
+        Cell(key: .remote(.right), column: 2, row: 1),
+    ]
 }
 
 // MARK: - Compose
@@ -442,79 +558,176 @@ public enum KeyboardKind: String, Sendable, Hashable {
     }
 }
 
-/// How the panel is put together for one window and keyboard.
+/// How the panel is put together for its width, the window and the
+/// keyboard (OT-2, OT-3; compact since build 25's OT-7).
+///
+/// The layout follows the **panel's** width (the person resizes it,
+/// `TypePanelGeometry`), not the window's:
+///
+///     one block (wide panels, numpad off)
+///     ┌─────────────────────────────────────────────────────────┐
+///     │ ⠿ [Live│Compose] ⌨ Typing into Safari    [▦] [–] (×)    │
+///     │ ┌────────────────────┐      ↑     ⌘ ⌥ ⌃ ⇧ esc tab──    │
+///     │ │ field              │   ←  ↓  →  ⌫ ⏎ home end ↑ ↓ fn │
+///     │ └────────────────────┘ [paste]                          │
+///     └─────────────────────────────────────────────────────────┘
+///
+///     stacked (narrower panels, or the numpad on)
+///     ┌──────────────────────────────────┐
+///     │ ⠿ [Live│Compose]   [▦] [–] (×)   │
+///     │ ⌨ Typing into Safari             │  (narrow: own line)
+///     │ ┌──────────────┐      ↑          │
+///     │ │ field        │   ←  ↓  →       │
+///     │ [paste]                          │
+///     │ ⌘ ⌥ ⌃ ⇧ esc tab │ 7 8 9 ÷ ⌫      │  numpad beside the keys
+///     │ ⌫ ⏎ hm end ↑ ↓ fn│ 4 5 6 × ⏎ ...  │  when it fits, else below
+///     └──────────────────────────────────┘
 public struct TypePanelLayout: Sendable, Hashable {
     /// What the panel shows.
     public enum Body: String, Sendable, Hashable {
-        /// Header (mode, target, tabs, close), field, keys row, modifiers.
+        /// Header (grip, mode, target, numpad, collapse, close), field,
+        /// arrows and keys.
         case full
-        /// A hardware keyboard types: the target line, keys row and
-        /// modifiers only (the field stays, one line, to take the keys).
+        /// A hardware keyboard types: the field is one line naming the
+        /// target (it must hold focus to take the keys), with no paste or
+        /// Compose actions under it.
         case keysOnly
     }
 
+    /// How the field (with the arrows) and the key block share the panel.
+    public enum Arrangement: String, Sendable, Hashable {
+        /// Field, arrows and keys side by side in one block.
+        case oneBlock
+        /// Field and arrows on top, the key block under them.
+        case stacked
+    }
+
+    /// Where the numpad goes when it's on.
+    public enum NumpadPlacement: String, Sendable, Hashable {
+        case hidden
+        /// To the right of the key block, in the same band.
+        case beside
+        /// Under the key block (narrow panels).
+        case below
+    }
+
     public let body: Body
-    /// The header row (mode, target, tabs, close). Off for the keys-only
-    /// panel and when the room above the keyboard is short (iPhone
-    /// landscape): the field row then carries the close button and the
-    /// field's placeholder names the target.
+    /// The header row. Off when the room above the keyboard is short
+    /// (iPhone landscape): the field row then carries the grip and the
+    /// close button, and the field's placeholder names the target.
     public let showsHeader: Bool
-    /// "Typing into …" sits in the header (medium and wide) or on its own
-    /// line under it (compact).
+    /// "Typing into …" sits in the header (wide panels) or on its own line
+    /// under it.
     public let targetInHeader: Bool
-    /// The panel's width cap (centred in the window).
+    /// The widest the panel may be in this window when no width is given
+    /// (the inline panel of the classic layout).
     public let maximumWidth: Double
-    /// The modifier chips share the keys row (700 pt and wider, or a short
-    /// panel) or get a row of their own.
-    public let modifiersInKeysRow: Bool
+    /// The panel's width this layout is for.
+    public let panelWidth: Double
+    public let arrangement: Arrangement
+    public let numpadPlacement: NumpadPlacement
+    /// The field's width (the arrows sit beside it).
+    public let fieldWidth: Double
+    /// The key cell this panel draws: `keyPitch` (44), or less only when
+    /// the panel is narrower than the key block (a 320 pt Slide Over
+    /// window), so the seven columns still fit.
+    public let cellPitch: Double
     /// Lines the Compose field may grow to before it scrolls.
     public let composeLines: Int
-    /// The numpad's key size (square), whole points.
-    public let numpadKeySize: Double
-    /// The side margin.
+    /// The side margin of the window.
     public let margin: Double
 
-    public static let numpadGap: Double = 8
-    /// Numpad keys stay between these (44 pt minimum touch target).
-    public static let numpadMinimumKey: Double = 44
-    public static let numpadMaximumKey: Double = 64
-    /// The panel never grows past this on wide windows: a column of keys,
-    /// not a stretched bar.
+    // MARK: Sizes (points)
+
+    /// One key cell: a 40 pt cap and a 4 pt gap, so every key keeps a
+    /// 44 pt touch target without overlapping its neighbour's.
+    public static let keyPitch: Double = 44
+    public static let keyGap: Double = 4
+    public static var keyCap: Double { keyPitch - keyGap }
+    /// Between the field, the arrows, the keys and the numpad.
+    public static let blockGap: Double = 12
+    /// The panel's inner padding.
+    public static let padding: Double = 12
+    /// The field never gets narrower than this (about 18 characters).
+    public static let fieldMinimumWidth: Double = 192
+    /// Numpad keys: the same 44 pt cells as the key block.
+    public static var numpadGap: Double { keyGap }
+
+    public static var keyBlockSize: (width: Double, height: Double) {
+        (Double(TypeKeyBlock.columns) * keyPitch, Double(TypeKeyBlock.rows) * keyPitch)
+    }
+    public static var arrowsSize: (width: Double, height: Double) {
+        (Double(ArrowCluster.columns) * keyPitch, Double(ArrowCluster.rows) * keyPitch)
+    }
+    public static var numpadSize: (width: Double, height: Double) {
+        (Double(NumpadKey.columns) * keyPitch, Double(NumpadKey.rows) * keyPitch)
+    }
+
+    /// The panel never grows past this: a block of keys, not a bar.
     public static let wideMaximumWidth: Double = 760
     /// Below this much room above the keyboard the header row goes.
     public static let headerMinimumRoom: Double = 300
-    /// From this width the chips fit in the keys row.
-    public static let chipsInRowMinimumWidth: Double = 700
+    /// From this panel width "Typing into …" fits in the header.
+    public static let targetInHeaderMinimumWidth: Double = 560
 
-    /// `width` and `height` are the window's (the shell's planning size),
-    /// `keyboard` what covers it, `keyboardOverlap` how much it covers.
-    public init(width: Double, height: Double, keyboard: KeyboardKind, keyboardOverlap: Double = 0) {
+    /// The narrowest panel that takes the one-block arrangement:
+    /// padding, the field at its minimum, the arrows and the keys.
+    public static var oneBlockMinimumWidth: Double {
+        2 * padding + fieldMinimumWidth + blockGap + arrowsSize.width + blockGap + keyBlockSize.width
+    }
+
+    /// The narrowest panel with the numpad beside the keys.
+    public static var numpadBesideMinimumWidth: Double {
+        2 * padding + keyBlockSize.width + blockGap + numpadSize.width
+    }
+
+    /// - Parameters:
+    ///   - width / height: the window's (the shell's planning size).
+    ///   - keyboard / keyboardOverlap: what covers the window.
+    ///   - panelWidth: the panel's current width (`TypePanelGeometry`);
+    ///     `nil` lays out for the widest the window allows.
+    ///   - showsNumpad: whether the numpad is on.
+    public init(
+        width: Double,
+        height: Double,
+        keyboard: KeyboardKind,
+        keyboardOverlap: Double = 0,
+        panelWidth: Double? = nil,
+        showsNumpad: Bool = false
+    ) {
         let metrics = LayoutMetrics(width: width, height: height)
         margin = metrics.margin
         body = keyboard == .hardware ? .keysOnly : .full
         maximumWidth = min(Self.wideMaximumWidth, max(0, width - 2 * metrics.margin))
+        // A width from `TypePanelGeometry` is already fitted to the free
+        // room (which can be wider than the window less its margins, on an
+        // iPhone); without one, the window's cap.
+        let panel = max(0, min(panelWidth ?? maximumWidth, Self.wideMaximumWidth))
+        self.panelWidth = panel
         // The room above the keyboard decides how tall the panel may be:
         // iPhone landscape with the keyboard up has barely a line.
         let above = height - (keyboard == .software ? keyboardOverlap : 0)
-        showsHeader = body == .full && above >= Self.headerMinimumRoom
-        targetInHeader = metrics.widthClass != .compact
-        modifiersInKeysRow = width >= Self.chipsInRowMinimumWidth || !showsHeader
+        showsHeader = above >= Self.headerMinimumRoom
+        targetInHeader = panel >= Self.targetInHeaderMinimumWidth
         composeLines = above < 360 ? 1 : (above < 520 ? 2 : 4)
-        // Four keys and three gaps across the panel, capped; on short
-        // windows the five rows must fit too.
-        let across = ((maximumWidth - 3 * Self.numpadGap) / Double(NumpadKey.columns)).rounded(.down)
-        let tall = ((height * 0.45 - 4 * Self.numpadGap) / Double(NumpadKey.rows)).rounded(.down)
-        numpadKeySize = min(Self.numpadMaximumKey, max(Self.numpadMinimumKey, min(across, tall)))
-    }
 
-    /// The numpad grid's size for `numpadKeySize`.
-    public var numpadSize: (width: Double, height: Double) {
-        let columns = Double(NumpadKey.columns)
-        let rows = Double(NumpadKey.rows)
-        return (
-            columns * numpadKeySize + (columns - 1) * Self.numpadGap,
-            rows * numpadKeySize + (rows - 1) * Self.numpadGap
-        )
+        let inner = panel - 2 * Self.padding
+        let pitch = min(Self.keyPitch, max(32, (inner / Double(TypeKeyBlock.columns)).rounded(.down)))
+        cellPitch = pitch
+        if showsNumpad {
+            arrangement = .stacked
+            numpadPlacement = panel >= Self.numpadBesideMinimumWidth ? .beside : .below
+        } else {
+            arrangement = panel >= Self.oneBlockMinimumWidth ? .oneBlock : .stacked
+            numpadPlacement = .hidden
+        }
+        let beside = Self.blockGap + Double(ArrowCluster.columns) * pitch
+        switch arrangement {
+        case .oneBlock:
+            fieldWidth = (inner - beside - Self.blockGap - Self.keyBlockSize.width).rounded(.down)
+        case .stacked:
+            fieldWidth = max(0, inner - beside).rounded(.down)
+        }
     }
 
     /// The panel's bottom padding inside its container: it sits `gap`
@@ -540,6 +753,8 @@ public struct TypePanelLayout: Sendable, Hashable {
 /// it, so the panel and the keyboard can't disagree (OT-2).
 public struct TypePanelPresence: Sendable, Hashable {
     public private(set) var isShown = false
+    /// Folded to the pill (target and mode; one tap opens it, OT-6).
+    public private(set) var isCollapsed = false
     public var mode: TypeMode
     public var tab: TypeTab = .keys
     public var showsFunctionKeys = false
@@ -563,13 +778,42 @@ public struct TypePanelPresence: Sendable, Hashable {
             isShown = true
             tab = .keys
         }
+        isCollapsed = false
         focusRequest += 1
     }
 
     public mutating func close() {
         isShown = false
+        isCollapsed = false
         showsFunctionKeys = false
         modifiers.clear()
+    }
+
+    /// Folds the panel to its pill: the keyboard steps down and held
+    /// modifiers let go (the pill can't show them).
+    public mutating func collapse() {
+        guard isShown, !isCollapsed else { return }
+        isCollapsed = true
+        modifiers.clear()
+    }
+
+    /// Opens the pill back up where it was, on the tab it had.
+    public mutating func expand() {
+        guard isShown, isCollapsed else { return }
+        isCollapsed = false
+        if tab.wantsSystemKeyboard { focusRequest += 1 }
+    }
+
+    /// The header's numpad button: the numpad docks beside the keys or
+    /// goes away (OT-7).
+    public mutating func toggleNumpad() {
+        select(tab == .numpad ? .keys : .numpad)
+    }
+
+    /// The field took focus (a tap) while the numpad was on: back to the
+    /// system keyboard, so focus and the tab agree.
+    public mutating func fieldFocused() {
+        if tab == .numpad { tab = .keys }
     }
 
     public mutating func select(_ newTab: TypeTab) {
@@ -579,7 +823,14 @@ public struct TypePanelPresence: Sendable, Hashable {
     }
 
     /// Whether the field should hold the keyboard now.
-    public var wantsFocus: Bool { isShown && tab.wantsSystemKeyboard }
+    public var wantsFocus: Bool { isShown && !isCollapsed && tab.wantsSystemKeyboard }
+
+    /// The pill's words: "Safari · Live" (`TypingTargetGuard`'s app name,
+    /// or "Mac" when none is known).
+    public func pillCaption(frontApp: String?) -> String {
+        let app = frontApp?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return "\(app.isEmpty ? "Mac" : app) · \(mode.title)"
+    }
 }
 
 // MARK: - The shell's planning size

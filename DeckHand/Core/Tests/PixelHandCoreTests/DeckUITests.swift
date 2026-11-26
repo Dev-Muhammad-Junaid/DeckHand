@@ -374,7 +374,7 @@ struct ActionLibraryTests {
     @Test("Every storable action kind is in the library")
     func everyKind() {
         let kinds = Set(ActionKind.allCases.map { $0.template(frontBundleID: nil).kindName })
-        #expect(kinds == ["shortcut", "appShortcut", "menuCommand", "launchApp", "system", "media", "macShortcut", "sequence"])
+        #expect(kinds == ["shortcut", "appShortcut", "menuCommand", "launchApp", "system", "media", "macShortcut", "typeText", "sequence"])
         #expect(ActionKind(.contextAction(id: "x")) == nil)
         #expect(ActionKind.allCases.allSatisfy { PixelGlyphs.named($0.glyphName) != nil })
     }

@@ -84,7 +84,7 @@ public struct WidgetDeckSnapshot: Codable, Sendable, Equatable {
         var chosen: [WidgetKey] = []
         var chosenIDs = Set<String>()
         func take(_ keys: [DeckKey], from page: DeckPage) {
-            for key in keys where chosen.count < maxWidgetKeys && isListable(key) && !key.confirm && !chosenIDs.contains(key.id) {
+            for key in keys where chosen.count < maxWidgetKeys && isListable(key) && !key.asksFirst && !chosenIDs.contains(key.id) {
                 chosenIDs.insert(key.id)
                 chosen.append(WidgetKey(key, pageTitle: page.title))
             }
@@ -175,7 +175,7 @@ public struct WidgetKey: Codable, Sendable, Equatable, Identifiable, Hashable {
             pageTitle: pageTitle,
             glyph: WidgetGlyph.resolve(key.appearance.glyph, action: key.action, label: key.label),
             tint: key.appearance.tint,
-            confirm: key.confirm
+            confirm: key.asksFirst
         )
     }
 }
@@ -219,6 +219,7 @@ public enum WidgetGlyph: Codable, Sendable, Equatable, Hashable {
             return .pixel(name: key == .playPause ? "play" : (key == .next ? "arrowR" : "arrowL"))
         case .macShortcut: return .pixel(name: "run")
         case .sequence: return .pixel(name: "build")
+        case .typeText: return .pixel(name: "type")
         case .menuCommand: return .pixel(name: "terminal")
         default: return .monogram(monogram(for: label))
         }

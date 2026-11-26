@@ -37,16 +37,7 @@ public enum AskStep: Codable, Sendable, Equatable, Hashable {
         case let .typeText(text):
             // One line: a trailing Return reads "then Return" and inner line
             // breaks show as ↩, never a quote broken across lines (VQ-049).
-            var body = text
-            var endsWithReturn = false
-            while let last = body.last, last.isNewline {
-                body.removeLast()
-                endsWithReturn = true
-            }
-            body = body.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).joined(separator: " ↩ ")
-            let shown = body.count > 60 ? String(body.prefix(57)) + "…" : body
-            if shown.isEmpty { return endsWithReturn ? "Press Return" : "Type “”" }
-            return endsWithReturn ? "Type “\(shown)” then Return" : "Type “\(shown)”"
+            return TypedTextSummary.line(text)
         case let .delay(ms):
             let seconds = Double(ms) / 1000
             let text = seconds == seconds.rounded() ? String(Int(seconds)) : String(format: "%.1f", seconds)
@@ -97,16 +88,18 @@ public struct AskPlan: Codable, Sendable, Equatable {
     /// Why the plan can't be saved as a key, or `nil` when it can.
     public var saveBlocker: AskPlanValidation.SaveBlocker? { AskPlanValidation.saveBlocker(for: self) }
 
-    /// The one action a deck key stores for this plan: the single action,
-    /// or a `sequence` of every step. `nil` when `saveBlocker` isn't.
+    /// The one action a deck key stores for this plan: the single step's
+    /// action, or a `sequence` of every step. Typed text is kept as a
+    /// `typeText` action (OT-8), so any plan Ask can run can be saved.
+    /// `nil` when `saveBlocker` isn't.
     public var savedAction: Action? {
         guard saveBlocker == nil else { return nil }
-        if steps.count == 1, let only = steps.first?.action { return only }
-        let sequence: [SequenceStep] = steps.compactMap { step in
+        if steps.count == 1, let only = steps.first?.storedAction { return only }
+        let sequence: [SequenceStep] = steps.map { step in
             switch step {
             case let .action(action): .run(action: action)
+            case .typeText: .run(action: step.storedAction ?? .typeText(text: ""))
             case let .delay(ms): .delay(milliseconds: ms)
-            case .typeText: nil
             }
         }
         let action = Action.sequence(steps: sequence)
@@ -173,13 +166,21 @@ public enum AskPlanValidation {
 
     public enum SaveBlocker: Equatable, Sendable {
         case cannotRun
-        case typesText
+        /// A step that runs but can't be kept on a key: says which step
+        /// and why, in plain words, shown next to that step.
+        case step(index: Int, reason: String)
 
         public var message: String {
             switch self {
             case .cannotRun: "Fix the plan before saving it."
-            case .typesText: "Keys can’t type text yet. Remove the Type step to save this plan as a key."
+            case let .step(index, reason): "Step \(index + 1) can’t be saved on a key: \(reason)"
             }
+        }
+
+        /// The step the blocker is about, if it's about one.
+        public var stepIndex: Int? {
+            if case let .step(index, _) = self { return index }
+            return nil
         }
     }
 
@@ -210,10 +211,24 @@ public enum AskPlanValidation {
         return issues
     }
 
+    /// Why the plan can't be saved as a key, or `nil` when it can. Every
+    /// step a plan can run is storable since OT-8 (typed text included);
+    /// this still checks each stored step against the deck's own rules,
+    /// so a future step kind that can't be kept says which and why
+    /// instead of failing silently.
     public static func saveBlocker(for plan: AskPlan) -> SaveBlocker? {
         guard issues(in: plan).isEmpty else { return .cannotRun }
-        if plan.steps.contains(where: { if case .typeText = $0 { true } else { false } }) { return .typesText }
+        for (index, step) in plan.steps.enumerated() {
+            if let reason = saveReason(for: step) { return .step(index: index, reason: reason) }
+        }
         return nil
+    }
+
+    /// Why one step can't be kept on a key, in plain words, or `nil`.
+    public static func saveReason(for step: AskStep) -> String? {
+        guard let action = step.storedAction else { return nil }
+        guard let issue = ActionValidation.issues(in: action, storable: true).first else { return nil }
+        return issue.message
     }
 }
 
@@ -264,6 +279,8 @@ public enum AskSafety {
             return reason(forMenuTitle: path.last ?? "")
         case .macShortcut:
             return .runsShortcut
+        case .typeText:
+            return .typesText
         case let .sequence(steps):
             return steps.lazy.compactMap { $0.action.flatMap(reason(for:)) }.first
         case .launchApp, .system, .media, .contextAction:
@@ -319,5 +336,19 @@ public enum AskSafety {
             return .deletes
         }
         return nil
+    }
+}
+
+extension AskStep {
+    /// What a saved key stores for this step: its action, typed text as
+    /// `typeText` (OT-8) in the form the Mac types it (line endings made
+    /// `\n`, stray control characters dropped, as `input.typeText` does),
+    /// `nil` for a pause (a `sequence` delay).
+    public var storedAction: Action? {
+        switch self {
+        case let .action(action): action
+        case let .typeText(text): .typeText(text: TypingText.normalized(text))
+        case .delay: nil
+        }
     }
 }

@@ -79,6 +79,128 @@ extension PixelGlyphs {
         ]
     )
 
+    /// The Type panel's grip (owner testing, build 25, OT-6): two columns
+    /// of single dots, the usual "drag me" mark, on the 9 × 9 grid.
+    public static let grip = GlyphBitmap(
+        name: "grip",
+        label: "Move",
+        pattern: [
+            ".........",
+            "...#.#...",
+            ".........",
+            "...#.#...",
+            ".........",
+            "...#.#...",
+            ".........",
+            "...#.#...",
+            ".........",
+        ]
+    )
+
+    /// Fold the Type panel to its pill (OT-6): a bar along the foot.
+    public static let collapse = GlyphBitmap(
+        name: "collapse",
+        label: "Collapse",
+        pattern: [
+            ".........",
+            ".........",
+            ".........",
+            ".........",
+            ".........",
+            ".........",
+            ".........",
+            ".#######.",
+            ".........",
+        ]
+    )
+
+    /// The Type panel's resize corner (OT-6): a stepped diagonal, the
+    /// corner dot lit.
+    public static let resizeCorner = GlyphBitmap(
+        name: "resizeCorner",
+        label: "Resize",
+        pattern: [
+            ".........",
+            ".......#.",
+            ".........",
+            ".....#.#.",
+            ".........",
+            "...#.#.#.",
+            ".........",
+            ".#.#.#.*.",
+            ".........",
+        ]
+    )
+
+    /// The arrow keys' legends (OT-7): a stem and a 45° head, one-dot
+    /// strokes, outlines only (§1's stroke rule).
+    public static let keyUp = GlyphBitmap(
+        name: "keyUp",
+        label: "Up arrow",
+        pattern: [
+            "....#....",
+            "...#.#...",
+            "..#.#.#..",
+            ".#..#..#.",
+            "....#....",
+            "....#....",
+            "....#....",
+            "....#....",
+            ".........",
+        ]
+    )
+
+    public static let keyDown = GlyphBitmap(
+        name: "keyDown",
+        label: "Down arrow",
+        pattern: [
+            ".........",
+            "....#....",
+            "....#....",
+            "....#....",
+            "....#....",
+            ".#..#..#.",
+            "..#.#.#..",
+            "...#.#...",
+            "....#....",
+        ]
+    )
+
+    public static let keyLeft = GlyphBitmap(
+        name: "keyLeft",
+        label: "Left arrow",
+        pattern: [
+            ".........",
+            "...#.....",
+            "..#......",
+            ".#.......",
+            "#########",
+            ".#.......",
+            "..#......",
+            "...#.....",
+            ".........",
+        ]
+    )
+
+    public static let keyRight = GlyphBitmap(
+        name: "keyRight",
+        label: "Right arrow",
+        pattern: [
+            ".........",
+            ".....#...",
+            "......#..",
+            ".......#.",
+            "#########",
+            ".......#.",
+            "......#..",
+            ".....#...",
+            ".........",
+        ]
+    )
+
     /// The layout glyphs, kept apart from the spec's 40.
-    public static let layout: [GlyphBitmap] = [layoutSplit, sidebar, chevronLeft, numpad]
+    public static let layout: [GlyphBitmap] = [
+        layoutSplit, sidebar, chevronLeft, numpad,
+        grip, collapse, resizeCorner, keyUp, keyDown, keyLeft, keyRight,
+    ]
 }

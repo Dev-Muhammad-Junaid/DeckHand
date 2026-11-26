@@ -12,8 +12,11 @@
 //  - `menuCommand`: `MenuCommandPresser` presses the item through AX;
 //  - `macShortcut`: `MacShortcutRunner` runs `shortcuts run`, ≤ 15 s;
 //  - `sequence`: each step in order, awaited (an app shortcut waits for its
-//    app), with the lock gate asked again before every step, stopping at
-//    the first step that fails.
+//    app, typed text until it's typed), with the lock gate asked again
+//    before every step, stopping at the first step that fails.
+//
+//  `typeText` (protocol 15, OT-8) has a domain message, so a key that only
+//  types runs like the first six; inside a sequence it runs here.
 //
 //  One receipt per run: the result (`completed` / `failed`) when it is
 //  known within `ActionLimits.receiptDeadline`, else `delivered` at the
@@ -124,6 +127,16 @@ final class DeckHandler: DomainHandler {
             // order with typed text (`TypingQueue`).
             guard let message = action.message else { return .failed(reason: "Unknown action.") }
             await router?.route(message, from: connection)
+            return .completed
+
+        case .typeText:
+            // OT-8: the same path as Live typing and Ask (`input.typeText`
+            // through the input handler and `TypingQueue`), then wait until
+            // it's typed, so the next step (an app shortcut, a launch)
+            // can't overtake it.
+            guard let message = action.message else { return .failed(reason: "Unknown action.") }
+            await router?.route(message, from: connection)
+            await TypingQueue.shared.idle()
             return .completed
 
         case .contextAction:

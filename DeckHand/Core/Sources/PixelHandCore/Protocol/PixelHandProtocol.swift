@@ -51,7 +51,9 @@ public enum PixelHandProtocol {
     /// - 14: `pairing.refused(reason:)`: why the Mac refused (a person's
     ///   Deny, a timeout, a remote path without pairing, no verified key, a
     ///   newer request); pairing codes are eight digits (seven and a check).
-    public static let version = 14
+    /// - 15: `Action.typeText(text:)`: deck keys and sequence steps type
+    ///   text (owner testing build 25, OT-8).
+    public static let version = 15
 
     /// Bonjour TXT key carrying `version`. Short, because TXT keys should
     /// stay under 9 bytes.

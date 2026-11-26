@@ -139,7 +139,7 @@ struct DeckKeyButton: View {
                     chord: face.chord,
                     size: size,
                     kind: face.kind,
-                    asksFirst: key.confirm,
+                    asksFirst: key.asksFirst,
                     delivery: tracker.state,
                     icon: face.icon,
                     tint: face.tint,
@@ -153,14 +153,15 @@ struct DeckKeyButton: View {
             Button("Run") { run() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text(key.action.summary { apps[$0]?.displayName })
+            // A key that types says where the text goes (OT-8).
+            Text(KeyRunConfirmation.message(for: key.action, appName: { apps[$0]?.displayName }, frontApp: TypingTarget.shared.frontApp))
         }
     }
 
     private func tap() {
         if isEditing {
             onEdit()
-        } else if key.confirm {
+        } else if key.asksFirst {
             isConfirming = true
         } else {
             run()

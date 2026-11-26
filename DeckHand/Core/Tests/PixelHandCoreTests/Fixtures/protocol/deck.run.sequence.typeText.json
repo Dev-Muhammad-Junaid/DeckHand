@@ -1,0 +1,1 @@
+{"deck":{"run":{"action":{"sequence":{"steps":[{"run":{"action":{"launchApp":{"bundleID":"com.apple.Safari"}}}},{"delay":{"milliseconds":500}},{"run":{"action":{"typeText":{"text":"youtube"}}}},{"run":{"action":{"shortcut":{"keys":["return"]}}}}]}},"requestID":"cmd-12"}},"v":15}

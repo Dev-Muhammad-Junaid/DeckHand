@@ -96,6 +96,13 @@ Tests in Core: every glyph is 9 × 9; at most one accent; no 2 × 2 filled block
 unless `solid` (rule 1); names unique. A snapshot test renders all 40 at pitch
 2 and 3 in both appearances.
 
+**Layout glyphs (outside the set's 40).** `layoutSplit`, `sidebar`,
+`chevronLeft`, `numpad`, and for the Type panel (build 25, OT-6/OT-7):
+`grip` (two columns of single dots, "drag me"), `collapse` (a bar along the
+foot), `resizeCorner` (a stepped diagonal, the corner dot lit), and the
+arrow-key legends `keyUp`, `keyDown`, `keyLeft`, `keyRight` (a stem and a
+45° head). They follow the stroke rule above.
+
 ## 2. Dot-matrix type
 
 **Font.** 5 × 7 cells, 1-cell tracking (6-cell advance), uppercase A–Z,
@@ -128,6 +135,14 @@ each character's 35-bit pattern in `PixelHandCore.DotMatrixFont` (data + tests
 in Core, like the glyphs). Numbers that change use
 `.contentTransition(.identity)` and redraw; no per-digit animation except the
 pairing code, which lights each new digit with the power-on curve.
+
+**Type panel key caps (owner testing, build 25, OT-7).** The owner asked
+for dot-matrix legends on the Type panel's word keys (ESC, TAB, HOME, END,
+PGUP, PGDN, FN, F1–F12) and its numpad numerals, at pitch 1.4 on 40 pt
+caps (2 on the numpad). This is a named exception to "never for buttons":
+a key cap is a label on a key, not a sentence, and each still has a
+VoiceOver name. Symbols the font doesn't have stay in the rounded chord
+face (⌘ ⌥ ⌃ ⇧ ⌫ ⏎); the arrows are pixel glyphs.
 
 ## 3. The status strip ("now playing")
 

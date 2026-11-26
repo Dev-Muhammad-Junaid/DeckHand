@@ -56,6 +56,13 @@ public enum ActionValidation {
         /// Dialog buttons only exist while their dialog is open, so a
         /// stored key or a sequence step can't press one.
         case contextActionNotStorable
+        /// Typed text that is empty or only whitespace.
+        case emptyText
+        /// Typed text over `TypingPolicy.maxMessageBytes`.
+        case textTooLong
+        /// Typed text with control characters other than Return and Tab
+        /// (the Mac would drop them, so the key wouldn't type what it shows).
+        case badText
     }
 
     /// Every problem with `action`; empty when it is valid. With
@@ -92,6 +99,8 @@ public enum ActionValidation {
             if !path.allSatisfy(isMenuTitle) { issues.append(.badMenuTitle) }
         case let .macShortcut(name):
             if !isShortcutName(name) { issues.append(.badShortcutName) }
+        case let .typeText(text):
+            checkText(text, into: &issues)
         case let .sequence(steps):
             if inSequence { issues.append(.nestedSequence); return }
             if steps.isEmpty { issues.append(.emptySequence) }
@@ -111,6 +120,15 @@ public enum ActionValidation {
             }
             if total > ActionLimits.maxTotalDelayMilliseconds { issues.append(.totalDelayTooLong) }
         }
+    }
+
+    /// Typed text: not blank, at most one `input.typeText`, and already in
+    /// the form the Mac types (`TypingText.normalized`), so what the key
+    /// shows is what lands. Line breaks press Return.
+    private static func checkText(_ text: String, into issues: inout [Issue]) {
+        if text.trimmingCharacters(in: .whitespaces).isEmpty || text.isEmpty { issues.append(.emptyText) }
+        if text.utf8.count > TypingPolicy.maxMessageBytes { issues.append(.textTooLong) }
+        if TypingText.normalized(text) != text { issues.append(.badText) }
     }
 
     private static func checkChord(_ keys: [String], into issues: inout [Issue]) {

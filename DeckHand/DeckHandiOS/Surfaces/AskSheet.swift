@@ -33,6 +33,7 @@
 
 import PixelHandCore
 import SwiftUI
+import UIKit
 
 struct AskSheet: View {
     let session: ControlSessionModel
@@ -156,6 +157,17 @@ struct AskPanel: View {
         // New request: the cleared field takes focus.
         .onChange(of: model.flow.fieldResetRequest) { _, _ in
             if isUnlocked { isFieldFocused = true }
+        }
+        // Build 25 bug 2: with a plan or result showing, the field still
+        // holds the request that made it. Focusing it selects that text,
+        // so typing starts a new request instead of joining the old one
+        // ("nowTake a screenshot"). After the focus lands, so the field is
+        // the first responder.
+        .onChange(of: isFieldFocused) { _, focused in
+            guard focused, model.flow.selectsFieldOnFocus, !model.request.isEmpty else { return }
+            DispatchQueue.main.async {
+                UIApplication.shared.sendAction(#selector(UIResponder.selectAll(_:)), to: nil, from: nil, for: nil)
+            }
         }
         .onDisappear {
             if placement == .sheet { model.cancelRun() }
@@ -342,6 +354,15 @@ struct AskPanel: View {
                     Text("Asks first")
                         .font(.caption2)
                         .foregroundStyle(PixelHandTheme.ink3)
+                }
+                // OT-8: a step that runs but can't be kept on a key says
+                // why here, next to it, not as a dead end after Save.
+                if !invalid, let reason = AskPlanValidation.saveReason(for: step) {
+                    Text("Can’t be saved on a key: \(reason)")
+                        .font(.caption2)
+                        .foregroundStyle(PixelHandTheme.warning)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("ph.ask.step.\(index).saveNote")
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

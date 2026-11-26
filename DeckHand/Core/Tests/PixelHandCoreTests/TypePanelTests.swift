@@ -129,6 +129,59 @@ struct TypePanelPresenceTests {
         #expect(presence.focusRequest == before + 1)
     }
 
+    @Test("Collapse folds to the pill and lets the keyboard go; one tap expands on the same tab (OT-6)")
+    func collapse() {
+        var presence = TypePanelPresence()
+        presence.collapse()
+        #expect(!presence.isCollapsed) // closed: nothing to fold
+        presence.open()
+        presence.modifiers.tap(.command)
+        presence.collapse()
+        #expect(presence.isShown && presence.isCollapsed)
+        #expect(!presence.wantsFocus)
+        #expect(presence.modifiers.isEmpty)
+        let before = presence.focusRequest
+        presence.expand()
+        #expect(!presence.isCollapsed && presence.wantsFocus)
+        #expect(presence.focusRequest == before + 1)
+        // On the numpad, expanding doesn't call the keyboard back.
+        presence.toggleNumpad()
+        presence.collapse()
+        let numpadBefore = presence.focusRequest
+        presence.expand()
+        #expect(presence.tab == .numpad && presence.focusRequest == numpadBefore)
+        // Opening (the dock's button) expands too; closing forgets the fold.
+        presence.collapse()
+        presence.open()
+        #expect(!presence.isCollapsed)
+        presence.collapse()
+        presence.close()
+        presence.open()
+        #expect(!presence.isCollapsed)
+    }
+
+    @Test("The numpad button toggles; tapping the field goes back to the keyboard (OT-7)")
+    func numpadToggle() {
+        var presence = TypePanelPresence()
+        presence.open()
+        presence.toggleNumpad()
+        #expect(presence.tab == .numpad && !presence.wantsFocus)
+        presence.fieldFocused()
+        #expect(presence.tab == .keys && presence.wantsFocus)
+        presence.toggleNumpad()
+        presence.toggleNumpad()
+        #expect(presence.tab == .keys)
+    }
+
+    @Test("The pill names the app and the mode")
+    func pill() {
+        var presence = TypePanelPresence(mode: .compose)
+        #expect(presence.pillCaption(frontApp: "Safari") == "Safari · Compose")
+        presence.mode = .live
+        #expect(presence.pillCaption(frontApp: nil) == "Mac · Live")
+        #expect(presence.pillCaption(frontApp: "  ") == "Mac · Live")
+    }
+
     @Test("Closing lets go of modifiers and the fn row")
     func closeClears() {
         var presence = TypePanelPresence(mode: .compose)
@@ -222,7 +275,7 @@ struct ModifierLatchTests {
 
 @Suite("Numpad (OT-3)")
 struct NumpadTests {
-    @Test("A 4 × 5 grid with every cell filled once: 0 spans two columns, Enter two rows")
+    @Test("A 5 × 4 grid with every cell filled once; Enter fills the last column under ⌫ (OT-7)")
     func grid() {
         var covered = Set<String>()
         for key in NumpadKey.allCases {
@@ -236,9 +289,13 @@ struct NumpadTests {
             }
         }
         #expect(covered.count == NumpadKey.columns * NumpadKey.rows)
-        #expect(NumpadKey.zero.cell.columnSpan == 2)
-        #expect(NumpadKey.enter.cell.rowSpan == 2)
-        #expect(NumpadKey.row(4) == [.zero, .point])
+        #expect(NumpadKey.columns == 5 && NumpadKey.rows == 4)
+        #expect(NumpadKey.row(0) == [.seven, .eight, .nine, .divide, .delete])
+        #expect(NumpadKey.row(1) == [.four, .five, .six, .multiply, .enter])
+        #expect(NumpadKey.row(2) == [.one, .two, .three, .minus])
+        #expect(NumpadKey.row(3) == [.zero, .point, .equals, .plus])
+        #expect(NumpadKey.enter.cell.rowSpan == 3)
+        #expect(NumpadKey.allCases.allSatisfy { $0.cell.columnSpan == 1 })
     }
 
     @Test("Digits, point and operators type text; Enter and ⌫ press keys the Mac knows")
@@ -303,39 +360,105 @@ struct ComposeSendTests {
     }
 }
 
-@Suite("Type panel layout (OT-2, OT-3)")
+@Suite("Type panel layout (OT-2, OT-3, OT-7)")
 struct TypePanelLayoutTests {
-    @Test("A hardware keyboard shows the keys row and modifiers only")
+    @Test("A hardware keyboard gives the keys-only body")
     func hardware() {
         #expect(TypePanelLayout(width: 1180, height: 820, keyboard: .hardware).body == .keysOnly)
         #expect(TypePanelLayout(width: 1180, height: 820, keyboard: .software, keyboardOverlap: 400).body == .full)
         #expect(TypePanelLayout(width: 1180, height: 820, keyboard: .none).body == .full)
     }
 
-    @Test("Wide windows cap the panel and put the chips in the keys row")
-    func wide() {
-        let layout = TypePanelLayout(width: 1180, height: 820, keyboard: .software, keyboardOverlap: 400)
-        #expect(layout.maximumWidth == TypePanelLayout.wideMaximumWidth)
-        #expect(layout.modifiersInKeysRow)
-        #expect(layout.showsHeader && layout.targetInHeader)
-        let portrait = TypePanelLayout(width: 820, height: 1180, keyboard: .software, keyboardOverlap: 320)
-        #expect(portrait.modifiersInKeysRow && portrait.showsHeader)
-        let phone = TypePanelLayout(width: 402, height: 874, keyboard: .software, keyboardOverlap: 336)
-        #expect(phone.maximumWidth == 402 - 32)
-        #expect(!phone.modifiersInKeysRow)
-        #expect(phone.showsHeader && !phone.targetInHeader)
+    @Test("The layout follows the panel's width, not the window's")
+    func followsPanel() {
+        let wide = TypePanelLayout(width: 1180, height: 820, keyboard: .software, keyboardOverlap: 400, panelWidth: 720)
+        #expect(wide.arrangement == .oneBlock)
+        #expect(wide.targetInHeader)
+        // The same window, the panel resized to the minimum: stacked.
+        let narrow = TypePanelLayout(width: 1180, height: 820, keyboard: .software, keyboardOverlap: 400, panelWidth: TypePanelGeometry.minimumWidth)
+        #expect(narrow.arrangement == .stacked)
+        #expect(!narrow.targetInHeader)
+        #expect(narrow.panelWidth == 360)
+        // No panel width: the window's cap.
+        let cap = TypePanelLayout(width: 1180, height: 820, keyboard: .none)
+        #expect(cap.panelWidth == TypePanelLayout.wideMaximumWidth)
+        #expect(cap.maximumWidth == TypePanelLayout.wideMaximumWidth)
+        // A width from the geometry is used as given (an iPhone's docked
+        // panel spans the room), capped at the widest panel.
+        let phone = TypePanelLayout(width: 402, height: 874, keyboard: .software, keyboardOverlap: 336, panelWidth: 386)
+        #expect(phone.panelWidth == 386)
+        #expect(phone.arrangement == .stacked)
+        #expect(TypePanelLayout(width: 1366, height: 1024, keyboard: .none, panelWidth: 900).panelWidth == 760)
+        // No width: the window's cap.
+        #expect(TypePanelLayout(width: 402, height: 874, keyboard: .none).panelWidth == 402 - 32)
     }
 
-    @Test("iPhone landscape with the keyboard up: no header, chips in the keys row")
+    @Test("The field is about 30 % narrower than build 25's, with the arrows beside it")
+    func fieldWidth() {
+        // Build 25: the field ran the panel's width less the paste control
+        // (about 640 of 736 at 760 wide).
+        let wide = TypePanelLayout(width: 1180, height: 820, keyboard: .none, panelWidth: 760)
+        #expect(wide.arrangement == .oneBlock)
+        #expect(wide.fieldWidth == 760 - 24 - 12 - 132 - 12 - 308)
+        #expect(wide.fieldWidth <= 640 * 0.7)
+        let stacked = TypePanelLayout(width: 1180, height: 820, keyboard: .none, panelWidth: 600)
+        #expect(stacked.fieldWidth == 600 - 24 - 12 - 132)
+        // Never under the minimum at the panel's minimum width.
+        let smallest = TypePanelLayout(width: 1180, height: 820, keyboard: .none, panelWidth: TypePanelGeometry.minimumWidth)
+        #expect(smallest.fieldWidth == TypePanelLayout.fieldMinimumWidth)
+    }
+
+    @Test("Key caps keep 44 pt targets; the blocks are whole cells")
+    func sizes() {
+        #expect(TypePanelLayout.keyPitch == 44)
+        #expect(TypePanelLayout.keyCap == 40)
+        #expect(TypePanelLayout.keyBlockSize == (308, 88))
+        #expect(TypePanelLayout.arrowsSize == (132, 88))
+        #expect(TypePanelLayout.numpadSize == (220, 176))
+        #expect(TypePanelLayout.oneBlockMinimumWidth == 680)
+        #expect(TypePanelLayout.numpadBesideMinimumWidth == 564)
+    }
+
+    @Test("The numpad docks beside the keys, or under them on narrow panels")
+    func numpadPlacement() {
+        let off = TypePanelLayout(width: 1180, height: 820, keyboard: .none, panelWidth: 720)
+        #expect(off.numpadPlacement == .hidden)
+        let beside = TypePanelLayout(width: 1180, height: 820, keyboard: .none, panelWidth: 720, showsNumpad: true)
+        #expect(beside.numpadPlacement == .beside)
+        #expect(beside.arrangement == .stacked)
+        let below = TypePanelLayout(width: 1180, height: 820, keyboard: .none, panelWidth: 360, showsNumpad: true)
+        #expect(below.numpadPlacement == .below)
+        // Stacked under the keys, it fits the minimum width.
+        #expect(TypePanelLayout.numpadSize.width <= TypePanelGeometry.minimumWidth - 2 * TypePanelLayout.padding)
+    }
+
+    @Test("Narrower than the key block (Slide Over, 320 pt): cells shrink so the seven columns fit")
+    func narrowest() {
+        let slideOver = TypePanelLayout(width: 320, height: 800, keyboard: .none, panelWidth: 304)
+        #expect(slideOver.cellPitch == 40)
+        #expect(7 * slideOver.cellPitch <= 304 - 24)
+        #expect(slideOver.fieldWidth + 12 + 3 * slideOver.cellPitch <= 304 - 24)
+        // At the minimum and up, always 44.
+        for width in stride(from: 360.0, through: 760, by: 20) {
+            #expect(TypePanelLayout(width: 1180, height: 820, keyboard: .none, panelWidth: width).cellPitch == 44)
+        }
+    }
+
+    @Test("Everything fits the minimum width: keys, field and arrows, numpad")
+    func minimumFits() {
+        let inner = TypePanelGeometry.minimumWidth - 2 * TypePanelLayout.padding
+        #expect(TypePanelLayout.keyBlockSize.width <= inner)
+        #expect(TypePanelLayout.fieldMinimumWidth + TypePanelLayout.blockGap + TypePanelLayout.arrowsSize.width <= inner)
+        #expect(TypePanelLayout.numpadSize.width <= inner)
+    }
+
+    @Test("Short room above the keyboard: no header; the dismissed keyboard brings it back")
     func shortRoom() {
         let landscape = TypePanelLayout(width: 874, height: 402, keyboard: .software, keyboardOverlap: 200)
         #expect(!landscape.showsHeader)
-        #expect(landscape.modifiersInKeysRow)
         #expect(landscape.body == .full)
-        // The keyboard dismissed: the header comes back.
         #expect(TypePanelLayout(width: 874, height: 402, keyboard: .none).showsHeader)
-        // Hardware keyboard: keys only, no header.
-        #expect(!TypePanelLayout(width: 1180, height: 820, keyboard: .hardware).showsHeader)
+        #expect(TypePanelLayout(width: 1180, height: 820, keyboard: .hardware).showsHeader)
     }
 
     @Test("Compose grows with the room above the keyboard")
@@ -346,28 +469,90 @@ struct TypePanelLayoutTests {
         #expect(TypePanelLayout(width: 820, height: 1180, keyboard: .hardware).composeLines == 4)
     }
 
-    @Test("Numpad keys are whole points, at least 44, and the grid fits the panel")
-    func numpad() {
+    @Test("Every window size gives a layout whose blocks fit the panel")
+    func everyWindowFits() {
         for (_, width, height) in ShellKeyboardTests.windows {
-            let layout = TypePanelLayout(width: width, height: height, keyboard: .none)
-            #expect(layout.numpadKeySize >= TypePanelLayout.numpadMinimumKey)
-            #expect(layout.numpadKeySize <= TypePanelLayout.numpadMaximumKey)
-            #expect(layout.numpadKeySize == layout.numpadKeySize.rounded())
-            #expect(layout.numpadSize.width <= max(layout.maximumWidth, 4 * 44 + 24))
+            for numpad in [false, true] {
+                let layout = TypePanelLayout(width: width, height: height, keyboard: .none, showsNumpad: numpad)
+                let inner = layout.panelWidth - 2 * TypePanelLayout.padding
+                #expect(layout.fieldWidth >= 0)
+                switch layout.arrangement {
+                case .oneBlock:
+                    #expect(layout.fieldWidth + 24 + 132 + 308 <= inner)
+                case .stacked:
+                    #expect(layout.fieldWidth + 12 + 132 <= inner)
+                }
+                if layout.numpadPlacement == .beside {
+                    #expect(308 + 12 + 220 <= inner)
+                }
+            }
         }
     }
 
     @Test("The panel sits on the keyboard, or above the dock when nothing covers it")
     func bottomPadding() {
-        // iPad landscape, 820 tall: keyboard top 420 covers the dock (740).
         #expect(TypePanelLayout.bottomPadding(containerMaxY: 800, keyboardMinY: 420, dockMinY: 740) == 388)
-        // No keyboard: above the dock.
         #expect(TypePanelLayout.bottomPadding(containerMaxY: 800, keyboardMinY: nil, dockMinY: 740) == 68)
-        // Hardware keyboard's shortcut bar only, no dock (rail, laptop).
         #expect(TypePanelLayout.bottomPadding(containerMaxY: 800, keyboardMinY: 770, dockMinY: nil) == 38)
-        // Nothing under it.
         #expect(TypePanelLayout.bottomPadding(containerMaxY: 800, keyboardMinY: nil, dockMinY: nil) == 8)
-        // A keyboard frame below the container (Stage Manager window above it).
         #expect(TypePanelLayout.bottomPadding(containerMaxY: 380, keyboardMinY: 420, dockMinY: nil) == 8)
+    }
+}
+
+@Suite("Compact key block and arrow cluster (OT-7)")
+struct TypeKeyBlockTests {
+    @Test("Two rows: modifiers with esc and tab; then ⌫ ⏎ home end pg↑ pg↓ fn")
+    func rows() {
+        let top = TypeKeyBlock.row(0).map(\.item)
+        #expect(top == [
+            .modifier(.command), .modifier(.option), .modifier(.control), .modifier(.shift),
+            .key(.remote(.escape)), .key(.remote(.tab)),
+        ])
+        let bottom = TypeKeyBlock.row(1).map(\.item)
+        #expect(bottom == [
+            .key(.remote(.delete)), .key(.remote(.return)), .key(.remote(.home)), .key(.remote(.end)),
+            .key(.remote(.pageUp)), .key(.remote(.pageDown)), .fn,
+        ])
+    }
+
+    @Test("Every row fills the 7 columns exactly once")
+    func grid() {
+        for row in 0..<TypeKeyBlock.rows {
+            var columns: [Int] = []
+            for cell in TypeKeyBlock.row(row) {
+                columns += Array(cell.column..<(cell.column + cell.columnSpan))
+            }
+            #expect(columns == Array(0..<TypeKeyBlock.columns), "row \(row)")
+        }
+        #expect(TypeKeyBlock.cells.first { $0.item == .key(.remote(.tab)) }?.columnSpan == 2)
+    }
+
+    @Test("Every key exists in the Mac's key table and keeps build 25's identifiers")
+    func keys() {
+        for cell in TypeKeyBlock.cells {
+            if case let .key(key) = cell.item {
+                #expect(KeyTable.keyCode(for: key.wireName) != nil)
+            }
+        }
+        #expect(TypeKeyBlock.Item.key(.remote(.return)).identifier == "ph.type.key.return")
+        #expect(TypeKeyBlock.Item.modifier(.command).identifier == "ph.type.modifier.command")
+        #expect(TypeKeyBlock.Item.fn.identifier == "ph.type.fn")
+        // The block and the arrows together hold everything build 25's row had.
+        let block = Set(TypeKeyBlock.cells.compactMap { cell -> String? in
+            if case let .key(key) = cell.item { return key.wireName }
+            return nil
+        })
+        let arrows = Set(ArrowCluster.cells.map(\.key.wireName))
+        #expect(block.union(arrows) == Set(TypeKeysRow.main.map(\.wireName)))
+    }
+
+    @Test("The arrows make an inverted T: ↑ over ← ↓ →")
+    func arrows() {
+        let cells = Dictionary(uniqueKeysWithValues: ArrowCluster.cells.map { ($0.key, [$0.column, $0.row]) })
+        #expect(cells[.remote(.up)] == [1, 0])
+        #expect(cells[.remote(.left)] == [0, 1])
+        #expect(cells[.remote(.down)] == [1, 1])
+        #expect(cells[.remote(.right)] == [2, 1])
+        #expect(ArrowCluster.cells.count == 4)
     }
 }
