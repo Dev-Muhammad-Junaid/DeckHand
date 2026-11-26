@@ -106,9 +106,13 @@ struct PeerPickerView: View {
             case .settings:
                 SettingsView()
             case .pair:
+                // VQ-100: no default by list order. Core picks the Mac that
+                // asked, the only Mac, or the only paired or recently used
+                // one; otherwise the sheet asks on a "Pair with" row.
                 PairingCodeEntryView(
-                    macName: pairTargets.count == 1 ? pairTargets[0].name : "your Mac",
-                    choices: pairTargets
+                    macName: "your Mac",
+                    choices: pairTargets,
+                    askingDeviceID: pairing.askingMacDeviceID
                 )
             }
         }
@@ -380,8 +384,15 @@ struct PeerPickerView: View {
     }
 
     /// Macs in reach that a typed code could be for.
-    private var pairTargets: [PairingCodeEntryView.Target] {
-        peers.filter(\.isNearby).map { .init(id: $0.deviceID, name: $0.name) }
+    private var pairTargets: [PairingTargetCandidate] {
+        peers.filter(\.isNearby).map { peer in
+            PairingTargetCandidate(
+                deviceID: peer.deviceID,
+                name: peer.name,
+                isPaired: pairing.isPaired(deviceID: peer.deviceID),
+                lastUsedAt: MacSwitcher.shared.memory(for: peer.deviceID)?.lastUsedAt
+            )
+        }
     }
 
     /// Shows `next`, or queues it while another sheet is still closing
@@ -412,6 +423,7 @@ struct PeerPickerView: View {
 
         connecting = peer.deviceID
         errorMessage = nil
+        pairing.noteConnectAttempt(to: peer.deviceID)
 
         DeckHandLog.connection.info("📡 Connecting to \(peer.name, privacy: .public) id=\(peer.deviceID, privacy: .public) nearby=\(peer.isNearby)")
         Task {
