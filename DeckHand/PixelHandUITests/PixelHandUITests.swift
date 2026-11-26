@@ -885,6 +885,139 @@ final class PixelHandUITests: XCTestCase {
         return (element.value(forKey: "hasKeyboardFocus") as? Bool) ?? false
     }
 
+    // MARK: - Owner testing, build 26
+
+    /// OT-9: the Send sheet in the pixel identity, portrait then landscape.
+    /// Asserts the Send | Inbox switch, three source chips of one size on
+    /// one line, the field with its Add button, compact device cards
+    /// (offline Macs smaller still), and a sheet no taller than its
+    /// content (its Done button isn't pushed to the top of the screen
+    /// with a short list).
+    func test22_SendSheetLayout() {
+        useFullScreenAppsIfAsked()
+        launch()
+        guard connect() else { return }
+        for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {
+            let tag = orientation == .portrait ? "portrait" : "landscape"
+            XCUIDevice.shared.orientation = orientation
+            sleep(2)
+            guard tapIfExists("ph.transfer.send") else { break }
+            sleep(1)
+            snap("send-\(tag)")
+
+            XCTAssertTrue(element("ph.transfer.tab").exists, "Send | Inbox switch (\(tag))")
+            XCTAssertTrue(element("ph.send.tab.send").exists, "Send side of the switch (\(tag))")
+            XCTAssertTrue(element("ph.send.tab.inbox").exists, "Inbox side of the switch (\(tag))")
+
+            let chips = ["photos", "files", "clipboard"].map { element("ph.send.source.\($0)") }
+            if chips.allSatisfy({ $0.exists }) {
+                let frames = chips.map(\.frame)
+                let heights = frames.map(\.height)
+                let widths = frames.map(\.width)
+                let tops = frames.map(\.minY)
+                XCTAssertLessThanOrEqual(heights.max()! - heights.min()!, 1, "Source chips share one height (\(tag)): \(heights)")
+                XCTAssertLessThanOrEqual(widths.max()! - widths.min()!, 1, "Source chips share one width (\(tag)): \(widths)")
+                XCTAssertLessThanOrEqual(tops.max()! - tops.min()!, 1, "Source chips sit on one line (\(tag)): \(tops)")
+                XCTAssertGreaterThanOrEqual(heights.min()!, 44, "Source chips are 44 pt targets (\(tag))")
+            } else {
+                snap("missing-source-chips-\(tag)")
+            }
+            XCTAssertTrue(element("ph.send.field").exists, "Text-or-link field (\(tag))")
+            XCTAssertTrue(element("ph.send.add").exists, "Field's Add button (\(tag))")
+
+            let cards = app.descendants(matching: .any).matching(identifier: "ph.transfer.macCard").allElementsBoundByIndex
+            let offline = app.descendants(matching: .any).matching(identifier: "ph.send.offlineCard").allElementsBoundByIndex
+            for card in cards {
+                XCTAssertLessThanOrEqual(card.frame.height, 72, "Device cards are compact (\(tag)): \(card.frame)")
+            }
+            for row in offline {
+                XCTAssertLessThanOrEqual(row.frame.height, 48, "An offline Mac is a small row (\(tag)): \(row.frame)")
+                if let card = cards.first {
+                    XCTAssertLessThan(row.frame.height, card.frame.height, "Offline Macs are smaller than live cards (\(tag))")
+                }
+            }
+
+            // Sized to the content: with no more than a row of cards and no
+            // tray, the sheet starts well below the top of the window.
+            let done = element("ph.send.done")
+            if done.exists, cards.count <= 3, offline.count <= 3, !element("ph.send.trayItem").exists {
+                let window = app.windows.firstMatch.frame
+                XCTAssertGreaterThan(done.frame.minY, window.minY + window.height * 0.25, "Sheet sized to its content (\(tag)): Done at \(done.frame.minY)")
+            }
+
+            if tapIfExists("ph.send.tab.inbox") {
+                sleep(1)
+                snap("inbox-\(tag)")
+                tapIfExists("ph.send.tab.send")
+            }
+            if !tapIfExists("ph.send.done") { dismissSheet() }
+            sleep(1)
+        }
+        XCUIDevice.shared.orientation = .portrait
+        sleep(1)
+    }
+
+    /// OT-10: the capture preview fills the screen. Takes the default
+    /// capture and asserts, in portrait, that the picture fills the width
+    /// (or, for a tall capture, most of the height), sits centred between
+    /// the header and the dock, and that the dock is anchored at the
+    /// bottom; double-tap zooms in and back out; then the same in
+    /// landscape.
+    func test23_CapturePreviewFillsPortrait() {
+        useFullScreenAppsIfAsked()
+        XCUIDevice.shared.orientation = .portrait
+        launch()
+        guard connect() else { return }
+        guard tapIfExists("ph.header.capture") else { return }
+        let picture = element("ph.capture.preview")
+        guard picture.waitForExistence(timeout: 15) else {
+            snap("missing-ph.capture.preview")
+            dismissSheet()
+            return
+        }
+        sleep(1)
+        for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {
+            let tag = orientation == .portrait ? "portrait" : "landscape"
+            XCUIDevice.shared.orientation = orientation
+            sleep(2)
+            snap("capture-\(tag)")
+            let window = app.windows.firstMatch.frame
+            let well = element("ph.capture.well").exists ? element("ph.capture.well").frame : picture.frame
+            let dock = element("ph.capture.dock")
+            guard dock.exists else { snap("missing-ph.capture.dock-\(tag)"); continue }
+
+            // Aspect-fit: one side meets the room's edge (16 pt margins).
+            let fillsWidth = well.width >= window.width - 2 * 16 - 2
+            let fillsHeight = well.height >= (dock.frame.minY - well.minY) - 2 * 12 - 2
+            XCTAssertTrue(fillsWidth || fillsHeight, "Picture fills the room (\(tag)): \(well) in \(window)")
+            if orientation == .portrait, well.width >= well.height {
+                XCTAssertTrue(fillsWidth, "A wide capture fills the width in portrait: \(well.width) of \(window.width)")
+            }
+            // The dock is at the bottom, under the picture, clear of the
+            // home indicator.
+            XCTAssertGreaterThanOrEqual(dock.frame.minY, well.maxY, "Dock under the picture (\(tag))")
+            XCTAssertGreaterThan(dock.frame.maxY, window.maxY - 64, "Dock anchored at the bottom (\(tag)): \(dock.frame)")
+            XCTAssertLessThanOrEqual(dock.frame.maxY, window.maxY, "Dock inside the window (\(tag))")
+            // No empty band: the picture is centred between the header
+            // (its close button) and the dock.
+            let close = app.buttons["Close capture"].firstMatch
+            if close.exists {
+                let above = well.minY - close.frame.maxY
+                let below = dock.frame.minY - well.maxY
+                XCTAssertLessThanOrEqual(abs(above - below), 4, "Picture centred between header and dock (\(tag)): \(above) above, \(below) below")
+            }
+
+            picture.doubleTap()
+            sleep(1)
+            snap("capture-zoomed-\(tag)")
+            picture.doubleTap()
+            sleep(1)
+        }
+        XCUIDevice.shared.orientation = .portrait
+        sleep(1)
+        dismissSheet()
+    }
+
     // MARK: - Helpers
 
     /// Build 22 (P2): the lock banner sits under the header and never
