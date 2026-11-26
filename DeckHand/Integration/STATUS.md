@@ -1947,7 +1947,6 @@ Built from `c9b87da` (build 25) on Xcode 27.2, Release, team `DD5AWPLT2V`.
 - The walks put the scratch document in front only at the start. They
   should check the front app before every step that types into the Mac.
 
-Status: BUILT (build 25) — 2 bugs
 
 ## Owner testing (build 25) — 2026-11-26
 
@@ -1976,3 +1975,45 @@ Fix lane: `claude/pixelhand-lane-owner25` (primary session).
 Lane written: `LANE-owner25.md` (Type panel moves, resizes and folds; compact
 two-row keys, inverted-T arrows, docked 5 × 4 numpad; keys that type, protocol
 15). Needs an iPad re-check.
+
+## Build 26 queued (2026-11-26): owner refinements and the final QA pass
+
+Build 26 is build 25 plus lane owner25 (`LANE-owner25.md`), merged at
+`45e9e7d`, plus the walk guard (`58d9204`). It contains:
+
+- **OT-6:** the Type panel is draggable and resizable, and remembers where
+  it was.
+- **OT-7:** a compact Type panel: a shorter field, an inverted-T arrow
+  cluster, two key rows, and a docked numpad.
+- **OT-8:** deck keys can type text, with the same Return guard, so any
+  plan Ask runs can be saved as a key. **Protocol 15: the Mac and the
+  iPad must both run build 26.**
+- **Build 25 bug 1 (P1):** the Type panel always stays above the keyboard,
+  in every orientation and during rotation.
+- **Build 25 bug 2 (P3):** Ask selects the old request when the field is
+  focused, so typing replaces it.
+- **Walks:** before typing on the Mac, they check the Mac's front app
+  (`PH_QA_SCRATCH_APP`, default TextEdit). New walks: `test20` and `test21`.
+  `test21` types into Safari only with `PH_QA_TYPE_IN_SAFARI=1`.
+
+Linux: Core **1180 / 1180 pass** (215 suites); `linux-typecheck/run.sh`
+passes; the UI tests parse and their braces balance.
+
+**Mac should do:**
+1. The build and all tests.
+2. Install on the Mac and the iPad.
+3. With the owner's OK to use the Mac and a scratch TextEdit document in
+   front, run every walk:
+   - iPad Pro 11" full screen and the iPhone 17 Pro, plus AX3;
+   - `test18` (keyboard) in **both** orientations;
+   - `test19`, `test20` and `test21`.
+4. **Final QA pass:**
+   - Re-check the `LANE-owner25.md` IDs and OT-1…8.
+   - Re-check the open P3s: VQ-100 (if a second Mac is around), VQ-101,
+     VQ-102 and VQ-103.
+   - Record pass, fail or not checked in `VISUAL-QA-build26.md` (new
+     findings from VQ-104), with the gallery.
+   - If there are no P1 or P2 findings, the coordinator publishes the
+     owner's review page.
+
+Status: READY FOR MAC BUILD (build 26)

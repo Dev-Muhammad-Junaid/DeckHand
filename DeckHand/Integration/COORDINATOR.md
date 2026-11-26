@@ -1,6 +1,6 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Build 25 built with 2 bugs, plus owner refinements OT-6…8.** The primary's lane owner25 (session_01H5HwATTz3WtwqhypMmq5NP) also takes both build 25 bugs, because they're in its files: the Type panel hidden in portrait (P1) and Ask keeping the old request (P3). I added the front-app guard to the walk tooling. When owner25 is ready: merge it, then queue build 26 with the final QA pass, then the review page.
+> **Build 26 queued with the final QA pass** (owner25 plus the walk guard; protocol 15). No lanes are running. If the QA comes back with no P1 or P2: publish the review page and finish. Otherwise: one more fix round.
 
 > **Mac builds:** 15, 16, 18 and 19 built (19 with 5 bugs, fixed in build 21). The primary session or the owner's Mac session runs Mac builds.
 
@@ -29,7 +29,6 @@ weekly usage limit is close).
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Primary (cloud, owner-facing: the owner sends changes here) | "★ Pixel Hand · PRIMARY" | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac, Claude Desktop session "DeckHand MAC build loop", `/loop` every 30 min; the only Mac build loop since 2026-11-25) | local_d0e9b529 | claude/pixelhand-integration (worktree `pixelhand-build`) | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
-| Owner refinements build 25 (OT-6 movable Type panel, OT-7 compact keys and numpad, OT-8 typed steps in keys) plus build 25 bugs 1 and 2; started by the primary | session_01H5HwATTz3WtwqhypMmq5NP | claude/pixelhand-lane-owner25 | `LANE-owner25.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -273,3 +272,7 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
     to the owner25 session directly, because they're in its files.
   - I added the walk guard myself (`58d9204`): it checks the Mac's front
     app before typing.
+- 2026-11-26 15:20 UTC: owner25 is ready (OT-6…8 plus both build 25 bugs;
+  protocol 15). Merged it (`45e9e7d`). Core has 1180 tests, all passing; the
+  type check passes; the UI tests parse and balance. **Build 26 queued**,
+  with the final QA pass.
