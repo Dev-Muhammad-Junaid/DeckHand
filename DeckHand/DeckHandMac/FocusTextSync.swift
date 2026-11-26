@@ -258,7 +258,7 @@ final class FocusTextSync {
 
     /// Puts the field's selection at `range`: through Accessibility where
     /// it's settable, else with arrow keys from the caret the Mac knows.
-    private func placeSelection(_ range: TextRange, in state: FocusedTextState) async -> Bool {
+    private func placeSelection(_ range: PixelHandCore.TextRange, in state: FocusedTextState) async -> Bool {
         if state.selection == range { return true }
         if state.canSetSelection, await observer.select(range) { return true }
         guard let window = state.window,
@@ -271,7 +271,7 @@ final class FocusTextSync {
 
     /// Types `replacement` over the selection: a deletion is one Delete
     /// (the selection goes), text replaces it as typed.
-    private func type(_ replacement: String, replacing range: TextRange) {
+    private func type(_ replacement: String, replacing range: PixelHandCore.TextRange) {
         if replacement.isEmpty {
             if range.length > 0 { TypingQueue.shared.shortcut(["delete"]) }
             return

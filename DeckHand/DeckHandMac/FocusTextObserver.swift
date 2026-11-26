@@ -153,7 +153,7 @@ final class FocusTextObserver: @unchecked Sendable {
     }
 
     /// `length` units of the field from `start`, as UTF-16.
-    func span(_ range: TextRange) async -> [UInt16]? {
+    func span(_ range: PixelHandCore.TextRange) async -> [UInt16]? {
         await onThread { [self] in
             guard let element = self.focusedElement() else { return nil }
             return Self.string(element, range: range).map { Array($0.utf16) }
@@ -162,7 +162,7 @@ final class FocusTextObserver: @unchecked Sendable {
 
     /// Sets the field's selection through Accessibility. Returns whether
     /// it took (read back).
-    func select(_ range: TextRange) async -> Bool {
+    func select(_ range: PixelHandCore.TextRange) async -> Bool {
         await onThread { [self] in
             guard let element = self.focusedElement() else { return false }
             var cfRange = CFRange(location: range.start, length: range.length)
@@ -305,7 +305,7 @@ final class FocusTextObserver: @unchecked Sendable {
             }
         }
         guard let length else { return unreadable(.noField, key: key) }
-        let selection = selected.map { TextRange(start: $0.location, length: $0.length) } ?? .caret(length)
+        let selection = selected.map { PixelHandCore.TextRange(start: $0.location, length: $0.length) } ?? .caret(length)
         let windowRange = TextSyncPolicy.window(fieldLength: length, selection: selection, previousStart: previousStart)
         let units: [UInt16]
         if let shortValue {
@@ -366,7 +366,7 @@ final class FocusTextObserver: @unchecked Sendable {
 
     // MARK: AX helpers
 
-    private static func string(_ element: AXUIElement, range: TextRange) -> String? {
+    private static func string(_ element: AXUIElement, range: PixelHandCore.TextRange) -> String? {
         var cfRange = CFRange(location: range.start, length: range.length)
         guard let value = AXValueCreate(.cfRange, &cfRange) else { return nil }
         var out: CFTypeRef?
