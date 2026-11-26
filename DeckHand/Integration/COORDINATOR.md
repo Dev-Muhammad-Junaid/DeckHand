@@ -1,12 +1,10 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Build 24 queued with the final QA pass** (`VISUAL-QA-build24.md`). No lanes running. If it comes back with no P1 and no P2 bugs: publish the review page and finish. Otherwise: one more fix round.
+> **Build 24 is green, and the final QA pass is done** (`VISUAL-QA-build24.md`: 0 P1, 4 P2, 3 P3). The last fix lane, qa24-fixes, is running. When it is ready: merge it, then queue build 25 with re-checks of just those IDs. If they pass: publish the review page and finish.
 
 > **Mac builds:** 15, 16, 18 and 19 built (19 with 5 bugs, fixed in build 21). The primary session or the owner's Mac session runs Mac builds.
 
 ## Needs the owner
-
-- **Build 24 final QA pass (2026-11-26):** the Mac build loop pushed a compile fix (`7b205ca`) at about 00:00 UTC and hasn't reported since. The walks type and click into the Mac, so they need the owner's OK and the Mac unlocked, with the iPad unlocked on Wi-Fi. When convenient, let the Mac loop run them (see STATUS.md › Build 24 queued).
 
 - **Developer portal:** nothing needed. Automatic signing registered the App Group and the widget and share App IDs (builds 15 and 16).
 
@@ -31,6 +29,7 @@ weekly usage limit is close).
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Primary (cloud, owner-facing: the owner sends changes here) | "★ Pixel Hand · PRIMARY" | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac, Claude Desktop session "DeckHand MAC build loop", `/loop` every 30 min; the only Mac build loop since 2026-11-25) | local_d0e9b529 | claude/pixelhand-integration (worktree `pixelhand-build`) | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
+| Build 24 QA fixes (VQ-100, 098, 099, 066, 101…103) | session_01H5HwARd99V3QTVg2XFJdYa | claude/pixelhand-lane-qa24-fixes | `LANE-qa24-fixes.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -245,3 +244,12 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   - **Build 24 queued**, with the final QA pass, including the areas never
     checked: landscape and the sidebar, widgets, transfers, dark mode.
 - 2026-11-26 03:15 UTC: build 24 is in progress on the Mac (compile fix `7b205ca`). Its results and the final QA haven't arrived yet. Noted under Needs the owner that the walks need the Mac.
+- 2026-11-26 12:40 UTC: build 24 is green after one compile fix (memberwise
+  argument order).
+  - Core 1058, Loom 480, DeckHandTests 8.
+  - Final QA: all 20 qa23 IDs pass; VQ 74 pass, 1 fail, 22 not checked;
+    OR 12 pass, 4 not checked.
+  - Newly checked: landscape, the sidebar, widgets and dark mode.
+  - Open: VQ-100, 098, 099, 066 (P2) and VQ-101…103 (P3).
+  - The real iPad isn't reachable (CoreDevice 4016), so transfers (OR-13)
+    are still unchecked. Started the last fix lane, qa24-fixes.
