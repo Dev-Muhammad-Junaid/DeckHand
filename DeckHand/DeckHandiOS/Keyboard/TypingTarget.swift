@@ -8,6 +8,7 @@
 //
 
 import Observation
+import PixelHandCore
 
 @MainActor
 @Observable
@@ -16,6 +17,11 @@ final class TypingTarget {
 
     /// The Mac's front app, as it last reported it.
     var frontApp: String?
+    /// Its bundle ID, when the Mac reported one.
+    var frontBundleID: String?
+
+    /// ↑/↓ mean shell history there (the arrow joystick labels them).
+    var isTerminal: Bool { TerminalApps.isTerminal(bundleID: frontBundleID, name: frontApp) }
 
     /// What the person typed into; Return to another app asks first.
     var guardrail = TypingTargetGuard()

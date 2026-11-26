@@ -59,8 +59,11 @@ struct TypePanel: View {
 
     @EnvironmentObject private var settings: DeckHandSettings
     @Environment(\.entitlements) private var entitlements
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// A Return held back while the person confirms the app (VQ-036).
     @State private var heldReturn: (() -> Void)?
+    /// The arrow joystick (hold an arrow, then drag).
+    @State private var joystick = ArrowJoystickModel()
     private let target = TypingTarget.shared
 
     private var presence: TypePanelPresence { model.presence }
@@ -81,6 +84,8 @@ struct TypePanel: View {
                 fieldColumn
                 actionBlock
                 arrowCluster
+                    // The joystick's trail runs over the field and keys.
+                    .zIndex(joystick.isEngaged ? 1 : 0)
                 keyBlock
                 NumpadGrid { key in press(key) }
                     .opacity(layout.shows(.numpad) ? 1 : 0)
@@ -440,14 +445,25 @@ struct TypePanel: View {
     // MARK: Arrows and keys (OT-7, OT-11)
 
     /// The inverted T (↑ over ← ↓ →), or one row (← ↑ ↓ →) at the
-    /// shortest; cells as big as the panel gives them.
+    /// shortest; cells as big as the panel gives them. Hold an arrow, then
+    /// drag: the arrow joystick (`ArrowJoystick.swift`).
     private var arrowCluster: some View {
-        KeyGrid(grid: layout.grid(.arrows)) {
+        let terminal = target.isTerminal
+        return KeyGrid(grid: layout.grid(.arrows)) {
+            CaretStepperElement(
+                model: joystick,
+                isTerminal: terminal,
+                held: { model.presence.modifiers.held },
+                send: { step in sendJoystickStep(step) }
+            )
             ForEach(ArrowCluster.cells(for: layout.arrowShape), id: \.key) { cell in
-                keyButton(cell.key)
+                arrowButton(cell.key, terminal: terminal)
                     .keyCell(column: cell.column, row: cell.row)
             }
+            ArrowJoystickOverlay(model: joystick)
+            ArrowJoystickQAProbe(model: joystick)
         }
+        .onDisappear { joystick.cancel() }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Arrow keys")
         .accessibilityIdentifier("ph.type.arrows")
@@ -521,21 +537,86 @@ struct TypePanel: View {
         .accessibilityIdentifier("ph.type.modifier.\(modifier.rawValue)")
     }
 
-    private func keyButton(_ key: TypeKey) -> some View {
+    private func keyButton(_ key: TypeKey, style: KeyCap.Style? = nil, legend: KeyCap.Legend? = nil) -> some View {
         Button {
-            onActivity()
-            GestureHaptic.light.trigger()
-            let modifiers = model.presence.modifiers.consume()
-            guardReturn(if: key.isReturn) {
-                Task { await sender.sendShortcut(key.chord(with: modifiers)) }
-            }
+            press(key)
         } label: {
-            KeyCap(legend: KeyCap.Legend(key), style: key.isReturn ? .accent : .plain)
+            KeyCap(legend: legend ?? KeyCap.Legend(key), style: style ?? (key.isReturn ? .accent : .plain))
         }
         .buttonStyle(ChipPressStyle())
         .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.kbd)
         .accessibilityLabel(key.spokenName)
         .accessibilityIdentifier("ph.type.key.\(key.wireName)")
+    }
+
+    /// An arrow cap: a key button that is also the joystick's handle.
+    /// While the joystick runs, the held cap is lit (accent, centre dot),
+    /// the cap it's moving toward is tinted, and in a terminal ↑/↓ read
+    /// HISTORY.
+    @ViewBuilder
+    private func arrowButton(_ key: TypeKey, terminal: Bool) -> some View {
+        if case let .remote(arrow) = key, let cell = ArrowCluster.cells(for: layout.arrowShape).first(where: { $0.key == key }) {
+            let style = arrowStyle(arrow)
+            let vertical = arrow == .up || arrow == .down
+            keyButton(key, style: style, legend: arrowLegend(key, arrow: arrow, terminal: terminal))
+                .animation(PixelHandMotion.reduced(PixelHandMotion.quick, reduceMotion: reduceMotion), value: style)
+                .arrowJoystick(key: arrow, column: cell.column, row: cell.row, model: joystick) {
+                    ArrowJoystickModel.Context(
+                        held: model.presence.modifiers.held,
+                        isTerminal: target.isTerminal,
+                        tap: { _ in press(key) },
+                        engaged: {
+                            onActivity()
+                            target.guardrail.typed(into: target.frontApp)
+                        },
+                        send: { step in sendJoystickStep(step) },
+                        finished: { _ = model.presence.modifiers.consume() }
+                    )
+                }
+                .accessibilityActions {
+                    // Terminals have no paragraphs: ⌥↑ is no use there.
+                    if !(terminal && vertical) {
+                        Button(vertical ? "Move by paragraphs" : "Move by words") {
+                            sendJoystickStep(CaretJoystick.Step(key: arrow, modifiers: [.option]))
+                        }
+                    }
+                }
+        } else {
+            keyButton(key)
+        }
+    }
+
+    private func arrowStyle(_ arrow: RemoteKey) -> KeyCap.Style {
+        guard joystick.isEngaged else { return .plain }
+        if joystick.heldKey == arrow { return .lit }
+        if joystick.engine.readout?.key == arrow { return .tint }
+        return .plain
+    }
+
+    /// While the joystick runs, the held cap gives its glyph up to the
+    /// centre dot (the stick, drawn by the overlay), and in a terminal
+    /// ↑/↓ read HISTORY.
+    private func arrowLegend(_ key: TypeKey, arrow: RemoteKey, terminal: Bool) -> KeyCap.Legend? {
+        guard joystick.isEngaged else { return nil }
+        if joystick.heldKey == arrow { return .dots("") }
+        guard terminal, arrow == .up || arrow == .down, let glyph = KeyCap.arrowGlyph(arrow) else { return nil }
+        return .glyphWord(glyph, word: "HISTORY", label: key.spokenName)
+    }
+
+    /// One joystick or caret-stepper press.
+    private func sendJoystickStep(_ step: CaretJoystick.Step) {
+        Task { await sender.sendShortcut(step.chord) }
+    }
+
+    /// A key cap's press: sends the key with the latched modifiers
+    /// (holding a Return that would land in another app).
+    private func press(_ key: TypeKey) {
+        onActivity()
+        GestureHaptic.light.trigger()
+        let modifiers = model.presence.modifiers.consume()
+        guardReturn(if: key.isReturn) {
+            Task { await sender.sendShortcut(key.chord(with: modifiers)) }
+        }
     }
 
     private var fnToggle: some View {
@@ -772,19 +853,31 @@ private struct KeyCap: View {
         case text(String)
         /// A symbol over a small dot-matrix word (Accept ⇥).
         case stacked(symbol: String, word: String)
+        /// A pixel glyph over a small dot-matrix word (↑ HISTORY in a
+        /// terminal, while the joystick runs).
+        case glyphWord(GlyphBitmap, word: String, label: String)
 
         init(_ key: TypeKey) {
             if let legend = key.dotMatrixLegend {
                 self = .dots(legend)
                 return
             }
-            switch key {
-            case .remote(.up): self = .glyph(PixelGlyphs.keyUp, label: key.spokenName)
-            case .remote(.down): self = .glyph(PixelGlyphs.keyDown, label: key.spokenName)
-            case .remote(.left): self = .glyph(PixelGlyphs.keyLeft, label: key.spokenName)
-            case .remote(.right): self = .glyph(PixelGlyphs.keyRight, label: key.spokenName)
-            default: self = .text(key.cap)
+            if case let .remote(arrow) = key, let glyph = KeyCap.arrowGlyph(arrow) {
+                self = .glyph(glyph, label: key.spokenName)
+            } else {
+                self = .text(key.cap)
             }
+        }
+    }
+
+    /// The pixel glyph for an arrow key.
+    static func arrowGlyph(_ key: RemoteKey) -> GlyphBitmap? {
+        switch key {
+        case .up: PixelGlyphs.keyUp
+        case .down: PixelGlyphs.keyDown
+        case .left: PixelGlyphs.keyLeft
+        case .right: PixelGlyphs.keyRight
+        default: nil
         }
     }
 
@@ -831,6 +924,13 @@ private struct KeyCap: View {
                     .font(.system(size: 16 * scale, weight: .semibold, design: .rounded))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
+            case let .glyphWord(glyph, word, label):
+                VStack(spacing: 2 * scale) {
+                    PHGlyph(glyph: glyph, pitch: 1.2 * scale)
+                    DotMatrixText(word, pitch: 0.9 * scale, label: word, glows: false, stepsWithType: false)
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(label)
             case let .stacked(symbol, word):
                 VStack(spacing: 2 * scale) {
                     Text(symbol)

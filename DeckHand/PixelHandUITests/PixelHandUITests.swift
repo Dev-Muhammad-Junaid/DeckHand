@@ -1120,6 +1120,60 @@ final class PixelHandUITests: XCTestCase {
         sleep(1)
     }
 
+    /// The arrow joystick (`RD-live-sync-and-caret.md` §1.5): hold an
+    /// arrow cap, drag, hold, release, and the joystick sent several
+    /// presses; a longer drag sends more in the same time; a plain tap on
+    /// an arrow is still one arrow. Each arrow stays its own button and
+    /// "Move the caret" is there for VoiceOver. The presses are ←/⌥← on
+    /// the Mac's front app (the caret moves); nothing is typed.
+    func test27_ArrowJoystick() {
+        launch()
+        guard connect() else { return }
+        sleep(1)
+        guard openTypePanel() else { return }
+        XCTAssertTrue(element("ph.type.panel").waitForExistence(timeout: 3), "The Type panel didn't open")
+        sleep(1)
+        let right = element("ph.type.key.right"), left = element("ph.type.key.left")
+        let probe = element("ph.type.joystick.last")
+        guard right.waitForExistence(timeout: 3), probe.waitForExistence(timeout: 3) else {
+            snap("missing-joystick")
+            XCTFail("No arrow caps or no joystick probe (is -qa.exposeJoystick set?)")
+            return
+        }
+        for id in ["up", "down", "left", "right"] {
+            XCTAssertTrue(element("ph.type.key.\(id)").isHittable, "The \(id) arrow isn't its own button")
+        }
+        XCTAssertTrue(element("ph.type.joystick").exists, "No adjustable \"Move the caret\" element for VoiceOver")
+        snap("joystick-before")
+
+        /// Holds the → cap 0.6 s, drags `dx` without lifting, holds 1 s
+        /// there; returns the presses the joystick sent.
+        func drive(_ dx: CGFloat) -> Int? {
+            let start = right.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            start.press(forDuration: 0.6, thenDragTo: start.withOffset(CGVector(dx: dx, dy: 0)), withVelocity: .slow, thenHoldForDuration: 1.0)
+            sleep(1)
+            let value = probe.value as? String ?? ""
+            XCTAssertTrue(value.hasPrefix("joystick "), "Hold and drag didn't run the joystick: \(value)")
+            return value.split(separator: " ").last.flatMap { Int($0) }
+        }
+        let near = drive(-30)
+        snap("joystick-near")
+        let far = drive(-110)
+        snap("joystick-far")
+        if let near, let far {
+            XCTAssertGreaterThanOrEqual(near, 3, "A 30 pt drag held 1 s sent \(near) presses")
+            XCTAssertGreaterThan(far, near, "Farther didn't go faster: \(near) → \(far)")
+        }
+
+        // A plain tap is one arrow, with no joystick.
+        left.tap()
+        sleep(1)
+        XCTAssertEqual(probe.value as? String, "tap left", "A tap on ← didn't send one arrow")
+        snap("joystick-tap")
+        tapIfExists("ph.type.close")
+        sleep(1)
+    }
+
     /// OT-10: the capture preview fills the screen. Takes the default
     /// capture and asserts, in portrait, that the picture fills the width
     /// (or, for a tall capture, most of the height), sits centred between
@@ -1240,6 +1294,9 @@ final class PixelHandUITests: XCTestCase {
             "-store.developerUnlock", isFree ? "NO" : "YES",
             // OT-14: badges become findable (`ph.badge.<kind>`) for test25.
             "-qa.exposeBadges", "YES",
+            // The arrow joystick's last gesture (`ph.type.joystick.last`)
+            // for test27.
+            "-qa.exposeJoystick", "YES",
         ]
         app.launch()
         acceptSystemAlerts()

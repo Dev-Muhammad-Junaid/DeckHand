@@ -349,6 +349,7 @@ final class ControlSessionModel {
                 activeBundleID = bundleID
             }
             TypingTarget.shared.frontApp = name
+            TypingTarget.shared.frontBundleID = bundleID
 
         case let .capture(.screenshotData(requestID, data)):
             capture.handleScreenshotData(requestID: requestID, data: data)
