@@ -56,7 +56,10 @@ public enum PixelHandProtocol {
     /// - 16: `system.watchFocus(on:)` and `system.focusState(focus:)`: the
     ///   Mac's focused text field for the Type panel's loupe (owner testing
     ///   build 26, OT-12).
-    public static let version = 16
+    /// - 17: live text sync: `watchFocus` gains `wantsText`;
+    ///   `system.textState`, `system.textEditResult`, `input.textEdit`,
+    ///   `input.textSelect`, `input.caretMove`.
+    public static let version = 17
 
     /// Bonjour TXT key carrying `version`. Short, because TXT keys should
     /// stay under 9 bytes.

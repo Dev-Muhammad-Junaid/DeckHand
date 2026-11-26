@@ -18,6 +18,19 @@
 //  presses instead of editing the local buffer. Backspace in an empty field
 //  still deletes on the Mac.
 //
+//  Synced Live (protocol 17, live text sync Phase 1): when the Mac can read
+//  its focused field (native, non-secure; `LiveTextSync`), the field shows
+//  the Mac's text, a window around the caret, with the caret at the Mac's
+//  selection. Edits go out as anchored range edits with local echo, one in
+//  flight (Core's `TextSyncReconciler`); the caret is free: taps, the
+//  keyboard's space-bar trackpad and the selection handles move the Mac's
+//  caret too (`textSelect`). Keyboard (owner decision 2): autocorrect and
+//  predictions on, smart quotes and dashes off, the spell-check underline
+//  off, and no local undo: undo (shake, three-finger swipe, ⌘Z) goes to the
+//  Mac. Nothing goes while an input method composes. When the field can't
+//  be read, it falls back to the blind buffer above and the placeholder
+//  says why.
+//
 //  Compose: an ordinary local field (caret, selection, paste, dictation),
 //  up to a few lines. Return sends (the keyboard's key reads "Send");
 //  ⇧Return adds a line. Nothing reaches the Mac until Send.
@@ -53,6 +66,9 @@ struct LiveTypingField: UIViewRepresentable {
     var onSubmit: () -> Void = {}
     /// The field took focus (a tap while the numpad shows, OT-7).
     var onFocus: () -> Void = {}
+    /// Live text sync: the Mac's text, when it can be read (`nil` in the
+    /// classic layout: always blind).
+    var sync: LiveTextSync? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -98,6 +114,10 @@ struct LiveTypingField: UIViewRepresentable {
         view.onSubmit = onSubmit
         view.onFocus = onFocus
         view.onDraftChange = { text in draft?.wrappedValue = text }
+        if view.sync !== sync {
+            view.sync = sync
+        }
+        if mode == .live { sync?.display = view }
 
         if context.coordinator.lastMode != mode {
             context.coordinator.lastMode = mode
@@ -108,6 +128,8 @@ struct LiveTypingField: UIViewRepresentable {
             view.text = draft.wrappedValue
             view.refreshPlaceholder()
         }
+
+        view.syncStateChanged()
 
         if wantsFocus {
             if context.coordinator.lastFocusRequest != focusRequest {
@@ -126,7 +148,7 @@ struct LiveTypingField: UIViewRepresentable {
     }
 }
 
-final class LiveTypingTextView: UITextView, UITextViewDelegate {
+final class LiveTypingTextView: UITextView, UITextViewDelegate, LiveTextDisplay {
     var placeholder = "" {
         didSet { placeholderLabel.text = placeholder }
     }
@@ -138,6 +160,24 @@ final class LiveTypingTextView: UITextView, UITextViewDelegate {
     var onSubmit: () -> Void = {}
     var onFocus: () -> Void = {}
     var onDraftChange: (String) -> Void = { _ in }
+    /// Live text sync (protocol 17).
+    weak var sync: LiveTextSync?
+    /// The Mac's text is being put in the field: not an edit.
+    private var applyingRemote = false
+    /// Whether the keyboard is set up for synced text (owner decision 2).
+    private var configuredSynced = false
+    /// Undo in synced Live goes to the Mac (⌘Z / ⇧⌘Z).
+    private lazy var macUndo = MacUndoManager(
+        undo: { [weak self] in self?.onChord(["cmd", "z"]) },
+        redo: { [weak self] in self?.onChord(["cmd", "shift", "z"]) }
+    )
+
+    /// Live, and the Mac's field is readable: the field holds its text.
+    var isSynced: Bool { mode == .live && (sync?.isSynced ?? false) }
+
+    override var undoManager: UndoManager? {
+        isSynced ? macUndo : super.undoManager
+    }
 
     override func becomeFirstResponder() -> Bool {
         let became = super.becomeFirstResponder()
@@ -203,8 +243,67 @@ final class LiveTypingTextView: UITextView, UITextViewDelegate {
         accessibilityLabel = newMode == .live ? "Type on the Mac" : "Compose text for the Mac"
         accessibilityHint = newMode.spokenHint
         text = newMode == .compose ? draft : ""
+        if newMode == .live, let sync, sync.isSynced {
+            applyingRemote = true
+            text = sync.text
+            selectedRange = Self.nsRange(sync.selection, in: text)
+            applyingRemote = false
+        }
+        configuredSynced = !isSynced // force the next call to apply
+        syncStateChanged()
         refreshPlaceholder()
         if isFirstResponder { reloadInputViews() }
+    }
+
+    // MARK: - Live text sync
+
+    /// Applies the keyboard and line settings for synced or blind Live.
+    func syncStateChanged() {
+        let synced = isSynced
+        guard synced != configuredSynced else { return }
+        configuredSynced = synced
+        if mode == .live {
+            textContainer.maximumNumberOfLines = synced ? 0 : 1
+            textContainer.lineBreakMode = synced ? .byWordWrapping : .byTruncatingHead
+        }
+        // Owner decision 2: autocorrect and predictions stay on; smart
+        // punctuation stays off (set in init); the spell-check underline
+        // goes in synced Live (the Mac app checks its own spelling).
+        spellCheckingType = synced ? .no : .default
+        autocorrectionType = synced ? .yes : .default
+        if isFirstResponder { reloadInputViews() }
+    }
+
+    func showSynced(text newText: String, selection: TextRange) {
+        guard mode == .live, markedTextRange == nil else { return }
+        applyingRemote = true
+        if text != newText { text = newText }
+        selectedRange = Self.nsRange(selection, in: newText)
+        applyingRemote = false
+        syncStateChanged()
+        refreshPlaceholder()
+        scrollRangeToVisible(selectedRange)
+        undoManager?.removeAllActions()
+    }
+
+    func becameBlind() {
+        guard mode == .live else { return }
+        applyingRemote = true
+        committed = ""
+        if markedTextRange == nil { text = "" }
+        applyingRemote = false
+        syncStateChanged()
+        refreshPlaceholder()
+    }
+
+    private static func nsRange(_ range: TextRange, in text: String) -> NSRange {
+        let length = (text as NSString).length
+        let start = min(max(0, range.start), length)
+        return NSRange(location: start, length: min(max(0, range.length), length - start))
+    }
+
+    private var currentSelection: TextRange {
+        TextRange(start: selectedRange.location, length: selectedRange.length)
     }
 
     func refreshPlaceholder() {
@@ -227,6 +326,26 @@ final class LiveTypingTextView: UITextView, UITextViewDelegate {
         refreshPlaceholder()
         if mode == .compose {
             onDraftChange(text ?? "")
+            return
+        }
+        if isSynced, let sync {
+            guard !applyingRemote else { return }
+            let current = text ?? ""
+            // A latched modifier turns the next letter into a chord (⌘C).
+            let change = TextEdit.between(sync.text, current)
+            if markedTextRange == nil, !latchedModifiers.isEmpty, change.range.length == 0,
+               change.replacement.count == 1, let character = change.replacement.first {
+                let name = String(character).lowercased()
+                if KeyTable.keyCode(for: name) != nil {
+                    showSynced(text: sync.text, selection: sync.selection)
+                    onChord(KeyModifier.pressOrder.filter(latchedModifiers.contains).map(\.wireName) + [name])
+                    onModifiersUsed()
+                    return
+                }
+            }
+            // Composing (marked text): the reconciler holds it until commit.
+            sync.localChange(text: current, selection: currentSelection, composing: markedTextRange != nil)
+            macUndo.removeAllActions()
             return
         }
         // An input method is composing: wait for the commit.
@@ -257,7 +376,14 @@ final class LiveTypingTextView: UITextView, UITextViewDelegate {
     }
 
     func textViewDidChangeSelection(_ textView: UITextView) {
-        // Live keeps the caret at the end: the Mac's cursor can't follow a
+        // Synced Live: the caret is free. A tap, the space-bar trackpad or
+        // the selection handles move the Mac's caret too.
+        if isSynced, let sync {
+            guard !applyingRemote, markedTextRange == nil else { return }
+            sync.localSelection(currentSelection)
+            return
+        }
+        // Blind Live keeps the caret at the end: the Mac's cursor can't follow a
         // caret moved here, so edits always apply at the end.
         guard mode == .live, markedTextRange == nil else { return }
         let end = (text as NSString?)?.length ?? 0
@@ -268,7 +394,7 @@ final class LiveTypingTextView: UITextView, UITextViewDelegate {
 
     override func deleteBackward() {
         // Live, nothing left here to delete: delete on the Mac anyway.
-        if mode == .live, markedTextRange == nil, (text ?? "").isEmpty {
+        if mode == .live, !isSynced, markedTextRange == nil, (text ?? "").isEmpty {
             onKey(.delete, latchedModifiers)
             if !latchedModifiers.isEmpty { onModifiersUsed() }
             return
@@ -359,4 +485,27 @@ final class LiveTypingTextView: UITextView, UITextViewDelegate {
         if flags.contains(.control) { out.append(.control) }
         return out
     }
+}
+
+
+/// Synced Live's undo manager: the field keeps no undo of its own (the
+/// Mac's text replaces it), so undo and redo, from the shake, the
+/// three-finger swipe or the edit menu, go to the Mac as ⌘Z / ⇧⌘Z.
+final class MacUndoManager: UndoManager {
+    private let onUndo: () -> Void
+    private let onRedo: () -> Void
+
+    init(undo: @escaping () -> Void, redo: @escaping () -> Void) {
+        onUndo = undo
+        onRedo = redo
+        super.init()
+        groupsByEvent = true
+    }
+
+    override var canUndo: Bool { true }
+    override var canRedo: Bool { true }
+    override var undoActionName: String { "on the Mac" }
+    override var redoActionName: String { "on the Mac" }
+    override func undo() { onUndo() }
+    override func redo() { onRedo() }
 }

@@ -20,7 +20,7 @@ final class TypingQueue {
     static let shared = TypingQueue()
 
     private enum Item {
-        case text(String)
+        case text(String, preferKeys: Bool)
         case chord([String])
     }
 
@@ -38,8 +38,10 @@ final class TypingQueue {
     /// Whether text or chords are waiting or being typed.
     var isBusy: Bool { drainTask != nil }
 
-    /// Queues `text` (already cleaned by `RemoteInputValidation`).
-    func type(_ text: String) {
+    /// Queues `text` (already cleaned by `RemoteInputValidation`). With
+    /// `preferKeys == false` it goes as Unicode strings, 20 units an event:
+    /// much faster for long text (live sync's long replacements).
+    func type(_ text: String, preferKeys: Bool = true) {
         let bytes = text.utf8.count
         guard queuedBytes + bytes <= TypingPolicy.maxQueuedBytes else {
             let now = Date()
@@ -50,7 +52,7 @@ final class TypingQueue {
             return
         }
         queuedBytes += bytes
-        items.append(.text(text))
+        items.append(.text(text, preferKeys: preferKeys))
         startDraining()
     }
 
@@ -101,11 +103,11 @@ final class TypingQueue {
             case let .chord(keys):
                 injector.sendShortcut(keys: keys)
                 try? await Task.sleep(for: TypingPolicy.interEventDelay)
-            case let .text(text):
+            case let .text(text, preferKeys):
                 queuedBytes = max(0, queuedBytes - text.utf8.count)
                 KeyboardLayoutMap.shared.refreshIfNeeded()
                 let map = KeyboardLayoutMap.shared
-                let steps = TypingPlanner.plan(text) { map.stroke(for: $0) }
+                let steps = TypingPlanner.plan(text, preferKeys: preferKeys) { map.stroke(for: $0) }
                 for step in steps {
                     if Task.isCancelled { return }
                     switch step {

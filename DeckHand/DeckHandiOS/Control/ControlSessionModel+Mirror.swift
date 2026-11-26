@@ -215,9 +215,7 @@ extension ControlSessionModel: MirrorStreamSink {
             let connection = connection
             Task { try? await connection.send(.mirror(.requestKeyFrame)) }
         }
-        if let sender {
-            Task { await sender.watchFocus(active) }
-        }
+        updateFocusWatch()
     }
 
     // MARK: - Start, stop, re-negotiate

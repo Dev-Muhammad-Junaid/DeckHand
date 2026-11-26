@@ -38,6 +38,16 @@ public enum InputMessage: Codable, Sendable, Equatable {
     case typeText(text: String)
     /// A hardware media key.
     case media(key: MediaKey)
+    /// Live text sync (protocol 17): replace a range of the Mac's focused
+    /// field, as of a revision. The Mac selects the range and types the
+    /// replacement (never sets `AXValue`), or answers `conflict`.
+    case textEdit(edit: TextEditRequest)
+    /// Live text sync (protocol 17): put the Mac's caret or selection in
+    /// its focused field.
+    case textSelect(selection: TextSelectRequest)
+    /// Arrow presses the Mac coalesces (the arrow joystick, the blind
+    /// trackpad). Refused under secure input. Protocol 17.
+    case caretMove(move: CaretMove)
 }
 
 public enum MouseButton: String, Codable, Sendable, CaseIterable {

@@ -44,6 +44,16 @@ import Testing
         ("input.mouseDown", .input(.mouseDown(button: .left))),
         ("input.mouseUp", .input(.mouseUp(button: .left))),
         ("input.typeText", .input(.typeText(text: "Héllo, 世界 👋🏽\n"))),
+        ("input.textEdit", .input(.textEdit(edit: TextEditRequest(
+            field: FieldToken(0x5EED_CAFE),
+            request: 9,
+            baseRevision: 42,
+            range: TextRange(start: 1212, length: 3),
+            replacement: "the",
+            context: TextEditContext(beforeHash: 0x811C_9DC5, beforeLength: 10, afterHash: 0x0BAD_F00D, afterLength: 4)
+        )))),
+        ("input.textSelect", .input(.textSelect(selection: TextSelectRequest(field: FieldToken(0x5EED_CAFE), baseRevision: 43, range: TextRange(start: 1200, length: 5))))),
+        ("input.caretMove", .input(.caretMove(move: CaretMove(direction: .left, unit: .word, count: 3, extend: true)))),
         // system
         ("system.run", .system(.run(action: .showDesktop))),
         ("system.switchSpace", .system(.switchSpace(direction: .next, displayID: nil))),
@@ -88,7 +98,24 @@ import Testing
         )))),
         ("system.lockState", .system(.lockState(state: .screenLocked))),
         ("system.lockState.offConsole", .system(.lockState(state: .offConsole))),
-        ("system.watchFocus", .system(.watchFocus(on: true))),
+        ("system.watchFocus", .system(.watchFocus(on: true, wantsText: true))),
+        ("system.watchFocus.loupeOnly", .system(.watchFocus(on: true, wantsText: false))),
+        ("system.textState", .system(.textState(state: FocusedTextState(
+            field: FieldToken(0x5EED_CAFE),
+            revision: 42,
+            readable: .yes,
+            window: TextWindow(start: 1200, value: "Héllo, 世界 👋🏽\nnext line"),
+            length: 5000,
+            selection: TextRange(start: 1205, length: 0),
+            canSetSelection: true,
+            canEdit: true
+        )))),
+        ("system.textState.webOff", .system(.textState(state: .unreadable(.webOff(app: "Claude"), field: FieldToken(7), revision: 1)))),
+        ("system.textState.secure", .system(.textState(state: .unreadable(.secure, field: FieldToken(8), revision: 3)))),
+        ("system.textState.locked", .system(.textState(state: .unreadable(.locked)))),
+        ("system.textEditResult", .system(.textEditResult(result: TextEditResult(field: FieldToken(0x5EED_CAFE), request: 9, outcome: .applied, revision: 43)))),
+        ("system.textEditResult.conflict", .system(.textEditResult(result: TextEditResult(field: FieldToken(0x5EED_CAFE), request: 10, outcome: .conflict, revision: 47)))),
+        ("system.textEditResult.refused", .system(.textEditResult(result: TextEditResult(field: FieldToken(0x5EED_CAFE), request: 11, outcome: .refused(reason: .secure), revision: 47)))),
         ("system.focusState", .system(.focusState(focus: FocusedFieldSnapshot(
             displayID: 1,
             displayWidth: 1512,
@@ -331,6 +358,9 @@ import Testing
             case .mouseDown: "input.mouseDown"
             case .mouseUp: "input.mouseUp"
             case .typeText: "input.typeText"
+            case .textEdit: "input.textEdit"
+            case .textSelect: "input.textSelect"
+            case .caretMove: "input.caretMove"
             }
         case let .system(m):
             switch m {
@@ -340,6 +370,8 @@ import Testing
             case .lockState: "system.lockState"
             case .watchFocus: "system.watchFocus"
             case .focusState: "system.focusState"
+            case .textState: "system.textState"
+            case .textEditResult: "system.textEditResult"
             }
         case let .apps(m):
             switch m {
@@ -412,8 +444,8 @@ import Testing
         }
     }
 
-    /// Cases in protocol version 16. Bump with every added or removed case.
-    static let expectedCaseCount = 59
+    /// Cases in protocol version 17. Bump with every added or removed case.
+    static let expectedCaseCount = 64
 
     /// The current version, for the hand-written JSON below.
     static let v = PixelHandProtocol.version

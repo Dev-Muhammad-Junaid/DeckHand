@@ -53,6 +53,8 @@ final class FocusReader: @unchecked Sendable {
         let pid: pid_t
         let name: String?
         let bundlePath: String?
+        /// For live text sync's per-app rules (terminals, Chromium).
+        let bundleID: String?
     }
 
     /// Per-call messaging timeout: an app that doesn't answer costs this,
@@ -74,7 +76,7 @@ final class FocusReader: @unchecked Sendable {
     @MainActor
     static func frontmost() -> Frontmost? {
         guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
-        return Frontmost(pid: app.processIdentifier, name: app.localizedName, bundlePath: app.bundleURL?.path)
+        return Frontmost(pid: app.processIdentifier, name: app.localizedName, bundlePath: app.bundleURL?.path, bundleID: app.bundleIdentifier)
     }
 
     /// "Nothing to show" on the main display. Reads no Accessibility.
