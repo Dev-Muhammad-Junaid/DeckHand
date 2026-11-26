@@ -83,6 +83,15 @@ grid (4 pt between caps), so every key, arrow and numpad key keeps a
 handles are 44 pt and straddle the card's bottom corners, mostly outside
 it, so they never take a tap meant for ⌫ or fn.
 
+Type panel sizing (owner testing, build 26, OT-11): cells are cut from the
+panel, not fixed. Rows run 44…72 pt tall; the key rows' cells are the
+panel's inner width ÷ 7 wide; arrows and actions are square with the row
+while the field keeps 144 pt. Blocks are 8 pt apart, 12 pt from the
+card's edge; the header is 44 pt (two rows under 456 pt wide). Legends
+scale with the cell, up to 1.5×. Every band runs edge to edge: no strip
+under the field, no block under the arrows, no gap right of the keys
+(`TypePanelLayoutTests.noDeadAreas`).
+
 ## 5. Alignment rules
 
 1. Leading edges of every block align to the margin or a column edge.
@@ -155,3 +164,57 @@ Screen-specific checks:
 | Onboarding | Step counter matches page; works in landscape (scrolls); one primary per page |
 | Pairing (Mac window and iPhone) | QR scannable (test with the Camera app) at 1× and 2×; code groups of 4 with a dim check digit; countdown beam matches the 5-minute window |
 | Mac panel | Follows the Mac's text size; no hover-only controls |
+
+## 8. Send sheet (owner testing, build 26, OT-9)
+
+The Send / Inbox sheet follows the grid, not stock controls. Sizes and
+copy live in Core (`SendSheetLayout`, `SendTargetPlan`, `SendTargetCopy`,
+`TransferGlyphs`); the view is `DeckHandiOS/Transfer/TransferSheet.swift`.
+
+| Part | Spec |
+| --- | --- |
+| Sheet | As tall as its content: header + content, at least 240, at most the window less 48, on the 4 pt grid; the Large detent is offered only when the content is taller. iPad (iOS 18): a form sheet fitted to that height. Radius 36, `canvas` background, class margin (16 · 20 · 24) |
+| Header | 60: Send \| Inbox switch leading, Done trailing (semibold accent text, 44 target). No navigation title: the switch names the tab |
+| Switch | The Type panel's mode switch: `fill` capsule with a 2 pt inset, 32 pt segments, the selected one accent with white text; selection by colour and fill only. Unseen Inbox items: a dot-matrix count (pitch 1.4) with a spoken label |
+| Sources | Photos · Files · Clipboard: three chips of one size (44 tall, a third of the row each, 8 apart), glyph (pitch 2, accent) + label, `raised` with a hairline, radius 14. Clipboard is a chip like the others, not the system paste circle |
+| Field | One field for text or a link: the Ask field's shape (52, `raised`, radius 24, hairline), the Add button inside it (36 accent circle, add glyph, 44 target; ink3 while empty) |
+| Tray | Staged items as 52 rows (glyph, name, size; remove glyph with a 44 target), radius 14, 8 apart, under a footnote label |
+| Send to | Device cards in equal columns: `floor((w + 12) / (160 + 12))`, 1–3 (two on iPhone). A card is 64: a 44 navy tile (radius 14; Mac glyph lit while the Mac talks, lock glyph when locked, dot wave while connecting), the name over one status line, and at the trailing edge the dot-matrix readout (`42%` sending, a waiting count) or the status pixel. Card radius 24 (10 inset → 14). The focused Mac gets the 2 pt cobalt ring; a drop target the dashed accent ring |
+| States | Ready · Sending N items (+ readout) · Waiting to accept · Locked · unlock to receive (amber) · Busy · sending you N items · Connecting… · N waiting · switch to send · Nearby / Remote · switch to send |
+| Offline | Not a card: a 44 row, `fill`, radius 14, unlit Mac glyph (pitch 1.6), name, "Seen 2 h ago" in ink3 (`MacGlanceCopy.age`, the same words as My Macs), most recently seen first, under the cards in the same columns. Tapping still queues a send for that Mac |
+| Beam, Waiting | The dot beam on a navy plate (radius 24, device and Mac glyphs at pitch 2.6); waiting rows 44 with a small destructive Cancel |
+| Inbox | Rows on `raised`, pixel glyphs for link / text / photo / file, the unseen mark a 6 pt rounded square, ages in Core's words |
+
+Checks (every size in §7, light and dark): chips equal size and on one
+line; no stock segmented control, `.roundedBorder` field or paste circle;
+cards equal width per row with their names on one leading edge; an
+offline Mac is a row, never a full card; no empty band under the last
+section, portrait and landscape, iPad and iPhone; at AX1+ the chip labels
+shrink to 80 % before they would truncate.
+
+Identifiers: `ph.transfer.send` (header), `ph.transfer.tab` (switch),
+`ph.send.tab.send`, `ph.send.tab.inbox`, `ph.send.done`,
+`ph.send.source.photos`, `ph.send.source.files`,
+`ph.send.source.clipboard`, `ph.send.field`, `ph.send.add`,
+`ph.send.trayItem`, `ph.transfer.macCard` (live card),
+`ph.send.offlineCard`, `ph.send.beam`, `ph.send.waiting.cancel`,
+`ph.inbox`, `ph.inbox.row`.
+
+## 9. Capture preview (owner testing, build 26, OT-10)
+
+The full-screen capture (`ScreenshotPreviewView`, preview step) uses the
+whole stage. Maths in Core (`CapturePreviewLayout`).
+
+| Part | Spec |
+| --- | --- |
+| Layout | Header (close · status strip), the picture's room, the dock, 12 apart. Every step takes the room between header and dock; the dock is anchored at the bottom, 8 above the home indicator, in both orientations and on iPhone |
+| Picture | Aspect-fit into the room less 16 each side, centred, on whole points; the black well (radius 24, hairline) hugs the picture. A wide capture fills the width in portrait; a tall one fills the height in landscape. Replaces VQ-051's "dock right under the picture", which left half the screen empty in portrait |
+| Zoom | Pinch 1×–6× (the pan scales with it); double-tap zooms to 2.5× on the tapped point, again back to 1×; a drag pans while zoomed and never shows past the picture's edges; at 1× a downward swipe closes. VoiceOver: a "Zoom in / Zoom out" action |
+| Dock | Raised navy, radius 24, at most 560 wide and centred (iPad keeps the five actions together); annotate's toolbar keeps the full width |
+
+Checks: iPad 11″ portrait and landscape, iPhone portrait and landscape;
+the picture's gaps to the header and to the dock are equal within 1 pt;
+nothing under the home indicator; a double-tap on a corner keeps that
+corner in view.
+
+Identifiers: `ph.capture.well`, `ph.capture.preview`, `ph.capture.dock`.

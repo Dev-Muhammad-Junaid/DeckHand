@@ -63,7 +63,8 @@ public enum PanelOrientation: String, Sendable, Hashable, CaseIterable {
     }
 }
 
-/// Where the person put the panel: fractions of the free room, and a width.
+/// Where the person put the panel: fractions of the free room, a width and
+/// (since build 26, OT-11) a height.
 public struct TypePanelPlacement: Sendable, Hashable, Codable {
     /// 0 = leading edge of the free room, 1 = trailing edge.
     public var x: Double
@@ -71,11 +72,15 @@ public struct TypePanelPlacement: Sendable, Hashable, Codable {
     public var y: Double
     /// The chosen width; `nil` until the person resizes (the default).
     public var width: Double?
+    /// The chosen height; `nil` until the person resizes (the panel's
+    /// shortest, `TypePanelLayout.heightRange`). Every block sizes to it.
+    public var height: Double?
 
-    public init(x: Double, y: Double, width: Double? = nil) {
+    public init(x: Double, y: Double, width: Double? = nil, height: Double? = nil) {
         self.x = x
         self.y = y
         self.width = width
+        self.height = height
     }
 
     /// Bottom centre at the default width: where build 25 put it.
@@ -92,8 +97,10 @@ public struct TypePanelPlacement: Sendable, Hashable, Codable {
     public static func restored(_ data: Data?) -> TypePanelPlacement? {
         guard let data, let place = try? JSONDecoder().decode(TypePanelPlacement.self, from: data) else { return nil }
         guard place.x.isFinite, place.y.isFinite, (0...1).contains(place.x), (0...1).contains(place.y) else { return nil }
-        if let width = place.width, !(width.isFinite && width > 0) { return TypePanelPlacement(x: place.x, y: place.y) }
-        return place
+        var clean = place
+        if let width = place.width, !(width.isFinite && width > 0) { clean.width = nil }
+        if let height = place.height, !(height.isFinite && height > 0) { clean.height = nil }
+        return clean
     }
 
     /// What `restored` reads back.
@@ -261,7 +268,7 @@ public struct TypePanelGeometry: Sendable, Hashable {
         let freeY = max(0, room.height - size.height)
         if style == .docked {
             let toBottom = frame.midY >= room.midY
-            return TypePanelPlacement(x: 0.5, y: toBottom ? 1 : 0, width: current.width)
+            return TypePanelPlacement(x: 0.5, y: toBottom ? 1 : 0, width: current.width, height: current.height)
         }
         var fx = freeX > 0 ? (frame.minX - room.minX) / freeX : 0.5
         var fy = freeY > 0 ? (frame.minY - room.minY) / freeY : 1
@@ -275,7 +282,27 @@ public struct TypePanelGeometry: Sendable, Hashable {
         // Snap y: top, bottom.
         if frame.minY - room.minY <= Self.magnet { fy = 0 }
         else if room.maxY - frame.maxY <= Self.magnet { fy = 1 }
-        return TypePanelPlacement(x: rounded(fx), y: rounded(fy), width: current.width)
+        return TypePanelPlacement(x: rounded(fx), y: rounded(fy), width: current.width, height: current.height)
+    }
+
+    /// A resize in flight from a bottom corner (OT-11): the width as
+    /// `resized(_:edge:translation:)`, and the bottom edge moved by `dy`
+    /// (positive = down, the top holds), the height clamped to `heights`
+    /// (the layout's range for the new width) and to the room below the
+    /// panel's top.
+    public func resized(
+        _ start: PanelRect,
+        edge: ResizeEdge,
+        translation dx: Double,
+        _ dy: Double,
+        heights: (Double) -> ClosedRange<Double>
+    ) -> PanelRect {
+        var frame = resized(start, edge: edge, translation: dx)
+        let range = heights(frame.width)
+        let below = room.maxY - start.minY
+        let wanted = (start.height + (dy.isFinite ? dy : 0)).rounded()
+        frame.height = max(range.lowerBound, min(min(range.upperBound, max(range.lowerBound, below)), wanted))
+        return frame
     }
 
     /// A resize in flight: the frame with one edge moved by `translation`
@@ -305,14 +332,59 @@ public struct TypePanelGeometry: Sendable, Hashable {
         return frame
     }
 
-    /// The placement a resize ends in: the new width, and the place that
-    /// keeps the frame where it was (snapped like a drag).
-    public func placement(resizedTo frame: PanelRect, keeping current: TypePanelPlacement) -> TypePanelPlacement {
+    /// The placement a resize ends in: the new width (and height, when
+    /// `keepsHeight`), and the place that keeps the frame where it was
+    /// (snapped like a drag).
+    public func placement(resizedTo frame: PanelRect, keeping current: TypePanelPlacement, keepsHeight: Bool = false) -> TypePanelPlacement {
         let width = clampWidth(frame.width)
         var place = placement(droppedAt: frame.minX, frame.minY, size: (width, frame.height), keeping: current)
         place.width = width
+        place.height = keepsHeight ? frame.height.rounded() : current.height
         return place
     }
+
+    /// The height a placement draws at: its own, or `nil` for the
+    /// layout's shortest.
+    public func height(for placement: TypePanelPlacement) -> Double? {
+        guard let height = placement.height, height.isFinite, height > 0 else { return nil }
+        return height
+    }
+
+    // MARK: Loupe (OT-12)
+
+    /// Where the loupe on the Mac's focused field sits: attached to the
+    /// panel, as wide as it, above it when there's room (the panel usually
+    /// rides on the keyboard or the dock), else below it, else over the
+    /// panel's top (the room is too short for both). `nil` with no room.
+    public func loupeFrame(panel: PanelRect) -> PanelRect? {
+        guard room.width > 0, room.height > 0, panel.width > 0 else { return nil }
+        let height = Self.loupeHeight(panelWidth: panel.width)
+        let above = panel.minY - room.minY - Self.gap
+        let below = room.maxY - panel.maxY - Self.gap
+        if above >= height {
+            return PanelRect(x: panel.x, y: panel.minY - Self.gap - height, width: panel.width, height: height)
+        }
+        if below >= height {
+            return PanelRect(x: panel.x, y: panel.maxY + Self.gap, width: panel.width, height: height)
+        }
+        // Squeeze into whichever side has more, never under the minimum;
+        // past that it overlaps the panel's top edge.
+        let side = max(above, below)
+        let squeezed = max(Self.loupeMinimumHeight, side)
+        if above >= below {
+            return PanelRect(x: panel.x, y: max(room.minY, panel.minY - Self.gap - squeezed), width: panel.width, height: squeezed)
+        }
+        return PanelRect(x: panel.x, y: min(panel.maxY + Self.gap, room.maxY - squeezed), width: panel.width, height: squeezed)
+    }
+
+    /// The loupe's height for a panel width: a wide strip (a text field is
+    /// wide and short), 30 % of the width, 96…200 pt.
+    public static func loupeHeight(panelWidth: Double) -> Double {
+        min(loupeMaximumHeight, max(loupeMinimumHeight, (panelWidth * 0.3).rounded()))
+    }
+
+    public static let loupeMinimumHeight: Double = 96
+    public static let loupeMaximumHeight: Double = 200
 
     // MARK: Helpers
 

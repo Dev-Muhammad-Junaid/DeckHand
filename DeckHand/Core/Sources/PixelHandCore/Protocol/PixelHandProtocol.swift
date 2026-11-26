@@ -53,7 +53,10 @@ public enum PixelHandProtocol {
     ///   newer request); pairing codes are eight digits (seven and a check).
     /// - 15: `Action.typeText(text:)`: deck keys and sequence steps type
     ///   text (owner testing build 25, OT-8).
-    public static let version = 15
+    /// - 16: `system.watchFocus(on:)` and `system.focusState(focus:)`: the
+    ///   Mac's focused text field for the Type panel's loupe (owner testing
+    ///   build 26, OT-12).
+    public static let version = 16
 
     /// Bonjour TXT key carrying `version`. Short, because TXT keys should
     /// stay under 9 bytes.

@@ -48,6 +48,12 @@ struct TypePanel: View {
     @Bindable var model: TypePanelModel
     let layout: TypePanelLayout
     var chrome: TypePanelChrome?
+    /// The Mac app's icon for the header (from the installed-apps list),
+    /// `nil` when unknown.
+    var targetIcon: Image?
+    /// The header's target chip zooms to the Mac's focused field (OT-12).
+    /// `nil` where there is no loupe (the classic layout).
+    var zoom: TypePanelZoom?
     /// A key or text went to the Mac (forgets what a gesture opened).
     var onActivity: () -> Void = {}
 
@@ -58,39 +64,32 @@ struct TypePanel: View {
     private let target = TypingTarget.shared
 
     private var presence: TypePanelPresence { model.presence }
-    private let gap = CGFloat(TypePanelLayout.blockGap)
 
     var body: some View {
-        VStack(alignment: .leading, spacing: PixelHandTheme.Space.sm) {
+        VStack(alignment: .leading, spacing: CGFloat(TypePanelLayout.headerSpacing)) {
             if layout.showsHeader {
                 header
-                if !layout.targetInHeader {
-                    targetLine
-                }
+                    .frame(height: CGFloat(layout.headerRows) * CGFloat(TypePanelLayout.headerHeight)
+                        + CGFloat(max(0, layout.headerRows - 1)) * CGFloat(TypePanelLayout.headerSpacing))
             }
-            PanelBodyLayout(
-                arrangement: layout.arrangement,
-                numpad: layout.numpadPlacement,
-                fieldWidth: CGFloat(layout.fieldWidth),
-                gap: gap
-            ) {
-                // One field in one place in the tree, whatever the
-                // arrangement: reflowing never hands the keyboard to a
-                // new view (OT-2).
+            // Every block at the frame Core cut for it from the panel's
+            // width and height (OT-11): nothing sized by its content, so
+            // nothing is left over. Always all five subviews, in one order:
+            // a hidden block gets no size but keeps its identity, so the
+            // field never hands the keyboard to a new view (OT-2).
+            PanelBodyLayout(layout: layout) {
                 fieldColumn
+                actionBlock
                 arrowCluster
                 keyBlock
-                if layout.numpadPlacement != .hidden {
-                    NumpadGrid { key in press(key) }
-                }
-            }
-            if layout.showsHeader, presence.mode == .live {
-                clipboardLine
+                NumpadGrid { key in press(key) }
+                    .opacity(layout.shows(.numpad) ? 1 : 0)
+                    .allowsHitTesting(layout.shows(.numpad))
+                    .accessibilityHidden(!layout.shows(.numpad))
             }
         }
         .padding(CGFloat(TypePanelLayout.padding))
-        .frame(width: CGFloat(layout.panelWidth), alignment: .leading)
-        .environment(\.typeKeyPitch, CGFloat(layout.cellPitch))
+        .frame(width: CGFloat(layout.panelWidth), height: CGFloat(layout.panelHeight), alignment: .topLeading)
         .background(
             RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous)
                 .fill(PixelHandTheme.raised)
@@ -120,28 +119,34 @@ struct TypePanel: View {
 
     // MARK: Header
 
-    /// Grip, mode, target, numpad, collapse, close; on two lines when it
-    /// doesn't fit (the narrowest panels at the largest text sizes).
+    /// One row: grip, mode, the target chip, numpad, collapse, close. On
+    /// narrow panels (`headerRows == 2`) the mode switch and the app's
+    /// name take a second row, so neither row is left half empty.
+    @ViewBuilder
     private var header: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: PixelHandTheme.Space.xs) {
-                gripHandle
-                ModeSwitch(mode: $model.mode)
-                if layout.targetInHeader {
-                    targetLine
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    Spacer(minLength: 0)
-                }
-                headerButtons
-            }
-            VStack(alignment: .leading, spacing: PixelHandTheme.Space.xs) {
+        if layout.headerRows >= 2 {
+            VStack(alignment: .leading, spacing: CGFloat(TypePanelLayout.headerSpacing)) {
                 HStack(spacing: PixelHandTheme.Space.xs) {
                     gripHandle
+                    targetChip(showsName: false)
                     Spacer(minLength: 0)
                     headerButtons
                 }
+                .frame(height: CGFloat(TypePanelLayout.headerHeight))
+                HStack(spacing: PixelHandTheme.Space.sm) {
+                    ModeSwitch(mode: $model.mode)
+                    statusText
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(height: CGFloat(TypePanelLayout.headerHeight))
+            }
+        } else {
+            HStack(spacing: PixelHandTheme.Space.xs) {
+                gripHandle
                 ModeSwitch(mode: $model.mode)
+                targetChip(showsName: layout.showsAppName)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                headerButtons
             }
         }
     }
@@ -189,21 +194,68 @@ struct TypePanel: View {
         }
     }
 
-    /// "Typing into Messages": where keys go, always in view (VQ-036).
-    private var targetLine: some View {
-        HStack(spacing: PixelHandTheme.Space.xs) {
-            PHGlyph(glyph: PixelGlyphs.keyboard, pitch: CGFloat(PixelPitch.badge), stepsWithType: true)
-            Text(TypingTargetGuard.caption(frontApp: target.frontApp))
-                .font(.caption.weight(.medium))
-                .lineLimit(1)
-                .truncationMode(.tail)
+    /// Where keys go, shown once (OT-11): the Mac app's icon, its name when
+    /// there's room, and a small magnifier. Tapping it zooms to the Mac's
+    /// focused field (OT-12, Pro); without a loupe it only names the app.
+    @ViewBuilder
+    private func targetChip(showsName: Bool) -> some View {
+        let caption = TypingTargetGuard.caption(frontApp: target.frontApp)
+        let label = HStack(spacing: PixelHandTheme.Space.xs) {
+            Group {
+                if let targetIcon {
+                    targetIcon.resizable().interpolation(.high).scaledToFit()
+                } else {
+                    PHGlyph(glyph: PixelGlyphs.keyboard, pitch: CGFloat(PixelPitch.badge), stepsWithType: true)
+                }
+            }
+            .frame(width: 24, height: 24)
+            if showsName {
+                statusText
+            }
+            if zoom != nil {
+                PHGlyph(glyph: PixelGlyphs.find, pitch: 1.4)
+                    .foregroundStyle(zoom?.isOn == true ? PixelHandTheme.accentInk : PixelHandTheme.ink2)
+            }
         }
-        .foregroundStyle(PixelHandTheme.ink2)
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("ph.type.target")
+        .padding(.horizontal, PixelHandTheme.Space.sm)
+        .frame(minWidth: PixelHandTheme.ControlHeight.hit, minHeight: PixelHandTheme.ControlHeight.secondary)
+        .background(Capsule().fill(zoom?.isOn == true ? PixelHandTheme.accentTint : PixelHandTheme.fill))
+        .frame(height: PixelHandTheme.ControlHeight.hit)
+        .contentShape(Rectangle())
+
+        if let zoom {
+            Button {
+                GestureHaptic.selection.trigger()
+                zoom.toggle()
+            } label: { label }
+                .buttonStyle(ChipPressStyle())
+                .phosphorFocusable(cornerRadius: PixelHandTheme.ControlHeight.secondary / 2)
+                .accessibilityLabel("\(caption). Zoom to the input")
+                .accessibilityValue(zoom.isOn ? "Shown" : "Hidden")
+                .accessibilityAddTraits(zoom.isOn ? [.isButton, .isSelected] : .isButton)
+                .accessibilityIdentifier("ph.type.target")
+                .requiresPro(.mirror)
+        } else {
+            label
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(caption)
+                .accessibilityIdentifier("ph.type.target")
+        }
     }
 
-    /// The numpad docks beside the keys or goes away (OT-7).
+    /// The app's name, or what the last paste did for a moment (S10), in
+    /// the header: one line, no separate clipboard row eating the panel's
+    /// height.
+    private var statusText: some View {
+        Text(clipboard?.pasteStatus ?? (target.frontApp ?? "Mac"))
+            .font(.caption.weight(.medium))
+            .foregroundStyle(PixelHandTheme.ink2)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .accessibilityHidden(true)
+    }
+
+    /// The numpad replaces the key rows or goes away (OT-7, OT-11).
     private var numpadToggle: some View {
         let isOn = presence.tab == .numpad
         return Button {
@@ -235,41 +287,35 @@ struct TypePanel: View {
 
     // MARK: Field
 
-    /// The field, and under it Paste (and Compose's +⏎ and Send). Without
-    /// the header (short room), the grip and close sit beside the field.
+    /// The field fills its frame (as tall as the arrows beside it, two
+    /// lines when there's room). Without the header (short room), the grip
+    /// and close sit beside it. Hidden in Live with the numpad on, but
+    /// kept in the tree.
     private var fieldColumn: some View {
-        VStack(alignment: .leading, spacing: PixelHandTheme.Space.xs) {
-            HStack(spacing: PixelHandTheme.Space.xs) {
-                if !layout.showsHeader { gripHandle }
-                field
-                if !layout.showsHeader { closeButton }
-            }
-            if layout.body == .full {
-                HStack(spacing: PixelHandTheme.Space.xs) {
-                    pasteButton
-                    if presence.mode == .compose {
-                        sendReturnToggle
-                        sendButton
-                    }
-                    Spacer(minLength: 0)
-                }
-            }
+        HStack(spacing: PixelHandTheme.Space.xs) {
+            if !layout.showsHeader { gripHandle }
+            field
+            if !layout.showsHeader { closeButton }
         }
+        .opacity(layout.shows(.field) ? 1 : 0)
+        .allowsHitTesting(layout.shows(.field))
     }
 
     private var field: some View {
         LiveTypingField(
             mode: presence.mode,
-            // Without the header, or with a hardware keyboard, the field
-            // says where text goes.
-            placeholder: (!layout.showsHeader || layout.body == .keysOnly) && presence.mode == .live
+            // The header names the target; without one (short room), or
+            // with a hardware keyboard and no header, the field does: the
+            // target always shows exactly once.
+            placeholder: !layout.showsHeader && presence.mode == .live
                 ? TypingTargetGuard.caption(frontApp: target.frontApp)
                 : presence.mode.placeholder,
             latchedModifiers: presence.modifiers.held,
             draft: $model.draft,
             wantsFocus: presence.wantsFocus || layout.body == .keysOnly,
             focusRequest: presence.focusRequest,
-            composeLines: layout.composeLines,
+            composeLines: layout.fieldLines,
+            fillsHeight: true,
             onEdit: { edit in
                 onActivity()
                 guardReturn(if: edit.insert.contains("\n")) {
@@ -291,57 +337,74 @@ struct TypePanel: View {
             onFocus: { model.presence.fieldFocused() }
         )
         .padding(.horizontal, PixelHandTheme.Space.md)
-        .frame(maxWidth: .infinity, minHeight: PixelHandTheme.ControlHeight.standard)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
             RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous)
                 .fill(PixelHandTheme.fill)
         )
     }
 
-    /// Paste from this device's clipboard: into the draft in Compose,
-    /// to the Mac in Live (the clipboard feature's setting decides whether
-    /// it lands at the Mac's cursor or on its clipboard). Icon only, to
-    /// keep the field's column short.
+    // MARK: Actions (OT-11, OT-13)
+
+    /// Beside the field: Live has Accept (Tab, which takes the Mac app's
+    /// inline suggestion) and Paste; Compose has +⏎ and Send. A column of
+    /// two next to the inverted T, a row of two next to the one-row arrows.
+    private var actionBlock: some View {
+        let grid = layout.grid(.actions)
+        return KeyGrid(grid: grid) {
+            ForEach(layout.actionCells, id: \.action) { cell in
+                actionButton(cell.action)
+                    .keyCell(column: cell.column, row: cell.row)
+            }
+        }
+        .opacity(grid == nil ? 0 : 1)
+        .allowsHitTesting(grid != nil)
+        .accessibilityHidden(grid == nil)
+    }
+
     @ViewBuilder
-    private var pasteButton: some View {
-        if presence.mode == .compose {
-            PasteToMacControl(iconOnly: true) { text in
-                model.draft += text
-            }
-            .frame(width: PixelHandTheme.ControlHeight.hit, height: PixelHandTheme.ControlHeight.secondary)
-            .frame(height: PixelHandTheme.ControlHeight.hit)
-            .accessibilityLabel("Paste into the draft")
-            .accessibilityIdentifier("ph.type.paste")
-        } else {
-            PasteToMacControl(iconOnly: true) { text in
-                onActivity()
-                clipboard?.pasteToMac(text, paste: settings.pasteRightAway, sender: sender)
-            }
-            .frame(width: PixelHandTheme.ControlHeight.hit, height: PixelHandTheme.ControlHeight.secondary)
-            .frame(height: PixelHandTheme.ControlHeight.hit)
-            .accessibilityHint(settings.pasteRightAway ? "Pastes at the Mac’s cursor" : "Puts the text on the Mac’s clipboard")
-            .accessibilityIdentifier("ph.type.paste")
-            .requiresPro(.sharing)
+    private func actionButton(_ action: TypePanelLayout.Action) -> some View {
+        switch action {
+        case .accept: acceptButton
+        case .paste: pasteButton
+        case .sendReturn: sendReturnToggle
+        case .send: sendButton
         }
     }
 
-    /// What the last paste did, or what was last copied on the Mac (S10),
-    /// in one quiet line; nothing when there's nothing to say.
-    @ViewBuilder
-    private var clipboardLine: some View {
-        if let status = clipboard?.pasteStatus {
-            Text(status)
-                .font(.system(.caption2, design: .rounded))
-                .foregroundStyle(PixelHandTheme.ink2)
-                .lineLimit(1)
-                .padding(.horizontal, PixelHandTheme.Space.xs)
-        } else if settings.clipboardSync, let fromMac = clipboard?.lastFromMac {
-            Text("Copied on the Mac: “\(fromMac)”")
-                .font(.system(.caption2, design: .rounded))
-                .foregroundStyle(PixelHandTheme.ink2)
-                .lineLimit(1)
-                .padding(.horizontal, PixelHandTheme.Space.xs)
+    /// Accept (⇥): presses Tab on the Mac, which is how Claude, Xcode,
+    /// Mail and most editors take their grey inline suggestion. The loupe
+    /// shows the suggestion; this makes taking it one obvious tap (OT-13).
+    private var acceptButton: some View {
+        Button {
+            onActivity()
+            GestureHaptic.light.trigger()
+            let modifiers = model.presence.modifiers.consume()
+            target.guardrail.typed(into: target.frontApp)
+            Task { await sender.sendShortcut(TypeKey.remote(.tab).chord(with: modifiers)) }
+        } label: {
+            KeyCap(legend: .stacked(symbol: "⇥", word: "ACCEPT"), style: .tint)
         }
+        .buttonStyle(ChipPressStyle())
+        .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.kbd)
+        .accessibilityLabel("Accept suggestion")
+        .accessibilityHint("Presses Tab on the Mac, which takes the app's inline suggestion.")
+        .accessibilityIdentifier("ph.type.accept")
+    }
+
+    /// Paste this device's clipboard on the Mac (the clipboard feature's
+    /// setting decides whether it lands at the Mac's cursor or on its
+    /// clipboard). Compose's field is local, so the system's own Paste
+    /// works in it; the button is Live's.
+    private var pasteButton: some View {
+        PasteToMacControl(iconOnly: true) { text in
+            onActivity()
+            clipboard?.pasteToMac(text, paste: settings.pasteRightAway, sender: sender)
+        }
+        .padding(CGFloat(TypePanelLayout.keyGap) / 2)
+        .accessibilityHint(settings.pasteRightAway ? "Pastes at the Mac’s cursor" : "Puts the text on the Mac’s clipboard")
+        .accessibilityIdentifier("ph.type.paste")
+        .requiresPro(.sharing)
     }
 
     private var sendReturnToggle: some View {
@@ -350,19 +413,10 @@ struct TypePanel: View {
             GestureHaptic.selection.trigger()
             model.sendsReturn.toggle()
         } label: {
-            Text("+⏎")
-                .font(.phChord)
-                .foregroundStyle(isOn ? PixelHandTheme.accentInk : PixelHandTheme.ink2)
-                .frame(width: 44, height: PixelHandTheme.ControlHeight.secondary)
-                .background(
-                    RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous)
-                        .fill(isOn ? PixelHandTheme.accentTint : PixelHandTheme.fill)
-                )
-                .frame(height: PixelHandTheme.ControlHeight.hit)
-                .contentShape(Rectangle())
+            KeyCap(legend: .text("+⏎"), style: isOn ? .tint : .plain)
         }
         .buttonStyle(ChipPressStyle())
-        .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.chip)
+        .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.kbd)
         .accessibilityLabel("Press Return after sending")
         .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
         .accessibilityIdentifier("ph.type.sendReturn")
@@ -371,28 +425,23 @@ struct TypePanel: View {
     private var sendButton: some View {
         let enabled = ComposeSend.canSend(draft: model.draft, withReturn: model.sendsReturn)
         return Button(action: sendDraft) {
-            Text("Send")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, PixelHandTheme.Space.md)
-                .frame(height: PixelHandTheme.ControlHeight.secondary)
-                .background(Capsule().fill(enabled ? PixelHandTheme.accent : PixelHandTheme.ink3))
-                .frame(height: PixelHandTheme.ControlHeight.hit)
-                .contentShape(Rectangle())
+            KeyCap(legend: .dots("SEND"), style: enabled ? .accent : .plain)
+                .opacity(enabled ? 1 : 0.5)
         }
         .buttonStyle(ChipPressStyle())
         .disabled(!enabled)
-        .phosphorFocusable(cornerRadius: PixelHandTheme.ControlHeight.secondary / 2)
+        .phosphorFocusable(cornerRadius: PixelHandTheme.Radius.kbd)
         .accessibilityLabel(model.sendsReturn ? "Send, then press Return" : "Send")
         .accessibilityIdentifier("ph.type.send")
     }
 
-    // MARK: Arrows and keys (OT-7)
+    // MARK: Arrows and keys (OT-7, OT-11)
 
-    /// The inverted T: ↑ over ← ↓ →.
+    /// The inverted T (↑ over ← ↓ →), or one row (← ↑ ↓ →) at the
+    /// shortest; cells as big as the panel gives them.
     private var arrowCluster: some View {
-        KeyGrid(columns: ArrowCluster.columns, rows: ArrowCluster.rows) {
-            ForEach(ArrowCluster.cells, id: \.key) { cell in
+        KeyGrid(grid: layout.grid(.arrows)) {
+            ForEach(ArrowCluster.cells(for: layout.arrowShape), id: \.key) { cell in
                 keyButton(cell.key)
                     .keyCell(column: cell.column, row: cell.row)
             }
@@ -402,11 +451,13 @@ struct TypePanel: View {
         .accessibilityIdentifier("ph.type.arrows")
     }
 
-    /// Two compact rows: ⌘ ⌥ ⌃ ⇧ esc tab / ⌫ ⏎ home end pg↑ pg↓ fn. With fn
-    /// on, the second row's keys give way to a strip of F1–F12.
+    /// Two rows across the panel's width: ⌘ ⌥ ⌃ ⇧ esc tab / ⌫ ⏎ home end
+    /// pg↑ pg↓ fn. With fn on, the second row's keys give way to a strip of
+    /// F1–F12. Gone while the numpad shows (OT-11).
     private var keyBlock: some View {
         let fnOn = presence.showsFunctionKeys
-        return KeyGrid(columns: TypeKeyBlock.columns, rows: TypeKeyBlock.rows) {
+        let grid = layout.grid(.keys)
+        return KeyGrid(grid: grid) {
             ForEach(TypeKeyBlock.cells.filter { !(fnOn && $0.row == 1 && $0.item != .fn) }, id: \.item) { cell in
                 blockItem(cell.item)
                     .keyCell(column: cell.column, row: cell.row, columnSpan: cell.columnSpan)
@@ -416,6 +467,9 @@ struct TypePanel: View {
                     .keyCell(column: 0, row: 1, columnSpan: TypeKeyBlock.functionStripColumns)
             }
         }
+        .opacity(grid == nil ? 0 : 1)
+        .allowsHitTesting(grid != nil)
+        .accessibilityHidden(grid == nil)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Keys")
         .accessibilityIdentifier("ph.type.keys")
@@ -431,11 +485,13 @@ struct TypePanel: View {
     }
 
     private var functionStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        let cell = layout.grid(.keys).map { CGSize(width: $0.cellWidth, height: $0.cellHeight) }
+            ?? CGSize(width: TypePanelLayout.keyPitch, height: TypePanelLayout.keyPitch)
+        return ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 0) {
                 ForEach(TypeKeysRow.functionKeys) { key in
                     keyButton(key)
-                        .frame(width: CGFloat(layout.cellPitch), height: CGFloat(layout.cellPitch))
+                        .frame(width: cell.width, height: cell.height)
                 }
             }
             .padding(.trailing, TrailingFade.overflowWidth)
@@ -565,6 +621,13 @@ struct TypePanel: View {
     }
 }
 
+/// The header's zoom switch (OT-12): whether the loupe shows, and how to
+/// flip it. The host owns the state.
+struct TypePanelZoom {
+    var isOn: Bool
+    var toggle: () -> Void
+}
+
 // MARK: - Mode switch
 
 /// Live | Compose, selection by colour and fill only (like the right
@@ -606,92 +669,64 @@ private struct ModeSwitch: View {
 
 // MARK: - Body layout
 
-/// Places the field column, the arrows, the key block and the numpad
-/// (`TypePanelLayout`): one block (side by side), or stacked with the
-/// numpad beside or under the keys. A `Layout`, so the four keep their
-/// identity when the arrangement changes and the field never loses the
-/// keyboard to a reflow.
+/// Places the field, the actions, the arrows, the key rows and the numpad
+/// at the frames `TypePanelLayout` cut from the panel (OT-11). A `Layout`,
+/// so the five keep their identity when the arrangement changes and the
+/// field never loses the keyboard to a reflow; a block the layout doesn't
+/// show gets a zero frame.
 private struct PanelBodyLayout: Layout {
-    let arrangement: TypePanelLayout.Arrangement
-    let numpad: TypePanelLayout.NumpadPlacement
-    let fieldWidth: CGFloat
-    let gap: CGFloat
+    let layout: TypePanelLayout
+
+    private static let order: [TypePanelLayout.Block] = [.field, .actions, .arrows, .keys, .numpad]
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        frames(subviews).reduce(CGRect.zero) { $0.union($1) }.size
+        let size = layout.bodySize
+        return CGSize(width: size.width, height: size.height)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        for (subview, frame) in zip(subviews, frames(subviews)) {
+        for (index, subview) in subviews.enumerated() {
+            let block = index < Self.order.count ? Self.order[index] : .numpad
+            guard let rect = layout.grid(block)?.rect else {
+                subview.place(at: bounds.origin, proposal: .zero)
+                continue
+            }
             subview.place(
-                at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),
-                proposal: ProposedViewSize(width: frame.width, height: frame.height)
+                at: CGPoint(x: bounds.minX + rect.minX, y: bounds.minY + rect.minY),
+                proposal: ProposedViewSize(width: rect.width, height: rect.height)
             )
         }
-    }
-
-    /// Frames for [field, arrows, keys, numpad?], from the top-leading
-    /// corner.
-    private func frames(_ subviews: Subviews) -> [CGRect] {
-        guard subviews.count >= 3 else { return [] }
-        let field = subviews[0].sizeThatFits(ProposedViewSize(width: fieldWidth, height: nil))
-        let arrows = subviews[1].sizeThatFits(.unspecified)
-        let keys = subviews[2].sizeThatFits(.unspecified)
-        let pad = subviews.count > 3 ? subviews[3].sizeThatFits(.unspecified) : .zero
-        var frames: [CGRect] = []
-        frames.append(CGRect(x: 0, y: 0, width: fieldWidth, height: field.height))
-        frames.append(CGRect(x: fieldWidth + gap, y: 0, width: arrows.width, height: arrows.height))
-        switch arrangement {
-        case .oneBlock:
-            frames.append(CGRect(x: fieldWidth + gap + arrows.width + gap, y: 0, width: keys.width, height: keys.height))
-            if subviews.count > 3 {
-                frames.append(CGRect(x: frames[2].maxX + gap, y: 0, width: pad.width, height: pad.height))
-            }
-        case .stacked:
-            let top = max(field.height, arrows.height) + gap
-            frames.append(CGRect(x: 0, y: top, width: keys.width, height: keys.height))
-            if subviews.count > 3 {
-                switch numpad {
-                case .beside, .hidden:
-                    frames.append(CGRect(x: keys.width + gap, y: top, width: pad.width, height: pad.height))
-                case .below:
-                    frames.append(CGRect(x: 0, y: top + keys.height + gap, width: pad.width, height: pad.height))
-                }
-            }
-        }
-        return frames
     }
 }
 
 // MARK: - Key caps
 
-/// The key cell size the panel draws (`TypePanelLayout.cellPitch`: 44 pt,
-/// less only in a panel narrower than the key block).
-private struct TypeKeyPitchKey: EnvironmentKey {
-    static let defaultValue = CGFloat(TypePanelLayout.keyPitch)
+/// The cell size of the grid a key sits in (Core's `Grid`: 44 pt and up,
+/// wider than tall in the key rows).
+private struct TypeKeyCellKey: EnvironmentKey {
+    static let defaultValue = CGSize(width: TypePanelLayout.keyPitch, height: TypePanelLayout.keyPitch)
 }
 
 extension EnvironmentValues {
-    var typeKeyPitch: CGFloat {
-        get { self[TypeKeyPitchKey.self] }
-        set { self[TypeKeyPitchKey.self] = newValue }
+    var typeKeyCell: CGSize {
+        get { self[TypeKeyCellKey.self] }
+        set { self[TypeKeyCellKey.self] = newValue }
     }
 }
 
-/// A grid of key cells (44 pt): each key fills its cell's touch target and
-/// draws a cap 4 pt smaller inside it.
+/// A grid of key cells at a Core block's size: each key fills its cell's
+/// touch target and draws a cap 4 pt smaller inside it.
 private struct KeyGrid<Content: View>: View {
-    let columns: Int
-    let rows: Int
+    let grid: TypePanelLayout.Grid?
     @ViewBuilder let content: Content
 
-    @Environment(\.typeKeyPitch) private var pitch
-
     var body: some View {
+        let cell = CGSize(width: grid?.cellWidth ?? 0, height: grid?.cellHeight ?? 0)
         ZStack(alignment: .topLeading) {
             content
         }
-        .frame(width: CGFloat(columns) * pitch, height: CGFloat(rows) * pitch, alignment: .topLeading)
+        .frame(width: CGFloat(grid?.rect.width ?? 0), height: CGFloat(grid?.rect.height ?? 0), alignment: .topLeading)
+        .environment(\.typeKeyCell, cell)
     }
 }
 
@@ -708,23 +743,33 @@ private struct KeyCell: ViewModifier {
     let columnSpan: Int
     let rowSpan: Int
 
-    @Environment(\.typeKeyPitch) private var pitch
+    @Environment(\.typeKeyCell) private var cell
 
     func body(content: Content) -> some View {
         content
-            .frame(width: CGFloat(columnSpan) * pitch, height: CGFloat(rowSpan) * pitch)
-            .offset(x: CGFloat(column) * pitch, y: CGFloat(row) * pitch)
+            .frame(width: CGFloat(columnSpan) * cell.width, height: CGFloat(rowSpan) * cell.height)
+            .offset(x: CGFloat(column) * cell.width, y: CGFloat(row) * cell.height)
     }
 }
 
-/// One key cap: 40 pt tall inside its 44 pt cell, the legend in the
-/// dot-matrix font (words), a pixel glyph (arrows) or the rounded chord
-/// face (⌘ ⌥ ⌃ ⇧ ⌫ ⏎).
+/// How much bigger than a 44 pt cell this one is (legends grow with the
+/// keys, up to 1.5×).
+private func legendScale(_ cell: CGSize) -> CGFloat {
+    let side = min(cell.width, cell.height)
+    guard side > 0 else { return 1 }
+    return min(1.5, max(0.8, side / CGFloat(TypePanelLayout.keyPitch)))
+}
+
+/// One key cap inside its cell, the legend in the dot-matrix font (words),
+/// a pixel glyph (arrows) or the rounded chord face (⌘ ⌥ ⌃ ⇧ ⌫ ⏎), scaled
+/// with the cell.
 private struct KeyCap: View {
     enum Legend {
         case dots(String)
         case glyph(GlyphBitmap, label: String)
         case text(String)
+        /// A symbol over a small dot-matrix word (Accept ⇥).
+        case stacked(symbol: String, word: String)
 
         init(_ key: TypeKey) {
             if let legend = key.dotMatrixLegend {
@@ -749,6 +794,8 @@ private struct KeyCap: View {
     var style: Style = .plain
     var isLocked = false
 
+    @Environment(\.typeKeyCell) private var cell
+
     private var ink: Color {
         switch style {
         case .plain: PixelHandTheme.ink
@@ -767,20 +814,27 @@ private struct KeyCap: View {
 
     var body: some View {
         let inset = CGFloat(TypePanelLayout.keyGap) / 2
+        let scale = legendScale(cell)
         ZStack {
             RoundedRectangle(cornerRadius: PixelHandTheme.Radius.kbd, style: .continuous)
                 .fill(plate)
             switch legend {
             case let .dots(text):
-                DotMatrixText(text, pitch: 1.4, label: text, glows: false, stepsWithType: false)
+                DotMatrixText(text, pitch: 1.4 * scale, label: text, glows: false, stepsWithType: false)
             case let .glyph(glyph, label):
-                PHGlyph(glyph: glyph, pitch: 1.6)
+                PHGlyph(glyph: glyph, pitch: 1.6 * scale)
                     .accessibilityLabel(label)
             case let .text(text):
                 Text(text)
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .font(.system(size: 16 * scale, weight: .semibold, design: .rounded))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
+            case let .stacked(symbol, word):
+                VStack(spacing: 2 * scale) {
+                    Text(symbol)
+                        .font(.system(size: 15 * scale, weight: .semibold, design: .rounded))
+                    DotMatrixText(word, pitch: 0.9 * scale, label: word, glows: false, stepsWithType: false)
+                }
             }
         }
         .foregroundStyle(ink)
@@ -799,19 +853,26 @@ private struct KeyCap: View {
 // MARK: - Numpad
 
 /// The 5 × 4 keypad in dot-matrix numerals (OT-7): 7 8 9 ÷ ⌫ / 4 5 6 × /
-/// 1 2 3 − / 0 . = +, Enter three rows tall in the last column, on the
-/// same 44 pt cells as the keys. Operators in accent ink; Enter on the
-/// accent.
+/// 1 2 3 − / 0 . = +, Enter three rows tall in the last column, cells as
+/// big as the panel gives them (OT-11). Operators in accent ink; Enter on
+/// the accent.
 struct NumpadGrid: View {
     let onPress: (NumpadKey) -> Void
 
     var body: some View {
-        KeyGrid(columns: NumpadKey.columns, rows: NumpadKey.rows) {
-            ForEach(NumpadKey.allCases) { key in
-                let cell = key.cell
-                NumpadKeyButton(key: key) { onPress(key) }
-                    .keyCell(column: cell.column, row: cell.row, columnSpan: cell.columnSpan, rowSpan: cell.rowSpan)
+        GeometryReader { proxy in
+            let cell = CGSize(
+                width: proxy.size.width / CGFloat(NumpadKey.columns),
+                height: proxy.size.height / CGFloat(NumpadKey.rows)
+            )
+            ZStack(alignment: .topLeading) {
+                ForEach(NumpadKey.allCases) { key in
+                    let place = key.cell
+                    NumpadKeyButton(key: key) { onPress(key) }
+                        .keyCell(column: place.column, row: place.row, columnSpan: place.columnSpan, rowSpan: place.rowSpan)
+                }
             }
+            .environment(\.typeKeyCell, cell)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Numpad")
@@ -823,21 +884,24 @@ private struct NumpadKeyButton: View {
     let key: NumpadKey
     let action: () -> Void
 
+    @Environment(\.typeKeyCell) private var cell
+
     var body: some View {
+        let scale = legendScale(cell)
         Button(action: action) {
             ZStack {
                 RoundedRectangle(cornerRadius: PixelHandTheme.Radius.kbd, style: .continuous)
                     .fill(key == .enter ? PixelHandTheme.accent : PixelHandTheme.fill)
                 if key == .delete {
                     Text("⌫")
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .font(.system(size: 16 * scale, weight: .semibold, design: .rounded))
                         .foregroundStyle(PixelHandTheme.ink)
                 } else if key == .enter {
                     // Three cells tall: the word stands up the key.
-                    DotMatrixText("ENT", pitch: 1.4, label: key.spokenName, glows: false, stepsWithType: false)
+                    DotMatrixText("ENT", pitch: 1.4 * scale, label: key.spokenName, glows: false, stepsWithType: false)
                         .foregroundStyle(Color.white)
                 } else {
-                    DotMatrixText(key.cap, pitch: 2, label: key.spokenName, glows: false, stepsWithType: false)
+                    DotMatrixText(key.cap, pitch: 2 * scale, label: key.spokenName, glows: false, stepsWithType: false)
                         .foregroundStyle(key.isOperator ? PixelHandTheme.accentInk : PixelHandTheme.ink)
                 }
             }
@@ -927,6 +991,7 @@ struct TypePanelHost: View {
     var arrangement = "single"
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.entitlements) private var entitlements
     @State private var placement = TypePanelPlacement.initial
     @State private var loadedKey: String?
     /// The panel's (or pill's) measured size.
@@ -934,6 +999,8 @@ struct TypePanelHost: View {
     /// A drag or resize in flight: where it started and where it is.
     @State private var gestureStart: PanelRect?
     @State private var liveFrame: PanelRect?
+    /// The loupe on the Mac's focused field is open (OT-12).
+    @State private var showsLoupe = false
 
     private var storageKey: String {
         TypePanelPlacement.storageKey(
@@ -953,20 +1020,16 @@ struct TypePanelHost: View {
                 dockMinY: showsDock ? model.dockMinY.map { Double($0) } : nil
             )
             let width = liveFrame?.width ?? geometry.width(for: placement)
-            let layout = TypePanelLayout(
-                width: Double(windowSize.width),
-                height: Double(windowSize.height),
-                keyboard: model.keyboard,
-                keyboardOverlap: model.keyboardOverlap,
-                panelWidth: width,
-                showsNumpad: model.presence.tab == .numpad
+            // OT-11: the panel's height is the person's too; the layout
+            // cuts every block from width × height, and shrinks to the
+            // free room when the keyboard leaves less.
+            let layout = panelLayout(width: width, height: liveFrame?.height ?? geometry.height(for: placement), room: geometry.room.height)
+            let pill = (
+                width: measured == .zero ? 200 : Double(measured.width),
+                height: measured == .zero ? 44 : Double(measured.height)
             )
-            let size = (
-                width: measured == .zero ? layout.panelWidth : Double(measured.width),
-                height: measured == .zero ? 200 : Double(measured.height)
-            )
-            let frame = liveFrame.map { PanelRect(x: $0.x, y: $0.y, width: $0.width, height: size.height) }
-                ?? geometry.frame(for: placement, size: model.isCollapsed ? size : (width: width, height: size.height))
+            let frame = liveFrame.map { PanelRect(x: $0.x, y: $0.y, width: $0.width, height: layout.panelHeight) }
+                ?? geometry.frame(for: placement, size: model.isCollapsed ? pill : (width: width, height: layout.panelHeight))
             let handles = panelChrome(geometry: geometry, frame: frame)
 
             ZStack(alignment: .topLeading) {
@@ -975,7 +1038,17 @@ struct TypePanelHost: View {
                         if model.isCollapsed {
                             TypePanelPill(model: model, chrome: handles)
                         } else {
-                            TypePanel(sender: sender, clipboard: session.clipboard, model: model, layout: layout, chrome: handles)
+                            TypePanel(
+                                sender: sender,
+                                clipboard: session.clipboard,
+                                model: model,
+                                layout: layout,
+                                chrome: handles,
+                                targetIcon: session.activeBundleID.flatMap { id in
+                                    DeckAppIcons.image(for: id, in: Dictionary(session.installedApps.map { ($0.bundleID, $0) }, uniquingKeysWith: { first, _ in first }))
+                                },
+                                zoom: TypePanelZoom(isOn: showsLoupe) { showsLoupe.toggle() }
+                            )
                                 .overlay(alignment: .bottomLeading) {
                                     if geometry.canResize { resizeHandle(.leading, geometry: geometry, frame: frame) }
                                 }
@@ -988,10 +1061,21 @@ struct TypePanelHost: View {
                     .offset(x: CGFloat(frame.x) - container.minX, y: CGFloat(frame.y) - container.minY)
                     .transition(.opacity) // Glyph rule: panels fade, never slide.
                 }
+                // OT-12: the loupe on the Mac's focused field, attached to
+                // the panel (above it, or below when it's parked at the
+                // top). Pro, like the mirror it cuts from.
+                if model.isShown, !model.isCollapsed, showsLoupe, entitlements.allows(.mirror),
+                   let loupe = geometry.loupeFrame(panel: frame) {
+                    FocusLoupeView(session: session)
+                        .frame(width: CGFloat(loupe.width), height: CGFloat(loupe.height))
+                        .offset(x: CGFloat(loupe.x) - container.minX, y: CGFloat(loupe.y) - container.minY)
+                        .transition(.opacity)
+                }
             }
             .frame(width: container.width, height: container.height, alignment: .topLeading)
             .animation(Animation.phPanelFade(reduceMotion: reduceMotion), value: model.isShown)
             .animation(Animation.phPanelFade(reduceMotion: reduceMotion), value: model.isCollapsed)
+            .animation(Animation.phPanelFade(reduceMotion: reduceMotion), value: showsLoupe)
         }
         // The panel places itself against the keyboard; it must not be
         // pushed up by the keyboard's safe area as well.
@@ -1003,11 +1087,31 @@ struct TypePanelHost: View {
         .onChange(of: windowSize) { _, _ in
             DispatchQueue.main.async { model.refreshKeyboard() }
         }
+        // Closing the panel closes the loupe (and stops the Mac following
+        // the focus).
+        .onChange(of: model.isShown) { _, shown in
+            if !shown { showsLoupe = false }
+        }
         .onChange(of: storageKey, initial: true) { _, key in
             guard loadedKey != key else { return }
             loadedKey = key
             placement = TypePanelPlacement.restored(UserDefaults.standard.data(forKey: key)) ?? .initial
         }
+    }
+
+    /// The layout for a width and a wanted height in this window.
+    private func panelLayout(width: Double, height: Double?, room: Double?) -> TypePanelLayout {
+        TypePanelLayout(
+            width: Double(windowSize.width),
+            height: Double(windowSize.height),
+            keyboard: model.keyboard,
+            keyboardOverlap: model.keyboardOverlap,
+            panelWidth: width,
+            panelHeight: height,
+            roomHeight: room,
+            showsNumpad: model.presence.tab == .numpad,
+            mode: model.presence.mode
+        )
     }
 
     // MARK: Moving
@@ -1043,7 +1147,8 @@ struct TypePanelHost: View {
         )
     }
 
-    /// The bottom corners resize; the other edge holds (OT-6). The 44 pt
+    /// The bottom corners resize in both directions (OT-6, OT-11): sideways
+    /// the other edge holds, down and up the top holds. The 44 pt
     /// target straddles the card's corner, mostly outside it, so it never
     /// takes taps meant for ⌫ or fn in the corners of the key block; the
     /// mark itself sits just inside the corner.
@@ -1062,25 +1167,41 @@ struct TypePanelHost: View {
                     .onChanged { value in
                         let start = gestureStart ?? frame
                         if gestureStart == nil { gestureStart = start }
-                        liveFrame = geometry.resized(start, edge: edge, translation: Double(value.translation.width))
+                        liveFrame = geometry.resized(
+                            start, edge: edge,
+                            translation: Double(value.translation.width), Double(value.translation.height),
+                            heights: heights
+                        )
                     }
                     .onEnded { value in
                         let start = gestureStart ?? frame
-                        let end = geometry.resized(start, edge: edge, translation: Double(value.translation.width))
-                        settle(geometry.placement(resizedTo: end, keeping: placement))
+                        let end = geometry.resized(
+                            start, edge: edge,
+                            translation: Double(value.translation.width), Double(value.translation.height),
+                            heights: heights
+                        )
+                        settle(geometry.placement(resizedTo: end, keeping: placement, keepsHeight: true))
                     }
             )
             .hoverEffect(.highlight)
             .accessibilityElement()
             .accessibilityLabel(edge == .leading ? "Resize from the left corner" : "Resize from the right corner")
-            .accessibilityValue("\(Int(frame.width)) points wide")
+            .accessibilityValue("\(Int(frame.width)) by \(Int(frame.height)) points")
             .accessibilityAdjustableAction { direction in
                 let step = direction == .increment ? 40.0 : -40.0
                 var next = placement
                 next.width = geometry.clampWidth(frame.width + step)
+                // Taller with wider, within the new width's range.
+                let range = heights(next.width ?? frame.width)
+                next.height = min(range.upperBound, max(range.lowerBound, frame.height + step / 2))
                 settle(next)
             }
             .accessibilityIdentifier("ph.type.resize.\(edge.rawValue)")
+    }
+
+    /// The heights the panel may take at a width (the layout's range).
+    private func heights(_ width: Double) -> ClosedRange<Double> {
+        panelLayout(width: width, height: nil, room: nil).heightRange
     }
 
     /// Ends a gesture: the new place, snapped with a short spring (none

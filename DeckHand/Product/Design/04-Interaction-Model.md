@@ -82,12 +82,14 @@ three-finger gestures.
 - An app with a dialog shows a warning dot on its icon.
 - Apps that aren't running: Ask ("open Figma") or the action library.
 
-### Keyboard (Type panel, owner testing builds 24–25, OT-2/OT-3/OT-6/OT-7)
+### Keyboard (Type panel, owner testing builds 24–26, OT-2/OT-3/OT-6/OT-7/OT-11/OT-12)
 - The keyboard button sits in the app dock; the pad has its own where the
   dock is folded. Both open the one **Type panel**, which floats above the
   system keyboard and the dock and has its own close button. The keyboard
   never changes the arrangement: the shell plans from the window and lays
-  out under the keyboard.
+  out under the keyboard. With a hardware or minimised keyboard, iPadOS's
+  slim bar (language, Paste, dictation) stays at the bottom: the dock
+  rides on it, and the panel stays above it (OT-11).
 - **Move it** (OT-6): drag the ⠿ grip in its header anywhere in the free
   room (the window's safe area above the keyboard and the dock). A soft
   magnet (24 pt) snaps it to the leading or trailing edge, the centre line,
@@ -96,9 +98,11 @@ three-finger gestures.
   room: parked bottom-right, it rides on the keyboard and drops back to
   the dock when the keyboard goes. VoiceOver: Move to the top, bottom,
   left, centre or right.
-- **Resize it** from either bottom corner (the other edge holds), from
-  **360 pt** to 760 pt; the width is remembered with the place. VoiceOver
-  adjusts the width in 40 pt steps.
+- **Resize it** from either bottom corner, **in both directions**
+  (OT-11): sideways the other edge holds, from **360 pt** to 760 pt; down
+  and up the top holds, between the shortest and the tallest the layout
+  allows at that width. Width and height are remembered with the place.
+  VoiceOver adjusts it in 40 pt steps.
 - **Fold it** with – to a pill ("⌨ Safari · Live"); one tap opens it again
   in the same corner, on the same tab. Folding lets the keyboard go.
 - iPhone (and any window under 500 pt either way): the panel is docked to
@@ -106,24 +110,48 @@ three-finger gestures.
   moves it between the two. In landscape it can be narrowed from the
   centre.
 - **Live** (each key goes to the Mac at once) or **Compose** (type or
-  dictate a draft, then **Send**, optionally with Return); Paste from this
-  device; the last mode is remembered. "Typing into <App>" always shows.
-- **Compact layout** (OT-7), following the panel's own width: the field
-  (about 30 % narrower than build 25's) with an **inverted-T** arrow
-  cluster beside it (↑ over ← ↓ →), and the keys in **two rows**: ⌘ ⌥ ⌃ ⇧
-  esc tab, then ⌫ ⏎ home end pg↑ pg↓ fn. From 680 pt wide it's one block
-  (field, arrows and keys side by side); narrower, the keys go under the
-  field. **fn** swaps the second row for a strip of F1–F12. Sticky ⌘ ⌥ ⌃ ⇧:
-  tap = once, again = lock, again = off; lit while latched.
-- **Numpad**: the header's numpad button docks a 5 × 4 keypad (7 8 9 ÷ ⌫ /
-  4 5 6 × / 1 2 3 − / 0 . = +, Enter three rows tall) beside the keys in
-  the same panel, or under them below 564 pt; the field stays. The system
-  keyboard steps down while it shows; tapping the field brings it back.
-- Keys are 40 pt caps on 44 pt cells (44 pt targets that never overlap),
-  legends in the dot-matrix font for words (ESC, HOME, F5) and pixel glyphs
-  for the arrows.
-- Hardware keyboard: the field is one line naming the target, with no
-  paste or Compose actions under it; the arrows and keys stay.
+  dictate a draft, then **Send**, optionally with Return); the last mode is
+  remembered. **The target shows once** (OT-11): the header's chip has the
+  Mac app's icon, its name when there's room, and a magnifier; the field's
+  placeholder is neutral ("Type here"). Without a header (iPhone landscape
+  with the keyboard up) the placeholder names the app instead.
+- **Every block sizes to the panel** (OT-11, `TypePanelLayout`): rows grow
+  from 44 pt to 72 pt with the panel's height, the key rows stretch across
+  its width, the field takes what's left beside the arrows and shows two
+  lines when the band is tall enough. Nothing is sized by its content, so
+  nothing is left over:
+  - **one block** (wide and short; from 676 pt wide): field │ Accept,
+    Paste │ inverted-T arrows │ the two key rows;
+  - **stacked**: field │ actions │ arrows on top, the key rows under them
+    spanning the panel;
+  - **shortest** (from 448 pt wide, under four rows of 44): the arrows go to
+    **one row** (← ↑ ↓ →) and the two actions sit side by side, saving a
+    row (44 pt). Narrower than 448 the field would drop under 144 pt beside
+    a row of four arrows, so the T stays.
+- **Actions beside the field:** Live has **Accept ⇥** (presses Tab, which
+  takes the Mac app's grey inline suggestion, OT-13) and **Paste** (this
+  device's clipboard to the Mac); Compose has **+⏎** and **Send** (its
+  field is local, so the system's own Paste works in it).
+- Keys: ⌘ ⌥ ⌃ ⇧ esc tab, then ⌫ ⏎ home end pg↑ pg↓ fn. **fn** swaps the
+  second row for a strip of F1–F12. Sticky ⌘ ⌥ ⌃ ⇧: tap = once, again =
+  lock, again = off; lit while latched.
+- **Numpad** (OT-11): the header's numpad button shows **only the arrows
+  and the 5 × 4 keypad** (7 8 9 ÷ ⌫ / 4 5 6 × / 1 2 3 − / 0 . = +, Enter
+  three rows tall), filling the panel together: side by side from 384 pt
+  wide (the arrows as tall as the pad), else the arrows in a row over it.
+  Compose keeps a one-line draft with +⏎ and Send on top. The system
+  keyboard steps down while it shows; the numpad button brings the keys
+  back.
+- **Zoom to the input** (OT-12, Pro): the header's target chip opens a
+  loupe attached to the panel (above it, or below when parked at the top)
+  showing the Mac's focused text field up close, cut live from the mirror
+  and following the caret. When the Mac can't say where the field is
+  (some web and Electron fields), it shows the area around the pointer
+  and says so in small print.
+- Keys are caps 4 pt smaller than their cells (44 pt targets and up, never
+  overlapping), legends in the dot-matrix font for words (ESC, HOME, F5)
+  and pixel glyphs for the arrows, scaled with the cell.
+- Hardware keyboard: no action column; the arrows and keys stay.
 
 ### Keys that type (OT-8)
 - A deck key, or a step of a sequence, can **type text** (the action

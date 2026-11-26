@@ -51,6 +51,10 @@ final class TypePanelModel {
     /// `.global`), while it covers the window.
     private(set) var keyboardMinY: Double?
     private(set) var hardwareKeyboardAttached = false
+    /// How far the app dock rises to sit on the iPadOS keyboard bar (a
+    /// hardware or minimised keyboard's slim bar; 0 under a full keyboard,
+    /// OT-11).
+    private(set) var dockLift: Double = 0
     /// The last keyboard end frame, in screen space (`nil` once hidden).
     @ObservationIgnored private var keyboardScreenFrame: CGRect?
     /// The app dock's top in global coordinates, while it shows under the
@@ -80,6 +84,7 @@ final class TypePanelModel {
                 self?.keyboardScreenFrame = nil
                 self?.keyboardOverlap = 0
                 self?.keyboardMinY = nil
+                self?.dockLift = 0
             }
         })
         observers.append(center.addObserver(forName: .GCKeyboardDidConnect, object: nil, queue: .main) { [weak self] _ in
@@ -142,6 +147,7 @@ final class TypePanelModel {
         else {
             keyboardOverlap = 0
             keyboardMinY = nil
+            dockLift = 0
             return
         }
         let frame = window.convert(screenFrame, from: window.screen.coordinateSpace)
@@ -152,6 +158,7 @@ final class TypePanelModel {
             keyboardHeight: Double(frame.height)
         )
         keyboardMinY = keyboardOverlap > 0 ? Double(frame.minY) : nil
+        dockLift = KeyboardKind.barLift(overlap: keyboardOverlap, bottomInset: Double(window.safeAreaInsets.bottom))
     }
 }
 

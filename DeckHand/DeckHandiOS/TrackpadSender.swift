@@ -303,6 +303,13 @@ actor TrackpadSender {
         await send(.sharing(.setClipboard(text: text, paste: paste)))
     }
 
+    /// Starts (`true`) or stops following the Mac's focused text field
+    /// (OT-12). While on, `ControlSessionModel.focusedField` updates. The
+    /// Mac also stops when the connection ends.
+    func watchFocus(_ on: Bool) async {
+        await send(.system(.watchFocus(on: on)))
+    }
+
     /// Runs a Mac-wide action (Mission Control, Show Desktop, …).
     func sendSystemAction(_ action: SystemMacro) async {
         await send(.system(.run(action: action)))

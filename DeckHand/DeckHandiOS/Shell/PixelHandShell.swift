@@ -898,6 +898,11 @@ struct PixelHandShell: View {
                 onKeyboard: { typePanel.toggle() }
             )
             .padding(.horizontal, PixelHandTheme.Space.md)
+            // With a hardware or minimised keyboard, iPadOS's slim bar
+            // (language, Paste, dictation) sits at the bottom: the dock
+            // rides on it instead of under it (OT-11).
+            .padding(.bottom, CGFloat(typePanel.dockLift))
+            .animation(PixelHandMotion.quick, value: typePanel.dockLift)
             // The Type panel sits above the dock when no keyboard covers it.
             .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { typePanel.dockMinY = $0 }
         }

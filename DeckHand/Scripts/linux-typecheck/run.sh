@@ -27,6 +27,7 @@ files=(
   "$app/DeckHandMac/Network/LinkObservation+Loom.swift"
   "$app/DeckHandMac/Network/RemoteAccessGate.swift"
   "$app/DeckHandMac/LockGate.swift"
+  "$app/DeckHandMac/FocusTracker.swift"
   "$app/DeckHandMac/UI/MenuBarActivity.swift"
   "$app/DeckHandMac/Transfer/MacTransferService.swift"
   "$app/DeckHandMac/Deck/MacShortcutRunner.swift"

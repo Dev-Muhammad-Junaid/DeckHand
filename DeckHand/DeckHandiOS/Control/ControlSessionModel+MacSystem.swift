@@ -4,7 +4,8 @@
 //
 //  The Mac system control lane's part of the session model: the Mac's lock
 //  state and its displays / Spaces snapshot (`system.lockState`,
-//  `system.displayState`, protocol 3).
+//  `system.displayState`, protocol 3), and the focused text field while
+//  the Type panel's loupe watches it (`system.focusState`, protocol 16).
 //
 
 import SwiftUI
@@ -19,7 +20,9 @@ extension ControlSessionModel {
             }
         case let .displayState(layout):
             displayLayout = layout
-        case .run, .switchSpace:
+        case let .focusState(focus):
+            focusedField = focus
+        case .run, .switchSpace, .watchFocus:
             break // remote → Mac only
         }
     }

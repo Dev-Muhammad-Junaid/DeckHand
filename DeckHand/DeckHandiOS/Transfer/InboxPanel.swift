@@ -33,7 +33,7 @@ struct InboxPanel: View {
                                 Text(activity.name).font(.subheadline.weight(.medium)).lineLimit(1).truncationMode(.middle)
                                 Spacer()
                                 Button("Cancel", role: .destructive) { center.cancel(activity.id) }
-                                    .font(.caption)
+                                    .buttonStyle(.ph(.destructive, size: .small))
                             }
                             DotBeam(state: .progress(activity.meter.fraction), count: 16)
                             Text("From \(activity.macName) · \(activity.meter.caption)")
@@ -41,6 +41,7 @@ struct InboxPanel: View {
                                 .foregroundStyle(PixelHandTheme.ink2)
                         }
                         .padding(.vertical, PixelHandTheme.Space.xs)
+                        .listRowBackground(PixelHandTheme.raised)
                     }
                 }
             }
@@ -62,6 +63,7 @@ struct InboxPanel: View {
                             .accessibilityAddTraits(.isButton)
                             .accessibilityHint(item.link != nil ? "Opens the link" : (item.text != nil ? "Copies the text" : "Opens the share sheet"))
                             .accessibilityIdentifier("ph.inbox.row")
+                            .listRowBackground(PixelHandTheme.raised)
                             .contextMenu { menu(for: item) }
                             .swipeActions {
                                 Button("Delete", role: .destructive) { center.deleteInboxItem(item.id) }
@@ -139,31 +141,33 @@ private struct InboxRow: View {
 
     var body: some View {
         HStack(spacing: PixelHandTheme.Space.md) {
-            Circle()
+            // The unseen mark is the app's dot: a rounded square.
+            RoundedRectangle(cornerRadius: 1.8, style: .continuous)
                 .fill(item.isSeen ? Color.clear : PixelHandTheme.accent)
-                .frame(width: 8, height: 8)
+                .frame(width: 6, height: 6)
                 .accessibilityHidden(true)
-            Image(systemName: symbol)
-                .frame(width: 28)
+            PHGlyph(glyph: glyph, pitch: PixelPitch.chip)
                 .foregroundStyle(PixelHandTheme.accent)
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title).font(.subheadline.weight(.medium)).lineLimit(1).truncationMode(.middle)
-                Text("From \(item.senderName) · \(item.receivedAt.formatted(.relative(presentation: .named)))\(item.kind.isInline ? "" : " · " + TransferProgressMeter.size(item.byteCount))")
+                // "seen … ago" words from Core, the same as the Mac cards.
+                Text("From \(item.senderName) · \(MacGlanceCopy.age(from: item.receivedAt, to: Date()))\(item.kind.isInline ? "" : " · " + TransferProgressMeter.size(item.byteCount))")
                     .font(.caption)
                     .foregroundStyle(PixelHandTheme.ink2)
+                    .lineLimit(1)
             }
         }
-        .frame(minHeight: 44)
+        .frame(minHeight: PixelHandTheme.ControlHeight.standard)
         .accessibilityElement(children: .combine)
         .accessibilityValue(item.isSeen ? "" : "New")
     }
 
-    private var symbol: String {
+    private var glyph: GlyphBitmap {
         switch item.kind {
-        case .link: "link"
-        case .text: "text.alignleft"
-        case .photo: "photo"
-        case .file: item.isPhotoLibraryCompatible ? "photo" : "doc"
+        case .link: TransferGlyphs.link
+        case .text: PixelGlyphs.type
+        case .photo: TransferGlyphs.photos
+        case .file: item.isPhotoLibraryCompatible ? TransferGlyphs.photos : TransferGlyphs.files
         }
     }
 }

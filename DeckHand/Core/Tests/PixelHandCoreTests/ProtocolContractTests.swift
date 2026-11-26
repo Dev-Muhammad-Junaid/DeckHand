@@ -88,6 +88,38 @@ import Testing
         )))),
         ("system.lockState", .system(.lockState(state: .screenLocked))),
         ("system.lockState.offConsole", .system(.lockState(state: .offConsole))),
+        ("system.watchFocus", .system(.watchFocus(on: true))),
+        ("system.focusState", .system(.focusState(focus: FocusedFieldSnapshot(
+            displayID: 1,
+            displayWidth: 1512,
+            displayHeight: 982,
+            field: FocusRect(x: 400, y: 300, width: 420, height: 22),
+            caret: FocusRect(x: 512.5, y: 303, width: 1, height: 16),
+            pointer: FocusRect(x: 588, y: 298, width: 24, height: 24),
+            source: .accessibility,
+            app: "TextEdit",
+            role: .textField,
+            text: FocusedText(
+                value: "Héllo, 世界 👋🏽",
+                selection: FocusedText.Selection(start: 5, length: 0),
+                truncatedBefore: false,
+                truncatedAfter: true,
+                suggestion: nil
+            )
+        )))),
+        ("system.focusState.pointer", .system(.focusState(focus: FocusedFieldSnapshot(
+            displayID: 2,
+            displayWidth: 2560,
+            displayHeight: 1440,
+            field: nil,
+            caret: nil,
+            pointer: FocusRect(x: 1268, y: 708, width: 24, height: 24),
+            source: .pointer,
+            app: "Claude",
+            role: .webArea,
+            text: nil
+        )))),
+        ("system.focusState.none", .system(.focusState(focus: .nothing(displayID: 1, displayWidth: 1512, displayHeight: 982)))),
         // apps
         ("apps.launchApp", .apps(.launchApp(bundleID: "com.apple.Safari"))),
         ("apps.appShortcut", .apps(.appShortcut(bundleID: "com.todesktop.230313mzl4w4u92", keys: ["cmd", "k"]))),
@@ -306,6 +338,8 @@ import Testing
             case .switchSpace: "system.switchSpace"
             case .displayState: "system.displayState"
             case .lockState: "system.lockState"
+            case .watchFocus: "system.watchFocus"
+            case .focusState: "system.focusState"
             }
         case let .apps(m):
             switch m {
@@ -378,8 +412,8 @@ import Testing
         }
     }
 
-    /// Cases in protocol version 11. Bump with every added or removed case.
-    static let expectedCaseCount = 57
+    /// Cases in protocol version 16. Bump with every added or removed case.
+    static let expectedCaseCount = 59
 
     /// The current version, for the hand-written JSON below.
     static let v = PixelHandProtocol.version
