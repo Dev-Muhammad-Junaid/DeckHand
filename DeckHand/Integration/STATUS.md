@@ -2437,4 +2437,26 @@ app later changed to Chrome and the Claude app, but nothing typed then.
   on its dot. The connect then timed out with “No Mac found”, the only
   time this happened in the run.
 
-Status: BUILT (build 28) — 8 bugs
+
+Status after build 28: BUILT — 8 bugs (fix lane `claude/pixelhand-lane-build28-fixes`, build 30).
+
+## Build 29 queued (2026-11-27, primary session): live sync phase 1
+
+Build 28 plus the two Phase 1 lanes from `RD-live-sync-and-caret.md`
+(owner-approved, see `DECISIONS.md` 2026-11-27):
+- **caret-joystick** (`LANE-caret-joystick.md`): hold the arrow cluster and
+  drag; ←/→ characters, ↑/↓ lines, speed grows with distance, ⇧ selects;
+  dot-matrix trail; a tap still sends one arrow.
+- **live-sync** (`LANE-live-sync.md`, **protocol 17**): `FocusTextObserver`
+  on the Mac, `textState`, anchored `TextEdit`s applied by selecting and
+  typing (never `AXValue`), synced Live field on the iPad with the sync
+  badge, keyboard settings per the owner, Tab-accepted text appears.
+
+Mac should check: build all targets (compile risks in both handoffs),
+tests, the walks; then with the owner's Mac free, the live-sync measurement
+checklist in `LANE-live-sync.md` (TextEdit, Notes, Mail, Xcode; latency;
+secure field; lock) and the joystick by hand. The build 28 bugs stay open
+until build 30.
+
+Status: READY FOR MAC BUILD (build 29)
+
