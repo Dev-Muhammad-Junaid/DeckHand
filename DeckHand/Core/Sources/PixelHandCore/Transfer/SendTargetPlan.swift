@@ -93,9 +93,14 @@ public struct SendTarget: Equatable, Sendable, Identifiable {
         }
     }
 
-    /// What VoiceOver reads for the card.
+    /// What VoiceOver reads for the card's state (the readout included,
+    /// in words). The control carries the name ("Send to Studio").
     public func spoken(now: Date) -> String {
-        "\(listing.name), \(statusLine(now: now))"
+        var line = statusLine(now: now)
+        if case let .sending(_, fraction?) = state {
+            line += ", \(TransferPanelPlan.percent(fraction)) percent"
+        }
+        return line
     }
 }
 
@@ -198,9 +203,9 @@ public enum SendTargetCopy {
         case .ready:
             return "Ready"
         case let .sending(count, fraction):
-            let what = count == 1 ? "Sending" : "Sending \(count)"
-            guard let fraction else { return count == 1 ? "Waiting to accept" : "\(count) waiting to accept" }
-            return "\(what) · \(TransferPanelPlan.percent(fraction)) %"
+            // The percentage is the card's dot-matrix readout, not repeated here.
+            guard fraction != nil else { return count == 1 ? "Waiting to accept" : "\(count) waiting to accept" }
+            return count == 1 ? "Sending 1 item" : "Sending \(count) items"
         case .busy(.locked):
             return "Locked · unlock to receive"
         case let .busy(.receiving(count)):

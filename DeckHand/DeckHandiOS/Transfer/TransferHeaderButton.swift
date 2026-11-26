@@ -31,9 +31,11 @@ struct TransferHeaderButton: View {
         }
         .overlay(alignment: .topTrailing) {
             if center.inbox.unseenCount > 0 {
-                Circle()
+                // The unseen dot is the app's one kind of dot: a rounded
+                // square (`06-Pixel-Identity.md` §0).
+                RoundedRectangle(cornerRadius: 2.4, style: .continuous)
                     .fill(PixelHandTheme.accent)
-                    .frame(width: 10, height: 10)
+                    .frame(width: 8, height: 8)
                     .offset(x: -4, y: 4)
                     .accessibilityHidden(true)
             }
@@ -41,8 +43,9 @@ struct TransferHeaderButton: View {
         .accessibilityIdentifier("ph.transfer.send")
         .requiresPro(.sharing)
         .sheet(isPresented: $showsSheet) {
+            // Sized to its content by the sheet itself (`TransferSheetSizing`,
+            // owner testing build 26, OT-9); it was a fixed medium detent.
             TransferSheet(tab: startTab)
-                .presentationDetents([.medium, .large])
         }
         .background {
             // Outside the Pro gate so it isn't disabled with the button.

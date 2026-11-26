@@ -71,10 +71,11 @@ import Testing
         #expect(state == .sending(count: 2, fraction: 0.21))
         let target = SendTarget(listing: Self.listing(Self.studio, "Studio", active: true), state: state)
         #expect(target.readout == "21%")
-        #expect(target.statusLine(now: Self.now) == "Sending 2 · 21 %")
+        #expect(target.statusLine(now: Self.now) == "Sending 2 items")
+        #expect(target.spoken(now: Self.now) == "Sending 2 items, 21 percent")
 
         let one = SendTargetPlan.state(for: Self.listing(Self.studio, "Studio", active: true), outgoing: [items[0]])
-        #expect(SendTargetCopy.statusLine(for: one, now: Self.now) == "Sending · 30 %")
+        #expect(SendTargetCopy.statusLine(for: one, now: Self.now) == "Sending 1 item")
     }
 
     @Test("Before any byte moves, a send reads as waiting for the Mac to accept")
@@ -161,7 +162,7 @@ import Testing
         // A clock that moved backwards never reads as the future.
         #expect(SendTargetCopy.offlineLine(lastSeen: now.addingTimeInterval(60), now: now) == "Seen just now")
         let target = SendTarget(listing: Self.listing(Self.mini, "Mini", seen: 7200), state: .offline(lastSeen: now.addingTimeInterval(-7200)))
-        #expect(target.spoken(now: now) == "Mini, Seen 2 h ago")
+        #expect(target.spoken(now: now) == "Seen 2 h ago")
     }
 
     // MARK: Layout
