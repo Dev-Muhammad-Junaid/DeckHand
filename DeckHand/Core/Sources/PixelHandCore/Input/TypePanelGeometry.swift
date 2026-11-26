@@ -350,6 +350,42 @@ public struct TypePanelGeometry: Sendable, Hashable {
         return height
     }
 
+    // MARK: Loupe (OT-12)
+
+    /// Where the loupe on the Mac's focused field sits: attached to the
+    /// panel, as wide as it, above it when there's room (the panel usually
+    /// rides on the keyboard or the dock), else below it, else over the
+    /// panel's top (the room is too short for both). `nil` with no room.
+    public func loupeFrame(panel: PanelRect) -> PanelRect? {
+        guard room.width > 0, room.height > 0, panel.width > 0 else { return nil }
+        let height = Self.loupeHeight(panelWidth: panel.width)
+        let above = panel.minY - room.minY - Self.gap
+        let below = room.maxY - panel.maxY - Self.gap
+        if above >= height {
+            return PanelRect(x: panel.x, y: panel.minY - Self.gap - height, width: panel.width, height: height)
+        }
+        if below >= height {
+            return PanelRect(x: panel.x, y: panel.maxY + Self.gap, width: panel.width, height: height)
+        }
+        // Squeeze into whichever side has more, never under the minimum;
+        // past that it overlaps the panel's top edge.
+        let side = max(above, below)
+        let squeezed = max(Self.loupeMinimumHeight, side)
+        if above >= below {
+            return PanelRect(x: panel.x, y: max(room.minY, panel.minY - Self.gap - squeezed), width: panel.width, height: squeezed)
+        }
+        return PanelRect(x: panel.x, y: min(panel.maxY + Self.gap, room.maxY - squeezed), width: panel.width, height: squeezed)
+    }
+
+    /// The loupe's height for a panel width: a wide strip (a text field is
+    /// wide and short), 30 % of the width, 96…200 pt.
+    public static func loupeHeight(panelWidth: Double) -> Double {
+        min(loupeMaximumHeight, max(loupeMinimumHeight, (panelWidth * 0.3).rounded()))
+    }
+
+    public static let loupeMinimumHeight: Double = 96
+    public static let loupeMaximumHeight: Double = 200
+
     // MARK: Helpers
 
     private func clampUnit(_ value: Double) -> Double {

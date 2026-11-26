@@ -324,3 +324,35 @@ struct TypePanelHeightResizeTests {
         #expect(TypePanelPlacement.restored(old) == TypePanelPlacement(x: 0.25, y: 1, width: 500))
     }
 }
+
+@Suite("The loupe is attached to the Type panel (OT-12)")
+struct TypePanelLoupePlacementTests {
+    let geometry = TypePanelGeometry(
+        container: PanelRect(x: 0, y: 24, width: 1180, height: 796),
+        windowWidth: 1180,
+        windowHeight: 820,
+        keyboardMinY: 420
+    )
+
+    @Test("Above the panel when there's room, as wide as it")
+    func above() {
+        let panel = PanelRect(x: 230, y: 250, width: 720, height: 160)
+        let loupe = try! #require(geometry.loupeFrame(panel: panel))
+        #expect(loupe.width == 720 && loupe.minX == 230)
+        #expect(loupe.maxY == panel.minY - 8)
+        #expect(loupe.height == 200)
+        #expect(TypePanelGeometry.loupeHeight(panelWidth: 360) == 108)
+        #expect(TypePanelGeometry.loupeHeight(panelWidth: 200) == 96)
+    }
+
+    @Test("Below a panel parked at the top; squeezed, never under 96 pt, when short")
+    func belowAndSqueezed() {
+        let top = PanelRect(x: 230, y: 32, width: 720, height: 160)
+        let below = try! #require(geometry.loupeFrame(panel: top))
+        #expect(below.minY == top.maxY + 8)
+        let tall = PanelRect(x: 230, y: 120, width: 720, height: 280)
+        let squeezed = try! #require(geometry.loupeFrame(panel: tall))
+        #expect(squeezed.height >= TypePanelGeometry.loupeMinimumHeight)
+        #expect(squeezed.minY >= geometry.room.minY)
+    }
+}
