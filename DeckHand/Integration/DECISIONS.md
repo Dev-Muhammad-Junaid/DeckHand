@@ -3,6 +3,20 @@
 Recorded by the coordinating session ("Deckhand project status review").
 Newest first. If a doc elsewhere disagrees, this file wins.
 
+## 2026-11-27 — Live text sync and caret gestures: recommendations approved
+The owner approved the R&D proposal (`DeckHand/Product/Design/RD-live-sync-and-caret.md`,
+board https://claude.ai/artifact/GWCG3cn1GAqmD2Dyg37fq5): "go with the
+recommendations".
+1. Web and Electron text (Claude, Slack, Safari pages) is **off by default**,
+   allowed **per app** from the "can't read" card with a confirmation on the
+   Mac. Chrome stays keys-only. Secure fields are never read.
+2. iPad keyboard in synced Live: autocorrect and predictions **on**, smart
+   quotes and dashes **off**, spell-check underline **off**, local undo
+   **off** (⌘Z goes to the Mac).
+3. Build order: **Phase 1** native sync + arrow joystick, then Phase 2 web
+   opt-in with the blind floating-cursor spike, then Phase 3 loupe tap/drag.
+   Edits are applied by setting the selection and typing; never `AXValue`.
+
 ## 2026-11-26 — Owner testing, build 26 (OT-9 … OT-13)
 From the owner's hands-on test of build 26 on the iPad Air 11" (M3),
 portrait and landscape, dark (`STATUS.md`, "Owner testing (build 26)");
