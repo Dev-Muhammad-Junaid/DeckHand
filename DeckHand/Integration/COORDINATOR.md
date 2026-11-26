@@ -29,7 +29,6 @@ weekly usage limit is close).
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Primary (cloud, owner-facing: the owner sends changes here) | "★ Pixel Hand · PRIMARY" | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac, Claude Desktop session "DeckHand MAC build loop", `/loop` every 30 min; the only Mac build loop since 2026-11-25) | local_d0e9b529 | claude/pixelhand-integration (worktree `pixelhand-build`) | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
-| Build 24 QA fixes (VQ-100, 098, 099, 066, 101…103) | session_01H5HwARd99V3QTVg2XFJdYa | claude/pixelhand-lane-qa24-fixes | `LANE-qa24-fixes.md` ends `Lane: READY TO MERGE` |
 | Owner testing build 24 (OT-1 dock icons, OT-2 keyboard loop, OT-3 typing, OT-4 handle, OT-5 Ask stuck), started by the primary | (primary's child) | claude/pixelhand-lane-owner24 | `LANE-owner24.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
@@ -258,3 +257,7 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   on the iPad and found OT-1…5 (now in STATUS.md). The primary started lane
   owner24 for them. I told qa24-fixes to stay out of the dock, keyboard,
   Type, Ask and handle files. Both lanes merge into one build 25.
+- 2026-11-26 13:00 UTC: qa24-fixes merged (`00bc3c0`). It stayed out of the
+  owner24 files. Core has 1083 tests, all passing; the type check passes;
+  the braces balance. Build 25 waits for owner24, then gets queued as one
+  build.
