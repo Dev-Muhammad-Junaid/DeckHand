@@ -103,6 +103,22 @@ struct KeyInspectorSheet: View {
                         .textInputAutocapitalization(.words)
                         .submitLabel(.done)
                 }
+                // Build 28 bug 8 (OT-8): "Ask before running" sits right
+                // under the label, in view when the sheet opens (it was
+                // the last option, below the glyphs, the colours and the
+                // action, so on iPad the sheet opened without it). A key
+                // that types always asks first: the switch shows on and
+                // can't be turned off, with why.
+                Section {
+                    Toggle("Ask before running", isOn: Binding(
+                        get: { key.asksFirst },
+                        set: { key.confirm = $0 }
+                    ))
+                    .disabled(key.asksFirstLockReason != nil)
+                    .accessibilityIdentifier("ph.inspector.asksFirst")
+                } footer: {
+                    Text(key.asksFirstFootnote)
+                }
                 glyphSection
                 colourSection
                 Section {
@@ -113,19 +129,7 @@ struct KeyInspectorSheet: View {
                     Text(key.action.summary { appsByID[$0]?.displayName })
                 }
                 Section {
-                    // A key that types always asks first (OT-8): the
-                    // switch shows on and can't be turned off, with why.
-                    Toggle("Ask before running", isOn: Binding(
-                        get: { key.asksFirst },
-                        set: { key.confirm = $0 }
-                    ))
-                    .disabled(key.asksFirstLockReason != nil)
-                    .accessibilityIdentifier("ph.inspector.asksFirst")
                     Toggle("Pin to first row", isOn: $key.pinnedToFirstRow)
-                } footer: {
-                    if let reason = key.asksFirstLockReason {
-                        Text(reason)
-                    }
                 }
                 if !messages.isEmpty {
                     Section {

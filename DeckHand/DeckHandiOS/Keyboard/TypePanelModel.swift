@@ -19,6 +19,7 @@
 
 import GameController
 import Observation
+import PixelHandCore
 import SwiftUI
 import UIKit
 
@@ -150,14 +151,32 @@ final class TypePanelModel {
             dockLift = 0
             return
         }
-        let frame = window.convert(screenFrame, from: window.screen.coordinateSpace)
-        keyboardOverlap = KeyboardKind.overlap(
-            windowMaxY: Double(window.bounds.maxY),
-            keyboardMinY: Double(frame.minY),
-            keyboardMaxY: Double(frame.maxY),
-            keyboardHeight: Double(frame.height)
-        )
-        keyboardMinY = keyboardOverlap > 0 ? Double(frame.minY) : nil
+        // Build 28 bug 6 (P1): in iPad landscape the conversion against
+        // the screen's interface-oriented space could come back turned a
+        // quarter, so the keyboard read as none and the panel drew under
+        // it. Every conversion is tried; Core keeps the one that reads as
+        // a keyboard in this window (wider than tall, shorter than the
+        // window), and a frame that reads as none leaves the last reading.
+        let screen = window.windowScene?.screen ?? window.screen
+        let candidates = [
+            window.convert(screenFrame, from: screen.coordinateSpace),
+            window.convert(screenFrame, from: screen.fixedCoordinateSpace),
+            window.convert(screenFrame, from: nil as UIWindow?),
+            screenFrame,
+        ].map { PanelRect(x: Double($0.minX), y: Double($0.minY), width: Double($0.width), height: Double($0.height)) }
+        guard let reading = KeyboardFrameReading.read(
+            candidates,
+            windowWidth: Double(window.bounds.width),
+            windowHeight: Double(window.bounds.height)
+        ) else { return }
+        switch reading {
+        case let .covers(top, overlap):
+            keyboardOverlap = overlap
+            keyboardMinY = top
+        case .clear:
+            keyboardOverlap = 0
+            keyboardMinY = nil
+        }
         dockLift = KeyboardKind.barLift(overlap: keyboardOverlap, bottomInset: Double(window.safeAreaInsets.bottom))
     }
 }

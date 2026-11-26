@@ -190,13 +190,25 @@ struct CaptureDock<Content: View>: View {
             PixelHandTheme.Brand.screenRaised.opacity(0.94),
             in: RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous)
         )
+        // Build 28 bug 4: the identifier sits on the card's own shape (the
+        // visible edge), an element of exactly the card's frame. On the
+        // `.contain` container its frame was built from its children and
+        // ran 1,177 pt (portrait) / 801 pt (landscape) past the window.
+        .background {
+            if let identifier {
+                RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous)
+                    .fill(Color.clear)
+                    .accessibilityElement()
+                    .accessibilityLabel("Capture actions")
+                    .accessibilityIdentifier(identifier)
+            }
+        }
         .overlay(
             RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous)
                 .strokeBorder(PixelHandTheme.Brand.tileStroke, lineWidth: PixelHandTheme.Stroke.hairline)
         )
         .contentShape(RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous))
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(identifier ?? "")
         .padding(.horizontal, PixelHandTheme.Space.lg)
         .padding(.bottom, PixelHandTheme.Space.sm)
         .frame(maxWidth: .infinity)

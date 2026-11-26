@@ -263,6 +263,9 @@ struct ContentRootView: View {
 
     private func connectToast(_ message: String, arrangement: ConnectToastPlan.Arrangement) -> some View {
         PHToast(message: message, pixel: .off, lineLimit: ConnectToastPlan.lineLimit(arrangement))
+            // Build 28 (`test04`): one element, the whole toast, so the
+            // identifier names the toast and not its 8 pt status dot.
+            .accessibilityElement(children: .combine)
             .accessibilityIdentifier("ph.connect.toast")
     }
 

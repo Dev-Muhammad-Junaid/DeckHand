@@ -93,10 +93,12 @@ struct TypePanel: View {
                     // The joystick's trail runs over the field and keys.
                     .zIndex(joystick.isEngaged ? 1 : 0)
                 keyBlock
-                NumpadGrid { key in press(key) }
-                    .opacity(layout.shows(.numpad) ? 1 : 0)
-                    .allowsHitTesting(layout.shows(.numpad))
-                    .accessibilityHidden(!layout.shows(.numpad))
+                // One subview either way (the body layout places five).
+                if layout.shows(.numpad) {
+                    NumpadGrid { key in press(key) }
+                } else {
+                    Color.clear
+                }
             }
         }
         .padding(CGFloat(TypePanelLayout.padding))
@@ -384,7 +386,7 @@ struct TypePanel: View {
         return KeyGrid(grid: grid) {
             ForEach(layout.actionCells, id: \.action) { cell in
                 actionButton(cell.action)
-                    .keyCell(column: cell.column, row: cell.row)
+                    .keyCell(column: cell.column, row: cell.row, rowSpan: cell.rowSpan)
             }
         }
         .opacity(grid == nil ? 0 : 1)
@@ -884,7 +886,15 @@ private struct KeyGrid<Content: View>: View {
     var body: some View {
         let cell = CGSize(width: grid?.cellWidth ?? 0, height: grid?.cellHeight ?? 0)
         ZStack(alignment: .topLeading) {
-            content
+            // A block the layout doesn't show (the key rows and the
+            // actions in numpad mode, OT-11) draws nothing at all: build
+            // 28 bug 7 had the ⌘⌥⌃⇧ row and the key rows still on screen
+            // and hittable beside the numpad, zero-sized caps overflowing
+            // their empty frame. Only the field has to keep its identity
+            // (OT-2), and it isn't in a grid.
+            if grid != nil {
+                content
+            }
         }
         .frame(width: CGFloat(grid?.rect.width ?? 0), height: CGFloat(grid?.rect.height ?? 0), alignment: .topLeading)
         .environment(\.typeKeyCell, cell)
@@ -1208,8 +1218,14 @@ struct TypePanelHost: View {
                 width: measured == .zero ? 200 : Double(measured.width),
                 height: measured == .zero ? 44 : Double(measured.height)
             )
-            let frame = liveFrame.map { PanelRect(x: $0.x, y: $0.y, width: $0.width, height: layout.panelHeight) }
-                ?? geometry.frame(for: placement, size: model.isCollapsed ? pill : (width: width, height: layout.panelHeight))
+            // Build 28 bug 6: whatever the frame came from (the remembered
+            // place, a drag or resize in flight, a size from before the
+            // keyboard came up or the window turned), it is kept in the
+            // free room above the keyboard, moved and never resized.
+            let frame = geometry.kept(
+                liveFrame.map { PanelRect(x: $0.x, y: $0.y, width: $0.width, height: layout.panelHeight) }
+                    ?? geometry.frame(for: placement, size: model.isCollapsed ? pill : (width: width, height: layout.panelHeight))
+            )
             let handles = panelChrome(geometry: geometry, frame: frame)
 
             ZStack(alignment: .topLeading) {
@@ -1267,7 +1283,14 @@ struct TypePanelHost: View {
         // keyboard in the new orientation and the panel (and its close
         // button) stays in view.
         .onChange(of: windowSize) { _, _ in
+            // A drag or resize in flight belongs to the old window.
+            liveFrame = nil
+            gestureStart = nil
             DispatchQueue.main.async { model.refreshKeyboard() }
+            // Build 28 bug 6: once the rotation has settled, read the
+            // keyboard again (its Did notification can be the only one
+            // with the new frame, and can come late).
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { model.refreshKeyboard() }
         }
         // Closing the panel closes the loupe (and stops the Mac following
         // the focus).
