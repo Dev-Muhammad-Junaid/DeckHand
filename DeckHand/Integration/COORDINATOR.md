@@ -6,6 +6,8 @@
 
 ## Needs the owner
 
+- **Build 24 final QA pass (2026-11-26):** the Mac build loop pushed a compile fix (`7b205ca`) at about 00:00 UTC and hasn't reported since. The walks type and click into the Mac, so they need the owner's OK and the Mac unlocked, with the iPad unlocked on Wi-Fi. When convenient, let the Mac loop run them (see STATUS.md › Build 24 queued).
+
 - **Developer portal:** nothing needed. Automatic signing registered the App Group and the widget and share App IDs (builds 15 and 16).
 
 - **App Store Connect:** done 2026-11-20 (see
@@ -242,3 +244,4 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
     passes; the braces balance.
   - **Build 24 queued**, with the final QA pass, including the areas never
     checked: landscape and the sidebar, widgets, transfers, dark mode.
+- 2026-11-26 03:15 UTC: build 24 is in progress on the Mac (compile fix `7b205ca`). Its results and the final QA haven't arrived yet. Noted under Needs the owner that the walks need the Mac.
