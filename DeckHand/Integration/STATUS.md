@@ -2147,3 +2147,65 @@ Also in build 27: **paste-control** (`LANE-paste-control.md`), the Send
 sheet's Clipboard chip uses the system paste control (no "Allow Paste").
 
 Status: READY FOR MAC BUILD (build 27)
+
+## Mac build results (build 27) — 2026-11-26
+
+Built from `576f234` (build 27 is `a1550fb` plus the build 26 report) on
+Xcode 27.2, Release, team `DD5AWPLT2V`.
+
+**Build:** the Mac app, the iOS app and the UI test target all build first
+time, with no fixes (none of the handoff's compile risks hit).
+
+**Tests**
+- `swift test --package-path DeckHand/Core`: **1265 / 1265 pass** (224 suites).
+- `swift test --scratch-path .build-local`: **480 / 480 pass**. The first
+  run, while the simulators were busy (load ~90), had one timing failure,
+  “Realtime display queue shapes drains into bounded bursts”
+  (`LoomOrderedUnreliableSendQueueTests.swift:407`), and then hung in the
+  next test binary for 29 minutes. Rerun at normal load: all pass. Looks
+  load-sensitive, not new.
+- `DeckHandTests` (macOS): **8 / 8 pass**.
+
+**Install:** Mac replaced and launched with `open`; iPad Air 11" (M3)
+installed and launched (protocol 16 on both).
+
+**Walks: only those that send nothing to the Mac.** The owner was using
+the Mac (Slack and FlutterFlow Studio in front), so the walks that type or
+click on the Mac (`test04`, `05`, `16`, `18`, `19`, `20`, `21`) and the
+hands-on "Mac checks (protocol 16)" (loupe in TextEdit, Safari, Notes,
+Mail; password field; Claude or Slack AX; lock; disconnect; OT-13 with
+Accessibility Inspector) wait for the owner.
+- iPad Pro 11", full screen: 01, 02, 03, 07, 09, 10, 11, 12, 13, 14, 17
+  pass; **`test22`, `test23`, `test24` fail**.
+- iPhone 17 Pro: 01, 03, 07, 09, 11, 12, 14, 23 pass (`test23` skipped
+  itself: no `ph.transfer.send` on iPhone); **`test22`, `test24` fail**.
+
+**Open bugs**
+1. **Loupe covers the Type panel for hit-testing (P2, OT-12):**
+   `FocusLoupeView` combines its children into one accessibility element,
+   and the child is the whole mirror frame scaled up and offset, so the
+   loupe's frame is about 4536 pt wide on iPad (`.clipped()` doesn't trim
+   it). With the loupe open in portrait the panel's target chip and close
+   aren't hittable (`test22` captures `06-not-hittable-ph-type-target`,
+   `07-not-hittable-ph-type-close`); VoiceOver over the panel lands on the
+   loupe. Fix: `.accessibilityHidden(true)` and `.allowsHitTesting(false)`
+   on the picture, and `.contentShape(Rectangle())` on the loupe.
+2. **Arrows don't grow with the panel (P2, OT-11):** `test22` drags the
+   trailing resize corner down and the arrows stay 44 pt (wants > 48), on
+   iPad (panel sitting on the keyboard) and iPhone (docked). Either the
+   drag has no room to grow into with the keyboard up or the panel's height
+   doesn't reach the arrows; the lane should check which.
+3. **Send sheet chips (P3, OT-9):** iPad `test23`: the source chips are
+   43 pt tall (wants 44) and 174.5 / 175 / 173.5 pt wide (wants equal).
+4. **Capture preview off centre (P3, OT-10):** `test24`: the picture is
+   8–9 pt nearer the header than the dock (246 / 255 pt iPad portrait,
+   199 / 207 iPhone portrait, 12 / 20 landscape). On iPad the dock's
+   measured frame ends 1169 pt below the window, probably an identifier on
+   an oversized container (the same pattern as bug 1).
+5. **iPhone landscape (P3):** `test22` finds no `ph.dock.keyboard` (as
+   VQ-105) and then the panel's header has no target.
+
+**Next:** with the owner's OK and a scratch TextEdit document in front,
+run the Mac walks and the protocol 16 checks, and record them here.
+
+Status: BUILT (build 27) — 5 bugs
