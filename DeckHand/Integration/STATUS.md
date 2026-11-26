@@ -2082,5 +2082,7 @@ Mac should check: build all targets (compile risks in the handoff), Core,
 Loom and app tests, the walks (Type panel bands, loupe, Send sheet,
 capture), the "Mac checks (protocol 16)" list, install on Mac and iPad.
 
-Status: READY FOR MAC BUILD (build 27)
+Also in build 27: **paste-control** (`LANE-paste-control.md`), the Send
+sheet's Clipboard chip uses the system paste control (no "Allow Paste").
 
+Status: READY FOR MAC BUILD (build 27)
