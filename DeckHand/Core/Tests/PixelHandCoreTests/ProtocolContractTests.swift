@@ -133,6 +133,13 @@ import Testing
         ("deck.run.media", .deck(.run(requestID: "cmd-6", action: .media(key: .next)))),
         ("deck.run.menuCommand", .deck(.run(requestID: "cmd-8", action: .menuCommand(bundleID: "com.apple.dt.Xcode", path: ["Product", "Build For", "Testing"])))),
         ("deck.run.macShortcut", .deck(.run(requestID: "cmd-9", action: .macShortcut(name: "Start “Focus” timer")))),
+        ("deck.run.typeText", .deck(.run(requestID: "cmd-11", action: .typeText(text: "Hello, “world” ✓\n")))),
+        ("deck.run.sequence.typeText", .deck(.run(requestID: "cmd-12", action: .sequence(steps: [
+            .run(action: .launchApp(bundleID: "com.apple.Safari")),
+            .delay(milliseconds: 500),
+            .run(action: .typeText(text: "youtube")),
+            .run(action: .shortcut(keys: ["return"])),
+        ])))),
         ("deck.run.sequence", .deck(.run(requestID: "cmd-10", action: .sequence(steps: [
             .run(action: .launchApp(bundleID: "com.apple.Terminal")),
             .delay(milliseconds: 300),

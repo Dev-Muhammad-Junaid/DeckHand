@@ -263,6 +263,7 @@ public enum LockPolicy {
     /// - `menuCommand` reads and presses another app's menus (and may
     ///   activate it): refused while locked, like `appShortcut`;
     /// - `macShortcut` runs automation as this user: refused while locked;
+    /// - `typeText` (OT-8) follows `input.typeText`;
     /// - `sequence` runs only when every step may (pauses always may). The
     ///   Mac checks each step again as it reaches it, so a lock that comes
     ///   mid-sequence stops the rest.
@@ -277,7 +278,7 @@ public enum LockPolicy {
                 if case .sequence = inner { return false }
                 return allows(inner, state: state)
             }
-        case .shortcut, .appShortcut, .launchApp, .system, .media, .contextAction:
+        case .shortcut, .appShortcut, .launchApp, .system, .media, .contextAction, .typeText:
             guard let message = action.message else { return false }
             return decide(message, state: state) == .allow
         }

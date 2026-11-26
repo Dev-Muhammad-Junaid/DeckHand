@@ -259,9 +259,10 @@ struct AskPlanTests {
         #expect(two.keyLabel() == "Open safari and make a new tab")
         if let action = two.savedAction { #expect(ActionValidation.isValid(action, storable: true)) }
 
+        // OT-8: typed text saves as a key too.
         let typing = parser.plan("type hi")
-        #expect(typing.saveBlocker == .typesText)
-        #expect(typing.savedAction == nil)
+        #expect(typing.saveBlocker == nil)
+        #expect(typing.savedAction == .typeText(text: "hi"))
     }
 
     @Test("editing removes, moves, replaces and marks the plan edited")
@@ -321,10 +322,11 @@ struct AskSaveTests {
         #expect(key.map { DeckValidation.keyIssues($0).isEmpty } == true)
     }
 
-    @Test("a typing plan isn't saved; a full deck refuses")
+    @Test("a typing plan saves (OT-8); a full deck refuses")
     func refuses() {
         var deck = DeckDocument.empty
-        #expect(deck.saveAskPlan(parser.plan("type hello")) == nil)
+        #expect(deck.saveAskPlan(parser.plan("type hello")) != nil)
+        deck = .empty
         deck.pages[0].keys = (0..<DeckValidation.maxKeysPerPage).map { DeckKey(id: "k\($0)", label: "K", action: .media(key: .next)) }
         #expect(deck.saveAskPlan(parser.plan("next song")) == nil)
     }

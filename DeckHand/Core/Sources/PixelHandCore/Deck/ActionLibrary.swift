@@ -20,6 +20,7 @@ public enum ActionKind: String, CaseIterable, Sendable, Identifiable {
     case system
     case media
     case macShortcut
+    case typeText
     case sequence
 
     public var id: String { rawValue }
@@ -35,6 +36,7 @@ public enum ActionKind: String, CaseIterable, Sendable, Identifiable {
         case .media: self = .media
         case .macShortcut: self = .macShortcut
         case .sequence: self = .sequence
+        case .typeText: self = .typeText
         case .contextAction: return nil
         }
     }
@@ -48,6 +50,7 @@ public enum ActionKind: String, CaseIterable, Sendable, Identifiable {
         case .system: "Mac action"
         case .media: "Media key"
         case .macShortcut: "Mac Shortcut"
+        case .typeText: "Type text"
         case .sequence: "Sequence"
         }
     }
@@ -61,6 +64,7 @@ public enum ActionKind: String, CaseIterable, Sendable, Identifiable {
         case .system: "Mission Control, Show Desktop, Launchpad and more."
         case .media: "Play, pause and skip on the Mac."
         case .macShortcut: "Runs a shortcut from the Shortcuts app on the Mac."
+        case .typeText: "Types text into the app in front. Asks first."
         case .sequence: "Runs several actions in order, with pauses."
         }
     }
@@ -75,6 +79,7 @@ public enum ActionKind: String, CaseIterable, Sendable, Identifiable {
         case .system: "mission"
         case .media: "play"
         case .macShortcut: "run"
+        case .typeText: "type"
         case .sequence: "build"
         }
     }
@@ -93,6 +98,7 @@ public enum ActionKind: String, CaseIterable, Sendable, Identifiable {
         case .system: return .system(action: .missionControl)
         case .media: return .media(key: .playPause)
         case .macShortcut: return .macShortcut(name: "")
+        case .typeText: return .typeText(text: "Hello")
         case .sequence:
             return .sequence(steps: [
                 .run(action: .launchApp(bundleID: app)),
@@ -255,6 +261,9 @@ extension ActionValidation.Issue {
         case .menuPathTooDeep: "Menu paths can be at most \(ActionLimits.maxMenuPathComponents) levels deep."
         case .badMenuTitle: "One of the menu titles is too long or empty."
         case .badShortcutName: "Type the Shortcut’s name as it appears in the Shortcuts app."
+        case .emptyText: "Type the text the key should type."
+        case .textTooLong: "That’s too much text for one key. Keep it under \(TypingPolicy.maxMessageBytes / 1024) KB."
+        case .badText: "The text has characters the Mac can’t type, like escape codes. Line breaks and tabs are fine."
         case .emptySequence: "Add at least one step."
         case .tooManySteps: "A sequence can have at most \(ActionLimits.maxSequenceSteps) steps."
         case .nestedSequence: "A sequence can’t contain another sequence."

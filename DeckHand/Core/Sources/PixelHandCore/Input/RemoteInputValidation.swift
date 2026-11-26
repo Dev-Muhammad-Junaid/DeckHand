@@ -138,7 +138,9 @@ public enum RemoteInputValidation {
             }
         case .menuCommand, .macShortcut:
             return true
-        case .shortcut, .appShortcut, .launchApp, .system, .media, .contextAction:
+        case .shortcut, .appShortcut, .launchApp, .system, .media, .contextAction, .typeText:
+            // Typed text (OT-8) must already be what `input.typeText`
+            // would type: cleaning it may not change it.
             guard let domain = action.message else { return false }
             return sanitize(domain) == domain
         }

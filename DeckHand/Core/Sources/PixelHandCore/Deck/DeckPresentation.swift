@@ -155,6 +155,7 @@ public enum DeckGlyphs {
         case .menuCommand: PixelGlyphs.deck
         case .macShortcut: PixelGlyphs.run
         case .sequence: PixelGlyphs.build
+        case .typeText: PixelGlyphs.type
         }
     }
 
@@ -191,6 +192,8 @@ extension Action {
         case let .sequence(steps):
             let count = steps.filter { $0.action != nil }.count
             return count == 1 ? "1 step" : "\(count) steps"
+        case let .typeText(text):
+            return TypedTextSummary.face(text)
         default:
             return nil
         }
@@ -220,6 +223,8 @@ extension Action {
         case let .sequence(steps):
             let count = steps.filter { $0.action != nil }.count
             return "Run \(count) \(count == 1 ? "step" : "steps") in order"
+        case let .typeText(text):
+            return TypedTextSummary.line(text)
         }
     }
 }

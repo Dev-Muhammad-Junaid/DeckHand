@@ -169,6 +169,8 @@ extension DeckKey {
             title = name.isEmpty ? "Shortcut" : name
         case .sequence:
             title = "Macro"
+        case let .typeText(text):
+            title = TypedTextSummary.label(text)
         }
         if glyph == nil { glyph = .pixel(id: DeckGlyphs.glyph(for: action).name) }
         let text = (label ?? title).trimmingCharacters(in: .whitespacesAndNewlines)

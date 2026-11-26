@@ -11,6 +11,8 @@
 //  handler as that message, so there is one code path per command. The
 //  Deck 2 cases (`menuCommand`, `macShortcut`, `sequence`) exist only as
 //  tracked runs: `message` is `nil` for them and `DeckHandler` runs them.
+//  `typeText` (protocol 15, OT-8) stands for `input.typeText`, so a key
+//  types through the same path as Live typing and Ask.
 //
 
 import Foundation
@@ -41,6 +43,12 @@ public enum Action: Codable, Sendable, Equatable, Hashable {
     /// `SequenceStep` refuses one while decoding, so hostile JSON can't
     /// nest them.
     case sequence(steps: [SequenceStep])
+    /// Protocol 15 (OT-8): type `text` into the app in front, as
+    /// `input.typeText` does for Live typing, Compose and Ask. `\n` presses
+    /// Return and `\t` Tab; other control characters are refused
+    /// (`ActionValidation`). At most `TypingPolicy.maxMessageBytes`. A key
+    /// that types always asks first (`DeckKey.asksFirst`).
+    case typeText(text: String)
 
     /// The untracked message that does the same thing, or `nil` for the
     /// Deck 2 actions, which only run tracked (`DeckMessage.run`).
@@ -52,6 +60,7 @@ public enum Action: Codable, Sendable, Equatable, Hashable {
         case let .system(action): .system(.run(action: action))
         case let .media(key): .input(.media(key: key))
         case let .contextAction(id): .apps(.triggerContextAction(id: id))
+        case let .typeText(text): .input(.typeText(text: text))
         case .menuCommand, .macShortcut, .sequence: nil
         }
     }
@@ -79,6 +88,7 @@ public enum Action: Codable, Sendable, Equatable, Hashable {
         case .menuCommand: "menuCommand"
         case .macShortcut: "macShortcut"
         case .sequence: "sequence"
+        case .typeText: "typeText"
         }
     }
 }
@@ -138,5 +148,43 @@ public enum SequenceStep: Codable, Sendable, Equatable, Hashable {
             var delay = container.nestedContainer(keyedBy: DelayKeys.self, forKey: .delay)
             try delay.encode(milliseconds, forKey: .milliseconds)
         }
+    }
+}
+
+// MARK: - Typing (OT-8)
+
+extension Action {
+    /// Whether running this types text on the Mac (itself, or any step of
+    /// a sequence).
+    public var typesText: Bool {
+        switch self {
+        case .typeText: true
+        case let .sequence(steps): steps.contains { $0.action?.typesText ?? false }
+        default: false
+        }
+    }
+
+    /// Whether running this presses Return in the app in front: typed text
+    /// with a line break, a Return chord, or a sequence with either.
+    public var pressesReturn: Bool {
+        switch self {
+        case let .typeText(text): text.contains("\n")
+        case let .shortcut(keys): keys.last.map { ChordParser.canonical($0) } == "return"
+        case let .sequence(steps): steps.contains { $0.action?.pressesReturn ?? false }
+        default: false
+        }
+    }
+}
+
+extension DeckKey {
+    /// Whether tapping the key asks first. A key that types on the Mac
+    /// always does, like Ask's plans and the Type panel's Return guard:
+    /// text lands in whatever app is in front, so the person confirms the
+    /// app before it goes (OT-8). Otherwise "Ask before running".
+    public var asksFirst: Bool { confirm || action.typesText }
+
+    /// Why "Ask before running" can't be turned off, or `nil` when it can.
+    public var asksFirstLockReason: String? {
+        action.typesText ? "Keys that type text always ask first, so the text goes to the app you expect." : nil
     }
 }
