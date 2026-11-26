@@ -2259,7 +2259,7 @@ Status: READY FOR MAC BUILD (build 28)
 
 ## Mac build results (build 28) — 2026-11-27
 
-Built from `d307d54` (build 28) on Xcode 27.2, Release, team `DD5AWPLT2V`.
+Built from `d307d54` on Xcode 27.2, Release, team `DD5AWPLT2V`. **This is build 28 without owner27:** owner27 was folded in (`7fc7d2f`) while this ran. A rebuild of the full build 28 follows; read these results as the build27-fixes check only.
 
 **Build:** the Mac app, the iOS app and the UI test target build first
 time, with no fixes.
@@ -2318,4 +2318,4 @@ installed and launched.
 **Still waiting for the owner:** the Mac walks (`test04`, `05`, `16`, `18`,
 `19`, `20`, `21`) and the protocol 16 checks.
 
-Status: BUILT (build 28) — 5 bugs
+Status: READY FOR MAC BUILD (build 28)
