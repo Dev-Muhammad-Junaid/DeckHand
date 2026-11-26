@@ -46,10 +46,11 @@ public enum TypeMode: String, Sendable, Hashable, CaseIterable, Codable {
         }
     }
 
-    /// The field's placeholder.
+    /// The field's placeholder. Neutral: the header names the app the
+    /// keys go to, once (OT-11).
     public var placeholder: String {
         switch self {
-        case .live: "Type: it goes straight to the Mac"
+        case .live: "Type here"
         case .compose: "Type or dictate, then Send"
         }
     }
@@ -473,12 +474,24 @@ public enum TypeKeyBlock {
     public static let functionStripColumns = 6
 }
 
-/// The inverted-T arrow cluster beside the field (OT-7): ↑ over ← ↓ →,
-/// three cells wide and two tall, shaped like the arrow keys of a Mac
-/// keyboard.
+/// The arrow cluster beside the field: an inverted T (↑ over ← ↓ →, three
+/// cells wide and two tall, shaped like a Mac keyboard's arrows, OT-7), or
+/// one row (← ↑ ↓ →) when the panel is at its shortest (OT-11), which
+/// saves a whole row of height.
 public enum ArrowCluster {
-    public static let columns = 3
-    public static let rows = 2
+    /// How the four arrows are arranged.
+    public enum Shape: String, Sendable, Hashable, CaseIterable {
+        /// ↑ over ← ↓ →.
+        case invertedT
+        /// ← ↑ ↓ → in one row.
+        case row
+
+        public var columns: Int { self == .invertedT ? 3 : 4 }
+        public var rows: Int { self == .invertedT ? 2 : 1 }
+    }
+
+    public static let columns = Shape.invertedT.columns
+    public static let rows = Shape.invertedT.rows
 
     public struct Cell: Sendable, Hashable {
         public let key: TypeKey
@@ -486,13 +499,28 @@ public enum ArrowCluster {
         public let row: Int
     }
 
-    /// Each arrow and its cell.
-    public static let cells: [Cell] = [
-        Cell(key: .remote(.up), column: 1, row: 0),
-        Cell(key: .remote(.left), column: 0, row: 1),
-        Cell(key: .remote(.down), column: 1, row: 1),
-        Cell(key: .remote(.right), column: 2, row: 1),
-    ]
+    /// Each arrow and its cell in the inverted T.
+    public static let cells: [Cell] = cells(for: .invertedT)
+
+    /// Each arrow and its cell for a shape.
+    public static func cells(for shape: Shape) -> [Cell] {
+        switch shape {
+        case .invertedT:
+            [
+                Cell(key: .remote(.up), column: 1, row: 0),
+                Cell(key: .remote(.left), column: 0, row: 1),
+                Cell(key: .remote(.down), column: 1, row: 1),
+                Cell(key: .remote(.right), column: 2, row: 1),
+            ]
+        case .row:
+            [
+                Cell(key: .remote(.left), column: 0, row: 0),
+                Cell(key: .remote(.up), column: 1, row: 0),
+                Cell(key: .remote(.down), column: 2, row: 0),
+                Cell(key: .remote(.right), column: 3, row: 0),
+            ]
+        }
+    }
 }
 
 // MARK: - Compose
@@ -547,6 +575,18 @@ public enum KeyboardKind: String, Sendable, Hashable {
         return hardwareAttached ? .hardware : .none
     }
 
+    /// How far the app dock must rise above the window's bottom (OT-11,
+    /// build 26). With a hardware keyboard, or the on-screen keyboard
+    /// minimised, iPadOS keeps a slim bar at the bottom (the language,
+    /// Paste and dictation buttons) that covers the dock: the dock sits on
+    /// it. A full on-screen keyboard covers the dock by design (the shell
+    /// never moves under the keyboard, OT-2; the Type panel rides on it),
+    /// so it lifts nothing.
+    public static func barLift(overlap: Double) -> Double {
+        guard overlap.isFinite, overlap > 0, overlap < softwareMinimumOverlap else { return 0 }
+        return overlap.rounded(.up)
+    }
+
     /// The overlap of a keyboard frame with the window, in window space:
     /// 0 when the keyboard is off-screen, floating above the bottom edge
     /// (iPad's floating keyboard) or undocked.
@@ -555,193 +595,6 @@ public enum KeyboardKind: String, Sendable, Hashable {
         // A floating or undocked keyboard doesn't reach the bottom edge.
         guard keyboardMaxY >= windowMaxY - 1 else { return 0 }
         return max(0, windowMaxY - keyboardMinY)
-    }
-}
-
-/// How the panel is put together for its width, the window and the
-/// keyboard (OT-2, OT-3; compact since build 25's OT-7).
-///
-/// The layout follows the **panel's** width (the person resizes it,
-/// `TypePanelGeometry`), not the window's:
-///
-///     one block (wide panels, numpad off)
-///     ┌─────────────────────────────────────────────────────────┐
-///     │ ⠿ [Live│Compose] ⌨ Typing into Safari    [▦] [–] (×)    │
-///     │ ┌────────────────────┐      ↑     ⌘ ⌥ ⌃ ⇧ esc tab──    │
-///     │ │ field              │   ←  ↓  →  ⌫ ⏎ home end ↑ ↓ fn │
-///     │ └────────────────────┘ [paste]                          │
-///     └─────────────────────────────────────────────────────────┘
-///
-///     stacked (narrower panels, or the numpad on)
-///     ┌──────────────────────────────────┐
-///     │ ⠿ [Live│Compose]   [▦] [–] (×)   │
-///     │ ⌨ Typing into Safari             │  (narrow: own line)
-///     │ ┌──────────────┐      ↑          │
-///     │ │ field        │   ←  ↓  →       │
-///     │ [paste]                          │
-///     │ ⌘ ⌥ ⌃ ⇧ esc tab │ 7 8 9 ÷ ⌫      │  numpad beside the keys
-///     │ ⌫ ⏎ hm end ↑ ↓ fn│ 4 5 6 × ⏎ ...  │  when it fits, else below
-///     └──────────────────────────────────┘
-public struct TypePanelLayout: Sendable, Hashable {
-    /// What the panel shows.
-    public enum Body: String, Sendable, Hashable {
-        /// Header (grip, mode, target, numpad, collapse, close), field,
-        /// arrows and keys.
-        case full
-        /// A hardware keyboard types: the field is one line naming the
-        /// target (it must hold focus to take the keys), with no paste or
-        /// Compose actions under it.
-        case keysOnly
-    }
-
-    /// How the field (with the arrows) and the key block share the panel.
-    public enum Arrangement: String, Sendable, Hashable {
-        /// Field, arrows and keys side by side in one block.
-        case oneBlock
-        /// Field and arrows on top, the key block under them.
-        case stacked
-    }
-
-    /// Where the numpad goes when it's on.
-    public enum NumpadPlacement: String, Sendable, Hashable {
-        case hidden
-        /// To the right of the key block, in the same band.
-        case beside
-        /// Under the key block (narrow panels).
-        case below
-    }
-
-    public let body: Body
-    /// The header row. Off when the room above the keyboard is short
-    /// (iPhone landscape): the field row then carries the grip and the
-    /// close button, and the field's placeholder names the target.
-    public let showsHeader: Bool
-    /// "Typing into …" sits in the header (wide panels) or on its own line
-    /// under it.
-    public let targetInHeader: Bool
-    /// The widest the panel may be in this window when no width is given
-    /// (the inline panel of the classic layout).
-    public let maximumWidth: Double
-    /// The panel's width this layout is for.
-    public let panelWidth: Double
-    public let arrangement: Arrangement
-    public let numpadPlacement: NumpadPlacement
-    /// The field's width (the arrows sit beside it).
-    public let fieldWidth: Double
-    /// The key cell this panel draws: `keyPitch` (44), or less only when
-    /// the panel is narrower than the key block (a 320 pt Slide Over
-    /// window), so the seven columns still fit.
-    public let cellPitch: Double
-    /// Lines the Compose field may grow to before it scrolls.
-    public let composeLines: Int
-    /// The side margin of the window.
-    public let margin: Double
-
-    // MARK: Sizes (points)
-
-    /// One key cell: a 40 pt cap and a 4 pt gap, so every key keeps a
-    /// 44 pt touch target without overlapping its neighbour's.
-    public static let keyPitch: Double = 44
-    public static let keyGap: Double = 4
-    public static var keyCap: Double { keyPitch - keyGap }
-    /// Between the field, the arrows, the keys and the numpad.
-    public static let blockGap: Double = 12
-    /// The panel's inner padding.
-    public static let padding: Double = 12
-    /// The field never gets narrower than this (about 18 characters).
-    public static let fieldMinimumWidth: Double = 192
-    /// Numpad keys: the same 44 pt cells as the key block.
-    public static var numpadGap: Double { keyGap }
-
-    public static var keyBlockSize: (width: Double, height: Double) {
-        (Double(TypeKeyBlock.columns) * keyPitch, Double(TypeKeyBlock.rows) * keyPitch)
-    }
-    public static var arrowsSize: (width: Double, height: Double) {
-        (Double(ArrowCluster.columns) * keyPitch, Double(ArrowCluster.rows) * keyPitch)
-    }
-    public static var numpadSize: (width: Double, height: Double) {
-        (Double(NumpadKey.columns) * keyPitch, Double(NumpadKey.rows) * keyPitch)
-    }
-
-    /// The panel never grows past this: a block of keys, not a bar.
-    public static let wideMaximumWidth: Double = 760
-    /// Below this much room above the keyboard the header row goes.
-    public static let headerMinimumRoom: Double = 300
-    /// From this panel width "Typing into …" fits in the header.
-    public static let targetInHeaderMinimumWidth: Double = 560
-
-    /// The narrowest panel that takes the one-block arrangement:
-    /// padding, the field at its minimum, the arrows and the keys.
-    public static var oneBlockMinimumWidth: Double {
-        2 * padding + fieldMinimumWidth + blockGap + arrowsSize.width + blockGap + keyBlockSize.width
-    }
-
-    /// The narrowest panel with the numpad beside the keys.
-    public static var numpadBesideMinimumWidth: Double {
-        2 * padding + keyBlockSize.width + blockGap + numpadSize.width
-    }
-
-    /// - Parameters:
-    ///   - width / height: the window's (the shell's planning size).
-    ///   - keyboard / keyboardOverlap: what covers the window.
-    ///   - panelWidth: the panel's current width (`TypePanelGeometry`);
-    ///     `nil` lays out for the widest the window allows.
-    ///   - showsNumpad: whether the numpad is on.
-    public init(
-        width: Double,
-        height: Double,
-        keyboard: KeyboardKind,
-        keyboardOverlap: Double = 0,
-        panelWidth: Double? = nil,
-        showsNumpad: Bool = false
-    ) {
-        let metrics = LayoutMetrics(width: width, height: height)
-        margin = metrics.margin
-        body = keyboard == .hardware ? .keysOnly : .full
-        maximumWidth = min(Self.wideMaximumWidth, max(0, width - 2 * metrics.margin))
-        // A width from `TypePanelGeometry` is already fitted to the free
-        // room (which can be wider than the window less its margins, on an
-        // iPhone); without one, the window's cap.
-        let panel = max(0, min(panelWidth ?? maximumWidth, Self.wideMaximumWidth))
-        self.panelWidth = panel
-        // The room above the keyboard decides how tall the panel may be:
-        // iPhone landscape with the keyboard up has barely a line.
-        let above = height - (keyboard == .software ? keyboardOverlap : 0)
-        showsHeader = above >= Self.headerMinimumRoom
-        targetInHeader = panel >= Self.targetInHeaderMinimumWidth
-        composeLines = above < 360 ? 1 : (above < 520 ? 2 : 4)
-
-        let inner = panel - 2 * Self.padding
-        let pitch = min(Self.keyPitch, max(32, (inner / Double(TypeKeyBlock.columns)).rounded(.down)))
-        cellPitch = pitch
-        if showsNumpad {
-            arrangement = .stacked
-            numpadPlacement = panel >= Self.numpadBesideMinimumWidth ? .beside : .below
-        } else {
-            arrangement = panel >= Self.oneBlockMinimumWidth ? .oneBlock : .stacked
-            numpadPlacement = .hidden
-        }
-        let beside = Self.blockGap + Double(ArrowCluster.columns) * pitch
-        switch arrangement {
-        case .oneBlock:
-            fieldWidth = (inner - beside - Self.blockGap - Self.keyBlockSize.width).rounded(.down)
-        case .stacked:
-            fieldWidth = max(0, inner - beside).rounded(.down)
-        }
-    }
-
-    /// The panel's bottom padding inside its container: it sits `gap`
-    /// above whichever is higher of the on-screen keyboard and the app
-    /// dock, so neither covers it and the dock's keyboard button stays
-    /// usable when no keyboard is up. All values share one coordinate
-    /// space (the window's): `containerMaxY` is the bottom of the area the
-    /// panel is laid out in, `keyboardMinY` the keyboard's top (`nil` when
-    /// none covers the window), `dockMinY` the dock's top (`nil` when no
-    /// dock shows).
-    public static func bottomPadding(containerMaxY: Double, keyboardMinY: Double?, dockMinY: Double?, gap: Double = 8) -> Double {
-        let obstacles = [keyboardMinY, dockMinY].compactMap { $0 }.filter { $0 < containerMaxY }
-        guard let top = obstacles.min() else { return gap }
-        return containerMaxY - top + gap
     }
 }
 
