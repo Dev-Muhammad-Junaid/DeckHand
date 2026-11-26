@@ -142,6 +142,12 @@ public enum LockPolicy {
             // Liveness and approval keep working, or the remote would drop.
             return .allow
 
+        case .input(.textEdit), .input(.textSelect), .input(.caretMove):
+            // Live text sync (protocol 17): nothing of the field is read
+            // or changed while locked. The password is typed as keys
+            // (`typeText`, `keyboardShortcut`), as before.
+            return .refuse(reply: .none)
+
         case .input(.mouseUp):
             // Releasing a held button is always allowed, so a drag that
             // began before the lock can't leave the button stuck.
@@ -164,7 +170,7 @@ public enum LockPolicy {
                 // one empty snapshot and nothing more (`withholdsFocus`),
                 // so turning it on reads nothing now.
                 return .allow
-            case .displayState, .lockState, .focusState:
+            case .displayState, .lockState, .focusState, .textState, .textEditResult:
                 return .allow // Mac → remote; the handler ignores it
             }
 
@@ -299,6 +305,13 @@ public enum LockPolicy {
     /// text) is withheld while locked: the Mac reads no Accessibility and
     /// sends one `.none` snapshot, then nothing until the unlock.
     public static func withholdsFocus(_ state: MacLockState) -> Bool {
+        state.isLocked
+    }
+
+    /// Live text sync (protocol 17): while locked the Mac reads no text,
+    /// sends one `.locked` `textState` and drops `textEdit`, `textSelect`
+    /// and `caretMove`.
+    public static func withholdsText(_ state: MacLockState) -> Bool {
         state.isLocked
     }
 }

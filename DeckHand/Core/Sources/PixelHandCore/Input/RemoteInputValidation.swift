@@ -65,10 +65,23 @@ public enum RemoteInputValidation {
             // Mac → remote only; a remote has no business sending it.
             return nil
 
-        case .system(.focusState):
-            // OT-12: Mac → remote only. `watchFocus(on:)` is a Bool and
-            // passes through unchanged.
+        case .system(.focusState), .system(.textState), .system(.textEditResult):
+            // OT-12 / live sync: Mac → remote only. `watchFocus(on:wantsText:)`
+            // is two Bools and passes through unchanged.
             return nil
+
+        case let .input(.textEdit(edit)):
+            return sanitize(edit).map { .input(.textEdit(edit: $0)) }
+
+        case let .input(.textSelect(selection)):
+            guard isAcceptable(selection.range) else { return nil }
+            return message
+
+        case let .input(.caretMove(move)):
+            guard move.count >= 1 else { return nil }
+            var safe = move
+            safe.count = min(move.count, TextSyncPolicy.maxCaretMoveCount)
+            return .input(.caretMove(move: safe))
 
         case .sharing(.transferStatus):
             // S1: a UUID (decoded strictly, or the message fails) and closed
@@ -149,6 +162,27 @@ public enum RemoteInputValidation {
             guard let domain = action.message else { return false }
             return sanitize(domain) == domain
         }
+    }
+
+    /// Live text sync: a `textEdit` from a remote. The range must be sane,
+    /// the context lengths within `TextEditContext.contextUnits`, and the
+    /// replacement at most `TextSyncPolicy.maxReplacementBytes`, cleaned
+    /// like typed text (`\n` and `\t` only). Unlike `typeText`, an empty
+    /// replacement is a deletion and passes. Cleaning must not change it:
+    /// the iPad's hashes and offsets were computed on what it sent.
+    public static func sanitize(_ edit: TextEditRequest) -> TextEditRequest? {
+        guard isAcceptable(edit.range),
+              edit.replacement.utf8.count <= TextSyncPolicy.maxReplacementBytes,
+              TypingText.normalized(edit.replacement) == edit.replacement,
+              (0...TextEditContext.contextUnits).contains(edit.context.beforeLength),
+              (0...TextEditContext.contextUnits).contains(edit.context.afterLength) else { return nil }
+        return edit
+    }
+
+    /// A text range from a remote: not negative, and within the largest
+    /// field offsets Accessibility reports (`Int32`).
+    public static func isAcceptable(_ range: TextRange) -> Bool {
+        range.start >= 0 && range.length >= 0 && range.start <= Int(Int32.max) && range.length <= Int(Int32.max) - range.start
     }
 
     /// A string from a remote: not longer than `ProtocolLimits.maxStringLength`.

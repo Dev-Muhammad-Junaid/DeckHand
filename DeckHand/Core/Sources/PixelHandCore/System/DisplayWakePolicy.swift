@@ -37,7 +37,7 @@ public enum DisplayWakePolicy {
             switch m {
             case .run, .switchSpace: return true
             // OT-12: watching the focus is a subscription, not an action.
-            case .watchFocus, .displayState, .lockState, .focusState: return false
+            case .watchFocus, .displayState, .lockState, .focusState, .textState, .textEditResult: return false
             }
         case let .apps(m):
             switch m {

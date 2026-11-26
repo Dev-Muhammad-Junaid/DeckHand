@@ -161,18 +161,18 @@ import Testing
     @Test("The lock gate lets the subscription through and withholds the focus")
     func lockGate() {
         for lock in [MacLockState.unlocked, .screenLocked, .offConsole] {
-            #expect(LockPolicy.decide(.system(.watchFocus(on: true)), state: lock) == .allow)
-            #expect(LockPolicy.decide(.system(.watchFocus(on: false)), state: lock) == .allow)
+            #expect(LockPolicy.decide(.system(.watchFocus(on: true, wantsText: false)), state: lock) == .allow)
+            #expect(LockPolicy.decide(.system(.watchFocus(on: false, wantsText: false)), state: lock) == .allow)
         }
         #expect(!LockPolicy.withholdsFocus(.unlocked))
         #expect(LockPolicy.withholdsFocus(.screenLocked))
         #expect(LockPolicy.withholdsFocus(.offConsole))
-        #expect(!DisplayWakePolicy.isPersonAction(.system(.watchFocus(on: true))))
+        #expect(!DisplayWakePolicy.isPersonAction(.system(.watchFocus(on: true, wantsText: false))))
     }
 
     @Test("A remote may ask to watch the focus but never send a focus state")
     func validation() {
-        #expect(RemoteInputValidation.sanitize(.system(.watchFocus(on: true))) == .system(.watchFocus(on: true)))
+        #expect(RemoteInputValidation.sanitize(.system(.watchFocus(on: true, wantsText: false))) == .system(.watchFocus(on: true, wantsText: false)))
         #expect(RemoteInputValidation.sanitize(Self.state) == nil)
     }
 

@@ -23,8 +23,10 @@ public enum SystemMessage: Codable, Sendable, Equatable {
     /// (OT-12, the Type panel's loupe). While on, the Mac sends
     /// `focusState` when the focus, the field, the caret or the pointer
     /// changes, at most about eight times a second. Stopped by `false` and
-    /// by disconnecting. Protocol 16.
-    case watchFocus(on: Bool)
+    /// by disconnecting. Protocol 16. `wantsText` (protocol 17): the Type
+    /// panel's Live field is open and on screen, so the Mac also sends
+    /// `textState`; nothing reads text without it.
+    case watchFocus(on: Bool, wantsText: Bool)
 
     // MARK: Mac → remote
 
@@ -43,4 +45,11 @@ public enum SystemMessage: Codable, Sendable, Equatable {
     /// ever comes from native, non-secure fields. See
     /// `FocusedFieldSnapshot`. Protocol 16.
     case focusState(focus: FocusedFieldSnapshot)
+    /// The focused field as text (live sync, protocol 17), to remotes that
+    /// watch with `wantsText`: on every value or selection change, at most
+    /// 30 a second. While locked one `.locked` state, then nothing.
+    case textState(state: FocusedTextState)
+    /// The answer to one `input.textEdit`, sent after the `textState` for
+    /// its revision. Protocol 17.
+    case textEditResult(result: TextEditResult)
 }
