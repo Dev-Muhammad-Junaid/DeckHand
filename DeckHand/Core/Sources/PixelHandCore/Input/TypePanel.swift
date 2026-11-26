@@ -628,6 +628,10 @@ public struct TypePanelLayout: Sendable, Hashable {
     public let numpadPlacement: NumpadPlacement
     /// The field's width (the arrows sit beside it).
     public let fieldWidth: Double
+    /// The key cell this panel draws: `keyPitch` (44), or less only when
+    /// the panel is narrower than the key block (a 320 pt Slide Over
+    /// window), so the seven columns still fit.
+    public let cellPitch: Double
     /// Lines the Compose field may grow to before it scrolls.
     public let composeLines: Int
     /// The side margin of the window.
@@ -708,6 +712,8 @@ public struct TypePanelLayout: Sendable, Hashable {
         composeLines = above < 360 ? 1 : (above < 520 ? 2 : 4)
 
         let inner = panel - 2 * Self.padding
+        let pitch = min(Self.keyPitch, max(32, (inner / Double(TypeKeyBlock.columns)).rounded(.down)))
+        cellPitch = pitch
         if showsNumpad {
             arrangement = .stacked
             numpadPlacement = panel >= Self.numpadBesideMinimumWidth ? .beside : .below
@@ -715,7 +721,7 @@ public struct TypePanelLayout: Sendable, Hashable {
             arrangement = panel >= Self.oneBlockMinimumWidth ? .oneBlock : .stacked
             numpadPlacement = .hidden
         }
-        let beside = Self.blockGap + Self.arrowsSize.width
+        let beside = Self.blockGap + Double(ArrowCluster.columns) * pitch
         switch arrangement {
         case .oneBlock:
             fieldWidth = (inner - beside - Self.blockGap - Self.keyBlockSize.width).rounded(.down)

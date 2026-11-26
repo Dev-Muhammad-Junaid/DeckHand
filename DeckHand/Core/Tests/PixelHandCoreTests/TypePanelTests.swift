@@ -432,6 +432,18 @@ struct TypePanelLayoutTests {
         #expect(TypePanelLayout.numpadSize.width <= TypePanelGeometry.minimumWidth - 2 * TypePanelLayout.padding)
     }
 
+    @Test("Narrower than the key block (Slide Over, 320 pt): cells shrink so the seven columns fit")
+    func narrowest() {
+        let slideOver = TypePanelLayout(width: 320, height: 800, keyboard: .none, panelWidth: 304)
+        #expect(slideOver.cellPitch == 40)
+        #expect(7 * slideOver.cellPitch <= 304 - 24)
+        #expect(slideOver.fieldWidth + 12 + 3 * slideOver.cellPitch <= 304 - 24)
+        // At the minimum and up, always 44.
+        for width in stride(from: 360.0, through: 760, by: 20) {
+            #expect(TypePanelLayout(width: 1180, height: 820, keyboard: .none, panelWidth: width).cellPitch == 44)
+        }
+    }
+
     @Test("Everything fits the minimum width: keys, field and arrows, numpad")
     func minimumFits() {
         let inner = TypePanelGeometry.minimumWidth - 2 * TypePanelLayout.padding

@@ -90,6 +90,7 @@ struct TypePanel: View {
         }
         .padding(CGFloat(TypePanelLayout.padding))
         .frame(width: CGFloat(layout.panelWidth), alignment: .leading)
+        .environment(\.typeKeyPitch, CGFloat(layout.cellPitch))
         .background(
             RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous)
                 .fill(PixelHandTheme.raised)
@@ -434,7 +435,7 @@ struct TypePanel: View {
             HStack(spacing: 0) {
                 ForEach(TypeKeysRow.functionKeys) { key in
                     keyButton(key)
-                        .frame(width: CGFloat(TypePanelLayout.keyPitch), height: CGFloat(TypePanelLayout.keyPitch))
+                        .frame(width: CGFloat(layout.cellPitch), height: CGFloat(layout.cellPitch))
                 }
             }
             .padding(.trailing, TrailingFade.overflowWidth)
@@ -664,15 +665,29 @@ private struct PanelBodyLayout: Layout {
 
 // MARK: - Key caps
 
-/// A grid of `TypePanelLayout.keyPitch` cells (44 pt): each key fills its
-/// cell's touch target and draws a 40 pt cap inside it.
+/// The key cell size the panel draws (`TypePanelLayout.cellPitch`: 44 pt,
+/// less only in a panel narrower than the key block).
+private struct TypeKeyPitchKey: EnvironmentKey {
+    static let defaultValue = CGFloat(TypePanelLayout.keyPitch)
+}
+
+extension EnvironmentValues {
+    var typeKeyPitch: CGFloat {
+        get { self[TypeKeyPitchKey.self] }
+        set { self[TypeKeyPitchKey.self] = newValue }
+    }
+}
+
+/// A grid of key cells (44 pt): each key fills its cell's touch target and
+/// draws a cap 4 pt smaller inside it.
 private struct KeyGrid<Content: View>: View {
     let columns: Int
     let rows: Int
     @ViewBuilder let content: Content
 
+    @Environment(\.typeKeyPitch) private var pitch
+
     var body: some View {
-        let pitch = CGFloat(TypePanelLayout.keyPitch)
         ZStack(alignment: .topLeading) {
             content
         }
@@ -683,8 +698,21 @@ private struct KeyGrid<Content: View>: View {
 private extension View {
     /// Puts a key in its grid cell (`KeyGrid`).
     func keyCell(column: Int, row: Int, columnSpan: Int = 1, rowSpan: Int = 1) -> some View {
-        let pitch = CGFloat(TypePanelLayout.keyPitch)
-        return frame(width: CGFloat(columnSpan) * pitch, height: CGFloat(rowSpan) * pitch)
+        modifier(KeyCell(column: column, row: row, columnSpan: columnSpan, rowSpan: rowSpan))
+    }
+}
+
+private struct KeyCell: ViewModifier {
+    let column: Int
+    let row: Int
+    let columnSpan: Int
+    let rowSpan: Int
+
+    @Environment(\.typeKeyPitch) private var pitch
+
+    func body(content: Content) -> some View {
+        content
+            .frame(width: CGFloat(columnSpan) * pitch, height: CGFloat(rowSpan) * pitch)
             .offset(x: CGFloat(column) * pitch, y: CGFloat(row) * pitch)
     }
 }

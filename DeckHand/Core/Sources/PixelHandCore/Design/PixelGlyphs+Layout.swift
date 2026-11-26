@@ -80,20 +80,20 @@ extension PixelGlyphs {
     )
 
     /// The Type panel's grip (owner testing, build 25, OT-6): two columns
-    /// of three dots, the usual "drag me" mark, on the 9 × 9 grid.
+    /// of single dots, the usual "drag me" mark, on the 9 × 9 grid.
     public static let grip = GlyphBitmap(
         name: "grip",
         label: "Move",
         pattern: [
             ".........",
-            "..##.##..",
-            "..##.##..",
+            "...#.#...",
             ".........",
-            "..##.##..",
-            "..##.##..",
+            "...#.#...",
             ".........",
-            "..##.##..",
-            "..##.##..",
+            "...#.#...",
+            ".........",
+            "...#.#...",
+            ".........",
         ]
     )
 
@@ -110,7 +110,7 @@ extension PixelGlyphs {
             ".........",
             ".........",
             ".#######.",
-            ".#######.",
+            ".........",
         ]
     )
 
@@ -132,15 +132,16 @@ extension PixelGlyphs {
         ]
     )
 
-    /// The arrow keys' legends (OT-7), solid heads on a stem.
+    /// The arrow keys' legends (OT-7): a stem and a 45° head, one-dot
+    /// strokes, outlines only (§1's stroke rule).
     public static let keyUp = GlyphBitmap(
         name: "keyUp",
         label: "Up arrow",
         pattern: [
             "....#....",
-            "...###...",
-            "..#####..",
-            ".###.###.",
+            "...#.#...",
+            "..#.#.#..",
+            ".#..#..#.",
             "....#....",
             "....#....",
             "....#....",
@@ -158,9 +159,9 @@ extension PixelGlyphs {
             "....#....",
             "....#....",
             "....#....",
-            ".###.###.",
-            "..#####..",
-            "...###...",
+            ".#..#..#.",
+            "..#.#.#..",
+            "...#.#...",
             "....#....",
         ]
     )
@@ -171,11 +172,11 @@ extension PixelGlyphs {
         pattern: [
             ".........",
             "...#.....",
-            "..##.....",
-            ".###.....",
+            "..#......",
+            ".#.......",
             "#########",
-            ".###.....",
-            "..##.....",
+            ".#.......",
+            "..#......",
             "...#.....",
             ".........",
         ]
@@ -187,11 +188,11 @@ extension PixelGlyphs {
         pattern: [
             ".........",
             ".....#...",
-            ".....##..",
-            ".....###.",
+            "......#..",
+            ".......#.",
             "#########",
-            ".....###.",
-            ".....##..",
+            ".......#.",
+            "......#..",
             ".....#...",
             ".........",
         ]

@@ -1973,3 +1973,6 @@ from two iPad landscape screenshots (dark mode):
 
 Fix lane: `claude/pixelhand-lane-owner25` (primary session).
 
+Lane written: `LANE-owner25.md` (Type panel moves, resizes and folds; compact
+two-row keys, inverted-T arrows, docked 5 × 4 numpad; keys that type, protocol
+15). Needs an iPad re-check.

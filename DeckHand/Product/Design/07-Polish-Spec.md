@@ -77,6 +77,12 @@ tab bar only.
 Hit targets are ≥ 44 × 44 even when the visual is smaller (badges get a
 `contentShape` of 44 when tappable).
 
+Type panel keys (owner testing, build 25, OT-7): 40 pt caps on a 44 pt
+grid (4 pt between caps), so every key, arrow and numpad key keeps a
+44 pt target without overlapping its neighbour's. The panel's resize
+handles are 44 pt and straddle the card's bottom corners, mostly outside
+it, so they never take a tap meant for ⌫ or fn.
+
 ## 5. Alignment rules
 
 1. Leading edges of every block align to the margin or a column edge.

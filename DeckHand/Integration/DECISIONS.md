@@ -3,6 +3,24 @@
 Recorded by the coordinating session ("Deckhand project status review").
 Newest first. If a doc elsewhere disagrees, this file wins.
 
+## 2026-11-26 — Owner testing, build 25 (OT-6 … OT-8)
+From the owner's hands-on test of build 25 on the iPad Air 11" (M3),
+landscape (`STATUS.md`, "Owner testing (build 25)"); built on
+`claude/pixelhand-lane-owner25` (`LANE-owner25.md`):
+- **The Type panel moves, resizes and folds:** dragged by a grip
+  anywhere above the keyboard and the dock with a soft magnet to edges and
+  corners, resized from 360 pt (the narrowest that keeps a 192 pt field
+  beside the arrows and the whole key block) to 760 pt, folded to a pill;
+  the place and size are remembered per arrangement and orientation.
+  iPhone docks it top or bottom.
+- **Compact typing layout:** a narrower field with an inverted-T arrow
+  cluster, the keys in two rows, a 5 × 4 numpad that docks beside the keys
+  in the same panel; dot-matrix legends on the key caps (an owner-asked
+  exception to "dot-matrix never on buttons", `06-Pixel-Identity.md` §2).
+- **Keys can type text** (`Action.typeText`, protocol 15). Any plan Ask can
+  run saves as a key. A key that types always asks first, naming the app
+  the text lands in; widgets leave such keys out.
+
 ## 2026-11-26 — Owner testing, build 24 (OT-1 … OT-5)
 From the owner's hands-on test on the iPad Air 11" (M3), landscape
 (`STATUS.md`, "Owner testing (build 24)"); fixed on
