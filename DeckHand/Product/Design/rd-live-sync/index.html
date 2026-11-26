@@ -1,0 +1,575 @@
+<title>Live Sync and Caret</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: navy hero band, then white (light) / ink-navy (dark) sheets, one per question;
+   every mockup is drawn at real iOS points (1 CSS px = 1 pt) and zoomed to fit its frame.
+   Two token layers, as in board/board.css: board chrome, and the app's .ph tokens (always dark here). */
+:root {
+  --page: #060a2a; --page-2: #0b1450;
+  --sheet: #ffffff; --sheet-muted: #f3f4f9; --ink: #121522; --ink-soft: rgba(18,21,34,.78); --ink-muted: rgba(18,21,34,.6);
+  --hair: #e3e6ef; --accent: #3a4cf2; --accent-ink: #2a38c9; --accent-tint: #e6eaff;
+  --teal-ink: #0b7a6c; --teal-tint: #dcf6f1; --warn-ink: #a35f00; --warn-tint: #fff1db;
+  --font-display: "Geist", "Google Sans", system-ui, -apple-system, sans-serif;
+  --font-sans: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  /* App tokens (06-Pixel-Identity / 02-Design-System) */
+  --cobalt: #3a4cf2; --screen: #060a2a; --screen-raised: #0e1540; --screen-high: #1c2c80;
+  --phosphor: #effffc; --glow: #3de0e0; --ray: #9ff6ff; --mint: #3de0b0; --amber: #ffb547; --dot-off: rgba(80,100,210,.22);
+  --app-canvas: #070a1c; --app-raised: #0e1330; --app-elev: #161c40; --app-ink: #f4f6ff; --app-ink2: rgba(235,238,255,.64); --app-ink3: rgba(235,238,255,.38);
+  --app-hair: rgba(255,255,255,.08); --app-fill: rgba(255,255,255,.07); --app-fill2: rgba(255,255,255,.12); --app-accent: #5466ff; --app-accent-ink: #9fb0ff;
+  --app-glass: rgba(26,32,72,.72); --app-sel: rgba(84,102,255,.42);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --sheet: #0b1030; --sheet-muted: #121842; --ink: #eef1ff; --ink-soft: rgba(238,241,255,.8); --ink-muted: rgba(238,241,255,.6);
+    --hair: rgba(255,255,255,.1); --accent: #6f80ff; --accent-ink: #9fb0ff; --accent-tint: rgba(84,102,255,.2);
+    --teal-ink: #3de0b0; --teal-tint: rgba(61,224,176,.14); --warn-ink: #ffb547; --warn-tint: rgba(255,181,71,.14); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --sheet: #0b1030; --sheet-muted: #121842; --ink: #eef1ff; --ink-soft: rgba(238,241,255,.8); --ink-muted: rgba(238,241,255,.6);
+  --hair: rgba(255,255,255,.1); --accent: #6f80ff; --accent-ink: #9fb0ff; --accent-tint: rgba(84,102,255,.2);
+  --teal-ink: #3de0b0; --teal-tint: rgba(61,224,176,.14); --warn-ink: #ffb547; --warn-tint: rgba(255,181,71,.14); color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font: 400 16px/1.55 var(--font-sans); letter-spacing: -.1px; -webkit-font-smoothing: antialiased; overflow-x: clip; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--page); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+@media (min-width: 810px) { .wrap { padding-left: max(40px, env(safe-area-inset-left, 0px)); padding-right: max(40px, env(safe-area-inset-right, 0px)); } }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+a { color: var(--accent-ink); text-underline-offset: 3px; }
+
+.hero { position: relative; isolation: isolate; color: #fff; overflow: hidden; margin-top: calc(-1 * env(safe-area-inset-top, 0px)); padding-top: calc(env(safe-area-inset-top, 0px) + 64px); padding-bottom: 56px;
+  background: radial-gradient(60% 70% at 70% 0%, rgba(58,76,242,.45), transparent 70%), radial-gradient(30% 40% at 95% 5%, rgba(61,224,176,.16), transparent 70%), linear-gradient(180deg, var(--page), var(--page-2)); }
+.hero::before { content: ""; position: absolute; inset: 0; z-index: -1; background-image: radial-gradient(circle, rgba(134,180,255,.16) 1.1px, transparent 1.7px); background-size: 18px 18px;
+  -webkit-mask-image: radial-gradient(80% 80% at 60% 20%, #000 20%, transparent 85%); mask-image: radial-gradient(80% 80% at 60% 20%, #000 20%, transparent 85%); }
+.eyebrow { display: inline-flex; align-items: center; gap: 10px; color: var(--ray); }
+.eyebrow i { width: 6px; height: 6px; border-radius: 1.5px; background: var(--mint); box-shadow: 0 0 6px var(--mint); }
+.hero h1 { margin: 18px 0 0; max-width: 860px; font: 500 clamp(34px, 5.6vw, 56px)/1.08 var(--font-display); letter-spacing: -1.4px; text-wrap: balance; }
+.hero p { margin: 18px 0 0; max-width: 680px; color: rgba(255,255,255,.78); font-size: 17px; text-wrap: pretty; }
+.tags { margin-top: 24px; display: flex; flex-wrap: wrap; gap: 8px; }
+.tag { display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px; border-radius: 300px; font: 500 13px/1 var(--font-sans); background: rgba(255,255,255,.1); color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
+.tag b { font-weight: 600; color: var(--mint); }
+
+.nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: rgba(6,10,42,.88); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255,255,255,.08); }
+.nav__row { display: flex; gap: 4px; overflow-x: auto; padding-block: 8px; scrollbar-width: none; }
+.nav__row::-webkit-scrollbar { display: none; }
+.nav a { flex: none; text-decoration: none; color: rgba(255,255,255,.72); font: 500 14px/1 var(--font-sans); padding: 9px 12px; border-radius: 10px; }
+.nav a:hover { background: rgba(255,255,255,.08); color: #fff; }
+
+main { padding-block: 24px 56px; display: grid; gap: 20px; }
+.sheet { background: var(--sheet); border-radius: 24px; padding-block: 36px 40px; }
+.sheet > .in { padding-inline: clamp(16px, 4vw, 48px); display: grid; gap: 24px; }
+.sec-head { display: grid; gap: 8px; max-width: 760px; }
+.kicker { font: 500 12px/1 var(--font-mono); letter-spacing: .6px; text-transform: uppercase; color: var(--accent-ink); }
+h2 { margin: 0; font: 500 clamp(26px, 3.4vw, 34px)/1.15 var(--font-display); letter-spacing: -.8px; text-wrap: balance; }
+h3 { margin: 0; font: 600 16px/1.3 var(--font-sans); letter-spacing: -.1px; }
+.sec-head p, .note p { margin: 0; color: var(--ink-soft); text-wrap: pretty; }
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); }
+.grid--4 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); }
+.cell { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.cell figcaption { font-size: 14px; color: var(--ink-soft); }
+.cell figcaption b { color: var(--ink); font-weight: 600; }
+figure { margin: 0; }
+.step { font: 500 12px/1 var(--font-mono); color: var(--accent-ink); background: var(--accent-tint); border-radius: 6px; padding: 5px 7px; justify-self: start; }
+.stage { background: #04071f; border-radius: 18px; padding: 16px; overflow: hidden; display: block; min-width: 0; }
+.fit { width: 100%; min-width: 0; display: flex; justify-content: center; }
+.note { border-radius: 14px; background: var(--sheet-muted); padding: 14px 16px; display: grid; gap: 6px; }
+.note--warn { background: var(--warn-tint); }
+.note--warn h3 { color: var(--warn-ink); }
+.matrix { overflow-x: auto; border-radius: 14px; border: 1px solid var(--hair); }
+.matrix table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 14px; }
+.matrix th, .matrix td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--hair); vertical-align: top; }
+.matrix th { font: 500 12px/1.2 var(--font-mono); text-transform: uppercase; letter-spacing: .4px; color: var(--ink-muted); background: var(--sheet-muted); }
+.matrix td:first-child { font-weight: 600; }
+.y { color: var(--teal-ink); } .m { color: var(--warn-ink); } .n { color: var(--ink-muted); }
+.decisions { display: grid; gap: 12px; counter-reset: d; }
+.decision { border-radius: 14px; border: 1px solid var(--hair); padding: 14px 16px; display: grid; gap: 6px; }
+.decision .rec { font-size: 14px; color: var(--teal-ink); font-weight: 600; }
+footer { color: rgba(255,255,255,.6); font-size: 14px; padding-block: 8px 40px; }
+
+/* ---------- App mockups (.ph, always dark, 1px = 1pt) ---------- */
+.ph { position: relative; color: var(--app-ink); font: 400 17px/1.29 -apple-system, "SF Pro Text", system-ui, sans-serif; letter-spacing: -.2px; }
+.ph svg.pg rect, .ph svg.dm rect { fill: currentColor; }
+.ph svg.pg rect.a { fill: var(--glow); }
+.ph svg .o { fill: var(--dot-off); }
+.ph svg { display: block; flex: none; }
+.panel { width: 560px; background: var(--app-glass); border-radius: 22px; box-shadow: inset 0 0 0 .5px rgba(255,255,255,.16), 0 16px 40px -12px rgba(0,0,0,.7); padding: 8px; display: grid; gap: 8px; -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px); }
+.hdr { display: flex; align-items: center; gap: 8px; height: 44px; }
+.hbtn { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; color: var(--app-ink2); }
+.seg { display: flex; background: var(--app-fill); border-radius: 12px; padding: 3px; height: 36px; width: 144px; }
+.seg span { flex: 1; display: grid; place-items: center; font-size: 14px; font-weight: 600; border-radius: 9px; color: var(--app-ink2); }
+.seg span.on { background: var(--app-fill2); color: var(--app-ink); }
+.chip { display: flex; align-items: center; gap: 7px; height: 36px; padding: 0 10px 0 6px; border-radius: 12px; background: var(--app-fill); font-size: 14px; font-weight: 600; }
+.appic { width: 24px; height: 24px; border-radius: 6px; background: linear-gradient(160deg, #d97757, #b5533a); display: grid; place-items: center; color: #fff; font: 700 12px/1 system-ui; }
+.appic--notes { background: linear-gradient(180deg, #ffd65c 0 34%, #fbf7ea 34%); }
+.appic--term { background: #1e1e1e; color: #9ff6ff; font: 600 10px/1 ui-monospace, monospace; }
+.appic--chrome { background: conic-gradient(#e94235 0 33%, #fbbc04 0 66%, #34a853 0); border-radius: 50%; }
+.sp { flex: 1; }
+.body { display: flex; gap: 8px; height: 104px; }
+.field { position: relative; flex: 1; min-width: 0; border-radius: 14px; background: var(--app-raised); box-shadow: inset 0 0 0 1px var(--app-hair); padding: 12px 14px 10px; font-size: 17px; line-height: 24px; overflow: hidden; }
+.field.focus { box-shadow: inset 0 0 0 1.5px var(--app-accent); }
+.field .t { white-space: pre-wrap; word-break: break-word; color: var(--app-ink); }
+.field .dim { color: var(--app-ink3); }
+.field .sel { background: var(--app-sel); border-radius: 3px; }
+.field .ell { color: var(--app-ink3); }
+.caret { display: inline-block; width: 2px; height: 22px; margin: 0 -1px; vertical-align: -5px; background: var(--app-accent); border-radius: 1px; box-shadow: 0 0 6px rgba(84,102,255,.8); }
+.caret--float { background: var(--glow); box-shadow: 0 0 10px var(--glow); width: 3px; height: 26px; vertical-align: -7px; }
+.field.hasb { padding-bottom: 30px; }
+.badge { position: absolute; bottom: 8px; right: 8px; display: flex; align-items: center; gap: 5px; height: 18px; padding: 0 6px; border-radius: 6px; background: rgba(6,10,42,.84); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.18); }
+.badge i { width: 5px; height: 5px; border-radius: 1.5px; background: var(--mint); box-shadow: 0 0 5px var(--mint); }
+.badge.send i { background: var(--glow); box-shadow: 0 0 5px var(--glow); }
+.badge.amber { color: var(--amber); } .badge.amber i { background: var(--amber); box-shadow: 0 0 5px var(--amber); }
+.badge.dimb { color: #6d7bb8; } .badge.dimb i { background: #6d7bb8; box-shadow: none; }
+.badge.sync { color: var(--phosphor); } .badge.send { color: var(--ray); }
+.reason { display: flex; align-items: center; gap: 8px; color: var(--app-ink2); font-size: 14px; line-height: 18px; }
+.reason button { all: unset; cursor: default; margin-left: auto; padding: 6px 10px; border-radius: 10px; background: var(--app-accent); color: #fff; font-weight: 600; font-size: 13px; }
+.acts { display: grid; gap: 8px; grid-template-rows: 1fr 1fr; width: 48px; }
+.act { border-radius: 12px; background: var(--app-fill); display: grid; place-items: center; font-size: 12px; font-weight: 600; color: var(--app-ink2); }
+.act.on { color: var(--app-ink); }
+.arrows { display: grid; grid-template-columns: repeat(3, 48px); grid-template-rows: 48px 48px; gap: 8px; position: relative; }
+.k { border-radius: 12px; background: var(--app-fill); display: grid; place-items: center; color: var(--app-ink); box-shadow: inset 0 -1px 0 rgba(0,0,0,.25); }
+.k.hot { background: var(--app-accent); color: #fff; box-shadow: 0 0 0 2px rgba(61,224,224,.0), 0 0 18px -2px rgba(61,224,224,.55); outline: 2px dotted var(--glow); outline-offset: 3px; }
+.k.lit { color: var(--glow); }
+.k.latched { background: var(--app-accent); color: #fff; }
+.keys { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+.keys .k { height: 44px; font-size: 15px; }
+.trail { position: absolute; pointer-events: none; overflow: visible; }
+.finger { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; border: 1.5px solid rgba(239,255,252,.85); box-shadow: 0 0 0 6px rgba(61,224,224,.12), 0 0 22px rgba(61,224,224,.35); }
+.finger--2 { border-style: dashed; }
+.readout { position: absolute; display: flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border-radius: 7px; background: rgba(6,10,42,.9); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.18); color: var(--phosphor); }
+
+/* keyboard */
+.kb { width: 390px; background: #2b2f3a; padding: 8px 3px 6px; border-radius: 0 0 0 0; display: grid; gap: 11px; position: relative; }
+.kb .r { display: flex; gap: 6px; justify-content: center; }
+.kb .c { height: 42px; flex: 0 0 33px; border-radius: 5px; background: #6b6f7a; color: #fff; font-size: 22px; display: grid; place-items: center; box-shadow: 0 1px 0 rgba(0,0,0,.4); }
+.kb .c.w { flex-basis: 42px; background: #474b56; font-size: 15px; }
+.kb .c.sp { flex: 1 1 auto; font-size: 15px; }
+.kb .c.ret { flex-basis: 88px; background: #474b56; font-size: 15px; }
+.kb.pad .c { color: transparent; background: #555963; box-shadow: none; }
+.kb.pad .c.w, .kb.pad .c.ret { background: #555963; }
+.kb.pad .c.sp { color: transparent; }
+
+/* devices */
+.dev { position: relative; border-radius: 26px; background: #000; padding: 10px; box-shadow: inset 0 0 0 1.5px #2a2f45, 0 30px 60px -30px rgba(0,0,0,.8); }
+.dev--phone { border-radius: 52px; padding: 12px; }
+.scr { position: relative; overflow: hidden; border-radius: 18px; background: radial-gradient(70% 60% at 50% 30%, #111a55, var(--screen)); }
+.dev--phone .scr { border-radius: 42px; }
+.dotgrid { position: absolute; inset: 0; background-image: radial-gradient(circle, var(--dot-off) 1.2px, transparent 1.6px); background-size: 15px 15px; }
+.macwin { position: absolute; border-radius: 10px; background: #f6f6f8; color: #1b1b1f; box-shadow: 0 10px 30px rgba(0,0,0,.5); overflow: hidden; font: 13px/1.45 -apple-system, system-ui, sans-serif; }
+.macwin .bar { height: 26px; background: #e9e9ee; display: flex; align-items: center; gap: 6px; padding: 0 10px; }
+.macwin .bar i { width: 10px; height: 10px; border-radius: 50%; background: #ff5f57; }
+.macwin .bar i:nth-child(2) { background: #febc2e; } .macwin .bar i:nth-child(3) { background: #28c840; }
+.macwin .mfield { margin: 12px; padding: 10px 12px; border-radius: 10px; background: #fff; box-shadow: inset 0 0 0 1px #d8d8de; }
+.macwin .msel { background: #b3d7ff; }
+.macwin .mcaret { display: inline-block; width: 1.5px; height: 15px; background: #1b1b1f; vertical-align: -3px; margin: 0 -.75px; }
+.macwin .ghost { color: #a1a1aa; }
+.statusstrip { position: absolute; display: flex; align-items: center; gap: 6px; height: 20px; padding: 0 8px; border-radius: 6px; background: rgba(6,10,42,.84); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.18); color: var(--phosphor); }
+.statusstrip i { width: 5px; height: 5px; border-radius: 1.5px; background: var(--mint); box-shadow: 0 0 5px var(--mint); }
+.dock { position: absolute; height: 56px; border-radius: 28px; background: var(--app-glass); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.16); display: flex; align-items: center; gap: 12px; padding: 0 14px; }
+.dock .ic { width: 36px; height: 36px; border-radius: 9px; position: relative; }
+.dock .ic.front::after { content: ""; position: absolute; left: 50%; bottom: -7px; width: 4px; height: 4px; margin-left: -2px; border-radius: 1px; background: var(--app-accent); }
+.loupe { position: relative; border-radius: 16px; overflow: hidden; background: #f6f6f8; box-shadow: inset 0 0 0 1px rgba(255,255,255,.2), 0 12px 30px -10px rgba(0,0,0,.7); }
+.loupe .lt { position: absolute; left: 0; right: 0; bottom: 0; height: 26px; background: rgba(6,10,42,.86); display: flex; align-items: center; gap: 8px; padding: 0 10px; color: var(--app-ink2); font-size: 12px; }
+.tapring { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; border: 2px dotted var(--glow); box-shadow: 0 0 18px rgba(61,224,224,.55); }
+.lbl { position: absolute; font: 500 11px/1.2 var(--font-mono); color: var(--ray); letter-spacing: .3px; }
+@media (prefers-reduced-motion: no-preference) {
+  .blink { animation: blink 1.06s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+}
+</style>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="eyebrow"><i></i><span data-dm="R&amp;D · TYPE PANEL · PROTOCOL 17" data-p="1.6" data-c="var(--ray)"></span></span>
+    <h1>Live shows the Mac's text, and the caret goes where you drag it</h1>
+    <p>Mockups for the owner's request: the Type panel's Live field mirrors the Mac's focused field in real time and edits it both ways, the iOS space-bar trackpad moves the Mac caret, an arrow-key joystick works in every app, and a tap in the loupe places the caret. Proposal: <code>RD-live-sync-and-caret.md</code>.</p>
+    <div class="tags">
+      <span class="tag"><b>Build first</b> Native sync + arrow joystick</span>
+      <span class="tag">Then: web/Electron opt-in, blind trackpad</span>
+      <span class="tag">Then: loupe tap &amp; drag</span>
+    </div>
+  </div>
+</header>
+<nav class="nav" aria-label="Sections"><div class="wrap nav__row">
+  <a href="#synced">Synced field</a><a href="#trackpad">Space-bar trackpad</a><a href="#joystick">Arrow joystick</a><a href="#loupe">Loupe tap</a><a href="#devices">iPad &amp; iPhone</a><a href="#matrix">By app</a><a href="#decisions">Decisions</a>
+</div></nav>
+
+<div class="wrap">
+<main>
+
+<!-- 1. Synced field -->
+<section class="sheet" id="synced"><div class="in">
+  <div class="sec-head">
+    <span class="kicker">1 · Live with the synced field</span>
+    <h2>The field holds the Mac's text, with its caret and selection</h2>
+    <p>The Mac watches the focused field with <code>AXObserver</code> and sends a window of up to 1 000 characters around the caret. You edit it like any text: the edit goes back as "replace this range", the Mac sets the selection and types it. A Tab-accepted suggestion appears as soon as the Mac app commits it.</p>
+  </div>
+  <div class="grid">
+    <figure class="cell">
+      <div class="stage"><div class="fit" data-w="560">
+        <div class="ph" id="m-sync"></div>
+      </div></div>
+      <figcaption><b>Synced.</b> The Mac's text, the Mac's selection ("revised draft") and the caret. The <span data-dm="SYNC" data-p="1.4" data-c="var(--teal-ink)" style="display:inline-block;vertical-align:middle"></span> badge has a mint pixel. The space-bar trackpad, taps and the selection handles all work here.</figcaption>
+    </figure>
+    <figure class="cell">
+      <div class="stage"><div class="fit" data-w="560">
+        <div class="ph" id="m-accept"></div>
+      </div></div>
+      <figcaption><b>After Accept ⇥.</b> Claude's ghost suggestion was taken on the Mac. The field shows it from the next value change, under 50 ms. Before this change the field was empty. The badge reads <i>SENDING</i> while one edit is in flight.</figcaption>
+    </figure>
+  </div>
+  <div class="grid grid--4">
+    <figure class="cell"><div class="stage"><div class="fit" data-w="300"><div class="ph" id="s-sync"></div></div></div><figcaption><b>SYNC</b> · mint pixel. Text and caret match the Mac.</figcaption></figure>
+    <figure class="cell"><div class="stage"><div class="fit" data-w="300"><div class="ph" id="s-send"></div></div></div><figcaption><b>SENDING</b> · glow pixel. Your edit is shown already (local echo); the Mac hasn't confirmed yet.</figcaption></figure>
+    <figure class="cell"><div class="stage"><div class="fit" data-w="300"><div class="ph" id="s-conf"></div></div></div><figcaption><b>MAC WINS</b> · amber for 1.4 s. Someone typed on the Mac at the same time; the field shows the Mac's text.</figcaption></figure>
+    <figure class="cell"><div class="stage"><div class="fit" data-w="300"><div class="ph" id="s-blind"></div></div></div><figcaption><b>BLIND</b> · dim. The field can't be read; Live types as today and the reason shows in one line.</figcaption></figure>
+  </div>
+  <h3>When the field can't be read</h3>
+  <div class="grid">
+    <figure class="cell"><div class="stage"><div class="fit" data-w="560"><div class="ph" id="m-weboff"></div></div></div><figcaption><b>Web text off for Claude</b> (the default). <i>Allow</i> asks the Mac, which confirms once with the app's icon. Typing, the joystick and the loupe still work.</figcaption></figure>
+    <figure class="cell"><div class="stage"><div class="fit" data-w="560"><div class="ph" id="m-secure"></div></div></div><figcaption><b>Password field</b> or secure input on (also <code>sudo</code> in Terminal). Nothing is read and no edits are accepted; key presses still go.</figcaption></figure>
+  </div>
+  <div class="grid grid--4">
+    <figure class="cell"><div class="stage"><div class="fit" data-w="300"><div class="ph" id="r-term"></div></div></div><figcaption><b>Terminal: keys only.</b> The shell owns the cursor; scrollback is never shown.</figcaption></figure>
+    <figure class="cell"><div class="stage"><div class="fit" data-w="300"><div class="ph" id="r-chrome"></div></div></div><figcaption><b>Chrome.</b> Its text needs a switch that disturbs window managers, so we don't flip it.</figcaption></figure>
+    <figure class="cell"><div class="stage"><div class="fit" data-w="300"><div class="ph" id="r-none"></div></div></div><figcaption><b>No text field</b> focused on the Mac.</figcaption></figure>
+    <figure class="cell"><div class="stage"><div class="fit" data-w="300"><div class="ph" id="r-lock"></div></div></div><figcaption><b>Mac is locked.</b> One empty state, nothing more until unlock.</figcaption></figure>
+  </div>
+</div></section>
+
+<!-- 2. Space-bar trackpad -->
+<section class="sheet" id="trackpad"><div class="in">
+  <div class="sec-head">
+    <span class="kicker">2 · The iOS space-bar trackpad</span>
+    <h2>Hold the space bar, drag, and the Mac caret follows</h2>
+    <p>This is the keyboard's own gesture, in any text view. iPhone: touch and hold the space bar, and the keys go blank. iPad: the same hold, or two fingers anywhere on the keyboard. Because the field now holds the Mac's real text, the caret has somewhere to go. Each selection change is mirrored to the Mac.</p>
+  </div>
+  <div class="grid grid--4">
+    <figure class="cell"><span class="step">1 · Hold</span><div class="stage"><div class="fit" data-w="390"><div class="ph" id="t1"></div></div></div><figcaption>Touch and hold the space bar. The keys go blank and the caret lifts off as a floating caret (<code>beginFloatingCursor</code>).</figcaption></figure>
+    <figure class="cell"><span class="step">2 · Drag</span><div class="stage"><div class="fit" data-w="390"><div class="ph" id="t2"></div></div></div><figcaption>Drag. The caret glides over the real words, and each stop sends <code>textSelect</code>.</figcaption></figure>
+    <figure class="cell"><span class="step">3 · Select</span><div class="stage"><div class="fit" data-w="390"><div class="ph" id="t3"></div></div></div><figcaption>Tap a second finger (iPad: hold two fingers before dragging) and drag to select.</figcaption></figure>
+    <figure class="cell"><span class="step">4 · On the Mac</span><div class="stage"><div class="fit" data-w="390"><div class="ph" id="t4"></div></div></div><figcaption>The Mac sets the same selection, through Accessibility in native fields and with arrow keys elsewhere. Typing now replaces it.</figcaption></figure>
+  </div>
+  <div class="note note--warn"><h3>In unreadable fields: a blind trackpad (needs measuring)</h3><p>With no synced text the field is empty, so the system caret can't move. UIKit still reports the drag through <code>updateFloatingCursor(at:)</code>. We could turn every ~8 pt of drag into ← / → on the Mac (↑ / ↓ per line). This needs an iPad measurement first: does UIKit send updates in an empty field? Hardware keyboards have no space bar to hold; their arrow keys already go to the Mac.</p></div>
+</div></section>
+
+<!-- 3. Joystick -->
+<section class="sheet" id="joystick"><div class="in">
+  <div class="sec-head">
+    <span class="kicker">3 · Arrow-key joystick</span>
+    <h2>Hold an arrow, then drag. Further means faster</h2>
+    <p>Hold any arrow cap for 300 ms; a shorter press is a normal tap. The cap becomes the anchor and a dot trail follows your finger. Left and right move by characters, up and down by lines. Past 60 pt it moves by words or paragraphs. The speed runs from 4 to 30 steps a second. With ⇧ latched, it selects. It works in every app, terminals included, because it only sends arrow keys.</p>
+  </div>
+  <div class="grid">
+    <figure class="cell"><div class="stage"><div class="fit" data-w="620"><div class="ph" id="j1" style="width:620px"></div></div></div><figcaption><b>Characters.</b> Held → and dragged 52 pt right: 14 steps a second. The trail's lit dots show the speed.</figcaption></figure>
+    <figure class="cell"><div class="stage"><div class="fit" data-w="620"><div class="ph" id="j2" style="width:620px"></div></div></div><figcaption><b>Words, selecting.</b> ⇧ latched, dragged 96 pt: ⌥⇧→ at 24 steps a second. The trail turns accent and the selection grows on both sides.</figcaption></figure>
+  </div>
+  <div class="grid grid--4">
+    <figure class="cell"><div class="stage"><div class="fit" data-w="300"><div class="ph" id="jc"></div></div></div><figcaption><b>The rate curve.</b> No movement in the first 12 pt; then 4 → 30 steps a second, linear to 120 pt. Release stops at once.</figcaption></figure>
+    <figure class="cell"><div class="stage"><div class="fit" data-w="300"><div class="ph" id="jv"></div></div></div><figcaption><b>Lines.</b> The first 10 pt of movement picks the axis. Here ↑ was dragged up 40 pt: three lines a second.</figcaption></figure>
+    <figure class="cell"><div class="stage"><div class="fit" data-w="300"><div class="ph" id="j1row"></div></div></div><figcaption><b>Shortest panel.</b> With the arrows in one row, any cap anchors the joystick the same way.</figcaption></figure>
+    <figure class="cell"><div class="stage"><div class="fit" data-w="300"><div class="ph" id="jt"></div></div></div><figcaption><b>Terminal.</b> ← / → move along the shell line; ↑ / ↓ are labelled HISTORY, because that's what they do there.</figcaption></figure>
+  </div>
+</div></section>
+
+<!-- 4. Loupe -->
+<section class="sheet" id="loupe"><div class="in">
+  <div class="sec-head">
+    <span class="kicker">4 · Tap or drag in the loupe · phase 3</span>
+    <h2>Point at the word in the picture</h2>
+    <p>The loupe (OT-12) already maps its pixels to the Mac's display points. A tap clicks there, so the caret lands where you pointed in any app, web and Electron included. The pointer then goes back where it was, so the trackpad doesn't jump. A hold then drag makes a mouse drag, which selects. It's the text caret, not the mouse pointer: the pointer already has the trackpad and the picture pointer (OR-16).</p>
+  </div>
+  <div class="grid">
+    <figure class="cell"><div class="stage"><div class="fit" data-w="560"><div class="ph" id="l1"></div></div></div><figcaption><b>Tap.</b> A dotted phosphor ring marks the point, the Mac clicks there, and the caret moves before "Friday".</figcaption></figure>
+    <figure class="cell"><div class="stage"><div class="fit" data-w="560"><div class="ph" id="l2"></div></div></div><figcaption><b>Hold, then drag.</b> It selects "the revised draft". In a synced field, the iPad field shows the same selection.</figcaption></figure>
+  </div>
+</div></section>
+
+<!-- 5. Devices -->
+<section class="sheet" id="devices"><div class="in">
+  <div class="sec-head">
+    <span class="kicker">5 · iPad landscape, iPad portrait, iPhone</span>
+    <h2>The same field at every size</h2>
+    <p>The panel keeps OT-11's layout. Only the field's contents change. On iPhone the field shows two lines around the caret and the window scrolls with it.</p>
+  </div>
+  <figure class="cell"><div class="stage"><div class="fit" data-w="1200"><div class="ph" id="d-land"></div></div></div><figcaption><b>iPad Air 11″ landscape</b> (1180 × 820). Mirror with Notes on the Mac, the loupe above the panel, the synced field in Live, the keyboard below.</figcaption></figure>
+  <div class="grid">
+    <figure class="cell"><div class="stage"><div class="fit" data-w="840"><div class="ph" id="d-port"></div></div></div><figcaption><b>iPad portrait</b> (820 × 1180). The panel is stacked: field, actions and arrows, then the key rows. The joystick is in use.</figcaption></figure>
+    <figure class="cell"><div class="stage"><div class="fit" data-w="420"><div class="ph" id="d-phone"></div></div></div><figcaption><b>iPhone</b> (393 × 852). The panel is docked at the bottom on the keyboard, and the space-bar trackpad is in use. The keys are blank and the caret floats over the synced text.</figcaption></figure>
+  </div>
+</div></section>
+
+<!-- 6. Matrix -->
+<section class="sheet" id="matrix"><div class="in">
+  <div class="sec-head">
+    <span class="kicker">6 · Feasibility by app</span>
+    <h2>What works where</h2>
+    <p><span class="y">●</span> works · <span class="m">●</span> works with a caveat, opt-in or after measuring · <span class="n">●</span> not offered</p>
+  </div>
+  <div class="matrix"><table>
+    <thead><tr><th>App</th><th>Read</th><th>Write</th><th>Selection</th><th>Space-bar trackpad</th><th>Joystick</th><th>Loupe tap</th></tr></thead>
+    <tbody>
+      <tr><td>Native (TextEdit, Notes, Messages)</td><td class="y">● observer</td><td class="y">● AX select + keys</td><td class="y">● AX</td><td class="y">● synced</td><td class="y">●</td><td class="y">●</td></tr>
+      <tr><td>Safari / WebKit inputs</td><td class="m">● opt-in</td><td class="y">● keys</td><td class="m">● AX or arrows</td><td class="m">● synced if opted in</td><td class="y">●</td><td class="y">●</td></tr>
+      <tr><td>WebKit contenteditable (Mail, Gmail)</td><td class="m">● opt-in, text markers</td><td class="y">● keys</td><td class="m">● arrows</td><td class="m">● synced if opted in</td><td class="y">●</td><td class="y">●</td></tr>
+      <tr><td>Chrome and Chromium</td><td class="n">● not read</td><td class="y">● keys (blind)</td><td class="n">●</td><td class="m">● blind</td><td class="y">●</td><td class="y">●</td></tr>
+      <tr><td>Electron: Claude, Slack</td><td class="m">● opt-in, AXManualAccessibility</td><td class="y">● keys</td><td class="m">● arrows</td><td class="m">● synced if opted in</td><td class="y">●</td><td class="y">●</td></tr>
+      <tr><td>Xcode</td><td class="y">● windowed</td><td class="y">●</td><td class="y">●</td><td class="y">●</td><td class="y">●</td><td class="y">●</td></tr>
+      <tr><td>VS Code, Cursor, JetBrains</td><td class="n">● no useful value</td><td class="y">● keys (blind)</td><td class="n">●</td><td class="m">● blind</td><td class="y">●</td><td class="y">●</td></tr>
+      <tr><td>Terminals</td><td class="n">● by design</td><td class="y">● keys</td><td class="n">●</td><td class="m">● blind, ← → only</td><td class="y">● ↑↓ = history</td><td class="m">● mouse reporting</td></tr>
+      <tr><td>Password / secure input</td><td class="n">● never</td><td class="y">● keys only</td><td class="n">●</td><td class="n">●</td><td class="y">●</td><td class="y">●</td></tr>
+    </tbody>
+  </table></div>
+</div></section>
+
+<!-- 7. Decisions -->
+<section class="sheet" id="decisions"><div class="in">
+  <div class="sec-head"><span class="kicker">7 · For the owner</span><h2>Three decisions</h2></div>
+  <div class="decisions">
+    <div class="decision"><h3>1 · Show text from web and Electron apps (Claude, Slack, Safari pages) per app, opt-in?</h3><p class="rec">Recommended: yes. Off by default, allowed per app from the "can't read" line, confirmed once on the Mac. Chrome stays keys-only.</p></div>
+    <div class="decision"><h3>2 · Which iPad keyboard features stay on in synced Live?</h3><p class="rec">Recommended: autocorrect and predictions on, because they now see the real words. Smart quotes and dashes off, as today. The spell-check underline off, because the Mac app has its own. Undo goes to the Mac.</p></div>
+    <div class="decision"><h3>3 · What to build first?</h3><p class="rec">Recommended: native sync plus the arrow joystick (≈ 9–13 days). Then the web opt-in and the blind-trackpad spike. Then the loupe tap.</p></div>
+  </div>
+</div></section>
+
+</main>
+<footer>Pixel Hand · R&amp;D board · branch claude/pixelhand-rd-live-sync · source DeckHand/Product/Design/rd-live-sync/</footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  /* 9 x 9 pixel glyphs, one-dot strokes, at most one accent (*). From board/pixel.js plus the Type panel layout glyphs. */
+  var G = {
+    keyLeft: ['.........', '.........', '...#.....', '..#......', '.#######.', '..#......', '...#.....', '.........', '.........'],
+    keyRight: ['.........', '.........', '.....#...', '......#..', '.#######.', '......#..', '.....#...', '.........', '.........'],
+    keyUp: ['....#....', '...#.#...', '..#.#.#..', '....#....', '....#....', '....#....', '....#....', '.........', '.........'],
+    keyDown: ['.........', '.........', '....#....', '....#....', '....#....', '....#....', '..#.#.#..', '...#.#...', '....#....'],
+    grip: ['.........', '...#.#...', '.........', '...#.#...', '.........', '...#.#...', '.........', '...#.#...', '.........'],
+    close: ['.........', '.#.....#.', '..#...#..', '...#.#...', '....#....', '...#.#...', '..#...#..', '.#.....#.', '.........'],
+    search: ['..###....', '.#...#...', '#.....#..', '#.....#..', '#.....#..', '.#...#...', '..###.#..', '.......#.', '........*'],
+    paste: ['..#####..', '.##...##.', '.#.....#.', '.#.###.#.', '.#.....#.', '.#.###.#.', '.#.....#.', '.#######.', '.........'],
+    lock: ['...###...', '..#...#..', '..#...#..', '.#######.', '.#.....#.', '.#..*..#.', '.#..#..#.', '.#.....#.', '.#######.'],
+    type: ['#########', '....#....', '....#....', '....#....', '....#....', '....#....', '....#....', '....#....', '...#*#...'],
+    terminal: ['.........', '#########', '#.......#', '#.#.....#', '#..#....#', '#.#.##*.#', '#.......#', '#########', '.........'],
+    keyboard: ['.........', '#########', '#.......#', '#.#.#.#.#', '#.......#', '#.#####.#', '#.......#', '#########', '.........'],
+    numpad: ['.........', '.#.#.#...', '.........', '.#.#.#...', '.........', '.#.#.#...', '.........', '...#.....', '.........'],
+    collapse: ['.........', '.........', '.........', '.........', '.........', '.........', '.........', '.#######.', '.........']
+  };
+  var F = {
+    '0': '01110100011001110101110011000101110', '1': '00100011000010000100001000010001110', '2': '01110100010000100010001000100011111', '3': '11110000010000101110000010000111110',
+    '4': '00010001100101010010111110001000010', '5': '11111100001111000001000011000101110', '6': '00110010001000011110100011000101110', '7': '11111000010001000100010000100001000',
+    '8': '01110100011000101110100011000101110', '9': '01110100011000101111000010001001100',
+    A: '01110100011000111111100011000110001', B: '11110100011000111110100011000111110', C: '01110100011000010000100001000101110', D: '11110100011000110001100011000111110',
+    E: '11111100001000011110100001000011111', F: '11111100001000011110100001000010000', G: '01110100011000010111100011000101111', H: '10001100011000111111100011000110001',
+    I: '01110001000010000100001000010001110', J: '00111000100001000010000101001001100', K: '10001100101010011000101001001010001', L: '10000100001000010000100001000011111',
+    M: '10001110111010110101100011000110001', N: '10001100011100110101100111000110001', O: '01110100011000110001100011000101110', P: '11110100011000111110100001000010000',
+    Q: '01110100011000110001101011001001101', R: '11110100011000111110101001001010001', S: '01111100001000001110000010000111110', T: '11111001000010000100001000010000100',
+    U: '10001100011000110001100011000101110', V: '10001100011000110001100010101000100', W: '10001100011000110101101011010101010', X: '10001100010101000100010101000110001',
+    Y: '10001100010101000100001000010000100', Z: '11111000010001000100010001000011111',
+    ' ': '00000000000000000000000000000000000', '·': '00000000000000000100000000000000000', ':': '00000001000000000000000000010000000', '/': '00001000100001000100010000100010000',
+    '%': '11001110100001000100010000101110011', '-': '00000000000000001110000000000000000', '.': '00000000000000000000000000000000100', '+': '00000001000010011111001000010000000',
+    '<': '00010001000100010000010000010000010', '>': '01000001000001000001000100010001000', '&': '01100100101010001000101011001001101', '×': '00000100010101000100010101000100000'
+  };
+  function rect(x, y, d, r, cls) { return '<rect x="' + x.toFixed(2) + '" y="' + y.toFixed(2) + '" width="' + d.toFixed(2) + '" height="' + d.toFixed(2) + '" rx="' + r.toFixed(2) + '"' + (cls ? ' class="' + cls + '"' : '') + '/>'; }
+  function g(name, p, color) {
+    var rows = G[name], d = p * 0.78, r = d * 0.3, o = (p - d) / 2, out = '';
+    for (var y = 0; y < 9; y++) for (var x = 0; x < 9; x++) { var c = rows[y][x]; if (c === '#' || c === '*') out += rect(x * p + o, y * p + o, d, r, c === '*' ? 'a' : ''); }
+    return '<svg class="pg" width="' + 9 * p + '" height="' + 9 * p + '" viewBox="0 0 ' + 9 * p + ' ' + 9 * p + '" aria-hidden="true"' + (color ? ' style="color:' + color + '"' : '') + '>' + out + '</svg>';
+  }
+  function dm(str, p, color, label) {
+    str = String(str).toUpperCase();
+    var d = p * 0.8, r = d * 0.32, o = (p - d) / 2, out = '', w = Math.max(1, str.length * 6 - 1);
+    for (var i = 0; i < str.length; i++) { var bits = F[str[i]] || F[' ']; for (var b = 0; b < 35; b++) if (bits[b] === '1') out += rect((i * 6 + b % 5) * p + o, Math.floor(b / 5) * p + o, d, r); }
+    return '<svg class="dm" width="' + (w * p).toFixed(1) + '" height="' + 7 * p + '" viewBox="0 0 ' + (w * p).toFixed(1) + ' ' + 7 * p + '" role="img" aria-label="' + (label || str) + '" style="color:' + (color || 'currentColor') + '"><g fill="currentColor">' + out + '</g></svg>';
+  }
+
+  /* ---------- Type panel parts ---------- */
+  var APP = { claude: '<span class="appic">✳</span>', notes: '<span class="appic appic--notes"></span>', term: '<span class="appic appic--term">&gt;_</span>', chrome: '<span class="appic appic--chrome"></span>' };
+  function header(app, name, opt) {
+    opt = opt || {};
+    return '<div class="hdr"><span class="hbtn">' + g('grip', 2) + '</span>' +
+      '<span class="seg"><span class="on">Live</span><span>Compose</span></span>' +
+      '<span class="chip">' + APP[app] + (name ? '<span>' + name + '</span>' : '') + g('search', 1.6, 'var(--app-ink2)') + '</span>' +
+      '<span class="sp"></span>' + (opt.lock ? '' : '<span class="hbtn">' + g('numpad', 2) + '</span>') + '<span class="hbtn">' + g('collapse', 2) + '</span><span class="hbtn">' + g('close', 2) + '</span></div>';
+  }
+  function badge(kind) {
+    var m = { sync: ['sync', 'SYNC'], send: ['send', 'SENDING'], conf: ['amber', 'MAC WINS'], blind: ['dimb', 'BLIND'] }[kind];
+    return '<span class="badge ' + m[0] + '"><i></i>' + dm(m[1], 1.3) + '</span>';
+  }
+  function field(html, opt) {
+    opt = opt || {};
+    return '<div class="field' + (opt.focus === false ? '' : ' focus') + (opt.badge ? ' hasb' : '') + '" style="' + (opt.style || '') + '">' + (opt.badge ? badge(opt.badge) : '') + '<div class="t">' + html + '</div></div>';
+  }
+  function acts() { return '<div class="acts"><span class="act on">Accept ⇥</span><span class="act">' + g('paste', 2) + '</span></div>'; }
+  function arrows(opt) {
+    opt = opt || {};
+    function cap(k, glyph) { var cls = 'k' + (opt.hot === k ? ' hot' : '') + (opt.lit && opt.lit.indexOf(k) >= 0 ? ' lit' : ''); return '<span class="' + cls + '" style="grid-area:' + ({ up: '1/2', left: '2/1', down: '2/2', right: '2/3' })[k] + '">' + g(glyph, 2.4, opt.hot === k ? '#fff' : null) + '</span>'; }
+    return '<div class="arrows">' + cap('up', 'keyUp') + cap('left', 'keyLeft') + cap('down', 'keyDown') + cap('right', 'keyRight') + (opt.extra || '') + '</div>';
+  }
+  var CARET = '<span class="caret blink"></span>';
+  function panel(app, name, fieldHTML, fopt, aopt, extra) {
+    return '<div class="panel">' + header(app, name) + '<div class="body">' + field(fieldHTML, fopt) + acts() + arrows(aopt) + '</div>' + (extra || '') + '</div>';
+  }
+  function keyRows(shift) {
+    var a = ['⌘', '⌥', '⌃', '⇧', 'ESC', 'TAB', '⌫'];
+    return '<div class="keys">' + a.map(function (k) { var word = /^[A-Z]+$/.test(k); return '<span class="k' + (shift && k === '⇧' ? ' latched' : '') + '">' + (word ? dm(k, 1.4) : k) + '</span>'; }).join('') + '</div>';
+  }
+
+  /* Dot trail from (x0,y0) to (x1,y1): dots every 6 pt, lit toward the finger. */
+  function trail(x0, y0, x1, y1, color, w, h) {
+    var dx = x1 - x0, dy = y1 - y0, len = Math.sqrt(dx * dx + dy * dy), n = Math.max(1, Math.round(len / 6)), out = '';
+    for (var i = 0; i <= n; i++) {
+      var t = i / n, x = x0 + dx * t, y = y0 + dy * t, s = 2.6 + 1.6 * t, a = 0.25 + 0.75 * Math.pow(t, 1.6);
+      out += '<rect x="' + (x - s / 2).toFixed(1) + '" y="' + (y - s / 2).toFixed(1) + '" width="' + s.toFixed(1) + '" height="' + s.toFixed(1) + '" rx="' + (s * 0.3).toFixed(1) + '" fill="' + (i === n ? 'var(--phosphor)' : color) + '" opacity="' + a.toFixed(2) + '"/>';
+    }
+    return '<svg class="trail" style="left:0;top:0" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" aria-hidden="true">' + out + '</svg>';
+  }
+
+  var TXT_A = 'Thanks for the notes. I\'ll send the ';
+  var put = function (id, html) { var el = document.getElementById(id); if (el) el.innerHTML = html; };
+
+  /* 1. Synced */
+  put('m-sync', panel('claude', 'Claude', TXT_A + '<span class="sel">revised draft</span>' + CARET + ' by Friday, with the new numbers.', { badge: 'sync' }));
+  put('m-accept', panel('claude', 'Claude', '<span class="ell">…</span>the new numbers. Can you check the totals in section 3 before I send it' + CARET, { badge: 'send' }));
+  function mini(html, b, style) { return '<div style="width:300px">' + field(html, { badge: b, style: 'height:92px;' + (style || '') }) + '</div>'; }
+  put('s-sync', mini('I\'ll send the revised draft' + CARET + ' by Friday.', 'sync'));
+  put('s-send', mini('I\'ll send the revised draft by Friday' + CARET, 'send'));
+  put('s-conf', mini('I\'ll send the final draft' + CARET + ' by Friday.', 'conf'));
+  put('s-blind', mini('<span class="dim">Type here</span>', 'blind'));
+  function reasonPanel(app, name, glyph, text, btn) {
+    return '<div class="panel">' + header(app, name) + '<div class="body">' +
+      '<div class="field focus">' + badge('blind').replace('class="badge', 'style="top:8px;bottom:auto" class="badge') + '<div class="t"><span class="dim">Type here</span>' + CARET + '</div>' +
+      '<div class="reason" style="position:absolute;left:14px;right:10px;bottom:10px">' + g(glyph, 1.6, 'var(--app-ink3)') + '<span>' + text + '</span>' + (btn ? '<button type="button" tabindex="-1">' + btn + '</button>' : '') + '</div></div>' +
+      acts() + arrows() + '</div></div>';
+  }
+  put('m-weboff', reasonPanel('claude', 'Claude', 'type', 'Web text is off for Claude', 'Allow'));
+  put('m-secure', reasonPanel('claude', 'Safari', 'lock', 'Password field: the text stays on the Mac'));
+  function reasonMini(glyph, text) { return '<div style="width:300px"><div class="field focus" style="height:92px">' + badge('blind').replace('class="badge', 'style="top:8px;bottom:auto" class="badge') + '<div class="t"><span class="dim">Type here</span></div><div class="reason" style="position:absolute;left:14px;right:10px;bottom:12px">' + g(glyph, 1.6, 'var(--app-ink3)') + '<span>' + text + '</span></div></div></div>'; }
+  put('r-term', reasonMini('terminal', 'Terminal: keys only'));
+  put('r-chrome', reasonMini('type', 'Chrome doesn\'t share its text'));
+  put('r-none', reasonMini('type', 'No text field'));
+  put('r-lock', reasonMini('lock', 'Mac is locked'));
+
+  /* 2. Space-bar trackpad (iPhone-width panel + keyboard) */
+  function kb(blank, fingers) {
+    var r1 = 'QWERTYUIOP'.split(''), r2 = 'ASDFGHJKL'.split(''), r3 = 'ZXCVBNM'.split('');
+    function row(a, pre, post) { return '<div class="r">' + (pre || '') + a.map(function (c) { return '<span class="c">' + c + '</span>'; }).join('') + (post || '') + '</div>'; }
+    return '<div class="kb' + (blank ? ' pad' : '') + '">' + row(r1) + row(r2) + row(r3, '<span class="c w">⇧</span>', '<span class="c w">⌫</span>') +
+      '<div class="r"><span class="c w">123</span><span class="c w">☺</span><span class="c sp">space</span><span class="c ret">return</span></div>' + (fingers || '') + '</div>';
+  }
+  function phoneField(html, b) { return '<div style="padding:8px;background:var(--app-glass);border-radius:22px 22px 0 0">' + field(html, { badge: b, style: 'height:84px;font-size:16px' }) + '</div>'; }
+  var LINE = 'Thanks for the notes. I\'ll send the revised draft by Friday, with the new numbers.';
+  put('t1', '<div style="width:390px">' + phoneField('Thanks for the notes. I\'ll send the revised draft by Friday, with the new numbers.<span class="caret caret--float"></span>', 'sync') + kb(true, '<span class="finger" style="left:190px;top:178px"></span><span class="lbl" style="left:150px;top:146px">HOLD</span>') + '</div>');
+  put('t2', '<div style="width:390px">' + phoneField('Thanks for the notes. I\'ll send the revised<span class="caret caret--float"></span> draft by Friday, with the new numbers.', 'sync') + kb(true, trail(190, 178, 96, 120, 'var(--glow)', 390, 230) + '<span class="finger" style="left:96px;top:120px"></span>') + '</div>');
+  put('t3', '<div style="width:390px">' + phoneField('Thanks for the notes. I\'ll send the <span class="sel">revised draft</span><span class="caret caret--float"></span> by Friday, with the new numbers.', 'send') + kb(true, '<span class="finger" style="left:150px;top:120px"></span><span class="finger finger--2" style="left:270px;top:150px"></span><span class="lbl" style="left:236px;top:112px">2ND FINGER</span>') + '</div>');
+  put('t4', '<div style="width:390px;display:grid;gap:10px">' +
+    '<div class="macwin" style="position:relative;width:390px"><div class="bar"><i></i><i></i><i></i><span style="margin-left:8px;font-size:12px;color:#6b6b75">Claude on the Mac</span></div>' +
+    '<div class="mfield">Thanks for the notes. I\'ll send the <span class="msel">revised draft</span> by Friday, with the new numbers.</div></div>' +
+    '<div style="display:flex;align-items:center;gap:8px;color:var(--app-ink2);font-size:13px">' + dm('TEXTSELECT 36+13', 1.4, 'var(--ray)') + '<span>→ AX selection set</span></div>' +
+    phoneField('Thanks for the notes. I\'ll send the <span class="sel">revised draft</span> by Friday, with the new numbers.', 'sync') + '</div>');
+
+  /* 3. Joystick */
+  function rd(chord, key, text, p) { return (chord ? '<span style="font:600 12px/1 system-ui;color:var(--phosphor)">' + chord + '</span>' : '') + g(key, 1.3, 'var(--phosphor)') + dm(text, p || 1.4); }
+  function joyPanel(fieldHTML, hot, dist, rateLabel, color, shift, badgeKind) {
+    // arrows block starts at x = 560-8-168 = 384 within panel; caps 48 + 8 gap; body top = 8+44+8 = 60.
+    var ax = { right: 384 + 112 + 24, left: 384 + 24, up: 384 + 56 + 24, down: 384 + 56 + 24 }[hot];
+    var ay = 60 + ({ up: 24, left: 80, right: 80, down: 80 })[hot];
+    var fx = ax + (hot === 'right' ? dist : hot === 'left' ? -dist : 0), fy = ay + (hot === 'up' ? -dist : hot === 'down' ? dist : 0);
+    var t = trail(ax, ay, fx, fy, color, 560, 240);
+    var ro = '<span class="readout" style="left:' + Math.min(fx - 40, 470) + 'px;top:' + (fy - 46) + 'px">' + rateLabel + '</span>';
+    return '<div class="panel" style="position:relative;overflow:visible">' + header('claude', 'Claude') + '<div class="body">' + field(fieldHTML, { badge: badgeKind || 'sync' }) + acts() + arrows({ hot: hot }) + '</div>' + keyRows(shift) +
+      '<div style="position:absolute;inset:0;pointer-events:none">' + t + '<span class="finger" style="left:' + fx + 'px;top:' + fy + 'px"></span>' + ro + '</div></div>';
+  }
+  put('j1', joyPanel('Thanks for the notes. I\'ll send the revi' + CARET + 'sed draft by Friday.', 'right', 52, rd('', 'keyRight', '14/S · CHAR'), 'var(--glow)', false));
+  put('j2', joyPanel('Thanks for the notes. I\'ll send <span class="sel">the revised draft by</span>' + CARET + ' Friday.', 'right', 96, rd('⌥⇧', 'keyRight', '24/S · WORD'), 'var(--app-accent)', true, 'send'));
+  // rate curve
+  (function () {
+    var w = 300, h = 150, px = function (d) { return 24 + d / 140 * (w - 40); }, py = function (r) { return h - 26 - r / 32 * (h - 46); };
+    var path = 'M' + px(0) + ' ' + py(0) + ' L' + px(12) + ' ' + py(0) + ' L' + px(12) + ' ' + py(4) + ' L' + px(120) + ' ' + py(30) + ' L' + px(140) + ' ' + py(30);
+    var dots = ''; for (var d = 0; d <= 140; d += 7) { var r = d < 12 ? 0 : Math.min(30, 4 + 26 * (d - 12) / 108); dots += '<rect x="' + (px(d) - 2) + '" y="' + (py(r) - 2) + '" width="4" height="4" rx="1.2" fill="' + (d < 12 ? 'var(--dot-off)' : 'var(--glow)') + '" opacity="' + (d < 12 ? 1 : (0.35 + 0.65 * r / 30)).toFixed(2) + '"/>'; }
+    var svg = '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="Rate rises from 4 to 30 steps per second between 12 and 120 points">' +
+      '<line x1="24" y1="' + py(0) + '" x2="' + (w - 10) + '" y2="' + py(0) + '" stroke="var(--app-hair)"/>' +
+      '<path d="' + path + '" fill="none" stroke="rgba(61,224,224,.35)" stroke-width="1"/>' + dots +
+      '<text x="' + px(12) + '" y="' + (h - 8) + '" fill="var(--app-ink3)" font-size="10" text-anchor="middle">12</text><text x="' + px(60) + '" y="' + (h - 8) + '" fill="var(--app-ink3)" font-size="10" text-anchor="middle">60</text><text x="' + px(120) + '" y="' + (h - 8) + '" fill="var(--app-ink3)" font-size="10" text-anchor="middle">120 pt</text>' +
+      '<text x="20" y="' + (py(30) + 4) + '" fill="var(--app-ink3)" font-size="10" text-anchor="end">30</text><text x="20" y="' + (py(4) + 4) + '" fill="var(--app-ink3)" font-size="10" text-anchor="end">4</text>' +
+      '<line x1="' + px(60) + '" y1="' + (py(0)) + '" x2="' + px(60) + '" y2="20" stroke="var(--app-ink3)" stroke-dasharray="1 3"/><text x="' + (px(60) + 4) + '" y="28" fill="var(--app-ink2)" font-size="10">words / paragraphs →</text></svg>';
+    put('jc', '<div style="width:300px;background:var(--app-raised);border-radius:14px;padding:10px 0 0">' + '<div style="padding:0 12px 4px">' + dm('STEPS/S BY DISTANCE', 1.3, 'var(--ray)') + '</div>' + svg + '</div>');
+  })();
+  put('jv', '<div style="position:relative;width:300px;height:230px">' +
+    '<div style="position:absolute;left:0;top:0;width:300px">' + field('Agenda<br>1. Budget<br>2. Hiring' + CARET + '<br>3. Launch', { badge: 'sync', style: 'height:110px;font-size:15px;line-height:20px' }) + '</div>' +
+    '<div style="position:absolute;left:66px;top:118px">' + arrows({ hot: 'up' }) + '</div>' +
+    '<div style="position:absolute;inset:0;pointer-events:none">' + trail(66 + 56 + 24, 118 + 24, 66 + 56 + 24, 118 + 24 - 40, 'var(--glow)', 300, 230) + '<span class="finger" style="left:146px;top:102px"></span><span class="readout" style="left:176px;top:90px">' + rd('', 'keyUp', '3/S · LINE', 1.3) + '</span></div></div>');
+  put('j1row', '<div style="position:relative;width:300px;height:120px">' +
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding-top:56px">' + ['keyLeft', 'keyUp', 'keyDown', 'keyRight'].map(function (k, i) { return '<span class="k' + (i === 3 ? ' hot' : '') + '" style="height:48px">' + g(k, 2.4, i === 3 ? '#fff' : null) + '</span>'; }).join('') + '</div>' +
+    '<div style="position:absolute;inset:0;pointer-events:none">' + trail(266, 80, 214, 80, 'var(--glow)', 300, 120) + '<span class="finger" style="left:214px;top:80px"></span><span class="readout" style="left:150px;top:14px">' + rd('', 'keyLeft', '9/S · CHAR', 1.3) + '</span></div></div>');
+  put('jt', '<div style="width:300px;display:grid;gap:8px">' +
+    '<div style="background:#0b0b0e;border-radius:12px;padding:10px 12px;font:13px/1.5 ui-monospace,Menlo,monospace;color:#d7e3ff;box-shadow:inset 0 0 0 1px var(--app-hair)">~/site $ git commit -m "fix hea' + CARET + 'der"</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">' +
+    '<span class="k" style="height:48px">' + g('keyLeft', 2.4) + '</span><span class="k" style="height:48px;display:grid;gap:2px;place-content:center;justify-items:center">' + g('keyUp', 1.6) + dm('HISTORY', 1) + '</span><span class="k" style="height:48px;display:grid;gap:2px;place-content:center;justify-items:center">' + g('keyDown', 1.6) + dm('HISTORY', 1) + '</span><span class="k hot" style="height:48px">' + g('keyRight', 2.4, '#fff') + '</span></div></div>');
+
+  /* 4. Loupe */
+  function loupe(inner, overlay) {
+    return '<div style="width:560px;display:grid;gap:8px">' +
+      '<div class="loupe" style="height:168px"><div style="padding:22px 26px;font:24px/1.5 -apple-system,system-ui,sans-serif;color:#1b1b1f">' + inner + '</div>' +
+      '<div class="lt">' + g('search', 1.4, 'var(--app-ink2)') + dm('LOUPE 3.2×', 1.3, 'var(--ray)') + '<span>Tap to place the caret · hold, then drag to select</span></div>' + (overlay || '') + '</div>' +
+      '<div class="panel" style="width:560px">' + header('claude', 'Claude') + '</div></div>';
+  }
+  put('l1', loupe('Thanks for the notes. I\'ll send the revised draft by <span class="mcaret" style="display:inline-block;width:2px;height:28px;background:#1b1b1f;vertical-align:-6px"></span>Friday, with the new numbers.',
+    '<span class="tapring" style="left:258px;top:104px"></span><span class="lbl" style="left:228px;top:66px;color:var(--cobalt)">CLICK</span>'));
+  put('l2', loupe('Thanks for the notes. I\'ll send <span style="background:#b3d7ff">the revised draft</span> by Friday, with the new numbers.',
+    '<svg class="trail" style="left:0;top:0" width="560" height="168" aria-hidden="true">' + (function () { var s = ''; for (var x = 120; x <= 370; x += 8) s += '<rect x="' + (x - 2) + '" y="' + (98) + '" width="4" height="4" rx="1.2" fill="var(--cobalt)" opacity="' + (0.3 + 0.7 * (x - 120) / 250).toFixed(2) + '"/>'; return s; })() + '</svg>' +
+    '<span class="finger" style="left:372px;top:100px"></span>'));
+
+  /* 5. Devices */
+  function mirror(w, h, macW, macX, macY, fieldHTML) {
+    return '<div class="dotgrid"></div>' +
+      '<div class="statusstrip" style="left:16px;top:14px"><i></i>' + dm('STUDIO · NOTES · 60 FPS', 1.6) + '</div>' +
+      '<div class="macwin" style="left:' + macX + 'px;top:' + macY + 'px;width:' + macW + 'px"><div class="bar"><i></i><i></i><i></i><span style="margin-left:8px;font-size:12px;color:#6b6b75">Notes</span></div>' +
+      '<div style="display:flex"><div style="width:30%;background:#efeff3;padding:10px;font-size:11px;color:#6b6b75">Meeting notes<br>Launch plan<br>Groceries</div>' +
+      '<div style="flex:1;padding:14px 16px;font-size:13px">' + fieldHTML + '</div></div></div>';
+  }
+  var NOTES_MAC = '<b>Launch plan</b><br>Thanks for the notes. I\'ll send the <span class="msel">revised draft</span> by Friday, with the new numbers.<br>— Budget: confirm totals<br>— Hiring: two roles';
+  function ipadKb(w) {
+    var r = function (s, pre, post) { return '<div class="r" style="gap:8px">' + (pre || '') + s.split('').map(function (c) { return '<span class="c" style="flex:1 1 0;height:58px;font-size:22px">' + c + '</span>'; }).join('') + (post || '') + '</div>'; };
+    return '<div class="kb" style="width:' + w + 'px;padding:10px 8px;gap:9px;background:#2b2f3a">' + r('QWERTYUIOP', '<span class="c w" style="flex:0 0 64px;height:58px">tab</span>', '<span class="c w" style="flex:0 0 80px;height:58px">⌫</span>') + r('ASDFGHJKL', '<span class="c w" style="flex:0 0 84px;height:58px">caps</span>', '<span class="c w" style="flex:0 0 100px;height:58px">return</span>') + r('ZXCVBNM', '<span class="c w" style="flex:0 0 120px;height:58px">⇧</span>', '<span class="c w" style="flex:0 0 120px;height:58px">⇧</span>') +
+      '<div class="r" style="gap:8px"><span class="c w" style="flex:0 0 120px;height:58px">.?123</span><span class="c w" style="flex:0 0 64px;height:58px">☺</span><span class="c sp" style="height:58px">space</span><span class="c w" style="flex:0 0 120px;height:58px">.?123</span></div></div>';
+  }
+  var SYNC_NOTES = 'Thanks for the notes. I\'ll send the <span class="sel">revised draft</span>' + CARET + ' by Friday, with the new numbers.';
+  put('d-land', '<div class="dev" style="width:1200px"><div class="scr" style="width:1180px;height:820px">' +
+    mirror(1180, 820, 760, 210, 70, NOTES_MAC) +
+    '<div style="position:absolute;left:300px;top:112px">' + '<div class="loupe" style="width:580px;height:150px"><div style="padding:26px 24px;font:22px/1.5 -apple-system,system-ui,sans-serif;color:#1b1b1f">… I\'ll send the <span style="background:#b3d7ff">revised draft</span> by Friday, with the</div><div class="lt">' + g('search', 1.4, 'var(--app-ink2)') + dm('LOUPE 2.4×', 1.3, 'var(--ray)') + '</div></div></div>' +
+    '<div style="position:absolute;left:300px;top:272px;width:580px">' + '<div class="panel" style="width:580px">' + header('notes', 'Notes') + '<div class="body">' + field(SYNC_NOTES, { badge: 'sync' }) + acts() + arrows() + '</div></div></div>' +
+    '<div style="position:absolute;left:0;bottom:0">' + ipadKb(1180) + '</div></div></div>');
+  put('d-port', '<div class="dev" style="width:840px"><div class="scr" style="width:820px;height:1180px">' +
+    mirror(820, 1180, 700, 60, 70, NOTES_MAC) +
+    '<div style="position:absolute;left:130px;top:330px"><div class="panel" style="position:relative;overflow:visible;width:560px">' + header('notes', 'Notes') + '<div class="body">' + field('Thanks for the notes. I\'ll send the revi' + CARET + 'sed draft by Friday, with the new numbers.', { badge: 'sync' }) + acts() + arrows({ hot: 'right' }) + '</div>' + keyRows(false) +
+    '<div style="position:absolute;inset:0;pointer-events:none">' + trail(520, 140, 570, 140, 'var(--glow)', 640, 240) + '<span class="finger" style="left:570px;top:140px"></span><span class="readout" style="left:470px;top:96px">' + rd('', 'keyRight', '14/S · CHAR') + '</span></div></div></div>' +
+    '<div style="position:absolute;left:0;bottom:0">' + ipadKb(820) + '</div></div></div>');
+  put('d-phone', '<div class="dev dev--phone" style="width:417px"><div class="scr" style="width:393px;height:852px">' +
+    '<div class="dotgrid"></div><div class="statusstrip" style="left:20px;top:62px"><i></i>' + dm('STUDIO · CLAUDE', 1.4) + '</div>' +
+    '<div class="macwin" style="left:12px;top:96px;width:369px"><div class="bar"><i></i><i></i><i></i><span style="margin-left:8px;font-size:11px;color:#6b6b75">Claude</span></div><div class="mfield" style="font-size:11px">Thanks for the notes. I\'ll send the revised<span class="mcaret"></span> draft by Friday, with the new numbers.</div></div>' +
+    '<div style="position:absolute;left:0;right:0;bottom:0">' +
+    '<div style="padding:8px;background:var(--app-glass);border-radius:22px 22px 0 0;display:grid;gap:8px"><div class="hdr" style="height:36px"><span class="seg" style="height:32px"><span class="on">Live</span><span>Compose</span></span><span class="chip" style="height:32px">' + APP.claude + g('search', 1.6, 'var(--app-ink2)') + '</span><span class="sp"></span><span class="hbtn" style="height:36px">' + g('close', 2) + '</span></div>' +
+    field('<span class="ell">…</span>I\'ll send the revised<span class="caret caret--float"></span> draft by Friday, with the new numbers.', { badge: 'sync', style: 'height:84px;font-size:16px' }) + '</div>' +
+    kb(true, trail(196, 178, 120, 150, 'var(--glow)', 390, 230) + '<span class="finger" style="left:120px;top:150px"></span>') + '<div style="height:34px;background:#2b2f3a"></div></div></div></div>');
+
+  /* Decorative dot-matrix labels in board chrome */
+  document.querySelectorAll('[data-dm]').forEach(function (el) { el.innerHTML = dm(el.getAttribute('data-dm'), parseFloat(el.getAttribute('data-p') || '1.6'), el.getAttribute('data-c')); });
+
+  /* Fit each mockup to its stage with CSS zoom (1 CSS px = 1 pt at zoom 1). */
+  function fit() {
+    document.querySelectorAll('.fit').forEach(function (f) {
+      var w = parseFloat(f.getAttribute('data-w')), inner = f.firstElementChild; if (!inner) return;
+      var avail = f.clientWidth; var z = Math.min(1, avail / w);
+      inner.style.zoom = z.toFixed(4);
+    });
+  }
+  fit();
+  var t; window.addEventListener('resize', function () { clearTimeout(t); t = setTimeout(fit, 80); });
+})();
+</script>
