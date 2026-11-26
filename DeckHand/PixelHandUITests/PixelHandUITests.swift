@@ -778,6 +778,20 @@ final class PixelHandUITests: XCTestCase {
             } else {
                 snap("missing-ph.type.resize.trailing-\(tag)")
             }
+            // OT-12: the target chip opens the loupe (Pro), attached to
+            // the panel; with the mirror off it offers to start it.
+            if tapIfExists("ph.type.target") {
+                sleep(2)
+                let loupe = element("ph.type.loupe")
+                if loupe.waitForExistence(timeout: 3) {
+                    XCTAssertEqual(loupe.frame.width, panel.frame.width, accuracy: 2, "The loupe isn't as wide as the panel")
+                    XCTAssertTrue(loupe.frame.maxY <= panel.frame.minY + 1 || loupe.frame.minY >= panel.frame.maxY - 1, "The loupe covers the panel")
+                    snap("type-loupe-\(tag)")
+                    tapIfExists("ph.type.target")
+                } else {
+                    snap("type-loupe-paywall-\(tag)")
+                }
+            }
             tapIfExists("ph.type.close")
             sleep(1)
         }
