@@ -2057,3 +2057,30 @@ only with arrows, one-row arrows, target once, dock over the keyboard bar;
 zoom-to-input loupe, protocol 16; Accept ⇥ and OT-13 findings; Send sheet
 and capture preview redrawn). Needs an iPad and Mac re-check.
 
+## Build 27 queued (2026-11-26, primary session): owner round 26
+
+Build 26 plus **owner26** (`LANE-owner26.md`, protocol 16):
+- **OT-11** Type panel sizes every block to the panel: arrows scale, field
+  can take two lines, numpad mode shows only arrows + numpad, arrows in
+  one row at the minimal size, target shown once (app icon in the header),
+  panel and dock avoid the iPadOS keyboard bar.
+- **OT-12** Zoom to the input: the Mac reads the focused field and caret
+  through Accessibility; a live loupe on the Type panel follows it (Pro);
+  falls back to the area around the pointer.
+- **OT-13** Accept ⇥ (Tab) in Live mode; native fields' text shown in the
+  loupe. Ghost text from web/Electron apps (Claude) isn't readable as text;
+  the loupe shows it as pixels.
+- **OT-9** Send sheet redesigned in the design system; **OT-10** capture
+  preview fits the screen in portrait.
+
+Owner decision taken by the primary session: the Send sheet's Clipboard
+chip should use the system `PasteButton` (no "Allow Paste" prompt), in
+line with the S10 decision (UIPasteControl, no paste prompts). If the
+lane's custom chip shipped, switch it in the next fix round.
+
+Mac should check: build all targets (compile risks in the handoff), Core,
+Loom and app tests, the walks (Type panel bands, loupe, Send sheet,
+capture), the "Mac checks (protocol 16)" list, install on Mac and iPad.
+
+Status: READY FOR MAC BUILD (build 27)
+

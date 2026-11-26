@@ -44,6 +44,11 @@ landscape (`STATUS.md`, "Owner testing (build 25)"); built on
   run saves as a key. A key that types always asks first, naming the app
   the text lands in; widgets leave such keys out.
 
+## 2026-11-26 — Send sheet clipboard uses the system Paste button
+Primary session's call (owner delegated UX calls): the Send sheet's
+Clipboard source uses SwiftUI `PasteButton` / `UIPasteControl`, so iOS
+never shows "Allow Paste", consistent with the S10 clipboard decision.
+
 ## 2026-11-26 — Owner testing, build 24 (OT-1 … OT-5)
 From the owner's hands-on test on the iPad Air 11" (M3), landscape
 (`STATUS.md`, "Owner testing (build 24)"); fixed on
