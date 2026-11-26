@@ -2319,3 +2319,66 @@ installed and launched.
 `19`, `20`, `21`) and the protocol 16 checks.
 
 Status: READY FOR MAC BUILD (build 28)
+
+## Mac build results (build 28 with owner27) — 2026-11-27
+
+Rebuilt from `839d62a` (build 28 with owner27 folded in) on Xcode 27.2,
+Release, team `DD5AWPLT2V`. This replaces the build 28 section above
+(which ran before owner27 was folded in) except where it says otherwise.
+
+**Build:** the Mac app builds; the iOS app didn't compile:
+`DeckHandiOS/Transfer/TransferSheet.swift:1081`, a `? :` between a `Color`
+and a `RadialGradient` in the Send to tile's fill. Fixed in `5348ee6`
+(both sides wrapped in `AnyShapeStyle`). The iOS app and the UI tests
+then build.
+
+**Tests**
+- `swift test --package-path DeckHand/Core`: **1305 / 1305 pass** (238 suites).
+- `swift test --scratch-path .build-local`: **480 / 480 pass**.
+- `DeckHandTests` (macOS): **8 / 8 pass**.
+
+**Install:** Mac replaced and launched with `open`; iPad Air 11" (M3)
+installed and launched.
+
+**Walks: only those that send nothing to the Mac** (the owner said
+"later" for the Mac walks and the protocol 16 checks).
+- iPad Pro 11", full screen: 01, 02, 03, 07, 09, 10, 11, 12, 13, 14, 17,
+  25, 26 pass; **`test22`, `test23`, `test24` fail**.
+- iPhone 17 Pro: 01, 03, 07, 09, 11, 12, 14, 23, 24, 25, 26 pass
+  (`test26` skips itself: no header Ask button on iPhone); **`test22`
+  fails**.
+- iPhone 17 Pro AX3: 01, 09, 12 pass (the reconnect finishes, VQ-107).
+
+**Re-checks**
+- owner27: OT-14 badges above glass (`test25`, iPad and iPhone): **pass**.
+  OT-18 header ⌘K Ask button (`test26`, iPad): **pass**, opens Ask with
+  Recent. OT-15 and OT-16: the Send sheet is centred with an even header
+  and shows “Muhammad’s / MacBook Pro” in full. OT-17: see bug 3.
+- build27-fixes: as in the section above. Loupe taps, arrows grow, Send
+  chips at 44 pt and capture centring **pass**.
+
+**Open bugs**
+1. **iPhone Live has no Accept (Tab) (P2, OT-13):** `test22`, still: no
+   `ph.type.accept` in Live on iPhone. The iPad has it.
+2. **iPhone landscape keyboard button not hittable (P2, VQ-105):** the
+   rail now has a keyboard button (`ph.rail.keyboard`, visible in the
+   capture) but XCTest says it isn't hittable, so `test22` can't open the
+   Type panel in landscape (`06-not-hittable-ph-rail-keyboard`). Needs a
+   check by hand.
+3. **Send sheet (P3, OT-15…17):** iPad `test23`:
+   - The device card is 90.5 pt tall (the walk wants ≤ 84). The full
+     two-line name (OT-16) makes it taller, so the walk's limit and OT-16
+     disagree.
+   - The Paste chip's fill differs from Photos and Files by 23 (≤ 12
+     wanted). It's the system `PasteButton`, per the owner's decision.
+   - "Sheet centred" compares against a window frame the walk reads as
+     zero, so that check is the walk's own bug.
+4. **Loupe frame overlaps the panel (P3):** iPad `test22`: taps work; the
+   frame check still fails.
+5. **Capture dock frame (P3):** iPad `test24`: the dock's measured frame
+   ends 1177 / 801 pt below the window, though it looks right.
+
+**Still waiting for the owner:** the Mac walks (`test04`, `05`, `16`, `18`,
+`19`, `20`, `21`, which also covers VQ-104) and the protocol 16 checks.
+
+Status: BUILT (build 28) — 5 bugs
