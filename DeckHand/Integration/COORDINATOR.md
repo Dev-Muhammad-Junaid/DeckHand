@@ -1,6 +1,6 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Build 24 is green; QA and owner testing are done.** Two lanes are running: qa24-fixes (mine: VQ-100/098/099/066 and P3s) and owner24 (the primary's: OT-1…5). When **both** are ready: merge them, then queue **one combined build 25** with a final QA pass. That pass adds a landscape keyboard walk and the new Ask walk. Then the review page.
+> **Build 25 queued by the primary** (`c9b87da`: qa24-fixes plus owner24). No lanes are running. Waiting on the Mac results and the final QA pass. If there are no P1 or P2 bugs: publish the review page, write `PROGRAMME COMPLETE`, and stop ticks. Otherwise: one more fix round.
 
 > **Mac builds:** 15, 16, 18 and 19 built (19 with 5 bugs, fixed in build 21). The primary session or the owner's Mac session runs Mac builds.
 
@@ -29,7 +29,6 @@ weekly usage limit is close).
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Primary (cloud, owner-facing: the owner sends changes here) | "★ Pixel Hand · PRIMARY" | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac, Claude Desktop session "DeckHand MAC build loop", `/loop` every 30 min; the only Mac build loop since 2026-11-25) | local_d0e9b529 | claude/pixelhand-integration (worktree `pixelhand-build`) | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
-| Owner testing build 24 (OT-1 dock icons, OT-2 keyboard loop, OT-3 typing, OT-4 handle, OT-5 Ask stuck), started by the primary | (primary's child) | claude/pixelhand-lane-owner24 | `LANE-owner24.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -261,3 +260,4 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   owner24 files. Core has 1083 tests, all passing; the type check passes;
   the braces balance. Build 25 waits for owner24, then gets queued as one
   build.
+- 2026-11-26 13:45 UTC: the primary merged owner24 (`eec7022`) and queued build 25 (`c9b87da`). Confirmed in the repo. Waiting on the Mac.
