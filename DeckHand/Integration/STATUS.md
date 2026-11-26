@@ -2460,3 +2460,48 @@ until build 30.
 
 Status: READY FOR MAC BUILD (build 29)
 
+
+## Mac build results (build 29) — 2026-11-27
+
+Built from `89ea90c` (build 29: live sync phase 1, caret joystick,
+protocol 17) on Xcode 27.2, Release, team `DD5AWPLT2V`.
+
+**Build:** the iOS app and the UI tests build first time. The Mac app
+needed two fixes, both pushed:
+- `1d57165`: `FocusTextObserver.swift` and `FocusTextSync.swift` used
+  `TextRange`, which Carbon's `AERegistry.h` also declares (“ambiguous for
+  type lookup”). They now name `PixelHandCore.TextRange`.
+- `902af4e`: `UInt(bitPattern: CFHash(element))` doesn't compile, because
+  `CFHashCode` is already `UInt`. It's now `UInt64(CFHash(element))`.
+
+**Tests**
+- `swift test --package-path DeckHand/Core`: **1399 / 1399 pass** (251 suites).
+- `swift test --scratch-path .build-local`: **480 / 480 pass**.
+- `DeckHandTests` (macOS): **8 / 8 pass**.
+
+**Install:** the Mac app was replaced and launched with `open`. The iPad
+Air 11" (M3) was installed and launched; both run protocol 17.
+
+**Walks:** only those that send nothing to the Mac.
+- iPad Pro 11", full screen: 01, 02, 03, 07, 09, 10, 11, 12, 13, 14, 17,
+  25 and 26 pass. `test22`, `test23` and `test24` fail on the same
+  assertions as build 28 (the loupe frame, the Send sheet's card height,
+  Paste fill and the walk's zero window frame, the capture dock's frame).
+  There are no new failures.
+- **Not run yet, needs the owner's OK to use the Mac:**
+  - The new `test27_ArrowJoystick`, `test27_LiveSyncTypeOnMac`,
+    `test28_LiveSyncTabAccept` and `test29_LiveSyncEditFromIPad`. These
+    type or send arrows on the Mac.
+  - The older Mac walks: `test04`, `05`, `16`, `18`, `19`, `20` and `21`.
+  - The `LANE-live-sync.md` measurement checklist (TextEdit, Notes, Mail,
+    Xcode; latency; a secure field; lock).
+  - The joystick by hand.
+- Tooling note: two walks are both numbered `test27`
+  (`test27_ArrowJoystick`, `test27_LiveSyncTypeOnMac`). XCTest runs them
+  in name order, which works, but one should be renumbered.
+
+**Open bugs:** the eight from build 28 stay open until build 30, as
+queued. Build 29's own features haven't been checked yet, because they
+need the Mac.
+
+Status: BUILT (build 29) — build 28's 8 bugs open; live-sync checks need the Mac
