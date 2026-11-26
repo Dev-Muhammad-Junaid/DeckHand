@@ -33,6 +33,7 @@
 
 import PixelHandCore
 import SwiftUI
+import UIKit
 
 struct AskSheet: View {
     let session: ControlSessionModel
@@ -156,6 +157,17 @@ struct AskPanel: View {
         // New request: the cleared field takes focus.
         .onChange(of: model.flow.fieldResetRequest) { _, _ in
             if isUnlocked { isFieldFocused = true }
+        }
+        // Build 25 bug 2: with a plan or result showing, the field still
+        // holds the request that made it. Focusing it selects that text,
+        // so typing starts a new request instead of joining the old one
+        // ("nowTake a screenshot"). After the focus lands, so the field is
+        // the first responder.
+        .onChange(of: isFieldFocused) { _, focused in
+            guard focused, model.flow.selectsFieldOnFocus, !model.request.isEmpty else { return }
+            DispatchQueue.main.async {
+                UIApplication.shared.sendAction(#selector(UIResponder.selectAll(_:)), to: nil, from: nil, for: nil)
+            }
         }
         .onDisappear {
             if placement == .sheet { model.cancelRun() }

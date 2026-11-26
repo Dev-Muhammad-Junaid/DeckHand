@@ -196,3 +196,25 @@ struct AskSaveNameTests {
         #expect(key?.label.count == DeckValidation.maxLabelLength)
     }
 }
+
+@Suite("Ask's field starts a new request after a plan (build 25 bug 2)")
+struct AskFieldSelectionTests {
+    @Test("After a plan, a result or Save as key › Cancel, focusing the field selects the old request")
+    func selects() {
+        var flow = AskFlow()
+        #expect(!flow.selectsFieldOnFocus)
+        flow.apply(.submit("Take a screenshot"))
+        #expect(!flow.selectsFieldOnFocus) // planning
+        flow.apply(.planReady)
+        #expect(flow.selectsFieldOnFocus)
+        flow.apply(.saveAsKey(suggestedName: "Screenshot"))
+        #expect(flow.selectsFieldOnFocus)
+        flow.apply(.cancelNaming)
+        #expect(flow.selectsFieldOnFocus) // the owner's case: back on the plan
+        flow.apply(.runStarted)
+        flow.apply(.runEnded(succeeded: true))
+        #expect(flow.selectsFieldOnFocus)
+        flow.apply(.newRequest)
+        #expect(!flow.selectsFieldOnFocus) // a cleared field: just the caret
+    }
+}

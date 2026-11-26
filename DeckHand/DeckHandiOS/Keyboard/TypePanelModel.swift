@@ -51,6 +51,8 @@ final class TypePanelModel {
     /// `.global`), while it covers the window.
     private(set) var keyboardMinY: Double?
     private(set) var hardwareKeyboardAttached = false
+    /// The last keyboard end frame, in screen space (`nil` once hidden).
+    @ObservationIgnored private var keyboardScreenFrame: CGRect?
     /// The app dock's top in global coordinates, while it shows under the
     /// panel; the panel sits above it when no keyboard covers the dock.
     var dockMinY: CGFloat?
@@ -63,12 +65,19 @@ final class TypePanelModel {
         presence = TypePanelPresence(mode: TypeMode.restored(UserDefaults.standard.string(forKey: Self.modeKey)))
         hardwareKeyboardAttached = GCKeyboard.coalesced != nil
         let center = NotificationCenter.default
-        observers.append(center.addObserver(forName: UIResponder.keyboardWillChangeFrameNotification, object: nil, queue: .main) { [weak self] note in
-            let frame = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue
-            MainActor.assumeIsolated { self?.keyboardFrameChanged(frame) }
-        })
+        // Will and Did both: on rotation the Will can arrive while the
+        // window still has its old bounds, which put the keyboard below a
+        // portrait window and the panel behind it (build 25 bug 1). The
+        // Did carries the same end frame once the window has turned.
+        for name in [UIResponder.keyboardWillChangeFrameNotification, UIResponder.keyboardDidChangeFrameNotification] {
+            observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                let frame = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue
+                MainActor.assumeIsolated { self?.keyboardFrameChanged(frame) }
+            })
+        }
         observers.append(center.addObserver(forName: UIResponder.keyboardWillHideNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
+                self?.keyboardScreenFrame = nil
                 self?.keyboardOverlap = 0
                 self?.keyboardMinY = nil
             }
@@ -117,7 +126,16 @@ final class TypePanelModel {
 
     /// The keyboard's end frame (screen space) against the key window.
     private func keyboardFrameChanged(_ screenFrame: CGRect?) {
-        guard let screenFrame,
+        keyboardScreenFrame = screenFrame
+        refreshKeyboard()
+    }
+
+    /// Measures the last keyboard frame against the window as it is now.
+    /// The host calls it when the window's size changes (rotation, Stage
+    /// Manager), so a frame reported before the window turned is read
+    /// again against the turned window.
+    func refreshKeyboard() {
+        guard let screenFrame = keyboardScreenFrame,
               let window = UIApplication.shared.connectedScenes
                 .compactMap({ ($0 as? UIWindowScene)?.keyWindow })
                 .first

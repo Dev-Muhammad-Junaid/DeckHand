@@ -224,3 +224,41 @@ struct TypePanelPillGeometryTests {
         #expect(pill.width == 180)
     }
 }
+
+@Suite("The panel stays above the keyboard in every orientation (build 25 bug 1)")
+struct TypePanelKeyboardRotationTests {
+    @Test("Every window, keyboard and place: the panel ends above the keyboard and its header is in view")
+    func aboveKeyboard() {
+        let places = [TypePanelPlacement.initial, .init(x: 0, y: 0), .init(x: 1, y: 1, width: 360), .init(x: 0.3, y: 0.7, width: 600)]
+        for (name, width, height) in ShellKeyboardTests.windows {
+            for keyboard in ShellKeyboardTests.keyboards where keyboard >= KeyboardKind.softwareMinimumOverlap {
+                let geometry = TypePanelGeometry(
+                    container: PanelRect(x: 0, y: 0, width: width, height: height),
+                    windowWidth: width, windowHeight: height,
+                    keyboardMinY: height - keyboard
+                )
+                for place in places {
+                    for panelHeight in [44.0, 200, 320] {
+                        let frame = geometry.frame(for: place, height: panelHeight)
+                        // The top (grip, close) is always above the keyboard.
+                        #expect(frame.minY + 44 <= height - keyboard || frame.minY == geometry.room.minY, "\(name) kb \(keyboard)")
+                        if panelHeight <= geometry.room.height {
+                            #expect(frame.maxY <= height - keyboard - TypePanelGeometry.gap, "\(name) kb \(keyboard) h \(panelHeight)")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test("Rotating to portrait with the keyboard up: bottom-parked rides on the portrait keyboard")
+    func rotation() {
+        let place = TypePanelPlacement.initial
+        let landscape = TypePanelGeometry(container: PanelRect(x: 0, y: 24, width: 1180, height: 796), windowWidth: 1180, windowHeight: 820, keyboardMinY: 420)
+        #expect(landscape.frame(for: place, height: 240).maxY == 412)
+        let portrait = TypePanelGeometry(container: PanelRect(x: 0, y: 24, width: 820, height: 1156), windowWidth: 820, windowHeight: 1180, keyboardMinY: 1180 - 320)
+        let frame = portrait.frame(for: place, height: 240)
+        #expect(frame.maxY == 852)
+        #expect(frame.minY > 24)
+    }
+}

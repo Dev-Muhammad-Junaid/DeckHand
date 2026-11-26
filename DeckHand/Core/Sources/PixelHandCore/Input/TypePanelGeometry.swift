@@ -166,7 +166,10 @@ public struct TypePanelGeometry: Sendable, Hashable {
         dockMinY: Double? = nil
     ) {
         style = (windowWidth < Self.floatingMinimumSide || windowHeight < Self.floatingMinimumSide) ? .docked : .floating
-        let obstacles = [keyboardMinY, dockMinY].compactMap { $0 }.filter { $0 > container.minY && $0 < container.maxY + Self.gap }
+        // An obstacle below the container (a Stage Manager window above
+        // the keyboard) doesn't count; one reaching above its top leaves
+        // no room, and the panel pins to the top with its header in view.
+        let obstacles = [keyboardMinY, dockMinY].compactMap { $0 }.filter { $0 < container.maxY + Self.gap }
         let bottom = min(container.maxY - Self.gap, (obstacles.min() ?? .infinity) - Self.gap)
         let top = container.minY + Self.gap
         let left = container.minX + Self.gap

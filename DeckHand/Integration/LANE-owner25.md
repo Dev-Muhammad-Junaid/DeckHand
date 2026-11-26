@@ -11,6 +11,8 @@ sources in `project.yml`.
 |---|---|---|
 | OT-6 Panel moves and resizes (P1) | Built (needs an iPad and iPhone check) | Core `Input/TypePanelGeometry.swift` (new), `Input/TypePanel.swift` (presence: collapse, numpad toggle), `Design/PixelGlyphs+Layout.swift` (grip, collapse, resize corner); iOS `Keyboard/TypePanel.swift` (`TypePanelHost`, pill), `Keyboard/TypePanelModel.swift`, `Shell/PixelHandShell.swift` (passes the arrangement) |
 | OT-7 Compact layout (P2) | Built (needs an iPad and iPhone check) | Core `Input/TypePanel.swift` (`TypePanelLayout`, `TypeKeyBlock`, `ArrowCluster`, 5 × 4 `NumpadKey`, legends), `Design/PixelGlyphs+Layout.swift` (arrow legends); iOS `Keyboard/TypePanel.swift`, `Keyboard/LiveTypingField.swift` (`onFocus`), `Clipboard/PasteToMacControl.swift` (`iconOnly`) |
+| Bug 1 (build 25) Type panel behind the keyboard in portrait (P1) | Fixed (needs an iPad check: `test18` in both orientations) | iOS `Keyboard/TypePanelModel.swift` (`refreshKeyboard`, Did-change observer), `Keyboard/TypePanel.swift` (host re-measures on resize); Core `Input/TypePanelGeometry.swift` (room rule) |
+| Bug 2 (build 25) Ask keeps the old request (P3) | Fixed (needs an iPad check: `test19`) | Core `Assist/AskFlow.swift` (`selectsFieldOnFocus`); iOS `Surfaces/AskSheet.swift`; `test19`'s last step |
 | OT-8 Typed steps save as keys (P2) | Built (needs a Mac and iPad check) | Core `Deck/Action.swift` (`typeText`), `Deck/ActionValidation.swift`, `Deck/ActionLibrary.swift`, `Deck/DeckEditing.swift`, `Deck/DeckPresentation.swift`, `Deck/TypedTextSummary.swift` (new), `Assist/AskPlan.swift`, `Input/RemoteInputValidation.swift`, `System/LockPolicy.swift`, `Intents/WidgetDeckSnapshot.swift`, `Protocol/PixelHandProtocol.swift`, `PROTOCOL.md`, fixtures; Mac `Handlers/DeckHandler.swift`, `Input/TypingQueue.swift`; iOS `Deck/KeyInspectorSheet.swift`, `Deck/DeckKeyButton.swift`, `Surfaces/DeckSurface.swift`, `Surfaces/AskSheet.swift` |
 
 ## OT-6 · The Type panel moves, resizes and folds
@@ -257,10 +259,48 @@ presentation; the library kind; widgets vs Shortcuts. Also
 runs and saves). Updated: `AskPlannerTests` (typing plans save),
 `DeckUITests.everyKind`, `ProtocolContractTests` samples.
 
+## Build 25 bugs (routed to this lane by the coordinator)
+
+**Bug 1 · Type panel behind the keyboard in portrait (P1).** After
+`test18` rotated back to portrait with the keyboard up, the panel sat
+behind the keyboard and `ph.type.close` wasn't hittable. **Cause:** the
+panel's keyboard top came only from `keyboardWillChangeFrame`, measured
+against the key window's bounds at that moment. On rotation that
+notification can arrive before the window has turned, so the portrait
+keyboard's top read as below a landscape-sized window: no overlap, no
+keyboard, and the panel went to the bottom, under the keyboard. **Fix:**
+- `TypePanelModel` keeps the keyboard's last end frame in screen space and
+  re-measures it (`refreshKeyboard()`); it also listens to
+  `keyboardDidChangeFrame`, which carries the same end frame after the
+  window has turned.
+- `TypePanelHost` calls `refreshKeyboard()` whenever the window's size
+  changes (rotation, Stage Manager), after that layout pass.
+- The panel's place is always inside the free room above the keyboard
+  (`TypePanelGeometry`, OT-6), so once the keyboard is measured right the
+  panel can't sit behind it. A keyboard reaching above the window's top
+  now leaves no room (the panel pins to the top, header in view) instead
+  of being ignored.
+
+`TypePanelKeyboardRotationTests`: every test window × keyboard height ×
+place × panel height ends above the keyboard with its header in view; and
+the rotation case (bottom-parked, landscape → portrait with the keyboard
+up) rides on the portrait keyboard. `test18` is unchanged and must pass in
+both orientations.
+
+**Bug 2 · Ask keeps the old request (P3, OT-5).** After Save as key ›
+Cancel the field still held "Take a screenshot", and tapping it put the
+caret at the start, so the next request became "nowTake a screenshot".
+**Fix:** while a plan or result shows (`AskFlow.selectsFieldOnFocus`:
+plan, editing, running, result, naming), focusing the field **selects
+its text**, so typing starts a new request; editing it is still one tap
+away. New request still clears it. `AskFieldSelectionTests` covers the
+stages. `test19`'s last step now types a whole new request and asserts
+the field holds only it (it typed " now" to append before).
+
 ## Linux results
 
-- `swift test --package-path DeckHand/Core`: **1177 / 1177 pass** (213
-  suites). There were 1133 before, so 44 tests are new.
+- `swift test --package-path DeckHand/Core`: **1180 / 1180 pass** (215
+  suites). There were 1133 before, so 47 tests are new.
 - `DeckHand/Scripts/linux-typecheck/run.sh`: passes. It covers
   `DeckHandler` and `TypingQueue` (Mac) and `Assist/*` (iOS `AskModel`).
 - `swiftc -parse` is clean on every changed app file that can't be
@@ -322,6 +362,8 @@ runs and saves). Updated: `AskPlannerTests` (typing plans save),
   type youtube and press return" → Run → Save as key with a name → "Saved
   as a key" → the key on the deck → tap → asks first with "Types into …" →
   Run → the inspector shows "Ask before running".
+- `test19`: the last step types a new request and asserts it replaced the
+  old one (bug 2).
 - `test18`: the numpad is a toggle now (`ph.type.tab.numpad` twice; the
   `ph.type.tab.keys` button is gone).
 - New identifiers: `ph.type.grip`, `ph.type.collapse`, `ph.type.pill`,

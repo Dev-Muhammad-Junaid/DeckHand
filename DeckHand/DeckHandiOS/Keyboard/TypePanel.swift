@@ -996,6 +996,13 @@ struct TypePanelHost: View {
         // The panel places itself against the keyboard; it must not be
         // pushed up by the keyboard's safe area as well.
         .ignoresSafeArea(.keyboard, edges: .bottom)
+        // Build 25 bug 1: a keyboard frame reported mid-rotation is read
+        // again against the turned window, so the free room ends above the
+        // keyboard in the new orientation and the panel (and its close
+        // button) stays in view.
+        .onChange(of: windowSize) { _, _ in
+            DispatchQueue.main.async { model.refreshKeyboard() }
+        }
         .onChange(of: storageKey, initial: true) { _, key in
             guard loadedKey != key else { return }
             loadedKey = key

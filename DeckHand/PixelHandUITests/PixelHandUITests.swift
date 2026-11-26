@@ -598,8 +598,11 @@ final class PixelHandUITests: XCTestCase {
         XCTAssertTrue(element("ph.ask.run").exists, "Cancel didn't return to the plan")
         snap("ask-after-cancel")
 
+        // Build 25 bug 2: focusing the field after a plan selects the old
+        // request, so typing replaces it instead of joining it.
         field.tap()
-        field.typeText(" now")
+        field.typeText("Show Mission Control")
+        XCTAssertEqual(field.value as? String, "Show Mission Control", "The new request joined the old one")
         tapIfExists("ph.ask.submit")
         XCTAssertTrue(element("ph.ask.run").waitForExistence(timeout: 10), "Asking again didn't plan")
         snap("ask-again")
