@@ -2256,3 +2256,66 @@ matching Photos/Files/Paste chips (OT-17), header Ask field replaced by a
 compact ⌘K button (OT-18).
 
 Status: READY FOR MAC BUILD (build 28)
+
+## Mac build results (build 28) — 2026-11-27
+
+Built from `d307d54` (build 28) on Xcode 27.2, Release, team `DD5AWPLT2V`.
+
+**Build:** the Mac app, the iOS app and the UI test target build first
+time, with no fixes.
+
+**Tests**
+- `swift test --package-path DeckHand/Core`: **1283 / 1283 pass** (233 suites).
+- `swift test --scratch-path .build-local`: **480 / 480 pass** (run on its
+  own, with no simulators busy).
+- `DeckHandTests` (macOS): **8 / 8 pass**.
+
+**Install:** Mac replaced and launched with `open`; iPad Air 11" (M3)
+installed and launched.
+
+**Walks: only those that send nothing to the Mac** (the owner said
+"later" for the Mac walks and the protocol 16 checks).
+- iPad Pro 11", full screen: 01, 02, 03, 07, 09, 10, 11, 12, 13, 14, 17,
+  23 pass; **`test22`, `test24` fail** (one assertion each, below).
+- iPhone 17 Pro: 01, 07, 09, 11, 12, 14, 23, 24 pass; **`test03`,
+  `test22` fail**.
+- iPhone 17 Pro AX3: 01, 09, 12 pass. The launch reconnect now finishes
+  at AX3 (build 26 had two walks stuck), and the picker at rest shows
+  Pair, Settings and the whole “Paired · Nearby” line.
+
+**build27-fixes re-checks**
+- Loupe taps (build 27 bug 1): **pass**. With the loupe open the panel's
+  target chip and close are hittable again. The walk's frame check
+  ("The loupe covers the panel") still fails on iPad (bug 3).
+- Arrows grow (bug 2): **pass** on iPad: the tall drag grows the panel and
+  its arrows (`test22` 03 vs 02).
+- Send chips (bug 3): **pass** (`test23`, iPad and iPhone).
+- Capture centring (bug 4): **pass** on both; the iPad dock frame check
+  still fails (bug 4).
+- VQ-107 (AX3 connect): **pass** for the reconnect; the Connecting… pill
+  itself wasn't caught on screen.
+- VQ-104, VQ-105, VQ-108: **not checked**. VQ-104 is in `test21` (types
+  on the Mac); on iPhone landscape `test22` still snaps
+  `missing-ph-dock-keyboard` before finding the panel (VQ-105); the iPad
+  mini wasn't run (VQ-108).
+
+**Open bugs**
+1. **iPhone Live has no Accept (Tab) (P2, OT-13):** `test22` portrait and
+   landscape: no `ph.type.accept` in Live on iPhone (iPad has it; build
+   27's iPhone panel showed ⇥ ACCEPT).
+2. **iPhone panel and keyboard (P3):** `test22`: "The taller panel went
+   under the keyboard" by 374 pt, yet the captures show the panel above
+   the dock with no system keyboard on screen. Either the keyboard didn't
+   come up on iPhone or the walk reads a hidden keyboard's frame.
+3. **Loupe frame overlaps the panel (P3):** iPad `test22`: taps work now,
+   but the loupe's frame still intersects the panel's.
+4. **Capture dock frame (P3):** iPad `test24`: the dock's measured frame
+   ends 1177 pt (portrait) / 801 pt (landscape) below the window, though
+   it looks right; likely the identifier sits on an oversized container.
+5. **iPhone picker (P3):** `test03` fails: no `ph.connect.settings` on
+   the picker (the walk used to snap it as missing and go on).
+
+**Still waiting for the owner:** the Mac walks (`test04`, `05`, `16`, `18`,
+`19`, `20`, `21`) and the protocol 16 checks.
+
+Status: BUILT (build 28) — 5 bugs
