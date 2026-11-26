@@ -105,6 +105,14 @@ final class TypePanelModel {
 
     func close() { presence.close() }
 
+    /// Fold to the pill (OT-6); the keyboard steps down.
+    func collapse() { presence.collapse() }
+
+    /// Open the pill back up.
+    func expand() { presence.expand() }
+
+    var isCollapsed: Bool { presence.isCollapsed }
+
     // MARK: Keyboard frame
 
     /// The keyboard's end frame (screen space) against the key window.

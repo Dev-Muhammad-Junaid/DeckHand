@@ -538,10 +538,11 @@ final class PixelHandUITests: XCTestCase {
             if field.exists { field.typeText("draft") }
             snap("type-compose-draft")
         }
+        // Build 25 (OT-7): the numpad is a toggle that docks beside the keys.
         if tapIfExists("ph.type.tab.numpad") {
             sleep(1)
             snap("type-numpad")
-            tapIfExists("ph.type.tab.keys")
+            tapIfExists("ph.type.tab.numpad")
         }
         tapIfExists("ph.type.mode.live")
         // Rotating while open keeps the panel.
@@ -603,6 +604,191 @@ final class PixelHandUITests: XCTestCase {
         XCTAssertTrue(element("ph.ask.run").waitForExistence(timeout: 10), "Asking again didn't plan")
         snap("ask-again")
         closeAsk()
+    }
+
+    /// OT-6 and OT-7 (owner testing, build 25): the Type panel moves,
+    /// snaps, resizes, folds to a pill and reflows; the arrows are an
+    /// inverted T; the numpad docks beside the keys. Landscape on iPad
+    /// (with `PH_QA_FULLSCREEN=1`), whatever fits on iPhone.
+    func test20_TypePanelMovesAndResizes() {
+        useFullScreenAppsIfAsked()
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
+        launch()
+        guard connect() else { return }
+        sleep(1)
+        guard tapIfExists("ph.dock.keyboard") || tapIfExists("ph.trackpad.keyboard") else { return }
+        let panel = element("ph.type.panel")
+        XCTAssertTrue(panel.waitForExistence(timeout: 3), "The Type panel didn't open")
+        sleep(1)
+        snap("type-panel-default")
+
+        // The inverted T: ↑ above ↓, ← and → either side of ↓.
+        let up = element("ph.type.key.up"), down = element("ph.type.key.down")
+        let left = element("ph.type.key.left"), right = element("ph.type.key.right")
+        XCTAssertTrue(up.exists && down.exists && left.exists && right.exists, "The arrow cluster is missing a key")
+        if up.exists, down.exists, left.exists, right.exists {
+            XCTAssertLessThan(up.frame.midY, down.frame.midY, "↑ isn't above ↓")
+            XCTAssertEqual(up.frame.midX, down.frame.midX, accuracy: 2, "↑ isn't over ↓")
+            XCTAssertLessThan(left.frame.midX, down.frame.midX, "← isn't left of ↓")
+            XCTAssertGreaterThan(right.frame.midX, down.frame.midX, "→ isn't right of ↓")
+            XCTAssertEqual(left.frame.midY, down.frame.midY, accuracy: 2, "← ↓ → aren't one row")
+            XCTAssertGreaterThanOrEqual(up.frame.height, 43.5, "Arrow keys lost their 44 pt target")
+            up.tap()
+        }
+        // The keys: two rows, modifiers with esc and tab first.
+        let command = element("ph.type.modifier.command"), delete = element("ph.type.key.delete")
+        if command.exists, delete.exists {
+            XCTAssertLessThan(command.frame.midY, delete.frame.midY, "The modifiers aren't the first row")
+            XCTAssertEqual(element("ph.type.key.escape").frame.midY, command.frame.midY, accuracy: 2, "esc isn't with the modifiers")
+        }
+
+        // Drag by the grip to the top-left corner: the magnet snaps it.
+        let grip = element("ph.type.grip")
+        if grip.waitForExistence(timeout: 2) {
+            let start = panel.frame
+            let window = app.windows.firstMatch.frame
+            grip.press(forDuration: 0.1, thenDragTo: app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.08)))
+            sleep(1)
+            snap("type-panel-dragged")
+            let moved = panel.frame
+            XCTAssertNotEqual(moved.origin, start.origin, "Dragging the grip didn't move the panel")
+            XCTAssertLessThan(moved.minX - window.minX, 40, "The panel didn't snap to the leading edge")
+            XCTAssertGreaterThanOrEqual(moved.minX, window.minX, "The panel left the window")
+        } else {
+            snap("missing-ph.type.grip")
+        }
+
+        // Resize from the right corner: narrower, never under the minimum,
+        // and the layout reflows (stacked: the keys go under the field).
+        let handle = element("ph.type.resize.trailing")
+        if handle.exists {
+            let before = panel.frame.width
+            handle.press(forDuration: 0.1, thenDragTo: handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).withOffset(CGVector(dx: -600, dy: 0)))
+            sleep(1)
+            snap("type-panel-narrow")
+            let after = panel.frame.width
+            XCTAssertLessThan(after, before, "Resizing didn't make the panel narrower")
+            XCTAssertGreaterThanOrEqual(after, 359, "The panel went under its 360 pt minimum")
+            let field = element("ph.type.field")
+            if field.exists, command.exists {
+                XCTAssertGreaterThan(command.frame.minY, field.frame.minY, "Narrow panel didn't stack the keys under the field")
+            }
+        } else if app.windows.firstMatch.frame.width >= 700 {
+            snap("missing-ph.type.resize.trailing")
+        }
+
+        // The numpad docks in the same panel and goes away again.
+        if tapIfExists("ph.type.tab.numpad") {
+            sleep(1)
+            let numpad = element("ph.type.numpad")
+            XCTAssertTrue(numpad.waitForExistence(timeout: 2), "The numpad didn't show")
+            XCTAssertTrue(element("ph.type.field").exists, "The numpad replaced the field instead of docking")
+            if numpad.exists {
+                XCTAssertTrue(panel.frame.contains(numpad.frame), "The numpad isn't inside the panel")
+                XCTAssertLessThanOrEqual(numpad.frame.width, 222, "The numpad is wider than its compact 5 × 4 grid")
+            }
+            snap("type-numpad-docked")
+            tapIfExists("ph.type.numpad.seven")
+            tapIfExists("ph.type.tab.numpad")
+            sleep(1)
+            XCTAssertFalse(element("ph.type.numpad").exists, "The numpad didn't go away")
+        }
+
+        // Fold to the pill and back.
+        if tapIfExists("ph.type.collapse") {
+            sleep(1)
+            let pill = element("ph.type.pill")
+            XCTAssertTrue(pill.waitForExistence(timeout: 2), "Collapse didn't leave a pill")
+            XCTAssertFalse(panel.exists, "The panel stayed open behind the pill")
+            snap("type-pill")
+            pill.tap()
+            XCTAssertTrue(panel.waitForExistence(timeout: 2), "Tapping the pill didn't open the panel")
+        }
+
+        // The place is remembered: close, open, same corner.
+        let remembered = panel.frame
+        tapIfExists("ph.type.close")
+        sleep(1)
+        if tapIfExists("ph.dock.keyboard") || tapIfExists("ph.trackpad.keyboard") {
+            XCTAssertTrue(panel.waitForExistence(timeout: 3))
+            sleep(1)
+            XCTAssertEqual(panel.frame.minX, remembered.minX, accuracy: 2, "The panel didn't come back where it was")
+            snap("type-panel-remembered")
+            tapIfExists("ph.type.close")
+        }
+    }
+
+    /// OT-8 (owner testing, build 25): Ask's "Open Safari · Type “youtube”
+    /// · Press ⏎" ran, but Save as key refused it. Walks Ask → Run → Save
+    /// as key → the key on the deck → run it (it asks first, naming
+    /// Safari).
+    func test21_AskTypedPlanSavesAsKey() {
+        launch()
+        guard connect() else { return }
+        guard openAsk() else { return }
+        let field = element("ph.ask.field")
+        guard field.waitForExistence(timeout: 3) else { snap("missing-ask-field"); return }
+        field.tap()
+        field.typeText("Open Safari and type youtube and press return")
+        tapIfExists("ph.ask.submit")
+        XCTAssertTrue(element("ph.ask.run").waitForExistence(timeout: 10), "No Run after planning")
+        snap("ask-typed-plan")
+        XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "can’t type text yet")).firstMatch.exists, "The old refusal is back")
+
+        tapIfExists("ph.ask.run")
+        let confirm = app.buttons["Run"].firstMatch
+        if confirm.waitForExistence(timeout: 2), confirm.isHittable, !element("ph.ask.run").isHittable { confirm.tap() }
+        XCTAssertTrue(element("ph.ask.saveAsKey").waitForExistence(timeout: 15), "No Save as key after the run")
+        snap("ask-typed-result")
+
+        tapIfExists("ph.ask.saveAsKey")
+        let name = element("ph.ask.name")
+        XCTAssertTrue(name.waitForExistence(timeout: 3), "Save as key didn't ask for a name")
+        let keyName = "YT \(Int.random(in: 100...999))"
+        name.tap()
+        if let current = name.value as? String, !current.isEmpty, current != name.placeholderValue {
+            name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count))
+        }
+        name.typeText(keyName)
+        tapIfExists("ph.ask.save")
+        let note = element("ph.ask.note")
+        XCTAssertTrue(note.waitForExistence(timeout: 3), "Saving didn't confirm")
+        if note.exists {
+            XCTAssertTrue(note.label.hasPrefix("Saved as a key"), "Save as key failed: \(note.label)")
+        }
+        snap("ask-typed-saved")
+        closeAsk()
+
+        // The key is on the deck, and running it asks first.
+        tapIfExists("ph.tab.deck")
+        sleep(1)
+        let key = app.descendants(matching: .any)
+            .matching(identifier: "ph.deck.key")
+            .matching(NSPredicate(format: "label CONTAINS %@", keyName))
+            .firstMatch
+        XCTAssertTrue(key.waitForExistence(timeout: 5), "The saved key isn't on the deck")
+        guard key.exists else { return }
+        snap("deck-typed-key")
+        key.tap()
+        let run = app.buttons["Run"].firstMatch
+        XCTAssertTrue(run.waitForExistence(timeout: 3), "The typing key didn't ask first")
+        let message = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Types into")).firstMatch
+        XCTAssertTrue(message.exists, "The confirmation doesn't say where the text goes")
+        snap("deck-typed-key-confirm")
+        run.tap()
+        sleep(3)
+        snap("deck-typed-key-ran")
+
+        // The key editor shows the typed step as editable text.
+        if tapIfExists("ph.deck.edit") {
+            key.tap()
+            sleep(1)
+            snap("deck-typed-key-inspector")
+            XCTAssertTrue(element("ph.inspector.asksFirst").exists, "No Ask before running in the inspector")
+            dismissSheet()
+            tapIfExists("ph.deck.done")
+        }
     }
 
     private func hasKeyboardFocus(_ element: XCUIElement) -> Bool {

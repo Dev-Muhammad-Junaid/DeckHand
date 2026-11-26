@@ -206,7 +206,15 @@ public struct TypePanelGeometry: Sendable, Hashable {
 
     /// The panel's frame for a placement and the panel's measured height.
     public func frame(for placement: TypePanelPlacement, height: Double) -> PanelRect {
-        let width = width(for: placement)
+        frame(for: placement, size: (width(for: placement), height))
+    }
+
+    /// The frame for a placement and a measured size: the collapsed pill
+    /// sits by the same fractions as the panel, so it folds into the same
+    /// corner it opens from.
+    public func frame(for placement: TypePanelPlacement, size: (width: Double, height: Double)) -> PanelRect {
+        let width = min(size.width, room.width)
+        let height = size.height
         let freeX = max(0, room.width - width)
         let freeY = max(0, room.height - height)
         let fx = style == .docked ? 0.5 : clampUnit(placement.x)

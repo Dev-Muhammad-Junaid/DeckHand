@@ -149,6 +149,25 @@ public enum TypeKey: Sendable, Hashable, Identifiable {
         KeyModifier.pressOrder.filter(modifiers.contains).map(\.wireName) + [wireName]
     }
 
+    /// The cap's legend in the dot-matrix font (OT-7), for keys named in
+    /// words: "ESC", "HOME", "PGUP", "F5". `nil` for keys drawn as a
+    /// symbol (⌫ ⏎) or a pixel arrow.
+    public var dotMatrixLegend: String? {
+        switch self {
+        case let .remote(key):
+            switch key {
+            case .escape: "ESC"
+            case .tab: "TAB"
+            case .home: "HOME"
+            case .end: "END"
+            case .pageUp: "PGUP"
+            case .pageDown: "PGDN"
+            default: nil
+            }
+        case let .function(number): "F\(number)"
+        }
+    }
+
     /// Whether this key is Return (Return to another app asks first, VQ-036).
     public var isReturn: Bool { self == .remote(.return) }
 }
@@ -461,12 +480,18 @@ public enum ArrowCluster {
     public static let columns = 3
     public static let rows = 2
 
-    /// Each arrow and its cell (column, row).
-    public static let cells: [(key: TypeKey, column: Int, row: Int)] = [
-        (.remote(.up), 1, 0),
-        (.remote(.left), 0, 1),
-        (.remote(.down), 1, 1),
-        (.remote(.right), 2, 1),
+    public struct Cell: Sendable, Hashable {
+        public let key: TypeKey
+        public let column: Int
+        public let row: Int
+    }
+
+    /// Each arrow and its cell.
+    public static let cells: [Cell] = [
+        Cell(key: .remote(.up), column: 1, row: 0),
+        Cell(key: .remote(.left), column: 0, row: 1),
+        Cell(key: .remote(.down), column: 1, row: 1),
+        Cell(key: .remote(.right), column: 2, row: 1),
     ]
 }
 
@@ -594,7 +619,8 @@ public struct TypePanelLayout: Sendable, Hashable {
     /// "Typing into …" sits in the header (wide panels) or on its own line
     /// under it.
     public let targetInHeader: Bool
-    /// The widest the panel may be in this window.
+    /// The widest the panel may be in this window when no width is given
+    /// (the inline panel of the classic layout).
     public let maximumWidth: Double
     /// The panel's width this layout is for.
     public let panelWidth: Double
@@ -669,7 +695,10 @@ public struct TypePanelLayout: Sendable, Hashable {
         margin = metrics.margin
         body = keyboard == .hardware ? .keysOnly : .full
         maximumWidth = min(Self.wideMaximumWidth, max(0, width - 2 * metrics.margin))
-        let panel = max(0, min(panelWidth ?? maximumWidth, maximumWidth))
+        // A width from `TypePanelGeometry` is already fitted to the free
+        // room (which can be wider than the window less its margins, on an
+        // iPhone); without one, the window's cap.
+        let panel = max(0, min(panelWidth ?? maximumWidth, Self.wideMaximumWidth))
         self.panelWidth = panel
         // The room above the keyboard decides how tall the panel may be:
         // iPhone landscape with the keyboard up has barely a line.

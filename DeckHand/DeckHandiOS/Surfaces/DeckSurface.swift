@@ -549,12 +549,15 @@ struct DeckSurface: View {
         } label: {
             Label("Edit key", systemImage: "slider.horizontal.3")
         }
-        Button {
-            var key = shown.key
-            key.confirm.toggle()
-            model.edit { $0.updateKey(key, onPage: page.id) }
-        } label: {
-            Label(shown.key.confirm ? "Run without asking" : "Ask before running", systemImage: shown.key.confirm ? "checkmark.circle" : "questionmark.circle")
+        // A key that types always asks first (OT-8): no switch to offer.
+        if shown.key.asksFirstLockReason == nil {
+            Button {
+                var key = shown.key
+                key.confirm.toggle()
+                model.edit { $0.updateKey(key, onPage: page.id) }
+            } label: {
+                Label(shown.key.confirm ? "Run without asking" : "Ask before running", systemImage: shown.key.confirm ? "checkmark.circle" : "questionmark.circle")
+            }
         }
         Button {
             var key = shown.key

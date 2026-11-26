@@ -343,6 +343,15 @@ struct AskPanel: View {
                         .font(.caption2)
                         .foregroundStyle(PixelHandTheme.ink3)
                 }
+                // OT-8: a step that runs but can't be kept on a key says
+                // why here, next to it, not as a dead end after Save.
+                if !invalid, let reason = AskPlanValidation.saveReason(for: step) {
+                    Text("Can’t be saved on a key: \(reason)")
+                        .font(.caption2)
+                        .foregroundStyle(PixelHandTheme.warning)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("ph.ask.step.\(index).saveNote")
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if let chord = step.chord {

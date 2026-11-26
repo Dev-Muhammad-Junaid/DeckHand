@@ -63,6 +63,16 @@ final class TypingQueue {
         items.append(.chord(keys))
     }
 
+    /// Returns once everything queued so far (and anything queued while
+    /// waiting) has been typed or dropped: a deck sequence's typed step
+    /// (OT-8) finishes before the step after it, even one that doesn't go
+    /// through this queue (an app shortcut, a launch).
+    func idle() async {
+        while let task = drainTask {
+            await task.value
+        }
+    }
+
     /// Drops whatever hasn't been typed yet (the remote left).
     func cancelAll() {
         items.removeAll()

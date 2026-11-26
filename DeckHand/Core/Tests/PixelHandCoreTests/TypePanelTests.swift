@@ -383,10 +383,14 @@ struct TypePanelLayoutTests {
         let cap = TypePanelLayout(width: 1180, height: 820, keyboard: .none)
         #expect(cap.panelWidth == TypePanelLayout.wideMaximumWidth)
         #expect(cap.maximumWidth == TypePanelLayout.wideMaximumWidth)
-        // A panel width past the window's cap is cut to it.
-        let phone = TypePanelLayout(width: 402, height: 874, keyboard: .software, keyboardOverlap: 336, panelWidth: 900)
-        #expect(phone.panelWidth == 402 - 32)
+        // A width from the geometry is used as given (an iPhone's docked
+        // panel spans the room), capped at the widest panel.
+        let phone = TypePanelLayout(width: 402, height: 874, keyboard: .software, keyboardOverlap: 336, panelWidth: 386)
+        #expect(phone.panelWidth == 386)
         #expect(phone.arrangement == .stacked)
+        #expect(TypePanelLayout(width: 1366, height: 1024, keyboard: .none, panelWidth: 900).panelWidth == 760)
+        // No width: the window's cap.
+        #expect(TypePanelLayout(width: 402, height: 874, keyboard: .none).panelWidth == 402 - 32)
     }
 
     @Test("The field is about 30 % narrower than build 25's, with the arrows beside it")
@@ -532,11 +536,11 @@ struct TypeKeyBlockTests {
 
     @Test("The arrows make an inverted T: ↑ over ← ↓ →")
     func arrows() {
-        let cells = Dictionary(uniqueKeysWithValues: ArrowCluster.cells.map { ($0.key, ($0.column, $0.row)) })
-        #expect(cells[.remote(.up)]! == (1, 0))
-        #expect(cells[.remote(.left)]! == (0, 1))
-        #expect(cells[.remote(.down)]! == (1, 1))
-        #expect(cells[.remote(.right)]! == (2, 1))
+        let cells = Dictionary(uniqueKeysWithValues: ArrowCluster.cells.map { ($0.key, [$0.column, $0.row]) })
+        #expect(cells[.remote(.up)] == [1, 0])
+        #expect(cells[.remote(.left)] == [0, 1])
+        #expect(cells[.remote(.down)] == [1, 1])
+        #expect(cells[.remote(.right)] == [2, 1])
         #expect(ArrowCluster.cells.count == 4)
     }
 }

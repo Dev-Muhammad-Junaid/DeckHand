@@ -13,13 +13,16 @@ import UIKit
 import UniformTypeIdentifiers
 
 struct PasteToMacControl: UIViewRepresentable {
+    /// The clipboard icon alone (the Type panel's compact field column,
+    /// OT-7); otherwise icon and "Paste".
+    var iconOnly = false
     var onPaste: (String) -> Void
 
     func makeUIView(context: Context) -> PasteTargetView {
         let target = PasteTargetView()
         target.onPaste = onPaste
         let configuration = UIPasteControl.Configuration()
-        configuration.displayMode = .iconAndLabel
+        configuration.displayMode = iconOnly ? .iconOnly : .iconAndLabel
         configuration.cornerStyle = .capsule
         let control = UIPasteControl(configuration: configuration)
         control.target = target

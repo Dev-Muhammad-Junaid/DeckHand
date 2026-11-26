@@ -113,8 +113,19 @@ struct KeyInspectorSheet: View {
                     Text(key.action.summary { appsByID[$0]?.displayName })
                 }
                 Section {
-                    Toggle("Ask before running", isOn: $key.confirm)
+                    // A key that types always asks first (OT-8): the
+                    // switch shows on and can't be turned off, with why.
+                    Toggle("Ask before running", isOn: Binding(
+                        get: { key.asksFirst },
+                        set: { key.confirm = $0 }
+                    ))
+                    .disabled(key.asksFirstLockReason != nil)
+                    .accessibilityIdentifier("ph.inspector.asksFirst")
                     Toggle("Pin to first row", isOn: $key.pinnedToFirstRow)
+                } footer: {
+                    if let reason = key.asksFirstLockReason {
+                        Text(reason)
+                    }
                 }
                 if !messages.isEmpty {
                     Section {
@@ -168,7 +179,7 @@ struct KeyInspectorSheet: View {
             chord: face.chord,
             size: 96,
             kind: face.kind,
-            asksFirst: key.confirm,
+            asksFirst: key.asksFirst,
             icon: face.icon,
             tint: face.tint
         ) {}
@@ -309,6 +320,8 @@ struct ActionFields: View {
             TextField("Shortcut name", text: Binding(get: { name }, set: { action = .macShortcut(name: $0) }))
                 .textInputAutocapitalization(.words)
                 .autocorrectionDisabled()
+        case let .typeText(text):
+            TypedTextFields(text: text) { action = .typeText(text: $0) }
         case let .sequence(steps):
             SequenceEditor(steps: Binding(get: { steps }, set: { action = .sequence(steps: $0) }), apps: apps, frontBundleID: frontBundleID)
         case .contextAction:
@@ -482,5 +495,44 @@ private struct SequenceEditor: View {
                 .foregroundStyle(PixelHandTheme.ink)
                 .lineLimit(2)
         }
+    }
+}
+
+/// Typed text (OT-8): what the key types, multi-line, and "Press Return
+/// after" for its trailing line break (`TypedTextEditing`). The text is
+/// kept as typed here while the action gets the cleaned form the Mac
+/// types.
+private struct TypedTextFields: View {
+    let text: String
+    let onChange: (String) -> Void
+
+    @State private var draft = ""
+    @State private var pressesReturn = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            TextField("Text to type", text: $draft, axis: .vertical)
+                .lineLimit(1...4)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                .accessibilityIdentifier("ph.inspector.typeText")
+                .onChange(of: draft) { _, _ in commit() }
+            Text("Types into the app in front on the Mac, then asks first each time.")
+                .font(.caption)
+                .foregroundStyle(PixelHandTheme.ink3)
+        }
+        Toggle("Press Return after", isOn: $pressesReturn)
+            .accessibilityIdentifier("ph.inspector.typeReturn")
+            .onChange(of: pressesReturn) { _, _ in commit() }
+            .onAppear {
+                let parts = TypedTextEditing.parts(text)
+                draft = parts.body
+                pressesReturn = parts.pressesReturn
+            }
+    }
+
+    private func commit() {
+        let next = TypedTextEditing.text(body: draft, pressesReturn: pressesReturn)
+        if next != text { onChange(next) }
     }
 }

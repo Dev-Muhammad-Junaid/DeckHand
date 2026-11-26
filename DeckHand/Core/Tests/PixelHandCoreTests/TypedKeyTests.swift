@@ -183,6 +183,7 @@ struct TypedKeyTests {
         #expect(!Action.typeText(text: "a").pressesReturn)
         #expect(Action.shortcut(keys: ["return"]).pressesReturn)
         #expect(!Action.shortcut(keys: ["cmd", "return", "x"]).pressesReturn)
+        #expect(Action.appShortcut(bundleID: safari, keys: ["return"]).pressesReturn)
         #expect(Action.sequence(steps: [.run(action: .typeText(text: "a\n"))]).pressesReturn)
     }
 
@@ -220,5 +221,58 @@ struct TypedKeyTests {
         let listed = snapshot.allKeys.first { $0.label == ownersPlan.keyLabel() }
         #expect(listed?.confirm == true)
         #expect(!snapshot.widgetKeys.contains { $0.label == ownersPlan.keyLabel() })
+    }
+}
+
+@Suite("Typed text in the key inspector (OT-8)")
+struct TypedTextEditingTests {
+    @Test("A trailing Return becomes the switch; inner lines stay")
+    func parts() {
+        #expect(TypedTextEditing.parts("youtube\n") == ("youtube", true))
+        #expect(TypedTextEditing.parts("a\nb") == ("a\nb", false))
+        #expect(TypedTextEditing.parts("\n") == ("", true))
+        #expect(TypedTextEditing.text(body: "youtube", pressesReturn: true) == "youtube\n")
+        #expect(TypedTextEditing.text(body: "a\r\nb\u{1B}", pressesReturn: false) == "a\nb")
+        for text in ["youtube\n", "a\nb", "\n", "x"] {
+            let (body, ret) = TypedTextEditing.parts(text)
+            #expect(TypedTextEditing.text(body: body, pressesReturn: ret) == text)
+        }
+    }
+}
+
+@Suite("Typing keys' confirmation names the app (OT-8)")
+struct KeyRunConfirmationTests {
+    @Test("The app the key opens before typing, else the app in front")
+    func target() {
+        let saved = ownersPlan.savedAction!
+        #expect(KeyRunConfirmation.typingApp(for: saved) == safari)
+        let names: (String) -> String? = { $0 == safari ? "Safari" : nil }
+        #expect(KeyRunConfirmation.message(for: saved, appName: names, frontApp: "Notes").hasSuffix("Types into Safari, then presses Return."))
+        let bare = Action.typeText(text: "hi")
+        #expect(KeyRunConfirmation.typingApp(for: bare) == nil)
+        #expect(KeyRunConfirmation.message(for: bare, frontApp: "Notes") == "Type “hi”\nTypes into Notes.")
+        #expect(KeyRunConfirmation.message(for: bare, frontApp: nil).hasSuffix("Types into the app in front on the Mac."))
+        // Not typing: just the summary.
+        #expect(KeyRunConfirmation.message(for: .media(key: .next), frontApp: "Notes") == Action.media(key: .next).summary())
+    }
+}
+
+@Suite("The owner's request, through the parser (OT-8)")
+struct OwnersRequestTests {
+    @Test("“Open Safari and type youtube and press return” plans, runs and saves")
+    func parsed() throws {
+        let parser = AskCommandParser(catalog: AskAppCatalog(installed: [
+            InstalledAppInfo(bundleID: safari, displayName: "Safari", iconData: nil),
+        ]))
+        let plan = parser.plan("Open Safari and type youtube and press return")
+        #expect(plan.steps.first == .action(.launchApp(bundleID: safari)))
+        #expect(plan.steps.contains { if case .typeText = $0 { true } else { false } })
+        #expect(plan.canRun)
+        #expect(plan.saveBlocker == nil)
+        let action = try #require(plan.savedAction)
+        #expect(action.typesText && action.pressesReturn)
+        var deck = DeckDocument.empty
+        let saved = deck.saveAskPlan(plan, label: "YT")
+        #expect(saved != nil)
     }
 }

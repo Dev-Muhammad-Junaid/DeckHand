@@ -189,3 +189,38 @@ struct TypePanelGeometryTests {
         #expect(small.maxY == 592)
     }
 }
+
+@Suite("Key legends (OT-7)")
+struct TypeKeyLegendTests {
+    @Test("Word keys draw in the dot-matrix font and fit a 40 pt cap at pitch 1.4")
+    func legends() {
+        let keys = TypeKeyBlock.cells.compactMap { cell -> TypeKey? in
+            if case let .key(key) = cell.item { return key }
+            return nil
+        } + TypeKeysRow.functionKeys
+        for key in keys {
+            guard let legend = key.dotMatrixLegend else { continue }
+            for character in legend {
+                #expect(DotMatrixFont.characters.contains(character), "\(key): \(character)")
+            }
+            #expect(Double(DotMatrixFont.widthInCells(legend)) * 1.4 <= TypePanelLayout.keyCap - 4, "\(legend)")
+        }
+        #expect(TypeKey.remote(.delete).dotMatrixLegend == nil)
+        #expect(TypeKey.remote(.return).dotMatrixLegend == nil)
+        #expect(TypeKey.remote(.up).dotMatrixLegend == nil)
+        #expect(TypeKey.function(12).dotMatrixLegend == "F12")
+    }
+}
+
+@Suite("The collapsed pill (OT-6)")
+struct TypePanelPillGeometryTests {
+    @Test("The pill sits in the corner the panel was parked in")
+    func pill() {
+        let geometry = TypePanelGeometry(container: PanelRect(x: 0, y: 24, width: 1180, height: 796), windowWidth: 1180, windowHeight: 820, dockMinY: 740)
+        let place = TypePanelPlacement(x: 1, y: 0, width: 500)
+        let panel = geometry.frame(for: place, height: 240)
+        let pill = geometry.frame(for: place, size: (180, 44))
+        #expect(panel.maxX == pill.maxX && panel.minY == pill.minY)
+        #expect(pill.width == 180)
+    }
+}

@@ -48,6 +48,8 @@ struct LiveTypingField: UIViewRepresentable {
     var onModifiersUsed: () -> Void
     /// Compose: Return (or ⌘Return) asked to send.
     var onSubmit: () -> Void = {}
+    /// The field took focus (a tap while the numpad shows, OT-7).
+    var onFocus: () -> Void = {}
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -86,6 +88,7 @@ struct LiveTypingField: UIViewRepresentable {
         view.onChord = onChord
         view.onModifiersUsed = onModifiersUsed
         view.onSubmit = onSubmit
+        view.onFocus = onFocus
         view.onDraftChange = { text in draft?.wrappedValue = text }
 
         if context.coordinator.lastMode != mode {
@@ -125,7 +128,14 @@ final class LiveTypingTextView: UITextView, UITextViewDelegate {
     var onChord: ([String]) -> Void = { _ in }
     var onModifiersUsed: () -> Void = {}
     var onSubmit: () -> Void = {}
+    var onFocus: () -> Void = {}
     var onDraftChange: (String) -> Void = { _ in }
+
+    override func becomeFirstResponder() -> Bool {
+        let became = super.becomeFirstResponder()
+        if became { onFocus() }
+        return became
+    }
 
     private(set) var mode: TypeMode = .live
     /// What the Mac has been sent, as this field showed it (Live).

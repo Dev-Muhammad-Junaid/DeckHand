@@ -154,7 +154,8 @@ struct PixelHandShell: View {
                     session: session,
                     model: typePanel,
                     windowSize: proxy.size,
-                    showsDock: showsDock(plan)
+                    showsDock: showsDock(plan),
+                    arrangement: plan.form.rawValue
                 )
             }
             .animation(PixelHandMotion.reduced(PixelHandMotion.spring, reduceMotion: reduceMotion), value: plan.form)

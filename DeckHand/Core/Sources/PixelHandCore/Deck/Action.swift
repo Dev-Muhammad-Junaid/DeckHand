@@ -169,7 +169,7 @@ extension Action {
     public var pressesReturn: Bool {
         switch self {
         case let .typeText(text): text.contains("\n")
-        case let .shortcut(keys): keys.last.map { ChordParser.canonical($0) } == "return"
+        case let .shortcut(keys), let .appShortcut(_, keys): keys.last.map { ChordParser.canonical($0) } == "return"
         case let .sequence(steps): steps.contains { $0.action?.pressesReturn ?? false }
         default: false
         }

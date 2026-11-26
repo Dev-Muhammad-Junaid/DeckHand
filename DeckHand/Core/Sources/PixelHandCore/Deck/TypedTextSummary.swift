@@ -59,3 +59,57 @@ public enum TypedTextSummary {
         text.count > limit ? String(text.prefix(max(1, limit - 1))) + "…" : text
     }
 }
+
+/// The key inspector's fields for typed text (OT-8): the text, and a
+/// "Press Return after" switch for its trailing line break, so the common
+/// "type this, then Return" reads as a switch, not an invisible newline.
+public enum TypedTextEditing {
+    /// The text without its last trailing line break, and whether it had
+    /// one. Inner line breaks stay (the field is multi-line).
+    public static func parts(_ text: String) -> (body: String, pressesReturn: Bool) {
+        guard text.hasSuffix("\n") else { return (text, false) }
+        return (String(text.dropLast()), true)
+    }
+
+    /// The stored text for the fields: line endings made `\n`, other
+    /// control characters dropped (what the Mac would type), and a line
+    /// break when Return is on.
+    public static func text(body: String, pressesReturn: Bool) -> String {
+        TypingText.normalized(body) + (pressesReturn ? "\n" : "")
+    }
+}
+
+/// What a key's "asks first" confirmation says (OT-8). A key that types
+/// names the app the text will land in, the way the Type panel's Return
+/// guard does: the app the key brings forward before it types, or else
+/// the app in front on the Mac now.
+public enum KeyRunConfirmation {
+    /// The app a typing action types into: the last app it opens or
+    /// brings forward before its first typed step, or `nil` when it types
+    /// into whatever is in front.
+    public static func typingApp(for action: Action) -> String? {
+        switch action {
+        case let .sequence(steps):
+            var app: String?
+            for step in steps {
+                guard let inner = step.action else { continue }
+                if inner.typesText { return app }
+                if let bundleID = inner.bundleID { app = bundleID }
+            }
+            return nil
+        default:
+            return nil
+        }
+    }
+
+    /// The confirmation's message: what the key does, then where the
+    /// text goes. `appName` names a bundle ID; `frontApp` is the Mac's
+    /// front app now, when known.
+    public static func message(for action: Action, appName: (String) -> String? = { _ in nil }, frontApp: String?) -> String {
+        let summary = action.summary(appName: appName)
+        guard action.typesText else { return summary }
+        let target = typingApp(for: action).map { appName($0) ?? $0 } ?? frontApp ?? "the app in front on the Mac"
+        let returnNote = action.pressesReturn ? ", then presses Return" : ""
+        return "\(summary)\nTypes into \(target)\(returnNote)."
+    }
+}
