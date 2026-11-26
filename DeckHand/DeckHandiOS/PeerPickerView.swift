@@ -44,6 +44,11 @@ struct PeerPickerView: View {
     /// starts over (build 22: Try again joins a start still in flight, or
     /// refreshes discovery, and the card comes back if still no Mac).
     @State private var checksRound = 0
+    /// The top of the scrolling column, relative to the scroll view: below
+    /// zero once it scrolls under the Pair and Settings buttons (VQ-102).
+    @State private var contentTop: CGFloat = 0
+    /// The bottom of the Pair and Settings row, in global coordinates.
+    @State private var topBarBottom: CGFloat = 0
     private let pairing = PairedMacsStore.shared
 
     private enum PickerSheet: String, Identifiable {
@@ -69,6 +74,15 @@ struct PeerPickerView: View {
                 GeometryReader { proxy in
                     ScrollView {
                         VStack(spacing: 0) {
+                            // Tracks how far the column has scrolled, for
+                            // the top bar's backdrop (VQ-102).
+                            Color.clear
+                                .frame(height: 0)
+                                .onGeometryChange(for: CGFloat.self) { geometry in
+                                    geometry.frame(in: .named(Self.scrollSpace)).minY
+                                } action: { top in
+                                    contentTop = top
+                                }
                             header(isShort: proxy.size.height < 520)
                             if let startError, peers.isEmpty {
                                 startFailedState(startError)
@@ -82,6 +96,7 @@ struct PeerPickerView: View {
                         .frame(maxWidth: .infinity, minHeight: proxy.size.height, alignment: .center)
                     }
                     .scrollIndicators(.hidden)
+                    .coordinateSpace(.named(Self.scrollSpace))
                 }
 
                 if let error = errorMessage {
@@ -90,6 +105,12 @@ struct PeerPickerView: View {
 
                 footer
             }
+
+            // VQ-102: once the column scrolls under the Pair and Settings
+            // buttons, the bar gets a scroll-edge backdrop (the picker's own
+            // background, opaque to just under the buttons, then fading), so
+            // the subtitle no longer runs under them at AX5.
+            topBarBackdrop
 
             // Reachable before connecting: appearance, pointer feel and the
             // welcome tour are all worth changing without a Mac in range.
@@ -172,10 +193,39 @@ struct PeerPickerView: View {
                 }
                 .accessibilityIdentifier("ph.connect.settings")
             }
+            .onGeometryChange(for: CGFloat.self) { geometry in
+                geometry.frame(in: .global).maxY
+            } action: { bottom in
+                topBarBottom = bottom
+            }
             Spacer()
         }
         .padding(.horizontal, PixelHandTheme.Space.lg)
         .padding(.top, PixelHandTheme.Space.sm)
+    }
+
+    private static let scrollSpace = "ph.picker.scroll"
+
+    /// The picker's background, masked to the top bar: drawn full screen so
+    /// its gradients line up with the background under it exactly.
+    private var topBarBackdrop: some View {
+        let showsBackdrop = PickerTopBarPlan.showsBackdrop(contentTop: Double(contentTop))
+        return PixelHandTheme.brandBackground()
+            .ignoresSafeArea()
+            .mask(alignment: .top) {
+                VStack(spacing: 0) {
+                    Rectangle()
+                        .frame(height: CGFloat(PickerTopBarPlan.opaqueBottom(buttonRowBottom: Double(topBarBottom))))
+                    LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
+                        .frame(height: CGFloat(PickerTopBarPlan.fadeHeight))
+                    Spacer(minLength: 0)
+                }
+                .ignoresSafeArea()
+            }
+            .opacity(showsBackdrop ? 1 : 0)
+            .animation(.easeOut(duration: 0.15), value: showsBackdrop)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 
     // MARK: - Header
