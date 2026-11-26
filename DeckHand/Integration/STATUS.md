@@ -2209,3 +2209,45 @@ Accessibility Inspector) wait for the owner.
 run the Mac walks and the protocol 16 checks, and record them here.
 
 Status: BUILT (build 27) — 5 bugs
+
+## Owner testing (build 27) — 2026-11-27
+
+From the owner on the iPad (landscape, dark), four screenshots:
+
+- **OT-14 Badge behind its button (P2):** after sending from the
+  clipboard, the Send button's indicator dot draws behind/under the glass
+  circle (cut off). Same class as the earlier free-plan Pro badge drawn
+  behind buttons. Fix the badge overlay for every glass button (draw above,
+  never clipped), not just this one.
+- **OT-15 Inbox uneven on iPad (P2):** the Send/Inbox sheet in Inbox is
+  misaligned: the sheet sits off-centre over the canvas and right column,
+  the empty state isn't centred in it, header spacing uneven.
+- **OT-16 Send to names truncated (P2):** "Mu…Pro" in the device card;
+  show the full Mac name (wrap to two lines, size cards to the name). The
+  offline row "AH's Mac mini …" should match the card style.
+- **OT-17 Paste chip looks different (P3):** Photos and Files match, Paste
+  (system paste control) is styled differently (accent text). Make the
+  three source chips look the same.
+- **OT-18 Header Ask field (owner question):** the wide "Tell <Mac>…" field
+  in the header has alignment issues and only opens the Ask column. Primary
+  session's recommendation: replace it with a compact ⌘K button now (frees
+  the header, fixes alignment; still opens Ask), and later turn ⌘K into a
+  universal command palette (apps, deck keys, menu commands, Macs, then
+  Ask) if the owner wants it.
+
+Fix lane: `claude/pixelhand-lane-owner27` (primary session).
+
+## Build 28 queued (2026-11-27, primary session)
+
+Build 27 plus **build27-fixes** (`LANE-build27-fixes.md`): loupe no longer
+swallows the Type panel's taps, arrows grow with the panel, Save as key
+stays above the keyboard (VQ-104), Connecting… at AX3 (VQ-107), iPhone
+landscape keyboard button (VQ-105), number pad clear of the pair sheet
+title (VQ-108), Send chips 44 pt equal width, capture preview centred.
+
+Mac should check: build all targets, tests, the walks including `test22`,
+`test23`, `test24`; the Mac walks and protocol 16 checks need the owner's
+Mac free with a scratch TextEdit document in front.
+
+Status: READY FOR MAC BUILD (build 28)
+
