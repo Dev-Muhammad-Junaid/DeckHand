@@ -83,6 +83,15 @@ grid (4 pt between caps), so every key, arrow and numpad key keeps a
 handles are 44 pt and straddle the card's bottom corners, mostly outside
 it, so they never take a tap meant for ⌫ or fn.
 
+Type panel sizing (owner testing, build 26, OT-11): cells are cut from the
+panel, not fixed. Rows run 44…72 pt tall; the key rows' cells are the
+panel's inner width ÷ 7 wide; arrows and actions are square with the row
+while the field keeps 144 pt. Blocks are 8 pt apart, 12 pt from the
+card's edge; the header is 44 pt (two rows under 456 pt wide). Legends
+scale with the cell, up to 1.5×. Every band runs edge to edge: no strip
+under the field, no block under the arrows, no gap right of the keys
+(`TypePanelLayoutTests.noDeadAreas`).
+
 ## 5. Alignment rules
 
 1. Leading edges of every block align to the margin or a column edge.
