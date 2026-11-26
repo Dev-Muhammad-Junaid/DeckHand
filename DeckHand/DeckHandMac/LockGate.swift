@@ -120,6 +120,7 @@ enum MacSystemSession {
         LockGate.shared.forget(id)
         InteractionSession.connectionRemoved(id: id) // iOS interaction lane: drag release, clipboard
         MacTransferService.shared.removeConnection(id: id) // Sharing lane: transfers (S1)
+        FocusTracker.shared.removeConnection(id: id) // OT-12: stop following the focus
     }
 
     static func lockStateChanged(from previous: MacLockState, to next: MacLockState) {
@@ -132,6 +133,7 @@ enum MacSystemSession {
             ContextObserver.shared.contextVisibilityChanged()
         }
         SpacesMonitor.shared.scheduleBroadcast()
+        FocusTracker.shared.lockStateChanged(next) // OT-12: withhold the focus while locked
         if next == .offConsole {
             // A capture of this session's display off console shows its
             // desktop behind the login window: stop every mirror now. The

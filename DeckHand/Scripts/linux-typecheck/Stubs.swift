@@ -106,6 +106,7 @@ enum DeckHandLog {
     static let connection = Logger()
     static let app = Logger()
     static let trust = Logger()
+    static let context = Logger()
 }
 
 // MARK: Mac services
@@ -257,6 +258,18 @@ enum MenuShortcutDiscovery {
     var connectionHandles: [UUID: LoomConnectionHandle] { [:] }
     func addConnection(_ handle: LoomConnectionHandle, id: UUID) {}
     func removeConnection(id: UUID) {}
+}
+// OT-12: FocusReader.swift (Accessibility glue; FocusTracker.swift is checked)
+final class FocusReader: @unchecked Sendable {
+    struct Frontmost: Sendable {
+        let pid: Int32
+        let name: String?
+        let bundlePath: String?
+    }
+    @MainActor static func frontmost() -> Frontmost? { nil }
+    static func nothing() -> FocusedFieldSnapshot { .nothing(displayID: 1, displayWidth: 1, displayHeight: 1) }
+    func read(front: Frontmost?) async -> FocusedFieldSnapshot { Self.nothing() }
+    func endWatch() {}
 }
 @MainActor final class DisplayWake {
     static let shared = DisplayWake()
