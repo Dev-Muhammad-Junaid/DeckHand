@@ -172,6 +172,10 @@ final class ControlSessionModel {
     /// sends it. The Mirror lane builds the display picker, desktop dots
     /// and cursor badge on it.
     var displayLayout: DisplayLayout?
+    /// The Mac's focused text field (OT-12, the Type panel's loupe), while
+    /// this remote watches it (`TrackpadSender.watchFocus(true)`). `nil`
+    /// until the Mac sends one; the last value stays after watching stops.
+    var focusedField: FocusedFieldSnapshot?
 
     // MARK: iOS interaction
     // Clipboard sync (S10). Logic: ControlSessionModel+Input.swift.
