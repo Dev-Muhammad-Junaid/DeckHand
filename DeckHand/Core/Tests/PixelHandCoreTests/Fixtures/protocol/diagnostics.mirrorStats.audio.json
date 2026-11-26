@@ -1,1 +1,1 @@
-{"diagnostics":{"mirrorStats":{"stats":{"audio":{"codec":1,"kilobitsPerSecond":131.5,"packetsDropped":1,"packetsSent":47},"capturedFPS":30,"codec":"hevc","droppedFrames":0,"encodeMilliseconds":3.5,"height":900,"kilobitsPerSecond":4200,"sentFPS":30,"width":1440}}},"v":15}
+{"diagnostics":{"mirrorStats":{"stats":{"audio":{"codec":1,"kilobitsPerSecond":131.5,"packetsDropped":1,"packetsSent":47},"capturedFPS":30,"codec":"hevc","droppedFrames":0,"encodeMilliseconds":3.5,"height":900,"kilobitsPerSecond":4200,"sentFPS":30,"width":1440}}},"v":16}
