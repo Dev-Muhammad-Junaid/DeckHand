@@ -2381,4 +2381,60 @@ installed and launched.
 **Still waiting for the owner:** the Mac walks (`test04`, `05`, `16`, `18`,
 `19`, `20`, `21`, which also covers VQ-104) and the protocol 16 checks.
 
-Status: BUILT (build 28) — 5 bugs
+### Mac walks (build 28) — 2026-11-27, owner gave the Mac
+
+Scratch TextEdit in front before each device's run; the typing guard was
+on. The only text that reached the Mac is one “hello” (no Return) in the
+TextEdit document, from the iPad's `test18`. `test05` ran a deck key,
+`test16` moved the pointer, and `test19` opened Mission Control. The front
+app later changed to Chrome and the Claude app, but nothing typed then.
+
+- iPad Pro 11", full screen: `test04`, `05`, `16`, `19` pass; **`test18`,
+  `test20`, `test21` fail**.
+- iPhone 17 Pro: `test05`, `16`, `19`, `21` pass; **`test04`, `test18`,
+  `test20` fail**. `test18` and `test20` can't open the Type panel in
+  landscape (bug 2 of the section above).
+- `test22` again with TextEdit in front (iPad): the loupe shows the
+  TextEdit document up close in portrait. In landscape the Claude app came
+  to the front, and the loupe drew it as pixels.
+
+**Re-checks**
+- **VQ-104 Save as key above the keyboard: pass.** On iPad and iPhone,
+  `test21` shows Save and Cancel above the keyboard. The key saves (“Saved
+  as a key on Home”) and asks first (“Types into Safari, then presses
+  Return”).
+- **VQ-107 Connecting… at AX size: pass visually.** On iPhone the
+  “Connecting to Muhammad’s MacBook Pro…” row is full width with Cancel
+  under it.
+- **Protocol 16 checks from the log** (`log show --info`):
+  - “Focus tracking started” / “stopped” as the loupe opens and closes.
+  - “Focus: AXManualAccessibility on for Claude” on opening, then “off”
+    on closing (check 5).
+  - Not checked, because they need someone at the Mac: checks 1 (a
+    protocol 15 Mac), 3 (CPU), 4 (password field), 6 (lock), 8 (OT-13
+    with Accessibility Inspector), and the second display in check 2.
+
+**New bugs from the Mac walks**
+6. **Type panel under the keyboard in iPad landscape (P1, build 25 bug
+   1 again):** `test18`. With the keyboard up, the panel isn't on screen
+   in landscape (`05-not-hittable-ph-type-mode-compose`; Compose, Numpad
+   and Live aren't hittable). It's fine in portrait (`08`) and in
+   `test20`/`test22`, where the panel was placed top-left first.
+7. **Numpad mode keeps the modifier row (P2, OT-11):** iPad `test20`
+   (`05-type-numpad-docked`): the ⌘⌥⌃⇧ row and the key rows stay with the
+   numpad. OT-11 says numpad mode shows only the arrows and the numpad.
+8. **No Ask-first toggle in the key editor (P3, OT-8):** iPad `test21`:
+   the typed key's Edit sheet has Label and Glyph but no Ask before
+   running.
+
+**Walk-only (no app bug)**
+- iPad `test18`: “The shell moved under the keyboard”. The dock moves up
+  46 pt when the keyboard bar shows, which is OT-11's “dock avoids the
+  keyboard bar”, so the walk's OT-2 check needs updating.
+- iPad `test20`: “Resizing didn't make the panel narrower”. The panel was
+  already at its 362 pt minimum, remembered from an earlier walk.
+- iPhone `test04`: the connecting toast measures 8 pt wide, the identifier
+  on its dot. The connect then timed out with “No Mac found”, the only
+  time this happened in the run.
+
+Status: BUILT (build 28) — 8 bugs
