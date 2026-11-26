@@ -26,7 +26,12 @@ final class SystemHandler: DomainHandler {
         case let .switchSpace(direction, displayID):
             Task { await self.handleSwitchSpace(direction: direction, displayID: displayID, from: connection) }
 
-        case .displayState, .lockState:
+        case let .watchFocus(on):
+            // OT-12: the Type panel's loupe. The lock gate let it through;
+            // the tracker withholds the focus itself while locked.
+            FocusTracker.shared.watch(on, connection: connection)
+
+        case .displayState, .lockState, .focusState:
             break // Mac → remote only
         }
     }

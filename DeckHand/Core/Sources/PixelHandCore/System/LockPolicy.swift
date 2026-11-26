@@ -159,7 +159,12 @@ public enum LockPolicy {
                 return offConsole ? .refuse(reply: .none) : .allow
             case .run, .switchSpace:
                 return .refuse(reply: .none)
-            case .displayState, .lockState:
+            case .watchFocus:
+                // OT-12: only a subscription. While locked the Mac sends
+                // one empty snapshot and nothing more (`withholdsFocus`),
+                // so turning it on reads nothing now.
+                return .allow
+            case .displayState, .lockState, .focusState:
                 return .allow // Mac → remote; the handler ignores it
             }
 
@@ -287,6 +292,13 @@ public enum LockPolicy {
     /// Mac → remote context (frontmost app, running apps, dialog buttons)
     /// is withheld while locked, and sent again at the unlock.
     public static func withholdsContext(_ state: MacLockState) -> Bool {
+        state.isLocked
+    }
+
+    /// OT-12: the focused field (its place, the caret, the pointer and its
+    /// text) is withheld while locked: the Mac reads no Accessibility and
+    /// sends one `.none` snapshot, then nothing until the unlock.
+    public static func withholdsFocus(_ state: MacLockState) -> Bool {
         state.isLocked
     }
 }
