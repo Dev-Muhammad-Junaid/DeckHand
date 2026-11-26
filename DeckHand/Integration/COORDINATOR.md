@@ -2,7 +2,7 @@
 
 > **Owner: the next Mac pass needs your Mac.** Builds 27 and 28 still owe the walks that type and click on the Mac, the protocol 16 checks and the final QA pass. When you can spare the Mac, unlock it, keep a scratch TextEdit document in front, keep the iPad unlocked on Wi-Fi, and let the Mac build loop run them.
 
-> **Build 29 is building on the Mac** (protocol 17). The primary merged **build28-fixes** into integration already, but left STATUS alone. **Once "Mac build results (build 29)" lands:** append "Build 30 queued" (build 29 plus `LANE-build28-fixes.md`) and set `Status: READY FOR MAC BUILD (build 30)`. Then the Mac walks and the live-sync checklist (they need the owner's Mac), then the review page if there's no P1 or P2. After that: live-sync phase 2 (web and Electron opt-in), once build 30 is green.
+> **Build 30 queued** (build 29 plus build28-fixes; protocol 17). No lanes are running. Next: the Mac walks, the live-sync checklist and the re-checks, which need the owner's Mac. Then the review page if there's no P1 or P2. Then live-sync phase 2 (web and Electron opt-in), once build 30 is green.
 
 > **Mac builds:** 15, 16, 18 and 19 built (19 with 5 bugs, fixed in build 21). The primary session or the owner's Mac session runs Mac builds.
 
@@ -287,3 +287,4 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
 - 2026-11-26 21:05 UTC: the owner approved live-sync R&D. The primary merged the docs (`fb0fa77`) and recorded the decisions (`1fbd090`), and started lanes caret-joystick and live-sync. Neither branch is pushed yet. Merge order: joystick, then live-sync, then build 29.
 - 2026-11-26 22:05 UTC: the primary merged caret-joystick and live-sync and queued build 29 (protocol 17). Build 28 had 8 bugs; the primary started lane build28-fixes for them. Next: merge it, then build 30.
 - 2026-11-26 22:30 UTC: the primary merged build28-fixes. Build 30 gets queued after build 29's Mac results, which are in progress (live-sync compile fixes at 22:12).
+- 2026-11-27 00:00 UTC: build 29 built after 2 Mac compile fixes. Core 1399, Loom 480, DeckHandTests 8. The walks that send nothing to the Mac show no new failures; the Mac walks need the owner. Renumbered the duplicate test27 (`61c69c3`). **Queued build 30.** Core has 1418 tests, all passing.

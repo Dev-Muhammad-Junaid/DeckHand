@@ -2504,4 +2504,46 @@ Air 11" (M3) was installed and launched; both run protocol 17.
 queued. Build 29's own features haven't been checked yet, because they
 need the Mac.
 
-Status: BUILT (build 29) — 8 bugs
+
+## Build 30 queued (2026-11-27)
+
+Build 30 is build 29 plus `LANE-build28-fixes.md` (merged at `7b67d08`),
+which fixes build 28's 8 bugs:
+
+1. The Type panel under the keyboard in iPad landscape (P1).
+2. The numpad keeping the modifier and key rows.
+3. No Accept ⇥ on the iPhone in Live mode.
+4. The iPhone landscape keyboard button not hittable (VQ-105).
+5. No "Ask before running" in the key editor.
+6. Three walk fixes: `test22`, `test23` and `test24`.
+
+The live sync walks are renumbered (`61c69c3`):
+- `test28_LiveSyncTypeOnMac`
+- `test29_LiveSyncTabAccept`
+- `test30_LiveSyncEditFromIPad`
+
+`test27_ArrowJoystick` stays.
+
+Protocol 17, unchanged since build 29.
+
+Linux: Core **1418 / 1418 pass** (257 suites); `linux-typecheck/run.sh`
+passes; the UI tests parse and their braces balance.
+
+**Mac should do:**
+1. The build and all tests.
+2. Install on the Mac and the iPad.
+3. With the owner's OK to use the Mac and a scratch TextEdit document in
+   front:
+   - every walk on the iPad Pro 11" full screen and the iPhone 17 Pro,
+     including the Mac walks (`test04`, `05`, `16`, `18`–`21`, `27`–`30`);
+   - the `LANE-live-sync.md` measurement checklist (TextEdit, Notes, Mail
+     and Xcode; latency; a secure field; lock);
+   - the joystick by hand.
+4. Re-check the 8 `LANE-build28-fixes.md` IDs, with iPad landscape for
+   bug 6.
+5. Record pass, fail or not checked per item.
+
+If there are no P1 or P2 findings, the coordinator publishes the owner's
+review page.
+
+Status: READY FOR MAC BUILD (build 30)
