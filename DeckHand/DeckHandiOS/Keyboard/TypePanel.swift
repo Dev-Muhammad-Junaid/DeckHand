@@ -991,6 +991,7 @@ struct TypePanelHost: View {
     var arrangement = "single"
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.entitlements) private var entitlements
     @State private var placement = TypePanelPlacement.initial
     @State private var loadedKey: String?
     /// The panel's (or pill's) measured size.
@@ -1060,10 +1061,21 @@ struct TypePanelHost: View {
                     .offset(x: CGFloat(frame.x) - container.minX, y: CGFloat(frame.y) - container.minY)
                     .transition(.opacity) // Glyph rule: panels fade, never slide.
                 }
+                // OT-12: the loupe on the Mac's focused field, attached to
+                // the panel (above it, or below when it's parked at the
+                // top). Pro, like the mirror it cuts from.
+                if model.isShown, !model.isCollapsed, showsLoupe, entitlements.allows(.mirror),
+                   let loupe = geometry.loupeFrame(panel: frame) {
+                    FocusLoupeView(session: session)
+                        .frame(width: CGFloat(loupe.width), height: CGFloat(loupe.height))
+                        .offset(x: CGFloat(loupe.x) - container.minX, y: CGFloat(loupe.y) - container.minY)
+                        .transition(.opacity)
+                }
             }
             .frame(width: container.width, height: container.height, alignment: .topLeading)
             .animation(Animation.phPanelFade(reduceMotion: reduceMotion), value: model.isShown)
             .animation(Animation.phPanelFade(reduceMotion: reduceMotion), value: model.isCollapsed)
+            .animation(Animation.phPanelFade(reduceMotion: reduceMotion), value: showsLoupe)
         }
         // The panel places itself against the keyboard; it must not be
         // pushed up by the keyboard's safe area as well.
@@ -1074,6 +1086,11 @@ struct TypePanelHost: View {
         // button) stays in view.
         .onChange(of: windowSize) { _, _ in
             DispatchQueue.main.async { model.refreshKeyboard() }
+        }
+        // Closing the panel closes the loupe (and stops the Mac following
+        // the focus).
+        .onChange(of: model.isShown) { _, shown in
+            if !shown { showsLoupe = false }
         }
         .onChange(of: storageKey, initial: true) { _, key in
             guard loadedKey != key else { return }

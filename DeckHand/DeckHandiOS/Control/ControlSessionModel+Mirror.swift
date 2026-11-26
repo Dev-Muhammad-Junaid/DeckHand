@@ -125,6 +125,11 @@ extension ControlSessionModel: MirrorStreamSink {
                 handleWatchdog(mirrorWatchdog.decodeFailed(now: now))
                 return
             }
+            if mirrorLoupeActive, !mirrorLoupeRenderer.enqueue(sample) {
+                // The loupe's layer lost the stream (it started between
+                // key frames): it recovers at the next one.
+                mirrorLoupeRenderer.flush()
+            }
             mirrorWatchdog.frameDisplayed(now: now)
             mirrorStatsBox.update { $0.noteFrameOut() }
             if !mirrorShowsVideo {
@@ -195,6 +200,24 @@ extension ControlSessionModel: MirrorStreamSink {
         // Build 19: the lock banner already knows the Mac is locked; say
         // so instead of whatever an older Mac sent.
         capture.showMirrorError(macLockState.isLocked ? LockPolicy.lockedErrorMessage : message)
+    }
+
+    // MARK: - Loupe (OT-12)
+
+    /// The Type panel's loupe opens or closes: it follows the Mac's focused
+    /// field, and its layer gets the mirror's frames from the next key
+    /// frame (asked for now, so it doesn't wait for the periodic one).
+    func setMirrorLoupe(active: Bool) {
+        guard mirrorLoupeActive != active else { return }
+        mirrorLoupeActive = active
+        mirrorLoupeRenderer.flush()
+        if active, isMirrorActive {
+            let connection = connection
+            Task { try? await connection.send(.mirror(.requestKeyFrame)) }
+        }
+        if let sender {
+            Task { await sender.watchFocus(active) }
+        }
     }
 
     // MARK: - Start, stop, re-negotiate
@@ -401,6 +424,7 @@ extension ControlSessionModel: MirrorStreamSink {
         mirrorShowsVideo = false
         mirrorVideoSize = nil
         mirrorVideoRenderer.flush()
+        mirrorLoupeRenderer.flush()
         resetMirrorPiPStream()
         mirrorWatchdog = MirrorVideoWatchdog(now: CACurrentMediaTime())
         mirrorCursor = nil

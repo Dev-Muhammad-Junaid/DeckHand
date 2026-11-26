@@ -87,6 +87,13 @@ final class ControlSessionModel {
     /// `mirrorImage`) is showing, and the picture size from the parameter
     /// sets.
     @ObservationIgnored let mirrorVideoRenderer = MirrorVideoRenderer()
+    /// The Type panel's loupe (OT-12): a second layer fed the same HEVC
+    /// frames while it shows, cropped by its view to the Mac's focused
+    /// field. A display layer can only be in one place, so the loupe can't
+    /// share the mirror pane's.
+    @ObservationIgnored let mirrorLoupeRenderer = MirrorVideoRenderer()
+    /// The loupe is on screen: feed `mirrorLoupeRenderer`.
+    @ObservationIgnored var mirrorLoupeActive = false
     var mirrorShowsVideo = false
     var mirrorVideoSize: CGSize?
     /// Decides what to decode and when to ask for a key frame or JPEG.
