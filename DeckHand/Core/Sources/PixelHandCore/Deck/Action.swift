@@ -187,4 +187,10 @@ extension DeckKey {
     public var asksFirstLockReason: String? {
         action.typesText ? "Keys that type text always ask first, so the text goes to the app you expect." : nil
     }
+
+    /// The line under "Ask before running" in the key editor (build 28
+    /// bug 8): why it's locked on for a key that types, else what it does.
+    public var asksFirstFootnote: String {
+        asksFirstLockReason ?? "Shows what the key will do and asks before it runs."
+    }
 }
