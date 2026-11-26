@@ -1888,4 +1888,63 @@ iPad Pro 11" simulator in landscape. The owner re-checks OT-1…OT-5 on the
 real iPad.
 
 Status: READY FOR MAC BUILD (build 25)
+## Mac build results (build 25) — 2026-11-26
 
+Built from `c9b87da` (build 25) on Xcode 27.2, Release, team `DD5AWPLT2V`.
+
+**Build:** Mac app and iOS app both build first time, with no fixes.
+
+**Tests**
+- `swift test --package-path DeckHand/Core`: **1133 / 1133 pass** (205 suites).
+- `swift test --scratch-path .build-local`: **480 / 480 pass**.
+- `DeckHandTests`: **8 / 8 pass**.
+
+**Install**
+- Mac: replaced and launched with `open`.
+- iPad Air 11" (M3): **installed and launched**; the iPad was reachable this
+  time. The owner can re-check OT-1…OT-5 on it.
+
+**Walks** (owner gave the Mac; scratch TextEdit in front at the start)
+- iPad Pro 11", full screen: **18 / 19 pass**. `test18_KeyboardStaysOpenInLandscape`
+  fails: "The close button didn't close the panel" (bug 1).
+- AX3: iPad `test13` and `test14`, iPhone `test03`, `test12` and `test14`;
+  all pass.
+- `test19_AskAgainAfterRun` passes and opened Mission Control on the Mac.
+
+**Re-checks**
+- **owner24:**
+  - OT-1: dock icons are transparent on iPad and iPhone.
+  - OT-2: in landscape, the keyboard stays open and the arrangement doesn't
+    change.
+  - OT-3: the Type panel has Live, Compose, the keys row, fn and numpad, and
+    names the target app ("Typing into …").
+  - OT-4: the collapsed column handle is an outlined, visible tab.
+  - OT-5: after a run Ask offers New request, Run again, Save as key (with
+    Cancel) and Edit.
+  - All pass in the simulator, except the portrait Type panel (bug 1).
+- **qa24-fixes:**
+  - VQ-066: Show screen now sits inside its card at iPhone AX3.
+  - VQ-098: the mirror tile stays off the empty deck.
+  - VQ-099: iPad AX3 sidebar cards stack with whole words.
+  - All three pass.
+  - Not checked: VQ-100 ("AH's Mac mini" was no longer on the network, so
+    the two-Mac chooser couldn't be reproduced), VQ-101 (cold boot),
+    VQ-102 (AX5), VQ-103 (iPad mini).
+
+**Open bugs**
+1. **Type panel hidden in portrait (P1, OT-2/OT-3):** after `test18`
+   rotates back to portrait with the keyboard up, the Type panel is behind
+   the keyboard. Its close button isn't hittable, so the panel can't be
+   closed (`test18` capture `11-not-hittable-ph.type.close`).
+2. **Ask keeps the old request (P3, OT-5):** after Save as key › Cancel,
+   the field still holds "Take a screenshot", so the next request is
+   appended ("nowTake a screenshot") and Ask can't understand it.
+
+**Tooling and an incident**
+- The Mac's front app changed from TextEdit to Claude during the run, so
+  `test18`'s Live step typed "hello" (no Return) into the Claude app on
+  the Mac. Nothing was sent; the owner was told.
+- The walks put the scratch document in front only at the start. They
+  should check the front app before every step that types into the Mac.
+
+Status: BUILT (build 25) — 2 bugs
