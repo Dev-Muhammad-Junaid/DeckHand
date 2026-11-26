@@ -177,10 +177,14 @@ private struct TransferSheetSizing: ViewModifier {
 
     @ViewBuilder
     private func sized(_ content: Content) -> some View {
-        if #available(iOS 18.0, *), UIDevice.current.userInterfaceIdiom == .pad {
-            content
-                .frame(idealHeight: height)
-                .presentationSizing(.form.fitted(horizontal: false, vertical: true))
+        if #available(iOS 18.0, *) {
+            if UIDevice.current.userInterfaceIdiom == .pad {
+                content
+                    .frame(idealHeight: height)
+                    .presentationSizing(.form.fitted(horizontal: false, vertical: true))
+            } else {
+                content
+            }
         } else {
             content
         }
