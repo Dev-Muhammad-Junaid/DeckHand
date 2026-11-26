@@ -2057,6 +2057,67 @@ only with arrows, one-row arrows, target once, dock over the keyboard bar;
 zoom-to-input loupe, protocol 16; Accept ⇥ and OT-13 findings; Send sheet
 and capture preview redrawn). Needs an iPad and Mac re-check.
 
+## Mac build results (build 26) — 2026-11-26
+
+Built from `38c4a97` (build 26) on Xcode 27.2, Release, team `DD5AWPLT2V`.
+
+**Build:** the Mac app and the iOS app build. The UI test target didn't
+compile (`test20` passed an `XCUICoordinate` where `press(forDuration:thenDragTo:)`
+wants an element): fixed in `a2f4adf`, which drags from the grip's and the
+handle's coordinates.
+
+**Tests**
+- `swift test --package-path DeckHand/Core`: **1180 / 1180 pass**.
+- `swift test --scratch-path .build-local`: **480 / 480 pass**.
+- `DeckHandTests`: **8 / 8 pass**.
+
+**Install:** Mac replaced and launched with `open`; iPad Air 11" (M3)
+installed and launched (protocol 15 on both).
+
+**Walks** (owner gave the Mac; scratch TextEdit in front)
+- iPad Pro 11", full screen: **20 / 21 pass**. `test21` fails: Save as
+  key's Save button is under the keyboard (VQ-104).
+- iPhone 17 Pro: **20 / 21 pass**. `test21` saves the typed plan as a
+  key and the key asks first, then fails tapping a Cancel the iPhone
+  popover doesn't have (VQ-106, walk only).
+- AX3 (iPhone 17 Pro): `test01`, `test09`, `test12`, `test14` pass. In
+  `test09` and `test12` the launch reconnect never finished, so Settings
+  and the paywall at AX3 weren't reached (see VQ-107).
+- iPad mini (unpaired): `test04` is skipped as unpaired and sends the Mac
+  no request (VQ-103 pass).
+- The front-app guard worked: the Mac's front app changed to Claude
+  (iPad run) and FlutterFlow Studio (iPhone run); the iPad's typing steps
+  were skipped, and TextEdit was put back before the iPhone's. Only
+  TextEdit received “hello”; `test19` ran Show Mission Control.
+
+**Final QA pass:** `VISUAL-QA-build26.md`, gallery https://claude.ai/artifact/Y56FqdNycRXGqXwQ4ugK1N
+- Owner testing OT-1…8: **7 pass, 1 fail** (OT-8 on iPad portrait,
+  VQ-104). Build 25 bug 1 (`test18`, both orientations) and bug 2
+  (`test19`): **pass**.
+- Open P3s: VQ-101 **pass** (Connecting… with Cancel shows, but breaks
+  at AX3: VQ-107); VQ-103 **pass**; VQ-100 and VQ-102 **not checked** (no
+  second Mac on the network, no AX5 run).
+- New findings: **VQ-104 (P2)**, VQ-105 (P3), VQ-106 (P3 tooling),
+  **VQ-107 (P2)**, VQ-108 (P3).
+
+**Open bugs**
+1. **VQ-104, Save as key hidden under the keyboard (P2, OT-8):** iPad
+   portrait, three-step plan: the name field is the last visible row and
+   Save and Cancel are scrolled out of view. Return still saves.
+2. **VQ-105, no keyboard button on the iPhone in landscape (P3):** the
+   Screen tab in landscape has neither `ph.dock.keyboard` nor
+   `ph.trackpad.keyboard`, so `test18` and `test20` stop early on iPhone.
+3. **VQ-107, Connecting… breaks at AX3 (P2):** on the iPhone picker the
+   reconnect state is squeezed to “Con- / necti…”, its Cancel draws over
+   Pair, and twice the reconnect gave up.
+4. **VQ-108, number pad over the pair sheet's title (P3):** iPad mini.
+
+There are two P2s, so this isn't the clean pass that unlocks the owner
+review page. Build 27 (queued below) changes the Type panel and Send areas, so
+VQ-104 and VQ-105 can be checked again on it; VQ-107 and VQ-108 need a fix round.
+
+Status: BUILT (build 26) — 4 bugs
+
 ## Build 27 queued (2026-11-26, primary session): owner round 26
 
 Build 26 plus **owner26** (`LANE-owner26.md`, protocol 16):
