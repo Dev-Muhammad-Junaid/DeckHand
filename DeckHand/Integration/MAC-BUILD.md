@@ -186,3 +186,11 @@ Every tick:
    `Status: BUILT (build N) — green` or `— N bugs`, and push.
 
 Never commit the apps' pins into the repo-root `Package.resolved`.
+
+## Typing walks check the Mac's front app (build 26)
+Before each step that types on the Mac (`test04`, `test18`), the walk reads
+the Type panel's "Typing into …" line. It skips the step, with a
+`skipped-typing-front-app-…` capture, unless the scratch app is in front.
+The scratch app is `TEST_RUNNER_PH_QA_SCRATCH_APP`, and defaults to
+`TextEdit`. Keep a scratch TextEdit document in front. In build 25 the front
+app changed mid-run and a walk typed "hello" into another app.
