@@ -1078,7 +1078,7 @@ private struct SendTargetCard: View {
 
     private var tile: some View {
         RoundedRectangle(cornerRadius: PixelHandTheme.Radius.chip, style: .continuous)
-            .fill(isOffline ? PixelHandTheme.fill2 : PixelHandTheme.Brand.screenSurface)
+            .fill(isOffline ? AnyShapeStyle(PixelHandTheme.fill2) : AnyShapeStyle(PixelHandTheme.Brand.screenSurface))
             .frame(width: PixelHandTheme.ControlHeight.standard, height: PixelHandTheme.ControlHeight.standard)
             .overlay {
                 if target.state == .connecting {
