@@ -43,12 +43,14 @@ private func expectTiles(_ layout: TypePanelLayout, _ note: String, sourceLocati
 struct TypePanelLayoutTests {
     static let widths: [Double] = Array(stride(from: 304.0, through: 760, by: 8))
 
-    @Test("A hardware keyboard gives the keys-only body, without the action column")
+    @Test("A hardware keyboard gives the keys-only body: Live keeps Accept alone (build 28 bug 1), Compose no action column")
     func hardware() {
         let hardware = TypePanelLayout(width: 1180, height: 820, keyboard: .hardware, panelWidth: 720)
         #expect(hardware.body == .keysOnly)
-        #expect(!hardware.shows(.actions))
-        #expect(hardware.actionCells.isEmpty)
+        #expect(hardware.actionCells.map(\.action) == [.accept])
+        let compose = TypePanelLayout(width: 1180, height: 820, keyboard: .hardware, panelWidth: 720, mode: .compose)
+        #expect(!compose.shows(.actions))
+        #expect(compose.actionCells.isEmpty)
         #expect(TypePanelLayout(width: 1180, height: 820, keyboard: .software, keyboardOverlap: 400).body == .full)
     }
 

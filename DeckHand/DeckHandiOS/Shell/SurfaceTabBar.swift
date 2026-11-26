@@ -23,6 +23,9 @@ struct SurfaceTabBar: View {
     /// there's no dock to carry it (`CanvasPlan.railCarriesKeyboard`,
     /// VQ-105). `nil` elsewhere.
     var keyboard: RailKeyboardButton.Config?
+    /// Between the tabs, Ask and the keyboard circle (the rail tightens it
+    /// on the shortest windows, `CanvasPlan.railSpacing`).
+    var spacing: CGFloat = PixelHandTheme.Space.md
     let onAsk: () -> Void
 
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -32,16 +35,23 @@ struct SurfaceTabBar: View {
 
     var body: some View {
         let layout = axis == .horizontal
-            ? AnyLayout(HStackLayout(spacing: PixelHandTheme.Space.md))
-            : AnyLayout(VStackLayout(spacing: PixelHandTheme.Space.md))
+            ? AnyLayout(HStackLayout(spacing: spacing))
+            : AnyLayout(VStackLayout(spacing: spacing))
         layout {
-            tabGroup
-            askButton
+            layout {
+                tabGroup
+                askButton
+            }
+            .phGlassGroup(spacing: spacing)
+            // Build 28 bug 2 (VQ-105): the keyboard circle is its own glass,
+            // outside the tabs' and Ask's glass container, at its full size
+            // and above its neighbours, so nothing covers its hit point.
             if let keyboard {
                 RailKeyboardButton(state: keyboard)
+                    .fixedSize()
+                    .zIndex(1)
             }
         }
-        .phGlassGroup(spacing: PixelHandTheme.Space.md)
     }
 
     private var tabGroup: some View {
@@ -144,6 +154,8 @@ struct RailKeyboardButton: View {
         }
         .buttonStyle(.plain)
         .phGlass(in: Circle(), interactive: true)
+        .frame(width: 62, height: 62)
+        .contentShape(Circle())
         .phosphorFocusable(cornerRadius: 31)
         .accessibilityLabel(state.isShown ? "Hide keyboard" : "Show keyboard")
         .accessibilityAddTraits(state.isShown ? [.isButton, .isSelected] : .isButton)

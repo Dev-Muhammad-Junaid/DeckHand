@@ -139,7 +139,7 @@ struct PixelHandShell: View {
                 case .single, .stacked:
                     tabbedLayout(plan: plan, height: proxy.size.height)
                 case .rail:
-                    railLayout(plan: plan)
+                    railLayout(plan: plan, height: proxy.size.height)
                 case .sideBySide:
                     sideBySideLayout(plan: plan)
                 case .columns:
@@ -250,7 +250,7 @@ struct PixelHandShell: View {
     /// header and strip on top. Without room for the column, the rail keeps
     /// the deck tab and the strip sits under the canvas.
     @ViewBuilder
-    private func railLayout(plan: CanvasPlan) -> some View {
+    private func railLayout(plan: CanvasPlan, height: CGFloat) -> some View {
         let metrics = plan.metrics
         let centre = selection.wrappedValue.centre(hasDeckColumn: plan.hasDeckColumn)
         HStack(spacing: CGFloat(metrics.gutter)) {
@@ -263,10 +263,15 @@ struct PixelHandShell: View {
                 keyboard: plan.railCarriesKeyboard
                     ? RailKeyboardButton.Config(isShown: typePanel.isShown) { typePanel.toggle() }
                     : nil,
+                // Build 28 bug 2: the whole stack fits the window's height,
+                // so the keyboard circle is never pushed past its edge.
+                spacing: CGFloat(plan.railSpacing(availableHeight: Double(height))),
                 onAsk: { openAsk(plan) }
             )
             .padding(.leading, PixelHandTheme.Space.sm)
             .frame(maxHeight: .infinity)
+            // Above the pad and the deck column beside it.
+            .zIndex(1)
 
             if plan.hasDeckColumn {
                 canvas(centre: centre, plan: plan, margin: 0)

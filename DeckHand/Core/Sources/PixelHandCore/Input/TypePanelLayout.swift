@@ -83,6 +83,10 @@ public struct TypePanelLayout: Sendable, Hashable {
         public let action: Action
         public let column: Int
         public let row: Int
+        /// Rows the button spans: 2 when it is the only action beside the
+        /// inverted T (Accept with a hardware keyboard), so no cell is
+        /// left empty under it.
+        public var rowSpan: Int = 1
     }
 
     // MARK: Constants (points)
@@ -281,10 +285,18 @@ extension TypePanelLayout {
         private var maxRow: Double { TypePanelLayout.maximumRowHeight }
         private var fieldMin: Double { TypePanelLayout.fieldMinimumWidth }
 
-        /// The action buttons beside the field, in order.
+        /// The action buttons beside the field, in order. With a hardware
+        /// keyboard (`keysOnly`) Live keeps Accept ⇥ (build 28 bug 1,
+        /// OT-13: the iPhone with a keyboard attached had none, so the
+        /// Mac's inline suggestion couldn't be taken with a tap); Compose
+        /// has none there (Return sends from the hardware keyboard).
         var actions: [Action] {
-            guard body == .full else { return [] }
-            return mode == .live ? [.accept, .paste] : [.sendReturn, .send]
+            switch (body, mode) {
+            case (.full, .live): [.accept, .paste]
+            case (.full, .compose): [.sendReturn, .send]
+            case (.keysOnly, .live): [.accept]
+            case (.keysOnly, .compose): []
+            }
         }
 
         /// The cell the narrowest windows fall back to: in a panel
@@ -375,7 +387,7 @@ extension TypePanelLayout {
                 blocks[.actions] = Grid(rect: PanelRect(x: x, y: y, width: actionsWidth, height: height), columns: actionColumns, rows: actionRows)
                 for (index, action) in actions.enumerated() {
                     cells.append(rows == 2
-                        ? ActionCell(action: action, column: 0, row: index)
+                        ? ActionCell(action: action, column: 0, row: index, rowSpan: actions.count == 1 ? 2 : 1)
                         : ActionCell(action: action, column: index, row: 0))
                 }
                 x += actionsWidth + gap

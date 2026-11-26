@@ -523,10 +523,21 @@ final class PixelHandUITests: XCTestCase {
                 XCTAssertTrue(hasKeyboardFocus(field), "The field lost focus after \(Double(tick + 1) * 0.5) s")
             }
             if dock.exists, dockFrame != .zero {
-                XCTAssertEqual(dock.frame, dockFrame, "The shell moved under the keyboard (arrangement changed)")
+                // OT-2: the arrangement never moves for the keyboard. OT-11:
+                // the dock may rise onto the keyboard bar (a hardware or
+                // minimised keyboard's slim bar, under 120 pt), and only
+                // straight up; build 28 measured 46 pt.
+                let now = dock.frame
+                XCTAssertEqual(now.size, dockFrame.size, "The dock changed size under the keyboard (arrangement changed)")
+                XCTAssertEqual(now.minX, dockFrame.minX, accuracy: 1, "The dock moved sideways (arrangement changed)")
+                let lift = dockFrame.minY - now.minY
+                XCTAssertTrue(abs(lift) <= 1 || (lift > 0 && lift < 120), "The shell moved under the keyboard: the dock moved \(lift) pt (only the keyboard bar's lift is allowed)")
             }
         }
         snap("type-panel-after-5s")
+        // Build 28 bug 6 (P1): in landscape the panel is above the keyboard,
+        // its header's controls hittable.
+        checkPanelAboveKeyboard(panel, tag: "landscape")
         if field.exists, ensureScratchFrontmost() {
             field.typeText("hello")
             snap("type-panel-typed")
@@ -545,11 +556,19 @@ final class PixelHandUITests: XCTestCase {
             tapIfExists("ph.type.tab.numpad")
         }
         tapIfExists("ph.type.mode.live")
-        // Rotating while open keeps the panel.
+        // Rotating while open keeps the panel, above the keyboard in the
+        // new orientation (build 28 bug 6), and back again.
         XCUIDevice.shared.orientation = .portrait
         sleep(2)
         XCTAssertTrue(panel.exists, "The Type panel closed on rotation")
         snap("type-panel-portrait")
+        checkPanelAboveKeyboard(panel, tag: "portrait")
+        XCUIDevice.shared.orientation = .landscapeLeft
+        sleep(2)
+        snap("type-panel-landscape-again")
+        checkPanelAboveKeyboard(panel, tag: "landscape-again")
+        XCUIDevice.shared.orientation = .portrait
+        sleep(2)
         tapIfExists("ph.type.close")
         sleep(1)
         XCTAssertFalse(panel.exists, "The close button didn't close the panel")
@@ -650,7 +669,7 @@ final class PixelHandUITests: XCTestCase {
         let grip = element("ph.type.grip")
         if grip.waitForExistence(timeout: 2) {
             let start = panel.frame
-            let window = app.windows.firstMatch.frame
+            let window = windowFrame()
             grip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.1, thenDragTo: app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.08)))
             sleep(1)
             snap("type-panel-dragged")
@@ -666,6 +685,10 @@ final class PixelHandUITests: XCTestCase {
         // and the layout reflows (stacked: the keys go under the field).
         let handle = element("ph.type.resize.trailing")
         if handle.exists {
+            // Build 28: a width remembered from an earlier walk can already
+            // be the 362 pt minimum, so widen it first (to the room).
+            handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.1, thenDragTo: handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).withOffset(CGVector(dx: 600, dy: 0)))
+            sleep(1)
             let before = panel.frame.width
             handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.1, thenDragTo: handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).withOffset(CGVector(dx: -600, dy: 0)))
             sleep(1)
@@ -677,7 +700,7 @@ final class PixelHandUITests: XCTestCase {
             if field.exists, command.exists {
                 XCTAssertGreaterThan(command.frame.minY, field.frame.minY, "Narrow panel didn't stack the keys under the field")
             }
-        } else if app.windows.firstMatch.frame.width >= 700 {
+        } else if windowFrame().width >= 700 {
             snap("missing-ph.type.resize.trailing")
         }
 
@@ -686,13 +709,35 @@ final class PixelHandUITests: XCTestCase {
             sleep(1)
             let numpad = element("ph.type.numpad")
             XCTAssertTrue(numpad.waitForExistence(timeout: 2), "The numpad didn't show")
-            // OT-11 (build 26): only the arrows and the numpad.
-            XCTAssertFalse(element("ph.type.modifier.command").isHittable, "The modifier row stayed with the numpad")
+            // OT-11 (build 26), build 28 bug 7: only the arrows and the
+            // numpad; the modifier and key rows are gone, not just hidden.
+            for id in ["ph.type.modifier.command", "ph.type.modifier.shift", "ph.type.key.escape", "ph.type.key.delete", "ph.type.fn", "ph.type.keys"] {
+                let gone = element(id)
+                XCTAssertFalse(gone.exists && gone.isHittable && gone.frame.width > 1, "\(id) stayed with the numpad")
+            }
+            XCTAssertTrue(element("ph.type.key.up").exists, "The arrows went with the numpad")
             if numpad.exists {
                 XCTAssertTrue(panel.frame.insetBy(dx: -1, dy: -1).contains(numpad.frame), "The numpad isn't inside the panel")
                 XCTAssertGreaterThan(numpad.frame.width, panel.frame.width * 0.5, "The numpad doesn't fill the panel")
+                // Arrows and numpad share the panel: together they span it.
+                let arrows = element("ph.type.arrows")
+                if arrows.exists {
+                    let both = arrows.frame.union(numpad.frame)
+                    XCTAssertGreaterThan(both.width, panel.frame.width - 2 * 12 - 4, "The arrows and numpad don't fill the panel's width")
+                }
             }
             snap("type-numpad-docked")
+            // The joystick still works on the arrows in numpad mode: hold
+            // ← and drag right (only with a scratch document in front).
+            let left = element("ph.type.key.left"), probe = element("ph.type.joystick.last")
+            if left.exists, left.isHittable, probe.exists, ensureScratchFrontmost() {
+                let start = left.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+                start.press(forDuration: 0.6, thenDragTo: start.withOffset(CGVector(dx: 60, dy: 0)), withVelocity: .slow, thenHoldForDuration: 0.5)
+                sleep(1)
+                snap("type-numpad-joystick")
+                let value = probe.value as? String ?? ""
+                XCTAssertTrue(value.hasPrefix("joystick "), "The joystick didn't run on the numpad's arrows: \(value)")
+            }
             if ensureScratchFrontmost() { tapIfExists("ph.type.numpad.seven") }
             tapIfExists("ph.type.tab.numpad")
             sleep(1)
@@ -762,7 +807,10 @@ final class PixelHandUITests: XCTestCase {
                 XCTAssertGreaterThan(panel.frame.height, panelBefore.height + 20, "The corner drag didn't make the panel taller: \(panelBefore) → \(panel.frame)")
                 XCTAssertGreaterThan(down.frame.height, before + 4, "The arrows didn't grow with the panel")
                 XCTAssertGreaterThan(down.frame.height, 48, "The arrows are still \(down.frame.height) pt tall")
-                if app.keyboards.count > 0, let keyboard = app.keyboards.allElementsBoundByIndex.first {
+                // Only a keyboard that is on screen (build 28: on iPhone the
+                // walk read a hidden keyboard's frame, 374 pt "under" it).
+                if let keyboard = app.keyboards.allElementsBoundByIndex.first, keyboard.exists, keyboard.isHittable,
+                   keyboard.frame.height > 100, keyboard.frame.minY < windowFrame().maxY - 1 {
                     XCTAssertLessThanOrEqual(panel.frame.maxY, keyboard.frame.minY + 1, "The taller panel went under the keyboard")
                 }
                 // Field and arrows share their band's height.
@@ -793,7 +841,7 @@ final class PixelHandUITests: XCTestCase {
                 let loupe = element("ph.type.loupe")
                 if loupe.waitForExistence(timeout: 3) {
                     XCTAssertEqual(loupe.frame.width, panel.frame.width, accuracy: 2, "The loupe isn't as wide as the panel")
-                    XCTAssertTrue(loupe.frame.maxY <= panel.frame.minY + 1 || loupe.frame.minY >= panel.frame.maxY - 1, "The loupe covers the panel")
+                    checkLoupeClearOfPanel(loupe, panel: panel, tag: tag)
                     // Build 27 bug 1: the loupe's scaled picture made its
                     // frame ~4,536 pt wide and took the panel's taps.
                     XCTAssertLessThanOrEqual(loupe.frame.height, 201, "The loupe's frame is bigger than the loupe: \(loupe.frame)")
@@ -966,8 +1014,14 @@ final class PixelHandUITests: XCTestCase {
             // one width per grid, inside the chips' row.
             let allCards = cards + offline
             let cardHeights = allCards.map(\.frame.height)
+            // Build 28: a name that wraps to two lines (OT-16) makes the
+            // card taller (90.5 pt measured); one-line names keep 84.
+            let twoLines = allCards.contains { card in
+                card.staticTexts.allElementsBoundByIndex.contains { $0.frame.height > 30 }
+                    || card.staticTexts.count == 0 && card.frame.height > 84
+            }
             for card in allCards {
-                XCTAssertLessThanOrEqual(card.frame.height, 84, "Device cards are compact (\(tag)): \(card.frame)")
+                XCTAssertLessThanOrEqual(card.frame.height, twoLines ? 104 : 84, "Device cards are compact (\(tag)): \(card.frame)")
             }
             if let low = cardHeights.min(), let high = cardHeights.max() {
                 XCTAssertLessThanOrEqual(high - low, 1, "Live and offline cards share one height (\(tag)): \(cardHeights)")
@@ -991,14 +1045,17 @@ final class PixelHandUITests: XCTestCase {
                 XCTAssertLessThanOrEqual(abs(tabSwitch.midY - doneFrame.midY), 1, "Switch and Done centred on one line (\(tag))")
                 // OT-17: the three chips have one face. Their fill, sampled
                 // at both ends (clear of icon and label), matches.
-                checkChipsLookAlike(chips, tag: tag)
+                // The Clipboard chip is the system paste control (the
+                // owner's decision): its fill is the system's, so only
+                // Photos and Files are compared for fill; all three for ink.
+                checkChipsLookAlike(chips, tag: tag, fillChips: 2)
             }
 
             // Sized to the content: with no more than a row of cards and no
             // tray, the sheet starts well below the top of the window.
             let done = element("ph.send.done")
             if done.exists, cards.count <= 3, offline.count <= 3, !element("ph.send.trayItem").exists {
-                let window = app.windows.firstMatch.frame
+                let window = windowFrame()
                 XCTAssertGreaterThan(done.frame.minY, window.minY + window.height * 0.25, "Sheet sized to its content (\(tag)): Done at \(done.frame.minY)")
             }
 
@@ -1007,7 +1064,9 @@ final class PixelHandUITests: XCTestCase {
             let sheet = element("ph.send.sheet")
             let sendFrame = sheet.exists ? sheet.frame : .zero
             if sheet.exists, UIDevice.current.userInterfaceIdiom == .pad {
-                let window = app.windows.firstMatch.frame
+                // Build 28: the first window element can read as zero;
+                // the app's own window is the largest.
+                let window = windowFrame()
                 XCTAssertLessThanOrEqual(abs(sendFrame.midX - window.midX), 2, "Sheet centred across the window (\(tag)): \(sendFrame) in \(window)")
                 XCTAssertLessThanOrEqual(abs(sendFrame.midY - window.midY), 2, "Sheet centred down the window (\(tag)): \(sendFrame) in \(window)")
                 XCTAssertLessThanOrEqual(sendFrame.width, 561, "Sheet at most 560 wide (\(tag))")
@@ -1198,7 +1257,7 @@ final class PixelHandUITests: XCTestCase {
             XCUIDevice.shared.orientation = orientation
             sleep(2)
             snap("capture-\(tag)")
-            let window = app.windows.firstMatch.frame
+            let window = windowFrame()
             let well = element("ph.capture.well").exists ? element("ph.capture.well").frame : picture.frame
             let dock = element("ph.capture.dock")
             guard dock.exists else { snap("missing-ph.capture.dock-\(tag)"); continue }
@@ -1728,11 +1787,63 @@ final class PixelHandUITests: XCTestCase {
         for id in ["ph.dock.keyboard", "ph.rail.keyboard", "ph.trackpad.keyboard"] where tapIfExists(id, timeout: 1) {
             return true
         }
+        // Build 28 bug 2 (VQ-105): the rail's circle must be a full-size
+        // target inside the window. If XCTest still calls it not hittable,
+        // record it and tap its centre, so the walk goes on to the panel.
+        let rail = element("ph.rail.keyboard")
+        if rail.exists {
+            let frame = rail.frame, window = windowFrame()
+            XCTAssertGreaterThanOrEqual(frame.width, 44, "The rail's keyboard button is too small: \(frame)")
+            XCTAssertGreaterThanOrEqual(frame.height, 44, "The rail's keyboard button is too small: \(frame)")
+            XCTAssertTrue(window.contains(CGPoint(x: frame.midX, y: frame.midY)), "The rail's keyboard button is outside the window: \(frame) in \(window)")
+            rail.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            if element("ph.type.panel").waitForExistence(timeout: 2) { return true }
+        }
         if required {
             snap("missing-keyboard-button")
             XCTFail("No keyboard button (ph.dock.keyboard, ph.rail.keyboard or ph.trackpad.keyboard) to open the Type panel")
         }
         return false
+    }
+
+    /// The app's window. `app.windows.firstMatch` can be a window that
+    /// reads as zero (build 28, `test23`), so take the largest.
+    private func windowFrame() -> CGRect {
+        let frames = app.windows.allElementsBoundByIndex.map(\.frame).filter { $0.width > 0 && $0.height > 0 }
+        return frames.max { $0.width * $0.height < $1.width * $1.height } ?? app.frame
+    }
+
+    /// Build 28 bug 6 (P1): the Type panel sits above the on-screen
+    /// keyboard and its header's mode switch is hittable.
+    private func checkPanelAboveKeyboard(_ panel: XCUIElement, tag: String) {
+        guard panel.exists else { return }
+        if let keyboard = app.keyboards.allElementsBoundByIndex.first, keyboard.exists, keyboard.frame.height > 100,
+           keyboard.frame.minY < windowFrame().maxY - 1 {
+            XCTAssertLessThanOrEqual(panel.frame.maxY, keyboard.frame.minY + 1, "The Type panel is under the keyboard (\(tag)): \(panel.frame) / \(keyboard.frame)")
+        }
+        for id in ["ph.type.mode.compose", "ph.type.mode.live", "ph.type.tab.numpad", "ph.type.close"] {
+            let control = element(id)
+            if control.exists {
+                XCTAssertTrue(control.isHittable, "\(id) isn't hittable (\(tag))")
+            }
+        }
+    }
+
+    /// OT-12: the loupe sits above or below the panel's card, never on it,
+    /// unless the room is too short for both (then it is squeezed to its
+    /// 96 pt minimum and may overlap the card's top). The card is measured
+    /// from its blocks, so the resize handles straddling its bottom
+    /// corners (build 28 bug 3: they reached into a loupe below the panel)
+    /// don't count.
+    private func checkLoupeClearOfPanel(_ loupe: XCUIElement, panel: XCUIElement, tag: String) {
+        var card = panel.frame
+        let blocks = ["ph.type.keys", "ph.type.arrows", "ph.type.numpad", "ph.type.field"].map(element).filter { $0.exists && $0.frame.height > 1 }
+        if let bottom = blocks.map(\.frame.maxY).max() {
+            card.size.height = min(card.height, bottom + 12 - card.minY)
+        }
+        let overlap = loupe.frame.intersection(card)
+        let squeezed = loupe.frame.height <= 97
+        XCTAssertTrue(overlap.isNull || overlap.height <= 1 || squeezed, "The loupe covers the panel (\(tag)): \(loupe.frame) / card \(card)")
     }
 
     private func dismissMenu() {
@@ -1748,10 +1859,10 @@ final class PixelHandUITests: XCTestCase {
     /// just inside each end (clear of icon and label), matches within a
     /// few levels, and so does the label's colour band (the darkest or
     /// lightest pixel across the chip's middle line).
-    private func checkChipsLookAlike(_ chips: [XCUIElement], tag: String) {
+    private func checkChipsLookAlike(_ chips: [XCUIElement], tag: String, fillChips: Int? = nil) {
         let shot = XCUIScreen.main.screenshot()
         var fills: [(r: Int, g: Int, b: Int)] = []
-        for chip in chips {
+        for chip in chips.prefix(fillChips ?? chips.count) {
             let f = chip.frame
             for x in [f.minX + 5, f.maxX - 5] {
                 if let colour = pixel(at: CGPoint(x: x, y: f.midY), in: shot) { fills.append(colour) }

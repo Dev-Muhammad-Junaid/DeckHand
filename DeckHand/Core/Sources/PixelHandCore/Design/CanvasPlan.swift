@@ -229,6 +229,48 @@ public struct CanvasPlan: Sendable, Hashable {
     /// pad then leaves its own button out, so there's one per window.
     public var railCarriesKeyboard: Bool { form == .rail }
 
+    // MARK: The rail's stack (build 28 bug 2, VQ-105)
+
+    /// A rail tab's height, the gap between tabs and the capsule's padding.
+    public static let railTab: Double = 54
+    public static let railTabGap: Double = 2
+    public static let railTabPadding: Double = 4
+    /// Ask's and the keyboard's glass circles.
+    public static let railCircle: Double = 62
+    /// The gap between the tab capsule, Ask and the keyboard circle; it
+    /// tightens to `railMinimumSpacing` on the shortest windows.
+    public static let railSpacing: Double = 12
+    public static let railMinimumSpacing: Double = 4
+
+    /// The rail's stack at a spacing: the tab capsule, Ask and (when it
+    /// carries it) the keyboard circle.
+    public static func railStackHeight(tabs: Int, carriesKeyboard: Bool, spacing: Double = railSpacing) -> Double {
+        let count = Double(max(0, tabs))
+        let capsule = count * railTab + max(0, count - 1) * railTabGap + 2 * railTabPadding
+        let circles = carriesKeyboard ? 2.0 : 1.0
+        return capsule + circles * railCircle + circles * spacing
+    }
+
+    /// The spacing that fits the rail's stack in `availableHeight` (the
+    /// safe area's height): 12, tighter on the shortest windows, never
+    /// under 4. Every control keeps its full size, so the keyboard circle
+    /// at the bottom is never pushed past the window's edge (where it
+    /// showed but couldn't be tapped).
+    public func railSpacing(availableHeight: Double) -> Double {
+        let tabs = tabSurfacesIncludeDeck ? 3 : 2
+        let gaps = railCarriesKeyboard ? 2.0 : 1.0
+        let fixed = Self.railStackHeight(tabs: tabs, carriesKeyboard: railCarriesKeyboard, spacing: 0)
+        guard availableHeight.isFinite else { return Self.railSpacing }
+        let room = (availableHeight - fixed) / gaps
+        return min(Self.railSpacing, max(Self.railMinimumSpacing, room.rounded(.down)))
+    }
+
+    /// Whether the rail's stack fits `availableHeight` at its tightest.
+    public func railFits(availableHeight: Double) -> Bool {
+        let tabs = tabSurfacesIncludeDeck ? 3 : 2
+        return Self.railStackHeight(tabs: tabs, carriesKeyboard: railCarriesKeyboard, spacing: Self.railMinimumSpacing) <= availableHeight
+    }
+
     /// The surfaces the tab bar offers: the deck goes when it has a column.
     public var tabSurfacesIncludeDeck: Bool { !hasDeckColumn }
 

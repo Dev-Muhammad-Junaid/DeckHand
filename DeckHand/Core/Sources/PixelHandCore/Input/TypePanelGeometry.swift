@@ -239,6 +239,33 @@ public struct TypePanelGeometry: Sendable, Hashable {
         )
     }
 
+    /// Any frame kept in the free room (build 28 bug 6): a frame worked
+    /// out before the keyboard came up, before the window turned, or while
+    /// a drag or resize was in flight is moved, never resized, so it ends
+    /// above the keyboard and the dock and inside the window's edges. A
+    /// panel taller than the room keeps its top (the header, the grip and
+    /// close) in view. The remembered place isn't touched: it is fractions
+    /// of the room, so the same corner comes back when the keyboard goes.
+    public func kept(_ frame: PanelRect) -> PanelRect {
+        guard [frame.x, frame.y, frame.width, frame.height].allSatisfy(\.isFinite) else {
+            return PanelRect(x: room.minX, y: room.minY, width: max(0, frame.width.isFinite ? frame.width : 0), height: max(0, frame.height.isFinite ? frame.height : 0))
+        }
+        var kept = frame
+        if style == .docked {
+            kept.x = (room.minX + max(0, room.width - frame.width) / 2).rounded()
+        } else {
+            kept.x = min(room.minX + max(0, room.width - frame.width), max(room.minX, frame.x))
+        }
+        kept.y = min(room.minY + max(0, room.height - frame.height), max(room.minY, frame.y))
+        return kept
+    }
+
+    /// Whether `frame` ends above the keyboard and the dock (within the
+    /// free room, give or take a point of rounding).
+    public func fitsAbove(_ frame: PanelRect) -> Bool {
+        frame.maxY <= room.maxY + 1 && frame.minY >= room.minY - 1
+    }
+
     /// Where a panel being dragged draws: its origin clamped into the
     /// room, without the magnet (that comes when the drag ends).
     public func clamped(origin x: Double, _ y: Double, size: (width: Double, height: Double)) -> PanelRect {
