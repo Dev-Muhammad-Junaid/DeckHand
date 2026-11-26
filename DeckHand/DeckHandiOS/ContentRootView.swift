@@ -200,6 +200,9 @@ struct ContentRootView: View {
         let listings = switcher.listings
         let dialing = switcher.machine.dialingDeviceID.flatMap { id in listings.first { $0.deviceID == id } }
         let reconnecting = switcher.reconnectingDeviceID.flatMap { id in listings.first { $0.deviceID == id } }
+        // VQ-101: the launch reconnect waiting for Loom to start (7–15 s
+        // after a cold boot) says so too, instead of a bare "Paired · Nearby".
+        let waiting = switcher.pendingLaunchDeviceID.flatMap { id in listings.first { $0.deviceID == id } }
         Group {
             if let notice = switcher.notice {
                 PHToast(message: notice, isFailure: true)
@@ -207,7 +210,9 @@ struct ContentRootView: View {
             } else if let reconnecting {
                 cancellableToast("Reconnecting to \(reconnecting.name)…")
             } else if let dialing {
-                cancellableToast("Connecting to \(dialing.name)…")
+                cancellableToast(MacReconnectPolicy.connectingLine(macName: dialing.name))
+            } else if let waiting {
+                cancellableToast(MacReconnectPolicy.connectingLine(macName: waiting.name))
             }
         }
         .padding(.horizontal, PixelHandTheme.Space.xl)
@@ -216,6 +221,7 @@ struct ContentRootView: View {
         .animation(.easeOut(duration: 0.2), value: switcher.notice)
         .animation(.easeOut(duration: 0.2), value: dialing?.deviceID)
         .animation(.easeOut(duration: 0.2), value: reconnecting?.deviceID)
+        .animation(.easeOut(duration: 0.2), value: waiting?.deviceID)
     }
 
     /// Room for the shell's header row above the toast.

@@ -190,6 +190,42 @@ public enum MacReconnectPolicy {
         return lastActiveDeviceID
     }
 
+    /// The Mac the launch reconnect is waiting to dial while the network
+    /// isn't ready yet, or `nil` (build 24, VQ-101). After a cold boot that
+    /// wait took 7–15 s and the picker showed a bare "Paired · Nearby"; the
+    /// remote now says "Connecting to <Mac>…" with Cancel meanwhile.
+    public static func pendingLaunchTarget(
+        isEnabled: Bool,
+        hasCompletedOnboarding: Bool,
+        alreadyTried: Bool,
+        hasSession: Bool,
+        isNetworkReady: Bool,
+        lastActiveDeviceID: UUID?,
+        listings: [MacListing],
+        isLockedByFreePlan: (UUID) -> Bool
+    ) -> UUID? {
+        guard !isNetworkReady else { return nil }
+        return launchTarget(
+            isEnabled: isEnabled,
+            hasCompletedOnboarding: hasCompletedOnboarding,
+            alreadyTried: alreadyTried,
+            hasSession: hasSession,
+            isNetworkReady: true,
+            lastActiveDeviceID: lastActiveDeviceID,
+            listings: listings,
+            isLockedByFreePlan: isLockedByFreePlan
+        )
+    }
+
+    /// How long "Connecting to <Mac>…" stays up while the network still
+    /// isn't ready; after that the picker waits for a tap as before.
+    public static let launchWaitLimit: TimeInterval = 30
+
+    /// The toast while the launch reconnect waits or dials.
+    public static func connectingLine(macName: String) -> String {
+        "Connecting to \(macName)…"
+    }
+
     /// The wait before redial number `attempt` (0-based) after the focused
     /// Mac dropped, or `nil` to stop. Approval verdicts (denied, revoked,
     /// forgotten) and the person's own Disconnect never redial.

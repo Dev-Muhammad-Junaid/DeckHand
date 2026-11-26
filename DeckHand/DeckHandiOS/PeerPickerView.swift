@@ -234,11 +234,14 @@ struct PeerPickerView: View {
 
         return VStack(spacing: PixelHandTheme.Space.md) {
             ForEach(orderedPeers, id: \.id) { peer in
+                // VQ-101: the launch reconnect (and a switcher dial) shows
+                // on its card too, not just the tapped one.
+                let busy = connecting ?? MacSwitcher.shared.connectingDeviceID
                 PeerCard(
                     peer: peer,
                     isPaired: pairing.isPaired(deviceID: peer.deviceID),
-                    isConnecting: connecting == peer.deviceID,
-                    isDimmed: connecting != nil && connecting != peer.deviceID
+                    isConnecting: busy == peer.deviceID,
+                    isDimmed: busy != nil && busy != peer.deviceID
                 ) {
                     connectTo(peer)
                 }

@@ -437,6 +437,29 @@ struct MacReconnectTests {
         #expect(pick(studio, ready: true, tried: true) == nil)
     }
 
+    @Test("Build 24 (VQ-101): while the network isn't ready the launch target is pending, then dialled")
+    func pendingWhileNetworkStarts() {
+        func pending(_ last: UUID?, ready: Bool, tried: Bool = false, session: Bool = false) -> UUID? {
+            MacReconnectPolicy.pendingLaunchTarget(
+                isEnabled: true, hasCompletedOnboarding: true, alreadyTried: tried, hasSession: session,
+                isNetworkReady: ready, lastActiveDeviceID: last, listings: listings, isLockedByFreePlan: { _ in false }
+            )
+        }
+        // Cold boot: the Mac is listed, Loom hasn't finished starting.
+        #expect(pending(studio, ready: false) == studio)
+        #expect(pending(nil, ready: false) == studio)
+        // Ready: no longer pending; `launchTarget` dials it.
+        #expect(pending(studio, ready: true) == nil)
+        // Nothing to wait for: a Mac that would prompt, one out of reach,
+        // a try already spent (Cancel), or a session already running.
+        #expect(pending(laptop, ready: false) == nil)
+        #expect(pending(mini, ready: false) == nil)
+        #expect(pending(studio, ready: false, tried: true) == nil)
+        #expect(pending(studio, ready: false, session: true) == nil)
+        #expect(MacReconnectPolicy.connectingLine(macName: "Studio") == "Connecting to Studio…")
+        #expect(MacReconnectPolicy.launchWaitLimit > 15)
+    }
+
     @Test("Own iCloud Macs reconnect at launch without pairing")
     func iCloud() {
         let own = [MacListing(deviceID: laptop, name: "Laptop", isReachable: true, isOwnICloud: true)]
