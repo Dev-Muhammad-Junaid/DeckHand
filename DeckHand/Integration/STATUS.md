@@ -2505,6 +2505,46 @@ queued. Build 29's own features haven't been checked yet, because they
 need the Mac.
 
 
+### Mac walks (build 29) — 2026-11-27, owner gave the Mac
+
+Scratch TextEdit in front before each run; `PH_QA_LIVE_SYNC=1`. Only the
+TextEdit scratch document was typed into: “hello”, “typed on the Mac”
+(added by the QA script for `test27_LiveSyncTypeOnMac`), “pixel hand”,
+“accept”⇥, “X”. `test19` opened Mission Control; `test27_ArrowJoystick`
+sent ←/⌥← presses to the front app.
+
+| Walk | iPad Pro 11" (full screen) | iPhone 17 Pro |
+|---|---|---|
+| `test04`, `05`, `16`, `19` | pass | pass, except `test04` (connecting-toast measure, walk) |
+| `test18` keyboard in landscape | **pass** (build 28's bug 6 didn't reproduce) | no keyboard button in landscape (bug 2) |
+| `test20` | numpad keeps the rows (bug 7); width already minimum (walk) | no keyboard button (bug 2) |
+| `test21` | Save as key passes; no Ask-first toggle in the editor (bug 8) | pass |
+| `test27_ArrowJoystick` | **pass** | **pass** |
+| `test27_LiveSyncTypeOnMac` | **pass**: text added on the Mac showed in the Live field, badge “In sync with the Mac” | **pass** |
+| `test28_LiveSyncTabAccept` | ⇥ reaches the Mac; fails on the connecting-toast measure (walk) | same |
+| `test29_LiveSyncEditFromIPad` | **fail** (bug 9) | **fail** (bug 9) |
+
+When the Mac's front app wasn't TextEdit, the badge said “Typing blind:
+the Mac's text isn't shown”, with “Web text is off for Claude” or “Google
+Chrome doesn't share its text”. The live-sync walks stopped there without
+typing, which is correct.
+
+**New bug**
+9. **Edits from the iPad land in the wrong place on the Mac (P1, live
+   sync):** `test29_LiveSyncEditFromIPad`.
+   - **iPad:** “pixel hand” lands at the end of the TextEdit document, but
+     tapping the start of the Live field doesn't move the Mac's caret, so
+     “X” lands at the end too: “…the Macpixel hand⇥X”.
+   - **iPhone:** “pixel hand”, “accept⇥” and “X” land after the first word
+     and interleave with it. The document now starts “Pixel pixel
+     XhandHandaccept⇥ QA scratch…” (was “Pixel Hand QA scratch…”). The
+     anchored edits don't apply at the field's caret, and they cut into
+     existing text.
+
+**Not done, needs the owner at the Mac:** the `LANE-live-sync.md`
+checklist (Notes, Mail, Xcode, latency, a secure field, lock) and the
+joystick by hand.
+
 ## Build 30 queued (2026-11-27)
 
 Build 30 is build 29 plus `LANE-build28-fixes.md` (merged at `7b67d08`),
