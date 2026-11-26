@@ -1,6 +1,6 @@
 # Coordinator state (read and update on every coordinator tick)
 
-> **Build 27 queued by the primary** (`e017feb`: owner26, protocol 16). Build 26 was superseded before its Mac results came in. The small paste-control lane is running. When it's ready, merge it into the next build: the same fix round if build 27 brings bugs, otherwise a quick build 28. Then the final QA pass, then the review page.
+> **Build 27 queued** (owner26 plus paste-control, folded in by the primary as `66c9a53`). No lanes are running. Waiting on the Mac results and the final QA pass. If there are no P1 or P2: publish the review page and finish.
 
 > **Mac builds:** 15, 16, 18 and 19 built (19 with 5 bugs, fixed in build 21). The primary session or the owner's Mac session runs Mac builds.
 
@@ -29,7 +29,6 @@ weekly usage limit is close).
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Primary (cloud, owner-facing: the owner sends changes here) | "★ Pixel Hand · PRIMARY" | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac, Claude Desktop session "DeckHand MAC build loop", `/loop` every 30 min; the only Mac build loop since 2026-11-25) | local_d0e9b529 | claude/pixelhand-integration (worktree `pixelhand-build`) | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
-| Send sheet Clipboard chip uses the system PasteButton/UIPasteControl (no \"Allow Paste\" prompt) | session_01H5HwAVYq4H9hrd4VyrmTsW | claude/pixelhand-lane-paste-control | `LANE-paste-control.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -279,3 +278,4 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   with the final QA pass.
 - 2026-11-26 16:20 UTC: the primary reported that the owner tested build 26 on the iPad (OT-9…13; confirmed in STATUS.md) and started lane owner26. The Mac's build 26 results haven't arrived; it pushed one walk fix, `a2f4adf`.
 - 2026-11-26 16:55 UTC: the primary merged owner26 (`62ca293`) and queued build 27 (`e017feb`, protocol 16). Confirmed in the repo. Started the paste-control lane for the follow-up the primary asked for (`DECISIONS.md`: the Clipboard chip uses PasteButton).
+- 2026-11-26 17:55 UTC: the primary merged paste-control into build 27 (`20be05f`, `66c9a53`). Waiting on the Mac.
