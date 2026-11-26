@@ -1833,3 +1833,33 @@ paired, so its connect walks wait and put an Allow prompt on the Mac).
   (OR-13, needs the real iPad), the sidebar's hidden state (OR-05), Duo.
 
 Status: BUILT (build 24) — 4 bugs
+
+## Owner testing (build 24) — 2026-11-26
+
+From the owner on the real iPad (screen recording reviewed by the primary
+session; landscape, Pro unlocked):
+
+- **OT-1 Dock icons (P2):** app icons in the bottom dock sit on a square
+  white/black container in light and dark mode. They should look like the
+  macOS Dock: the real icon shape, no tile behind it. Cause found: the Mac
+  sends icons as 64×64 **JPEG** (`DeckHandMac/InstalledAppScanner.swift`
+  ~L175–195), which has no alpha.
+- **OT-2 Keyboard open/close loop (P1):** tapping the dock's keyboard
+  button in iPad landscape makes the keyboard open and close repeatedly
+  until rotating to portrait or tapping the button again. In the recording
+  the shell switches to a compact arrangement when the keyboard appears,
+  then back, each cycle. Likely cause: the keyboard shrinks the layout
+  (no `.ignoresSafeArea(.keyboard)` anywhere in `DeckHandiOS`), the
+  arrangement changes, the view holding the first responder is rebuilt,
+  the keyboard drops, the layout reverts.
+- **OT-3 Typing UX (P2, owner open to ideas):** the keyboard input bar
+  doesn't follow the rebrand, typing into a Mac text field isn't easy,
+  and there's no number keypad.
+- **OT-4 Right column handle (P2):** the collapsed right column's edge
+  handle is hardly visible; it matches the background.
+- **OT-5 Ask gets stuck after one use (P1):** after running a plan, the
+  column ends in a state that only offers a Name field (rename and save);
+  there's no way back, no new request and no other actions.
+
+Fix lane: `claude/pixelhand-lane-owner24` (primary session).
+
