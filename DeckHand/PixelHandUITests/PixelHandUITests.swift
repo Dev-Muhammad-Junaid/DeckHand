@@ -893,7 +893,7 @@ final class PixelHandUITests: XCTestCase {
     /// (offline Macs smaller still), and a sheet no taller than its
     /// content (its Done button isn't pushed to the top of the screen
     /// with a short list).
-    func test22_SendSheetLayout() {
+    func test23_SendSheetLayout() {
         useFullScreenAppsIfAsked()
         launch()
         guard connect() else { return }
@@ -963,7 +963,7 @@ final class PixelHandUITests: XCTestCase {
     /// the header and the dock, and that the dock is anchored at the
     /// bottom; double-tap zooms in and back out; then the same in
     /// landscape.
-    func test23_CapturePreviewFillsPortrait() {
+    func test24_CapturePreviewFillsPortrait() {
         useFullScreenAppsIfAsked()
         XCUIDevice.shared.orientation = .portrait
         launch()
