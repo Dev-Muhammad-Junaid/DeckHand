@@ -368,7 +368,6 @@ private struct AppButton: View {
             Image(uiImage: uiImage)
                 .resizable()
                 .scaledToFit()
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
         } else {
             // Fallback SF Symbol

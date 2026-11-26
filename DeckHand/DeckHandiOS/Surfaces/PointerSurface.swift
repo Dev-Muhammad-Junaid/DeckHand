@@ -55,7 +55,16 @@ struct PointerSurface: View {
     /// One finger scrolls (an accessibility fallback; from the strip's menu
     /// and the VoiceOver actions).
     @State private var scrollMode = false
-    @State private var showKeyboard = false
+    /// The shell's Type panel: the pad's keyboard button opens the same
+    /// panel the dock's does, drawn by the shell above the keyboard
+    /// (OT-2: one owner for "shown").
+    @Environment(\.typePanel) private var typePanel
+
+    private var showKeyboard: Bool { typePanel?.isShown ?? false }
+
+    private func toggleKeyboard() {
+        typePanel?.toggle()
+    }
 
     private var caption: PointerCaption {
         PointerCaption.caption(for: activity)
@@ -72,26 +81,11 @@ struct PointerSurface: View {
     }
 
     var body: some View {
-        VStack(spacing: PixelHandTheme.Space.sm) {
-            GeometryReader { proxy in
-                pad(height: proxy.size.height)
-            }
-
-            if showKeyboard {
-                RemoteKeyboardPanel(
-                    sender: sender,
-                    clipboard: clipboard,
-                    colorScheme: colorScheme,
-                    onActivity: { gestureMap.forget() }
-                )
-                .transition(.opacity)
-            }
+        GeometryReader { proxy in
+            pad(height: proxy.size.height)
         }
         .padding(.horizontal, margin)
         .padding(.bottom, PixelHandTheme.Space.sm)
-        // Glyph rule: the keyboard panel fades in 180 ms, never rises from
-        // the bottom; Reduce Motion is instant.
-        .phPanelFade(value: showKeyboard)
     }
 
     // MARK: Pad
@@ -111,7 +105,7 @@ struct PointerSurface: View {
                     ZStack {
                         touchSurface
                         captionLayer
-                        if !keyboardInDock { chromeLayer }
+                        if !keyboardInDock && typePanel != nil { chromeLayer }
                         if !coachMarkSeen && height >= 300 {
                             PointerCoachMark { dismissCoachMark() }
                                 .padding(PixelHandTheme.Space.lg)
@@ -166,7 +160,7 @@ struct PointerSurface: View {
             scrollMode.toggle()
         }
         .accessibilityAction(named: keyboardActionName) {
-            showKeyboard.toggle()
+            toggleKeyboard()
         }
     }
 
@@ -212,8 +206,7 @@ struct PointerSurface: View {
             label: showKeyboard ? "Hide keyboard" : "Show keyboard",
             isOn: showKeyboard
         ) {
-            GestureHaptic.selection.trigger()
-            showKeyboard.toggle()
+            toggleKeyboard()
         }
         .accessibilityIdentifier("ph.trackpad.keyboard")
         .mirrorTileKeepOut(.keyboard, owner: sender)

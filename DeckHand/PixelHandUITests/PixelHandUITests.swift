@@ -480,6 +480,127 @@ final class PixelHandUITests: XCTestCase {
         }
     }
 
+    // MARK: - Owner testing, build 24
+
+    /// OT-2 (P1): in iPad landscape the dock's keyboard button opened the
+    /// keyboard, the shell switched arrangement, the field was rebuilt and
+    /// the keyboard dropped, round and round. Opens the Type panel in
+    /// landscape and asserts that it, and the field's keyboard focus, stay
+    /// put for 5 s and the arrangement doesn't change (the dock stays
+    /// where it was). On a simulator with "Connect Hardware Keyboard" on,
+    /// no on-screen keyboard shows; the field's focus is checked instead.
+    func test18_KeyboardStaysOpenInLandscape() {
+        useFullScreenAppsIfAsked()
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
+        launch()
+        guard connect() else { return }
+        sleep(1)
+        let dock = element("ph.dock")
+        let dockFrame = dock.exists ? dock.frame : .zero
+        guard tapIfExists("ph.dock.keyboard") || tapIfExists("ph.trackpad.keyboard") else { return }
+        let panel = element("ph.type.panel")
+        XCTAssertTrue(panel.waitForExistence(timeout: 3), "The Type panel didn't open")
+        sleep(1)
+        snap("type-panel-open")
+        let field = element("ph.type.field")
+        let hadKeyboard = app.keyboards.count > 0
+        for tick in 0..<10 {
+            usleep(500_000)
+            XCTAssertTrue(panel.exists, "The Type panel closed by itself after \(Double(tick + 1) * 0.5) s")
+            if hadKeyboard {
+                XCTAssertTrue(app.keyboards.count > 0, "The keyboard dropped after \(Double(tick + 1) * 0.5) s")
+            } else {
+                XCTAssertTrue(hasKeyboardFocus(field), "The field lost focus after \(Double(tick + 1) * 0.5) s")
+            }
+            if dock.exists, dockFrame != .zero {
+                XCTAssertEqual(dock.frame, dockFrame, "The shell moved under the keyboard (arrangement changed)")
+            }
+        }
+        snap("type-panel-after-5s")
+        if field.exists {
+            field.typeText("hello")
+            snap("type-panel-typed")
+        }
+        // Compose, Numpad, and back.
+        if tapIfExists("ph.type.mode.compose") {
+            sleep(1)
+            snap("type-compose")
+            if field.exists { field.typeText("draft") }
+            snap("type-compose-draft")
+        }
+        if tapIfExists("ph.type.tab.numpad") {
+            sleep(1)
+            snap("type-numpad")
+            tapIfExists("ph.type.tab.keys")
+        }
+        tapIfExists("ph.type.mode.live")
+        // Rotating while open keeps the panel.
+        XCUIDevice.shared.orientation = .portrait
+        sleep(2)
+        XCTAssertTrue(panel.exists, "The Type panel closed on rotation")
+        snap("type-panel-portrait")
+        tapIfExists("ph.type.close")
+        sleep(1)
+        XCTAssertFalse(panel.exists, "The close button didn't close the panel")
+    }
+
+    /// OT-5 (P1): after one run Ask was left on a Name field with no way
+    /// back. Walks ask → run → New request → Save as key → Cancel → ask
+    /// again, asserting each step offers what the flow says.
+    func test19_AskAgainAfterRun() {
+        launch()
+        guard connect() else { return }
+        guard openAsk() else { return }
+        let field = element("ph.ask.field")
+        guard field.waitForExistence(timeout: 3) else { snap("missing-ask-field"); return }
+        field.tap()
+        field.typeText("Show Mission Control")
+        tapIfExists("ph.ask.submit")
+        XCTAssertTrue(element("ph.ask.run").waitForExistence(timeout: 10), "No Run after planning")
+        snap("ask-plan")
+        tapIfExists("ph.ask.run")
+        // A confirmation may ask first.
+        let confirm = app.buttons["Run"].firstMatch
+        if confirm.waitForExistence(timeout: 1), confirm.isHittable, !element("ph.ask.run").isHittable { confirm.tap() }
+        XCTAssertTrue(element("ph.ask.newRequest").waitForExistence(timeout: 10), "No New request after the run")
+        XCTAssertTrue(element("ph.ask.runAgain").exists, "No Run again after the run")
+        XCTAssertTrue(element("ph.ask.saveAsKey").exists, "No Save as key after the run")
+        XCTAssertTrue(element("ph.ask.result").exists, "No result line after the run")
+        snap("ask-result")
+
+        tapIfExists("ph.ask.newRequest")
+        sleep(1)
+        let cleared = (field.value as? String) ?? ""
+        XCTAssertTrue(cleared.isEmpty || cleared == field.placeholderValue, "New request didn't clear the field")
+        snap("ask-new-request")
+
+        field.typeText("Take a screenshot")
+        tapIfExists("ph.ask.submit")
+        XCTAssertTrue(element("ph.ask.saveAsKey").waitForExistence(timeout: 10), "No Save as key on the plan")
+        tapIfExists("ph.ask.saveAsKey")
+        XCTAssertTrue(element("ph.ask.name").waitForExistence(timeout: 3), "Save as key didn't ask for a name")
+        XCTAssertTrue(element("ph.ask.cancel").exists, "Save as key has no Cancel")
+        snap("ask-naming")
+        tapIfExists("ph.ask.cancel")
+        sleep(1)
+        XCTAssertFalse(element("ph.ask.name").exists, "Cancel left the name field")
+        XCTAssertTrue(element("ph.ask.run").exists, "Cancel didn't return to the plan")
+        snap("ask-after-cancel")
+
+        field.tap()
+        field.typeText(" now")
+        tapIfExists("ph.ask.submit")
+        XCTAssertTrue(element("ph.ask.run").waitForExistence(timeout: 10), "Asking again didn't plan")
+        snap("ask-again")
+        closeAsk()
+    }
+
+    private func hasKeyboardFocus(_ element: XCUIElement) -> Bool {
+        guard element.exists else { return false }
+        return (element.value(forKey: "hasKeyboardFocus") as? Bool) ?? false
+    }
+
     // MARK: - Helpers
 
     /// Build 22 (P2): the lock banner sits under the header and never

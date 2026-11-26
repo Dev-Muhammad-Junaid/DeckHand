@@ -83,8 +83,14 @@ struct RightColumnSwitch: View {
     }
 }
 
-/// The collapsed column: a slim rounded bar on the trailing edge with a
-/// 44 pt touch target. A tap brings the column back.
+/// The collapsed column: a slim capsule on the trailing edge with a
+/// chevron, and a 44 pt touch target. A tap brings the column back.
+///
+/// Owner testing, build 24 (OT-4): the old bar was `raised` on the canvas
+/// (about 1.1:1) and disappeared into it. Now the edge is `accent` over
+/// an `accentTint` fill with the chevron in `accentInk`, each 3:1 or
+/// better against what's behind it in light, dark and high contrast
+/// (`ContrastAudit.rightColumnHandle`).
 struct RightColumnHandle: View {
     let mode: RightColumnMode
     let onExpand: () -> Void
@@ -92,15 +98,22 @@ struct RightColumnHandle: View {
     var body: some View {
         Button(action: onExpand) {
             Capsule()
-                .fill(PixelHandTheme.raised)
-                .overlay(Capsule().strokeBorder(PixelHandTheme.hairline, lineWidth: PixelHandTheme.Stroke.hairline))
-                .frame(width: 6, height: 72)
+                .fill(PixelHandTheme.accentTint)
+                .overlay(
+                    Capsule().strokeBorder(PixelHandTheme.accent, lineWidth: CGFloat(RightColumnPlan.handleStroke))
+                )
+                .overlay(
+                    PHGlyph(glyph: PixelGlyphs.chevronLeft, pitch: 1.6)
+                        .foregroundStyle(PixelHandTheme.accentInk)
+                )
+                .frame(width: CGFloat(RightColumnPlan.handleWidth), height: CGFloat(RightColumnPlan.handleHeight))
                 .frame(width: CGFloat(RightColumnPlan.handleWidth))
                 .frame(maxHeight: .infinity)
                 // The touch target reaches past the slim bar to 44 pt.
                 .contentShape(Rectangle().inset(by: -CGFloat(RightColumnPlan.handleHitWidth - RightColumnPlan.handleWidth) / 2))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ChipPressStyle())
+        .phosphorFocusable(cornerRadius: CGFloat(RightColumnPlan.handleWidth) / 2)
         .accessibilityLabel(mode == .ask ? "Show Ask" : "Show the deck")
         .accessibilityHint("Opens the column beside the canvas")
         .accessibilityIdentifier("ph.column.expand")

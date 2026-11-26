@@ -143,8 +143,19 @@ public enum ContrastAudit {
             // Primary button labels use the `.headline` role (semibold).
             ContrastPair("white on accent", .brand(.white), on: .token(T.accent), use: .largeText),
         ]
+        pairs += rightColumnHandle
         return pairs
     }()
+
+    /// The collapsed right column's edge handle (owner testing, build 24,
+    /// OT-4: it matched the background). Its edge is `accent` on the
+    /// canvas behind it; inside, an `accentTint` fill and the chevron in
+    /// `accentInk`. Each must reach 3:1 in light, dark and high contrast.
+    public static let rightColumnHandle: [ContrastPair] = [
+        ContrastPair("column handle edge: accent on canvas", .token(T.accent), on: .token(T.canvas), use: .nonText),
+        ContrastPair("column handle chevron: accentInk on accentTint", .token(T.accentInk), on: .token(T.accentTint), use: .nonText),
+        ContrastPair("column handle chevron: accentInk on canvas", .token(T.accentInk), on: .token(T.canvas), use: .nonText),
+    ]
 
     /// Phosphor, cobalt and the lit colours on the always-navy surfaces
     /// (trackpad, mirror pane, status strip, onboarding, paywall).

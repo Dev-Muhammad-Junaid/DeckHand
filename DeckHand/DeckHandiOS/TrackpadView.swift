@@ -27,8 +27,16 @@ struct TrackpadView: View {
     /// Gesture → Mac view, with toggle-back (S11). A click, key or text
     /// forgets what a gesture opened.
     @State private var gestureMap = GestureMap()
-    /// The keyboard panel (typing, special keys, Paste to Mac).
-    @State private var showKeyboard = false
+    /// The Type panel (typing, keys, numpad, Paste to Mac), inline here:
+    /// the classic layout has one arrangement, so the keyboard can't
+    /// change it.
+    @State private var typePanel = TypePanelModel()
+    private var showKeyboard: Binding<Bool> {
+        Binding(
+            get: { typePanel.isShown },
+            set: { $0 ? typePanel.open() : typePanel.close() }
+        )
+    }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var bg: Color { PixelHandTheme.color(PaletteTokens.canvas, for: colorScheme) }
@@ -109,11 +117,20 @@ struct TrackpadView: View {
             .padding(.top, 16)
 
             // ── Keyboard panel: typing, special keys, Paste to Mac ────
-            if showKeyboard {
-                RemoteKeyboardPanel(
+            if typePanel.isShown {
+                // A medium-width layout: the chips get their own row and
+                // the panel caps itself; the classic layout never changes
+                // arrangement, so the panel can sit inline.
+                TypePanel(
                     sender: sender,
                     clipboard: clipboard,
-                    colorScheme: colorScheme,
+                    model: typePanel,
+                    layout: TypePanelLayout(
+                        width: 600,
+                        height: 800,
+                        keyboard: typePanel.keyboard,
+                        keyboardOverlap: typePanel.keyboardOverlap
+                    ),
                     onActivity: { gestureMap.forget() }
                 )
                 .padding(.horizontal, 20)
@@ -171,13 +188,13 @@ struct TrackpadView: View {
             .padding(.top, 8)
 
             // ── Gesture button bar ────────────────────────────────────
-            GestureButtonBar(sender: sender, scrollMode: $scrollMode, showKeyboard: $showKeyboard, colorScheme: colorScheme)
+            GestureButtonBar(sender: sender, scrollMode: $scrollMode, showKeyboard: showKeyboard, colorScheme: colorScheme)
                 .padding(.horizontal, 20)
                 .padding(.top, 10)
                 .padding(.bottom, 16)
         }
         .background(bg)
-        .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.28, dampingFraction: 0.85), value: showKeyboard)
+        .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.28, dampingFraction: 0.85), value: typePanel.isShown)
     }
 }
 

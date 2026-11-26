@@ -31,9 +31,13 @@ extension AskPlan {
     }
 
     /// The key Save as key stores, or `nil` when the plan can't be saved.
-    public func deckKey(appName: (String) -> String? = { _ in nil }) -> DeckKey? {
+    /// `label` is the name the person gave it in Save as key (OT-5); blank
+    /// or `nil` keeps the plan's own label. Cut to the deck's label length.
+    public func deckKey(appName: (String) -> String? = { _ in nil }, label: String? = nil) -> DeckKey? {
         guard let action = savedAction else { return nil }
-        var key = DeckKey.draft(for: action, label: keyLabel(appName: appName), appName: appName)
+        let named = label?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let chosen = named.isEmpty ? keyLabel(appName: appName) : String(named.prefix(DeckValidation.maxLabelLength))
+        var key = DeckKey.draft(for: action, label: chosen, appName: appName)
         key.confirm = !AskSafety.reasons(in: self).isEmpty
         guard DeckValidation.keyIssues(key).isEmpty else { return nil }
         return key
@@ -50,8 +54,12 @@ extension DeckDocument {
     /// Saves `plan` as a key: on its one app's page, else Home, else the
     /// first custom page with room. `nil` when the plan can't be saved or
     /// every candidate page is full.
-    public mutating func saveAskPlan(_ plan: AskPlan, appName: (String) -> String? = { _ in nil }) -> AskSaveResult? {
-        guard let key = plan.deckKey(appName: appName) else { return nil }
+    public mutating func saveAskPlan(
+        _ plan: AskPlan,
+        appName: (String) -> String? = { _ in nil },
+        label: String? = nil
+    ) -> AskSaveResult? {
+        guard let key = plan.deckKey(appName: appName, label: label) else { return nil }
         var candidates: [Int] = []
         if let app = plan.singleApp {
             var trial = self

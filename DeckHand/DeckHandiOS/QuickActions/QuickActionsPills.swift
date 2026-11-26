@@ -45,10 +45,10 @@ struct AppContextPill: View {
     @ViewBuilder
     private var icon: some View {
         if let data = app.iconData, let uiImage = UIImage(data: data) {
+            // The icon's own shape: it comes with transparency (OT-1).
             Image(uiImage: uiImage)
                 .resizable()
                 .scaledToFit()
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         } else {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .fill(PixelHandTheme.color(PaletteTokens.fill, for: colorScheme))
