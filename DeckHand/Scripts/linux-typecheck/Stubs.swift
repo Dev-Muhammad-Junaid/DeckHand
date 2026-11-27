@@ -282,6 +282,7 @@ final class FocusTextObserver: @unchecked Sendable {
     struct Reading: Sendable {
         let elementKey: UInt64?
         let reading: TextRevisionTracker.Reading
+        var selectionKnown = true
     }
     var onChange: (@Sendable () -> Void)?
     func start(front: Front?) {}

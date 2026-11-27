@@ -54,6 +54,11 @@ final class FocusTextObserver: @unchecked Sendable {
         /// The process and element, hashed; `nil` without a field.
         let elementKey: UInt64?
         let reading: TextRevisionTracker.Reading
+        /// The app reported its selection. When it didn't, `reading`'s
+        /// selection is a stand-in (the end) for the iPad's caret, and the
+        /// Mac never moves the caret with arrow keys from it (build 29
+        /// bug 9: never type at a guessed position).
+        var selectionKnown = true
     }
 
     private static let messagingTimeout: Float = 0.1
@@ -161,14 +166,15 @@ final class FocusTextObserver: @unchecked Sendable {
     }
 
     /// Sets the field's selection through Accessibility. Returns whether
-    /// it took (read back).
+    /// it took, by reading it back; no read-back is not a yes. The caller
+    /// confirms with a fresh `read` either way (`TextSelectionPlacement`).
     func select(_ range: PixelHandCore.TextRange) async -> Bool {
         await onThread { [self] in
             guard let element = self.focusedElement() else { return false }
             var cfRange = CFRange(location: range.start, length: range.length)
             guard let value = AXValueCreate(.cfRange, &cfRange) else { return false }
             guard AXUIElementSetAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, value) == .success else { return false }
-            guard let now = Self.range(element, kAXSelectedTextRangeAttribute) else { return true }
+            guard let now = Self.range(element, kAXSelectedTextRangeAttribute) else { return false }
             return now.location == range.start && now.length == range.length
         }
     }
@@ -262,7 +268,7 @@ final class FocusTextObserver: @unchecked Sendable {
 
     private func look(front: Front?, lock: MacLockState, previousStart: Int?) -> Reading {
         func unreadable(_ reason: TextReadability, key: UInt64? = nil) -> Reading {
-            Reading(elementKey: key, reading: .init(readable: reason, window: nil, length: 0, selection: .caret(0), canSetSelection: false, canEdit: false))
+            Reading(elementKey: key, reading: .init(readable: reason, window: nil, length: 0, selection: .caret(0), canSetSelection: false, canEdit: false), selectionKnown: false)
         }
         // Locked or secure input: no Accessibility at all.
         if lock.isLocked { return unreadable(.locked) }
@@ -325,7 +331,7 @@ final class FocusTextObserver: @unchecked Sendable {
             selection: selection,
             canSetSelection: canSetSelection,
             canEdit: canEdit
-        ))
+        ), selectionKnown: selected != nil)
     }
 
     private func focusedElement() -> AXUIElement? {

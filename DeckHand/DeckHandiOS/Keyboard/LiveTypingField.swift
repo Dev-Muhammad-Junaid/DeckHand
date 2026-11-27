@@ -380,7 +380,11 @@ final class LiveTypingTextView: UITextView, UITextViewDelegate, LiveTextDisplay 
         // the selection handles move the Mac's caret too.
         if isSynced, let sync {
             guard !applyingRemote, markedTextRange == nil else { return }
-            sync.localSelection(currentSelection)
+            // UIKit reports a typed character's caret before the text
+            // (`textViewDidChangeSelection` before `textViewDidChange`):
+            // with the field's text, the reconciler tells a caret move
+            // from the start of an edit (build 29 bug 9).
+            sync.localSelection(currentSelection, fieldText: text ?? "")
             return
         }
         // Blind Live keeps the caret at the end: the Mac's cursor can't follow a

@@ -38,10 +38,11 @@ final class InputHandler: DomainHandler {
             DragGuard.shared.mouseUp(button, from: connection.id)
 
         case let .keyboardShortcut(keys):
-            TypingQueue.shared.shortcut(keys)
+            // Live text sync: behind an edit still being placed or typed.
+            FocusTextSync.shared.inOrder { TypingQueue.shared.shortcut(keys) }
 
         case let .typeText(text):
-            TypingQueue.shared.type(text)
+            FocusTextSync.shared.inOrder { TypingQueue.shared.type(text) }
 
         case let .textEdit(edit):
             // Live text sync (protocol 17): select, then type; never AXValue.
