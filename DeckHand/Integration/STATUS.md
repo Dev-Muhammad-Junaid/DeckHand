@@ -2586,4 +2586,9 @@ passes; the UI tests parse and their braces balance.
 If there are no P1 or P2 findings, the coordinator publishes the owner's
 review page.
 
+Also in build 30: **live-sync-edits** (`LANE-live-sync-edits.md`), the fix
+for build 29 bug 9 (P1): iPad edits and caret moves now land at the right
+place on the Mac. Re-check `test29_LiveSyncEditFromIPad` with exact
+TextEdit contents, and the checklist in that handoff (TextEdit and Notes).
+
 Status: READY FOR MAC BUILD (build 30)
