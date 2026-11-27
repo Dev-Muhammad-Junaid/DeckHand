@@ -350,12 +350,12 @@ struct TypePanel: View {
             onKey: { key, modifiers in
                 onActivity()
                 guardReturn(if: key == .return) {
-                    Task { await sender.sendKey(key, modifiers: modifiers) }
+                    sendKeys(key.chord(with: modifiers))
                 }
             },
             onChord: { keys in
                 onActivity()
-                Task { await sender.sendShortcut(keys) }
+                sendKeys(keys)
             },
             onModifiersUsed: { _ = model.presence.modifiers.consume() },
             onSubmit: { sendDraft() },
@@ -368,6 +368,24 @@ struct TypePanel: View {
             if presence.mode == .live, let liveSync {
                 SyncBadgeView(badge: liveSync.badge, reason: liveSync.reasonLine)
                     .padding(PixelHandTheme.Space.xs)
+            }
+        }
+        // Build 29 bug 9: when the Mac can't put its caret where an edit
+        // goes it types nothing (never at a guessed place) and says so.
+        .overlay(alignment: .bottomLeading) {
+            if presence.mode == .live, let note = liveSync?.note {
+                Text(note)
+                    .font(.caption2)
+                    .foregroundStyle(PixelHandTheme.warning)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(
+                        RoundedRectangle(cornerRadius: PixelHandTheme.Radius.badge, style: .continuous)
+                            .fill(PixelHandTheme.warningTint)
+                    )
+                    .padding(PixelHandTheme.Space.xs)
+                    .allowsHitTesting(false)
+                    .accessibilityIdentifier("ph.type.syncNote")
             }
         }
         .background(
@@ -415,7 +433,7 @@ struct TypePanel: View {
             GestureHaptic.light.trigger()
             let modifiers = model.presence.modifiers.consume()
             target.guardrail.typed(into: target.frontApp)
-            Task { await sender.sendShortcut(TypeKey.remote(.tab).chord(with: modifiers)) }
+            sendKeys(TypeKey.remote(.tab).chord(with: modifiers))
         } label: {
             KeyCap(legend: .stacked(symbol: "⇥", word: "ACCEPT"), style: .tint)
         }
@@ -632,7 +650,7 @@ struct TypePanel: View {
 
     /// One joystick or caret-stepper press.
     private func sendJoystickStep(_ step: CaretJoystick.Step) {
-        Task { await sender.sendShortcut(step.chord) }
+        sendKeys(step.chord)
     }
 
     /// A key cap's press: sends the key with the latched modifiers
@@ -642,7 +660,7 @@ struct TypePanel: View {
         GestureHaptic.light.trigger()
         let modifiers = model.presence.modifiers.consume()
         guardReturn(if: key.isReturn) {
-            Task { await sender.sendShortcut(key.chord(with: modifiers)) }
+            sendKeys(key.chord(with: modifiers))
         }
     }
 
@@ -662,6 +680,32 @@ struct TypePanel: View {
     }
 
     // MARK: Sending
+
+    /// The live field shows the Mac's text: keys go through its queue.
+    private var syncedLive: LiveTextSync? {
+        guard model.presence.mode == .live, let liveSync, liveSync.isSynced else { return nil }
+        return liveSync
+    }
+
+    /// A key chord for the Mac's caret. In synced Live it waits behind the
+    /// edit typed before it (build 29 bug 9: Accept ⇥ overtook the text);
+    /// otherwise it goes at once, as before.
+    private func sendKeys(_ keys: [String]) {
+        if let syncedLive {
+            syncedLive.sendRaw(.keys(keys))
+        } else {
+            Task { await sender.sendShortcut(keys) }
+        }
+    }
+
+    /// Text typed at the Mac's caret (the numpad), in the same order.
+    private func sendText(_ text: String) {
+        if let syncedLive {
+            syncedLive.sendRaw(.text(text))
+        } else {
+            Task { await sender.typeText(text) }
+        }
+    }
 
     /// Compose's Send: the draft as typed text, then Return when asked, in
     /// order, then a clear field.
@@ -706,15 +750,15 @@ struct TypePanel: View {
         case let .text(text):
             target.guardrail.typed(into: target.frontApp)
             if modifiers.isEmpty {
-                Task { await sender.typeText(text) }
+                sendText(text)
             } else if KeyTable.keyCode(for: text) != nil {
-                Task { await sender.sendShortcut(KeyModifier.pressOrder.filter(modifiers.contains).map(\.wireName) + [text]) }
+                sendKeys(KeyModifier.pressOrder.filter(modifiers.contains).map(\.wireName) + [text])
             } else {
-                Task { await sender.typeText(text) }
+                sendText(text)
             }
         case let .key(name):
             guardReturn(if: key == .enter) {
-                Task { await sender.sendShortcut(KeyModifier.pressOrder.filter(modifiers.contains).map(\.wireName) + [name]) }
+                sendKeys(KeyModifier.pressOrder.filter(modifiers.contains).map(\.wireName) + [name])
             }
         }
     }

@@ -11,6 +11,12 @@
 //  field (`LiveTextDisplay`), plays the refused haptic and keeps the badge
 //  current.
 //
+//  Everything for the Mac goes out through one ordered outbox (edits,
+//  selections, keys), never as separate tasks that could overtake each
+//  other (build 29 bug 9). Keys pressed in synced Live (Accept ⇥, the key
+//  row, the joystick, hardware arrows) come here too (`sendRaw`), so they
+//  wait behind the edit typed before them.
+//
 //  One per session (`ControlSessionModel.liveText`). It only has text
 //  while the Live field is open and on screen: the panel asks with
 //  `ControlSessionModel.setLiveTextWanted(_:)`, which sends
@@ -39,6 +45,9 @@ final class LiveTextSync {
     private(set) var isSynced = false
     /// Why it can't, in plain words (`nil` while synced or unknown).
     private(set) var reasonLine: String?
+    /// A short note under the field when an edit didn't land as typed
+    /// ("The Mac couldn't move its caret there, so nothing was typed").
+    private(set) var note: String?
 
     @ObservationIgnored private var reconciler = TextSyncReconciler()
     @ObservationIgnored weak var display: LiveTextDisplay?
@@ -47,6 +56,14 @@ final class LiveTextSync {
     /// Return guard, VQ-036); runs `send` now when not needed.
     @ObservationIgnored var confirmReturn: ((_ send: @escaping () -> Void) -> Void)?
     @ObservationIgnored private var badgeRefresh: Task<Void, Never>?
+    /// One ordered queue to the Mac.
+    private enum Outgoing {
+        case edit(TextEditRequest)
+        case select(TextSelectRequest)
+        case raw(TextSyncRawInput)
+    }
+    @ObservationIgnored private var outbox: [Outgoing] = []
+    @ObservationIgnored private var draining = false
 
     init() {}
 
@@ -70,13 +87,22 @@ final class LiveTextSync {
         run(reconciler.localChange(text: text, selection: selection, composing: composing, now: Self.now()))
     }
 
-    func localSelection(_ selection: TextRange) {
-        run(reconciler.localSelection(selection, now: Self.now()))
+    /// The caret moved in the field. `fieldText` is the field's text now:
+    /// a caret that comes with a text change isn't a caret move.
+    func localSelection(_ selection: TextRange, fieldText: String) {
+        run(reconciler.localSelection(selection, fieldText: fieldText, now: Self.now()))
+    }
+
+    /// Keys or text for the Mac's caret. Synced: behind the edits typed
+    /// before them. Blind: at once, as before.
+    func sendRaw(_ input: TextSyncRawInput) {
+        run(reconciler.localRaw(input, now: Self.now()))
     }
 
     /// Watching stopped (Live closed, the panel hidden, disconnected).
     func reset() {
         reconciler.reset()
+        outbox.removeAll()
         display?.becameBlind()
         refreshBadge()
     }
@@ -87,16 +113,16 @@ final class LiveTextSync {
         for effect in effects {
             switch effect {
             case let .sendEdit(edit):
-                let sender = sender
-                let send = { Task { await sender?.sendTextEdit(edit) } }
                 if edit.replacement.contains("\n"), let confirmReturn {
-                    confirmReturn { _ = send() }
+                    confirmReturn { [weak self] in self?.enqueue(.edit(edit)) }
                 } else {
-                    _ = send()
+                    enqueue(.edit(edit))
                 }
             case let .sendSelect(selection):
-                let sender = sender
-                Task { await sender?.sendTextSelect(selection) }
+                enqueue(.select(selection))
+            case let .sendRaw(input):
+                // The Type panel already guarded a Return key press.
+                enqueue(.raw(input))
             case let .show(text, selection):
                 display?.showSynced(text: text, selection: selection)
             case .becameBlind:
@@ -108,6 +134,31 @@ final class LiveTextSync {
         refreshBadge()
     }
 
+    /// Sends in order: each message waits for the one before it.
+    private func enqueue(_ item: Outgoing) {
+        outbox.append(item)
+        guard !draining else { return }
+        draining = true
+        Task { [weak self] in await self?.drain() }
+    }
+
+    private func drain() async {
+        while !outbox.isEmpty {
+            let item = outbox.removeFirst()
+            guard let sender else { continue }
+            switch item {
+            case let .edit(edit): await sender.sendTextEdit(edit)
+            case let .select(selection): await sender.sendTextSelect(selection)
+            case let .raw(.keys(chord)): await sender.sendShortcut(chord)
+            case let .raw(.text(text)): await sender.typeText(text)
+            }
+        }
+        draining = false
+    }
+
+    /// Badge, reason and note; and the next timeout (an unanswered edit,
+    /// keys the Mac showed nothing for, the end of MAC WINS or a note)
+    /// runs the reconciler's tick.
     private func refreshBadge() {
         let now = Self.now()
         let next = reconciler.badge(now: now)
@@ -115,12 +166,14 @@ final class LiveTextSync {
         if isSynced != reconciler.isSynced { isSynced = reconciler.isSynced }
         let reason = reconciler.isSynced ? nil : reconciler.reasonLine
         if reasonLine != reason { reasonLine = reason }
+        let line = reconciler.note(now: now)?.line
+        if note != line { note = line }
         badgeRefresh?.cancel()
-        if let deadline = reconciler.badgeDeadline(now: now) {
+        if let deadline = reconciler.nextDeadline(now: now) {
             badgeRefresh = Task { [weak self] in
-                try? await Task.sleep(for: .seconds(max(0.01, deadline - now)))
-                guard !Task.isCancelled else { return }
-                self?.refreshBadge()
+                try? await Task.sleep(for: .seconds(max(0.01, deadline - now + 0.005)))
+                guard !Task.isCancelled, let self else { return }
+                self.run(self.reconciler.tick(now: Self.now()))
             }
         }
     }

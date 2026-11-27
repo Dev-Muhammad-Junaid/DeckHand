@@ -1653,11 +1653,12 @@ final class PixelHandUITests: XCTestCase {
     /// TextEdit in front on the Mac with a new, empty plain-text document
     /// (`open -a TextEdit`, ⌘N, ⇧⌘T). Optional:
     ///   PH_QA_LIVE_SYNC_MARKER=<text>  text the QA script types on the Mac
-    ///     while test27 waits (e.g. `osascript -e 'tell application
+    ///     while test28 waits (e.g. `osascript -e 'tell application
     ///     "System Events" to keystroke "<text>"'`).
-    ///   PH_QA_LIVE_SYNC_OUT=<path>  test29 writes what the Mac's document
-    ///     should hold there, for the script to compare with TextEdit's
-    ///     text afterwards.
+    ///   PH_QA_LIVE_SYNC_OUT=<path>  test30 writes what the Mac's document
+    ///     must hold there, for the script to compare with TextEdit's
+    ///     text afterwards (`osascript -e 'tell application "TextEdit" to
+    ///     get text of document 1'`): they must be equal.
     private func openSyncedLiveField(_ tag: String) -> (field: XCUIElement, badge: XCUIElement)? {
         guard ProcessInfo.processInfo.environment["PH_QA_LIVE_SYNC"] == "1" else {
             snap("skipped-live-sync")
@@ -1721,29 +1722,62 @@ final class PixelHandUITests: XCTestCase {
         tapIfExists("ph.type.close")
     }
 
-    /// Editing on the iPad lands on the Mac: typed text, then a caret moved
-    /// to the start with a tap and a letter typed there.
+    /// Editing on the iPad lands on the Mac (build 29 bug 9): a tap at the
+    /// field's start, "pixel hand" typed there; another tap at the start
+    /// and "X". The Mac's document must then be exactly
+    /// "X" + "pixel hand" + what it held before. The field shows the whole
+    /// document (the scratch document is far under the 1 000-unit window),
+    /// so the walk reads the Mac's text back by closing and reopening Live
+    /// (a fresh `textState`), and writes the expected text to
+    /// `PH_QA_LIVE_SYNC_OUT` for the QA script to compare with TextEdit's.
     func test30_LiveSyncEditFromIPad() {
         guard let (field, badge) = openSyncedLiveField("edit-from-ipad") else { return }
         let start = fieldText(field)
+        guard start.utf16.count < 900 else {
+            XCTFail("The scratch document is too long to read back whole (\(start.utf16.count) units); start from a short one")
+            return
+        }
+        let expected = "X" + "pixel hand" + start
+        if let out = ProcessInfo.processInfo.environment["PH_QA_LIVE_SYNC_OUT"] {
+            try? expected.write(toFile: out, atomically: true, encoding: .utf8)
+        }
+        let inSync = NSPredicate(format: "label == %@", "In sync with the Mac")
+        // The caret is free: tap at the very start (the opening tap put it
+        // mid-text on the iPhone) and type there.
+        tapFieldStart(field)
+        sleep(1)
         app.typeText("pixel hand")
-        sleep(2)
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: inSync, object: badge)], timeout: 5), .completed,
+                       "The badge didn't settle back to SYNC (\(badge.label))")
+        sleep(1)
         snap("edit-typed")
-        XCTAssertTrue(fieldText(field).contains("pixel hand"), "The typed text isn't in the field: “\(fieldText(field))”")
-        XCTAssertEqual(badge.label, "In sync with the Mac", "The badge didn't settle back to SYNC")
-        // The caret is free: tap at the very start and type there.
-        field.coordinate(withNormalizedOffset: CGVector(dx: 0.0, dy: 0.0)).withOffset(CGVector(dx: 2, dy: 14)).tap()
+        XCTAssertEqual(fieldText(field), "pixel hand" + start, "“pixel hand” didn't land at the tapped start")
+        // Again at the start, now that the Mac's caret is after the text.
+        tapFieldStart(field)
         sleep(1)
         app.typeText("X")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: inSync, object: badge)], timeout: 5), .completed,
+                       "The badge didn't settle back to SYNC (\(badge.label))")
         sleep(2)
         snap("edit-caret-moved")
-        let text = fieldText(field)
-        XCTAssertTrue(text.hasPrefix("X"), "The caret didn't move to the start (field: “\(text)”)")
-        if let out = ProcessInfo.processInfo.environment["PH_QA_LIVE_SYNC_OUT"] {
-            try? text.write(toFile: out, atomically: true, encoding: .utf8)
-        }
-        XCTAssertNotEqual(text, start)
+        XCTAssertEqual(fieldText(field), expected, "The field after the edits")
+        XCTAssertFalse(element("ph.type.syncNote").exists, "The Mac couldn't place its caret")
+        // Read the Mac's text back: Live closed and opened again shows the
+        // Mac's document fresh, not this field's echo.
         tapIfExists("ph.type.close")
+        sleep(1)
+        guard openTypePanel() else { return }
+        let reopened = element("ph.type.field")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: inSync, object: element("ph.type.sync"))], timeout: 5), .completed)
+        snap("edit-read-back")
+        XCTAssertEqual(fieldText(reopened), expected, "The Mac's document isn't exactly what was typed where it was typed")
+        tapIfExists("ph.type.close")
+    }
+
+    /// Taps the field's first character (top-leading, inside the text
+    /// inset), which puts the caret at 0.
+    private func tapFieldStart(_ field: XCUIElement) {
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.0, dy: 0.0)).withOffset(CGVector(dx: 2, dy: 14)).tap()
     }
 
     private func element(_ id: String) -> XCUIElement {

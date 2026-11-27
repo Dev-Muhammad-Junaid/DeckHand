@@ -13,15 +13,23 @@
 //    `FocusTracker` calls `pollTick` as a safety net. Each reading goes
 //    through Core's `TextRevisionTracker` (field token, revision) and is
 //    sent as `system.textState` when it changed.
-//  - `input.textEdit`: one at a time. The Mac reads the field fresh,
+//  - `input.textEdit`: one at a time. The Mac waits for keys it already
+//    posted to reach the field (two equal reads in a row), reads it fresh,
 //    checks the edit's context (`TextEditCheck`: apply, rebase, conflict,
-//    refuse), sets the selection through Accessibility (or arrow keys
-//    from the caret it knows), then **types** the replacement through
-//    `TypingQueue`, the path Live already uses. `AXValue` is never set.
-//    When the typing is done it sends the new `textState` and then
-//    `textEditResult`. The Mac is the source of truth: on a conflict it
-//    types nothing and sends its own state ("MAC WINS" on the iPad).
-//  - `input.textSelect`: the same selection step, nothing typed.
+//    refuse), then puts the caret there and **confirms it with a read**
+//    before typing (`TextSelectionPlacement`: Accessibility, else arrow
+//    keys from the caret it read, else nothing is typed and the edit is
+//    refused). Then it **types** the replacement through `TypingQueue`,
+//    the path Live already uses, and waits until the field shows it
+//    (`TextSelectionPlacement.landed`) before it sends the new
+//    `textState` and then `textEditResult`. `AXValue` is never set. The
+//    Mac is the source of truth: on a conflict it types nothing and sends
+//    its own state ("MAC WINS" on the iPad). Build 29 bug 9: typing went
+//    out before the selection had taken, at the old caret.
+//  - `input.textSelect`: the same placement, nothing typed.
+//  - `input.caretMove`, and keys and typed text while a remote watches
+//    text (`inOrder`): behind any edit or selection still running, so
+//    Accept ⇥ never lands inside the text typed before it.
 //  - `input.caretMove`: arrow chords through `TypingQueue`, refused under
 //    secure input.
 //  - Locked (`LockPolicy.withholdsText`): one `.locked` state, nothing
@@ -51,6 +59,22 @@ final class FocusTextSync {
     private var publishedSequence = 0
     /// Edits, selections and caret moves run one at a time, in order.
     private var work: Task<Void, Never>?
+    /// Jobs queued or running on `work`.
+    private var pendingJobs = 0
+    /// The last reading had the app's own selection (not a stand-in).
+    private var lastSelectionKnown = false
+
+    /// A fresh reading and whether its selection is the app's own.
+    private struct Observed {
+        var state: FocusedTextState
+        var selectionKnown: Bool
+    }
+
+    /// Reads taken while waiting for posted keys to reach the field.
+    private static let stableReads = 8
+    private static let stableInterval = Duration.milliseconds(25)
+    /// How long the Mac waits for its typing to show before answering.
+    private static let landedReads = 20
 
     private init() {
         observer.onChange = {
@@ -149,12 +173,14 @@ final class FocusTextSync {
         let result = await observer.read(front: Self.front(), lock: lock, previousStart: windowStart)
         // The Mac may have locked while the observer looked.
         if LockPolicy.withholdsText(MacLockMonitor.shared.state) {
+            lastSelectionKnown = false
             return publish(elementKey: nil, reading: .init(readable: .locked, window: nil, length: 0, selection: .caret(0), canSetSelection: false, canEdit: false))
         }
         guard sequence > publishedSequence, isWatching else {
             return lastSent ?? .unreadable(.noField)
         }
         publishedSequence = sequence
+        lastSelectionKnown = result.selectionKnown
         return publish(elementKey: result.elementKey, reading: result.reading)
     }
 
@@ -180,19 +206,38 @@ final class FocusTextSync {
     }
 
     func caretMove(_ move: CaretMove) {
-        guard TextSyncPolicy.allowsCaretMove(secureInput: FocusTextObserver.secureInputEnabled(), lock: MacLockMonitor.shared.state) else {
-            DeckHandLog.input.info("Focus text: caret move refused (secure input or locked)")
+        inOrder {
+            guard TextSyncPolicy.allowsCaretMove(secureInput: FocusTextObserver.secureInputEnabled(), lock: MacLockMonitor.shared.state) else {
+                DeckHandLog.input.info("Focus text: caret move refused (secure input or locked)")
+                return
+            }
+            for chord in TextSyncPolicy.chords(for: move) {
+                TypingQueue.shared.shortcut(chord)
+            }
+        }
+    }
+
+    /// Keys and typed text from a remote (`keyboardShortcut`, `typeText`,
+    /// `caretMove`). While a remote watches text and an edit or selection
+    /// is still running, they wait behind it (Accept ⇥ pressed after typed
+    /// text lands after it); otherwise they go at once, as before.
+    func inOrder(_ body: @escaping @MainActor () -> Void) {
+        guard isWatching, pendingJobs > 0 else {
+            body()
             return
         }
-        for chord in TextSyncPolicy.chords(for: move) {
-            TypingQueue.shared.shortcut(chord)
+        enqueue {
+            body()
+            await TypingQueue.shared.idle()
         }
     }
 
     private func enqueue(_ job: @escaping @MainActor () async -> Void) {
         let previous = work
+        pendingJobs += 1
         work = Task {
             await previous?.value
+            defer { self.pendingJobs = max(0, self.pendingJobs - 1) }
             guard !Task.isCancelled else { return }
             await job()
         }
@@ -200,9 +245,11 @@ final class FocusTextSync {
 
     private func applyEdit(_ request: TextEditRequest, from connection: LoomConnectionHandle) async {
         DeckHandLog.input.info("Focus text: \(TextSyncLog.describe(request), privacy: .public)")
-        // Earlier typing first, so the field we check is the one we type in.
+        // Earlier typing first, and until the field shows it, so the field
+        // we check is the one we type in.
         await TypingQueue.shared.idle()
-        let state = await readNow()
+        let observed = await readStable()
+        let state = observed.state
         let decision: TextEditCheck.Decision
         if FocusTextObserver.secureInputEnabled() {
             decision = .refused(.secure)
@@ -223,12 +270,12 @@ final class FocusTextSync {
         var outcome = decision.outcome
         switch decision {
         case let .apply(range), let .rebase(range):
-            if await placeSelection(range, in: state) {
+            if let placed = await placeSelection(range, from: observed) {
                 type(request.replacement, replacing: range)
                 await TypingQueue.shared.idle()
-                // Give the app a moment to post its notifications.
-                try? await Task.sleep(for: .milliseconds(40))
+                await waitUntilLanded(range, replacement: request.replacement, lengthBefore: placed.state.length)
             } else {
+                // Never type at a guessed position: the iPad says so.
                 outcome = .refused(reason: .notEditable)
             }
         case .conflict, .refused:
@@ -244,29 +291,80 @@ final class FocusTextSync {
 
     private func applySelect(_ request: TextSelectRequest) async {
         await TypingQueue.shared.idle()
-        let state = await readNow()
+        let observed = await readStable()
+        let state = observed.state
         guard state.field == request.field, state.readable.isReadable, !FocusTextObserver.secureInputEnabled(),
               request.range.end <= state.length else {
             DeckHandLog.input.info("Focus text: \(TextSyncLog.describe(request), privacy: .public) dropped")
             return
         }
-        if await placeSelection(request.range, in: state) {
-            await TypingQueue.shared.idle()
+        if await placeSelection(request.range, from: observed) == nil {
+            DeckHandLog.input.info("Focus text: \(TextSyncLog.describe(request), privacy: .public) not placed")
         }
         _ = await readNow()
     }
 
-    /// Puts the field's selection at `range`: through Accessibility where
-    /// it's settable, else with arrow keys from the caret the Mac knows.
-    private func placeSelection(_ range: PixelHandCore.TextRange, in state: FocusedTextState) async -> Bool {
-        if state.selection == range { return true }
-        if state.canSetSelection, await observer.select(range) { return true }
-        guard let window = state.window,
-              let chords = TextSyncPolicy.arrowChords(window: window.value, windowStart: window.start, from: state.selection, to: range) else {
-            return false
+    /// Reads until two readings in a row agree (keys already posted have
+    /// reached the field), at most `stableReads` times.
+    private func readStable() async -> Observed {
+        var previous = await readNow()
+        for _ in 1..<Self.stableReads {
+            try? await Task.sleep(for: Self.stableInterval)
+            let next = await readNow()
+            if next.window == previous.window, next.length == previous.length, next.selection == previous.selection {
+                return Observed(state: next, selectionKnown: lastSelectionKnown)
+            }
+            previous = next
         }
-        for chord in chords { TypingQueue.shared.shortcut(chord) }
-        return true
+        return Observed(state: previous, selectionKnown: lastSelectionKnown)
+    }
+
+    /// Puts the field's selection at `range` and confirms it with a fresh
+    /// read (`TextSelectionPlacement`): Accessibility where it's settable,
+    /// else arrow keys from the caret the Mac read. Returns the confirming
+    /// reading, or `nil` when it couldn't (then nothing may be typed).
+    private func placeSelection(_ range: PixelHandCore.TextRange, from start: Observed) async -> Observed? {
+        var current = start
+        var attempts = TextSelectionPlacement.Attempts()
+        while true {
+            let step = TextSelectionPlacement.next(
+                target: range,
+                current: current.selectionKnown ? current.state.selection : nil,
+                canSetSelection: current.state.canSetSelection,
+                window: current.state.window,
+                attempts: attempts
+            )
+            switch step {
+            case .done:
+                return current
+            case .fail:
+                DeckHandLog.input.info("Focus text: caret not placed at \(range.start, privacy: .public)+\(range.length, privacy: .public) (settable \(current.state.canSetSelection, privacy: .public), caret known \(current.selectionKnown, privacy: .public))")
+                return nil
+            case .accessibility:
+                attempts.accessibility += 1
+                _ = await observer.select(range)
+                current = await readStable()
+            case let .arrows(chords):
+                attempts.arrows += 1
+                for chord in chords { TypingQueue.shared.shortcut(chord) }
+                await TypingQueue.shared.idle()
+                current = await readStable()
+            }
+        }
+    }
+
+    /// Waits (briefly) until the field shows the typed replacement, so the
+    /// answer and the next edit never race keys still in the app's queue.
+    /// The Mac's own autocorrect may change it: then it stops waiting.
+    private func waitUntilLanded(_ range: PixelHandCore.TextRange, replacement: String, lengthBefore: Int) async {
+        for _ in 0..<Self.landedReads {
+            let state = await readNow()
+            if TextSelectionPlacement.landed(range: range, replacement: replacement, lengthBefore: lengthBefore, after: state) {
+                return
+            }
+            try? await Task.sleep(for: Self.stableInterval)
+        }
+        DeckHandLog.input.info("Focus text: typing not seen at \(range.start, privacy: .public) after \(Self.landedReads, privacy: .public) reads")
     }
 
     /// Types `replacement` over the selection: a deletion is one Delete
