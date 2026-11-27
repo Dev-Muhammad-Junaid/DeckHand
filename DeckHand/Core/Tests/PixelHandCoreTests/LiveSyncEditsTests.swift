@@ -30,7 +30,7 @@ enum SimAX: String, Sendable, CaseIterable, CustomTestStringConvertible {
 
 struct SimMacField {
     var units: [UInt16]
-    var selection: TextRange
+    var selection: PixelHandCore.TextRange
     var ax: SimAX = .works
     /// The app reports its selection (else the Mac knows no caret).
     var selectionReadable = true
@@ -92,14 +92,14 @@ struct SimMacField {
         case "return": insert("\n")
         case "delete":
             if selection.length == 0, selection.start > 0 {
-                selection = TextRange(start: before(selection.start), length: selection.start - before(selection.start))
+                selection = PixelHandCore.TextRange(start: before(selection.start), length: selection.start - before(selection.start))
             }
             insert("")
         case "left":
             selection = .caret(selection.length > 0 ? selection.start : before(selection.start))
         case "right":
             if shift {
-                selection = TextRange(start: selection.start, length: after(selection.end) - selection.start)
+                selection = PixelHandCore.TextRange(start: selection.start, length: after(selection.end) - selection.start)
             } else {
                 selection = .caret(selection.length > 0 ? selection.end : after(selection.start))
             }
@@ -108,7 +108,7 @@ struct SimMacField {
     }
 
     /// `FocusTextSync.placeSelection`: a step, then a fresh read.
-    mutating func place(_ target: TextRange) -> Bool {
+    mutating func place(_ target: PixelHandCore.TextRange) -> Bool {
         var attempts = TextSelectionPlacement.Attempts()
         while true {
             let window = reading().window
@@ -146,7 +146,7 @@ final class LiveSyncHarness {
     var pad = TextSyncReconciler()
     /// The iPad's `UITextView`.
     var fieldText = ""
-    var fieldSelection = TextRange.caret(0)
+    var fieldSelection = PixelHandCore.TextRange.caret(0)
     var mac: SimMacField
     var now = 0.0
     let latency: Double
@@ -189,7 +189,7 @@ final class LiveSyncHarness {
             var next = units
             next.replaceSubrange(fieldSelection.start..<fieldSelection.end, with: Array(s.utf16))
             let newText = String(decoding: next, as: UTF16.self)
-            let newSelection = TextRange.caret(fieldSelection.start + s.utf16.count)
+            let newSelection = PixelHandCore.TextRange.caret(fieldSelection.start + s.utf16.count)
             run(pad.localSelection(newSelection, fieldText: newText, now: now))
             fieldText = newText
             fieldSelection = newSelection
@@ -210,10 +210,10 @@ final class LiveSyncHarness {
                 previous = offset
                 offset += character.utf16.count
             }
-            range = TextRange(start: previous, length: range.start - previous)
+            range = PixelHandCore.TextRange(start: previous, length: range.start - previous)
         }
         let newText = TextUnits.replacing(range, in: fieldText, with: "")!
-        let newSelection = TextRange.caret(range.start)
+        let newSelection = PixelHandCore.TextRange.caret(range.start)
         run(pad.localSelection(newSelection, fieldText: newText, now: now))
         fieldText = newText
         fieldSelection = newSelection
@@ -221,7 +221,7 @@ final class LiveSyncHarness {
     }
 
     /// A tap, a space-bar trackpad step or a handle drag.
-    func padCaret(_ range: TextRange) {
+    func padCaret(_ range: PixelHandCore.TextRange) {
         fieldSelection = range
         run(pad.localSelection(range, fieldText: fieldText, now: now))
     }
@@ -504,9 +504,9 @@ final class LiveSyncHarness {
     @Test("A selection made with the handles is selected on the Mac, and typing replaces it", arguments: SimAX.allCases)
     func selectionReplaced(ax: SimAX) {
         let h = LiveSyncHarness("one two three", ax: ax)
-        h.padCaret(TextRange(start: 4, length: 3))
+        h.padCaret(PixelHandCore.TextRange(start: 4, length: 3))
         h.advance(0.5)
-        #expect(h.mac.selection == TextRange(start: 4, length: 3))
+        #expect(h.mac.selection == PixelHandCore.TextRange(start: 4, length: 3))
         h.padType("2")
         h.settle()
         #expect(h.mac.doc == "one 2 three")
@@ -693,7 +693,7 @@ final class LiveSyncHarness {
         // It said yes but didn't move, twice: arrows from where it is.
         #expect(P.next(target: .caret(2), current: .caret(6), canSetSelection: true, window: window, attempts: .init(accessibility: 2))
             == .arrows(Array(repeating: ["left"], count: 4)))
-        #expect(P.next(target: TextRange(start: 1, length: 2), current: .caret(0), canSetSelection: false, window: window, attempts: .init())
+        #expect(P.next(target: PixelHandCore.TextRange(start: 1, length: 2), current: .caret(0), canSetSelection: false, window: window, attempts: .init())
             == .arrows([["right"], ["shift", "right"], ["shift", "right"]]))
         // Arrows drifted twice: give up.
         #expect(P.next(target: .caret(2), current: .caret(3), canSetSelection: false, window: window, attempts: .init(arrows: 2)) == .fail)
@@ -717,7 +717,7 @@ final class LiveSyncHarness {
         // Typed somewhere else.
         #expect(!P.landed(range: .caret(3), replacement: "XY", lengthBefore: 6, after: state("abcdefXY", caret: 8)))
         // A deletion over a selection.
-        #expect(P.landed(range: TextRange(start: 1, length: 2), replacement: "", lengthBefore: 6, after: state("adef", caret: 1)))
+        #expect(P.landed(range: PixelHandCore.TextRange(start: 1, length: 2), replacement: "", lengthBefore: 6, after: state("adef", caret: 1)))
         // Emoji count in UTF-16.
         #expect(P.landed(range: .caret(0), replacement: "👍🏽", lengthBefore: 2, after: state("👍🏽ok", caret: 4)))
     }
