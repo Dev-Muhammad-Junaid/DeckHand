@@ -2592,3 +2592,76 @@ place on the Mac. Re-check `test29_LiveSyncEditFromIPad` with exact
 TextEdit contents, and the checklist in that handoff (TextEdit and Notes).
 
 Status: READY FOR MAC BUILD (build 30)
+
+## Mac build results (build 30) — 2026-11-28
+
+Built from `ab6c093` (build 30: build 29 + build28-fixes + live-sync-edits)
+on Xcode 27.2, Release, team `DD5AWPLT2V`.
+
+**Build:** Mac app, iOS app and UI tests build first time. Core's tests
+didn't compile on macOS: `LiveSyncEditsTests.swift` hits the same
+`TextRange` clash with Carbon's `AERegistry.h` as build 29 (Linux can't
+see it). Fixed in `5db9393` (`PixelHandCore.TextRange` in the test).
+
+**Tests**
+- `swift test --package-path DeckHand/Core`: **1445 / 1445 pass** (264 suites).
+- `swift test --scratch-path .build-local`: **480 / 480 pass**.
+- `DeckHandTests` (macOS): **8 / 8 pass**.
+
+**Install:** Mac replaced and launched with `open`; iPad Air 11" (M3)
+installed and launched.
+
+**Walks that send nothing to the Mac:** iPad Pro 11" full screen **16 / 16
+pass**, iPhone 17 Pro **16 / 16 pass**, including `test22`, `test23`,
+`test24` (all three failed in builds 27–29). `test25` on iPad failed once
+when the test runner restarted (simulators were being cleaned up at the
+same time) and passed on rerun.
+
+**Mac walks** (owner gave the Mac; scratch TextEdit in front and reset to
+a short known text before each live-sync walk; only TextEdit was typed
+into; `test19` opened Mission Control; the joystick sent arrows):
+
+| Walk | iPad Pro 11" (full screen) | iPhone 17 Pro |
+|---|---|---|
+| `test04`, `05`, `16`, `19` | pass | pass (`05` and `16` found their tab not hittable and stopped early; `test04`'s typing was skipped, Claude was in front) |
+| `test18` keyboard in landscape | **pass** (build 28 bug 1 fixed in landscape) | fails a frame check: panel (257, 62, 360, 312) vs a keyboard frame in portrait coordinates (−226, 0, 162, 874); the captures show the panel above the keyboard. Walk check |
+| `test20` | **fail (P3):** arrows + numpad 336 pt wide, want > 344 | **fail (P3):** the panel didn't snap to the leading edge (x = 257) |
+| `test21` Save as key, Ask first | pass | pass |
+| `test27_ArrowJoystick` | pass | pass |
+| `test28_LiveSyncTypeOnMac` | **pass** | not checked: the panel opened in Compose (kept from `test18`), so no sync badge |
+| `test29_LiveSyncTabAccept` | **fail:** no Accept, accepted text never shown (see bug 1) | not checked (Compose, as above) |
+| `test30_LiveSyncEditFromIPad` | **fail** (bug 1) | not checked (Compose, as above) |
+
+**`test30`, exact TextEdit contents (iPad):** before and after, the
+document is exactly "Pixel Hand QA scratch: typing from the UI walk lands
+here." The walk expected "Xpixel handPixel Hand QA scratch: …". Nothing
+reached the Mac, and nothing landed in the wrong place either (build 29's
+garbling didn't recur), but the fix itself is unverified.
+
+**Open bugs**
+1. **iPad portrait: the Type panel goes under the keyboard when Live's
+   field takes focus (P1):** `test30` captures `02-edit-typed` and
+   `03-edit-caret-moved`. With the keyboard up only the panel's header
+   shows above it. The first tap at the field's start brought up iOS's
+   Select / Select All / AutoFill menu. The typed "pixel hand" and "X"
+   reached neither the field nor the Mac. Probably also why `test29` on
+   iPad finds no Accept. Landscape is fixed (`test18`).
+2. **Numpad width (P3):** iPad `test20`: arrows + numpad 336 pt in a
+   panel that should fill > 344 pt.
+3. **iPhone panel snap (P3):** `test20`: dropping near the leading edge
+   leaves it at x = 257.
+
+**Walk fixes needed:**
+- `openSyncedLiveField` should switch the panel to Live. The panel
+  remembers Compose from `test18`, so on iPhone `test28`–`30` ran in
+  Compose.
+- iPhone `test18` compares the panel with a keyboard frame in portrait
+  coordinates.
+- iPhone `test05` and `test16` stop early when their tab isn't hittable,
+  and should fail instead.
+
+**Not done, needs the owner at the Mac:** the `LANE-live-sync.md` and
+`LANE-live-sync-edits.md` checklists (Notes, Mail, Xcode, latency, a
+secure field, lock) and the joystick by hand.
+
+Status: BUILT (build 30) — 3 bugs
