@@ -200,13 +200,17 @@ struct TypePanelAboveKeyboardTests {
         #expect(kept.height == 400)
     }
 
-    @Test("Docked panels are kept centred; NaN frames go to the room's corner")
+    @Test("Docked panels are kept in the room; NaN frames go to the room's corner")
     func dockedAndNaN() {
         let window = Window.iPhonePortrait
         let geometry = window.geometry(keyboardTop: window.height - window.keyboard)
         #expect(geometry.style == .docked)
+        // Build 30 bug 3: moved into the room, not re-centred (a docked
+        // panel may sit at the leading or trailing edge).
         let kept = geometry.kept(PanelRect(x: 0, y: 900, width: 300, height: 200))
-        #expect(abs(kept.midX - geometry.room.midX) <= 0.5)
+        #expect(kept.minX == geometry.room.minX)
+        let centred = geometry.kept(geometry.frame(for: .initial, size: (300, 200)))
+        #expect(abs(centred.midX - geometry.room.midX) <= 0.5)
         #expect(geometry.fitsAbove(kept))
         let nan = geometry.kept(PanelRect(x: .nan, y: .nan, width: 300, height: 200))
         #expect(nan.x == geometry.room.minX && nan.y == geometry.room.minY)

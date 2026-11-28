@@ -58,6 +58,15 @@ final class TypePanelModel {
     private(set) var dockLift: Double = 0
     /// The last keyboard end frame, in screen space (`nil` once hidden).
     @ObservationIgnored private var keyboardScreenFrame: CGRect?
+    /// What the keyboard notifications last said (`nil` before any, or
+    /// once the keyboard hid).
+    @ObservationIgnored private var notificationReading: KeyboardFrameReading.Reading?
+    /// What UIKit's keyboard layout guide last said (build 30 bug 1;
+    /// `KeyboardGuideReader`), `nil` before it was laid out.
+    @ObservationIgnored private var guideReading: KeyboardFrameReading.Reading?
+    /// The key window's bottom safe area (the home indicator), for the
+    /// dock's lift.
+    @ObservationIgnored private var bottomInset: Double = 0
     /// The app dock's top in global coordinates, while it shows under the
     /// panel; the panel sits above it when no keyboard covers the dock.
     var dockMinY: CGFloat?
@@ -83,9 +92,8 @@ final class TypePanelModel {
         observers.append(center.addObserver(forName: UIResponder.keyboardWillHideNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.keyboardScreenFrame = nil
-                self?.keyboardOverlap = 0
-                self?.keyboardMinY = nil
-                self?.dockLift = 0
+                self?.notificationReading = nil
+                self?.applyReadings()
             }
         })
         observers.append(center.addObserver(forName: .GCKeyboardDidConnect, object: nil, queue: .main) { [weak self] _ in
@@ -146,11 +154,11 @@ final class TypePanelModel {
                 .compactMap({ ($0 as? UIWindowScene)?.keyWindow })
                 .first
         else {
-            keyboardOverlap = 0
-            keyboardMinY = nil
-            dockLift = 0
+            notificationReading = nil
+            applyReadings()
             return
         }
+        bottomInset = Double(window.safeAreaInsets.bottom)
         // Build 28 bug 6 (P1): in iPad landscape the conversion against
         // the screen's interface-oriented space could come back turned a
         // quarter, so the keyboard read as none and the panel drew under
@@ -168,16 +176,40 @@ final class TypePanelModel {
             candidates,
             windowWidth: Double(window.bounds.width),
             windowHeight: Double(window.bounds.height)
-        ) else { return }
-        switch reading {
-        case let .covers(top, overlap):
-            keyboardOverlap = overlap
-            keyboardMinY = top
-        case .clear:
-            keyboardOverlap = 0
-            keyboardMinY = nil
+        ) else {
+            applyReadings()
+            return
         }
-        dockLift = KeyboardKind.barLift(overlap: keyboardOverlap, bottomInset: Double(window.safeAreaInsets.bottom))
+        notificationReading = reading
+        applyReadings()
+    }
+
+    /// UIKit's keyboard layout guide, measured in the window by
+    /// `KeyboardGuideReader` (build 30 bug 1, P1). It is laid out again
+    /// whenever the keyboard moves, so it holds the keyboard's top even
+    /// when a notification is missed, arrives for the old orientation, or
+    /// converts wrongly (iPad portrait, when Live's field took focus).
+    func keyboardGuideChanged(_ reading: KeyboardFrameReading.Reading?, bottomInset inset: Double) {
+        if inset.isFinite { bottomInset = max(0, inset) }
+        guard reading != guideReading else { return }
+        guideReading = reading
+        applyReadings()
+    }
+
+    /// The keyboard as both sources see it (Core's `merged`): covered when
+    /// either says so, up to the higher top.
+    private func applyReadings() {
+        let merged = KeyboardFrameReading.merged([notificationReading, guideReading])
+        var overlap = 0.0
+        var top: Double?
+        if case let .covers(t, o)? = merged {
+            overlap = o
+            top = t
+        }
+        if keyboardOverlap != overlap { keyboardOverlap = overlap }
+        if keyboardMinY != top { keyboardMinY = top }
+        let lift = KeyboardKind.barLift(overlap: overlap, bottomInset: bottomInset)
+        if dockLift != lift { dockLift = lift }
     }
 }
 

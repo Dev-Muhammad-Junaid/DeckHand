@@ -149,7 +149,9 @@ final class PixelHandUITests: XCTestCase {
     func test05_Deck() {
         launch()
         guard connect() else { return }
-        guard tapIfExists("ph.tab.deck") else { return }
+        // Build 30: a Deck tab that isn't there or can't be tapped fails the
+        // walk (it used to stop early and pass).
+        guard requireTap("ph.tab.deck", "the Deck tab") else { return }
         sleep(1)
         snap("deck")
         if tapIfExists("ph.deck.pageMenu") {
@@ -415,7 +417,8 @@ final class PixelHandUITests: XCTestCase {
         } else {
             XCUIDevice.shared.orientation = .landscapeLeft
             sleep(2)
-            guard tapIfExists("ph.tab.screen") else {
+            // Build 30: fail, don't pass, when the Screen tab can't be tapped.
+            guard requireTap("ph.tab.screen", "the Screen tab (iPhone landscape)") else {
                 XCUIDevice.shared.orientation = .portrait
                 return
             }
@@ -675,7 +678,16 @@ final class PixelHandUITests: XCTestCase {
             snap("type-panel-dragged")
             let moved = panel.frame
             XCTAssertNotEqual(moved.origin, start.origin, "Dragging the grip didn't move the panel")
-            XCTAssertLessThan(moved.minX - window.minX, 40, "The panel didn't snap to the leading edge")
+            // Build 30 bug 3: a docked panel (iPhone, a window under 500 pt
+            // either way) narrower than its room docks to the leading edge
+            // too. Its room starts inside the safe area (iPhone landscape:
+            // the 62 pt sensor inset, then the 8 pt gap), so allow for it.
+            let docked = window.width < 500 || window.height < 500
+            let leadingAllowance: CGFloat = docked && window.width > window.height ? 90 : 40
+            if docked, start.width < window.width - 2 * leadingAllowance {
+                XCTAssertLessThan(moved.minX, start.minX, "The docked panel didn't move towards the leading edge (\(start) → \(moved))")
+            }
+            XCTAssertLessThan(moved.minX - window.minX, leadingAllowance, "The panel didn't snap to the leading edge (\(moved) in \(window))")
             XCTAssertGreaterThanOrEqual(moved.minX, window.minX, "The panel left the window")
         } else {
             snap("missing-ph.type.grip")
@@ -720,10 +732,20 @@ final class PixelHandUITests: XCTestCase {
                 XCTAssertTrue(panel.frame.insetBy(dx: -1, dy: -1).contains(numpad.frame), "The numpad isn't inside the panel")
                 XCTAssertGreaterThan(numpad.frame.width, panel.frame.width * 0.5, "The numpad doesn't fill the panel")
                 // Arrows and numpad share the panel: together they span it.
+                // Build 30 bug 2: measured against the card (`ph.type.card`,
+                // the panel's own shape); `ph.type.panel` is a container
+                // whose frame is built from its children and read 12 pt
+                // wider than the card on build 30.
                 let arrows = element("ph.type.arrows")
+                let card = element("ph.type.card")
+                let cardFrame = card.exists ? card.frame : panel.frame
                 if arrows.exists {
                     let both = arrows.frame.union(numpad.frame)
-                    XCTAssertGreaterThan(both.width, panel.frame.width - 2 * 12 - 4, "The arrows and numpad don't fill the panel's width")
+                    XCTAssertGreaterThan(both.width, cardFrame.width - 2 * 12 - 4, "The arrows and numpad don't fill the card's width: \(both.width) in \(cardFrame.width) (panel \(panel.frame.width), card says \(card.exists ? (card.value as? String ?? "") : "missing"))")
+                    XCTAssertLessThanOrEqual(both.maxX, cardFrame.maxX - 12 + 1, "The numpad runs past the card's padding")
+                }
+                if card.exists {
+                    XCTAssertLessThanOrEqual(abs(panel.frame.width - card.frame.width), 2, "Something in the panel reaches past its card: panel \(panel.frame), card \(card.frame)")
                 }
             }
             snap("type-numpad-docked")
@@ -1674,6 +1696,16 @@ final class PixelHandUITests: XCTestCase {
             snap("missing-ph.type.field")
             return nil
         }
+        // Build 30: the panel remembers its mode, and an earlier walk
+        // (test18) leaves it in Compose; live sync is Live's.
+        let live = element("ph.type.mode.live")
+        if live.waitForExistence(timeout: 2), !live.isSelected {
+            XCTAssertTrue(tapIfExists("ph.type.mode.live"), "Couldn't switch the Type panel to Live")
+            sleep(1)
+        }
+        if live.exists {
+            XCTAssertTrue(live.isSelected, "The Type panel isn't in Live (\(tag))")
+        }
         let badge = element("ph.type.sync")
         XCTAssertTrue(badge.waitForExistence(timeout: 3), "Live has no sync badge")
         // The Mac's state arrives within a moment of opening Live.
@@ -1687,6 +1719,12 @@ final class PixelHandUITests: XCTestCase {
         field.tap()
         sleep(1)
         snap("\(tag)-synced")
+        // Build 30 bug 1 (P1): with Live's field focused the whole panel is
+        // above the keyboard (iPad portrait put all but its header under
+        // it), and the tap opened no edit menu.
+        checkPanelAboveKeyboard(element("ph.type.panel"), tag: "\(tag)-focused")
+        checkNoEditMenu(tag: "\(tag)-focused")
+        XCTAssertTrue(hasKeyboardFocus(field), "Live's field didn't take the keyboard (\(tag))")
         return (field, badge)
     }
 
@@ -1746,6 +1784,8 @@ final class PixelHandUITests: XCTestCase {
         // mid-text on the iPhone) and type there.
         tapFieldStart(field)
         sleep(1)
+        checkNoEditMenu(tag: "edit-start-tap")
+        checkPanelAboveKeyboard(element("ph.type.panel"), tag: "edit-start-tap")
         app.typeText("pixel hand")
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: inSync, object: badge)], timeout: 5), .completed,
                        "The badge didn't settle back to SYNC (\(badge.label))")
@@ -1755,6 +1795,7 @@ final class PixelHandUITests: XCTestCase {
         // Again at the start, now that the Mac's caret is after the text.
         tapFieldStart(field)
         sleep(1)
+        checkNoEditMenu(tag: "edit-second-tap")
         app.typeText("X")
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: inSync, object: badge)], timeout: 5), .completed,
                        "The badge didn't settle back to SYNC (\(badge.label))")
@@ -1851,9 +1892,16 @@ final class PixelHandUITests: XCTestCase {
     /// keyboard and its header's mode switch is hittable.
     private func checkPanelAboveKeyboard(_ panel: XCUIElement, tag: String) {
         guard panel.exists else { return }
-        if let keyboard = app.keyboards.allElementsBoundByIndex.first, keyboard.exists, keyboard.frame.height > 100,
-           keyboard.frame.minY < windowFrame().maxY - 1 {
-            XCTAssertLessThanOrEqual(panel.frame.maxY, keyboard.frame.minY + 1, "The Type panel is under the keyboard (\(tag)): \(panel.frame) / \(keyboard.frame)")
+        // Build 30: XCTest can report the keyboard in portrait coordinates
+        // while the app is in landscape (iPhone test18: (−226, 0, 162,
+        // 874) against a 874 × 402 window); it's put in the window's space
+        // first, and only a keyboard docked on screen is compared.
+        let window = windowFrame()
+        if let keyboard = app.keyboards.allElementsBoundByIndex.first, keyboard.exists,
+           let frame = dockedKeyboardFrame(keyboard.frame, in: window), frame.height > 100 {
+            let card = element("ph.type.card")
+            let panelFrame = card.exists ? card.frame : panel.frame
+            XCTAssertLessThanOrEqual(panelFrame.maxY, frame.minY + 1, "The Type panel is under the keyboard (\(tag)): \(panelFrame) / \(frame) (as reported: \(keyboard.frame))")
         }
         for id in ["ph.type.mode.compose", "ph.type.mode.live", "ph.type.tab.numpad", "ph.type.close"] {
             let control = element(id)
@@ -1861,6 +1909,62 @@ final class PixelHandUITests: XCTestCase {
                 XCTAssertTrue(control.isHittable, "\(id) isn't hittable (\(tag))")
             }
         }
+    }
+
+    /// The keyboard's frame in the window's space, when it is docked on
+    /// screen (spans the window's width and reaches its bottom); `nil`
+    /// when it is hidden, floating or off screen. A frame reported in the
+    /// other orientation's space is turned a quarter either way and the
+    /// one that reads as a docked keyboard is used.
+    private func dockedKeyboardFrame(_ reported: CGRect, in window: CGRect) -> CGRect? {
+        let short = min(window.width, window.height), long = max(window.width, window.height)
+        let r = reported
+        let candidates = [
+            r,
+            // Portrait space → landscape, both ways round.
+            CGRect(x: r.minY, y: short - r.maxX, width: r.height, height: r.width),
+            CGRect(x: long - r.maxY, y: r.minX, width: r.height, height: r.width),
+        ]
+        return candidates.first { frame in
+            frame.width >= frame.height
+                && frame.width >= window.width * 0.9
+                && frame.maxY >= window.maxY - 1
+                && frame.minY < window.maxY - 1
+                && frame.minY > window.minY
+        }
+    }
+
+    /// Build 30 bug 1: a tap in Live's field shows no Select / Select All /
+    /// AutoFill menu over the field.
+    private func checkNoEditMenu(tag: String) {
+        for title in ["Select", "Select All", "AutoFill"] {
+            let item = app.menuItems[title].firstMatch
+            if item.exists {
+                snap("edit-menu-\(tag)")
+                XCTFail("The tap opened the edit menu (\(title)) instead of just placing the caret (\(tag))")
+                dismissMenu()
+                return
+            }
+        }
+    }
+
+    /// Taps a control that the walk can't go on without, or fails with
+    /// what was wrong (missing, or there but not hittable) and a snapshot.
+    @discardableResult
+    private func requireTap(_ id: String, _ what: String, timeout: TimeInterval = 3) -> Bool {
+        let el = element(id)
+        guard el.waitForExistence(timeout: timeout) else {
+            snap("missing-\(id)")
+            XCTFail("No \(what) (\(id)) to tap")
+            return false
+        }
+        guard el.isHittable else {
+            snap("not-hittable-\(id)")
+            XCTFail("\(what.prefix(1).uppercased() + what.dropFirst()) (\(id)) is there but not hittable: \(el.frame) in the window \(windowFrame())")
+            return false
+        }
+        el.tap()
+        return true
     }
 
     /// OT-12: the loupe sits above or below the panel's card, never on it,

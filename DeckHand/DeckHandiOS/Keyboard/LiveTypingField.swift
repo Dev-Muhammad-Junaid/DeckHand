@@ -396,6 +396,16 @@ final class LiveTypingTextView: UITextView, UITextViewDelegate, LiveTextDisplay 
         }
     }
 
+    /// Build 30 bug 1: a tap at the caret (or where it lands) in Live puts
+    /// the caret there and shows no menu. iOS shows Select / Select All /
+    /// AutoFill when a focused field is tapped at its caret, which took
+    /// the walk's first tap at the field's start (and covers the field).
+    /// A selection still gets the system's menu; Live has its own Paste.
+    func textView(_ textView: UITextView, editMenuForTextIn range: NSRange, suggestedActions: [UIMenuElement]) -> UIMenu? {
+        guard mode == .live, range.length == 0 else { return nil }
+        return UIMenu(children: [])
+    }
+
     override func deleteBackward() {
         // Live, nothing left here to delete: delete on the Mac anyway.
         if mode == .live, !isSynced, markedTextRange == nil, (text ?? "").isEmpty {

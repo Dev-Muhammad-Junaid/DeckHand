@@ -15,7 +15,10 @@
 //    docked     iPhone, and any window under 500 in either direction:
 //               full width (or narrower in landscape), docked to the top
 //               or the bottom of the free room; a drag moves it between
-//               the two.
+//               the two. Narrower than the room (iPhone landscape), it
+//               also docks to the leading edge, the centre or the
+//               trailing edge, whichever the drop is nearest (build 30
+//               bug 3: it always went back to the centre).
 //
 //  The free room is the window's safe area above the on-screen keyboard
 //  and the app dock (`gap` above whichever is higher), so the panel never
@@ -227,7 +230,7 @@ public struct TypePanelGeometry: Sendable, Hashable {
         let height = size.height
         let freeX = max(0, room.width - width)
         let freeY = max(0, room.height - height)
-        let fx = style == .docked ? 0.5 : clampUnit(placement.x)
+        let fx = style == .docked ? Self.dockedSlot(placement.x) : clampUnit(placement.x)
         let fy = style == .docked ? (placement.y < 0.5 ? 0 : 1) : clampUnit(placement.y)
         // A panel taller than the room keeps its top in view (its header,
         // the grip and the close button).
@@ -251,11 +254,9 @@ public struct TypePanelGeometry: Sendable, Hashable {
             return PanelRect(x: room.minX, y: room.minY, width: max(0, frame.width.isFinite ? frame.width : 0), height: max(0, frame.height.isFinite ? frame.height : 0))
         }
         var kept = frame
-        if style == .docked {
-            kept.x = (room.minX + max(0, room.width - frame.width) / 2).rounded()
-        } else {
-            kept.x = min(room.minX + max(0, room.width - frame.width), max(room.minX, frame.x))
-        }
+        // Docked panels keep their leading, centre or trailing place too
+        // (build 30 bug 3), so both styles are only moved into the room.
+        kept.x = min(room.minX + max(0, room.width - frame.width), max(room.minX, frame.x))
         kept.y = min(room.minY + max(0, room.height - frame.height), max(room.minY, frame.y))
         return kept
     }
@@ -272,18 +273,18 @@ public struct TypePanelGeometry: Sendable, Hashable {
         let maxX = room.minX + max(0, room.width - size.width)
         let maxY = room.minY + max(0, room.height - size.height)
         let cy = min(maxY, max(room.minY, y))
-        // Docked panels only move up and down.
-        let cx = style == .docked
-            ? (room.minX + max(0, room.width - size.width) / 2).rounded()
-            : min(maxX, max(room.minX, x))
+        // Docked panels follow the finger sideways too where they're
+        // narrower than the room (iPhone landscape); the drop docks them.
+        let cx = min(maxX, max(room.minX, x))
         return PanelRect(x: cx, y: cy, width: size.width, height: size.height)
     }
 
     /// The placement a drag ends in: clamped, then snapped. Floating
     /// panels snap to the leading or trailing edge, the centre line, the
     /// top or the bottom when within `magnet` (two at once make a
-    /// corner); docked panels go to the nearer of the top and the bottom.
-    /// The width is kept.
+    /// corner); docked panels go to the nearer of the top and the bottom,
+    /// and to the nearest of the leading edge, the centre and the trailing
+    /// edge (build 30 bug 3). The width is kept.
     public func placement(
         droppedAt x: Double,
         _ y: Double,
@@ -295,7 +296,7 @@ public struct TypePanelGeometry: Sendable, Hashable {
         let freeY = max(0, room.height - size.height)
         if style == .docked {
             let toBottom = frame.midY >= room.midY
-            return TypePanelPlacement(x: 0.5, y: toBottom ? 1 : 0, width: current.width, height: current.height)
+            return TypePanelPlacement(x: dockedSlot(of: frame), y: toBottom ? 1 : 0, width: current.width, height: current.height)
         }
         var fx = freeX > 0 ? (frame.minX - room.minX) / freeX : 0.5
         var fy = freeY > 0 ? (frame.minY - room.minY) / freeY : 1
@@ -354,7 +355,18 @@ public struct TypePanelGeometry: Sendable, Hashable {
         let range = widthRange
         var frame = start
         if style == .docked {
+            // Docked to an edge (build 30 bug 3), that edge holds; centred
+            // (or spanning the room), both edges move.
+            // Either handle: outwards widens, inwards narrows.
             let delta = edge == .trailing ? translation : -translation
+            let atLeading = start.minX <= room.minX + 1
+            let atTrailing = start.maxX >= room.maxX - 1
+            if atLeading != atTrailing {
+                let width = min(range.upperBound, max(range.lowerBound, (start.width + delta).rounded()))
+                frame.width = width
+                frame.x = atLeading ? room.minX : room.maxX - width
+                return frame
+            }
             let width = min(range.upperBound, max(range.lowerBound, (start.width + 2 * delta).rounded()))
             frame.width = width
             frame.x = (room.midX - width / 2).rounded()
@@ -426,6 +438,29 @@ public struct TypePanelGeometry: Sendable, Hashable {
 
     public static let loupeMinimumHeight: Double = 96
     public static let loupeMaximumHeight: Double = 200
+
+    // MARK: Docked slots (build 30 bug 3)
+
+    /// The docked place nearest a fraction: 0 (leading), 0.5 (centre) or
+    /// 1 (trailing). Anything else, or not a number, is the centre.
+    public static func dockedSlot(_ fraction: Double) -> Double {
+        guard fraction.isFinite else { return 0.5 }
+        if fraction <= 0.25 { return 0 }
+        if fraction >= 0.75 { return 1 }
+        return 0.5
+    }
+
+    /// The docked place a frame is nearest: the leading edge, the centre
+    /// or the trailing edge of the room (the centre on a tie, and always
+    /// when the panel spans the room).
+    public func dockedSlot(of frame: PanelRect) -> Double {
+        guard room.width - frame.width >= 1 else { return 0.5 }
+        let leading = abs(frame.minX - room.minX)
+        let trailing = abs(room.maxX - frame.maxX)
+        let centre = abs(frame.midX - room.midX)
+        if centre <= min(leading, trailing) { return 0.5 }
+        return leading <= trailing ? 0 : 1
+    }
 
     // MARK: Helpers
 

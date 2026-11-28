@@ -77,9 +77,17 @@ struct TypePanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: CGFloat(TypePanelLayout.headerSpacing)) {
             if layout.showsHeader {
+                // Build 30 bug 2: the header is cut to the card's inner
+                // width like every block, so nothing it holds can run past
+                // the card (the panel measured 12 pt wider than the card
+                // its numpad fills).
                 header
-                    .frame(height: CGFloat(layout.headerRows) * CGFloat(TypePanelLayout.headerHeight)
-                        + CGFloat(max(0, layout.headerRows - 1)) * CGFloat(TypePanelLayout.headerSpacing))
+                    .frame(
+                        width: CGFloat(max(0, layout.panelWidth - 2 * TypePanelLayout.padding)),
+                        height: CGFloat(layout.headerRows) * CGFloat(TypePanelLayout.headerHeight)
+                            + CGFloat(max(0, layout.headerRows - 1)) * CGFloat(TypePanelLayout.headerSpacing),
+                        alignment: .leading
+                    )
             }
             // Every block at the frame Core cut for it from the panel's
             // width and height (OT-11): nothing sized by its content, so
@@ -120,6 +128,17 @@ struct TypePanel: View {
             RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous)
                 .strokeBorder(PixelHandTheme.hairline, lineWidth: PixelHandTheme.Stroke.hairline)
         )
+        // Build 30 bug 2: the card itself, measured by the walks (a
+        // `.contain` element's frame is built from its children, so
+        // `ph.type.panel` can read wider than the card).
+        .background {
+            RoundedRectangle(cornerRadius: PixelHandTheme.Radius.card, style: .continuous)
+                .fill(Color.clear)
+                .accessibilityElement()
+                .accessibilityLabel("Keyboard panel")
+                .accessibilityValue("\(Int(layout.panelWidth)) by \(Int(layout.panelHeight)) points")
+                .accessibilityIdentifier("ph.type.card")
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Type on the Mac")
         .accessibilityIdentifier("ph.type.panel")
@@ -1322,6 +1341,19 @@ struct TypePanelHost: View {
         // The panel places itself against the keyboard; it must not be
         // pushed up by the keyboard's safe area as well.
         .ignoresSafeArea(.keyboard, edges: .bottom)
+        // Build 30 bug 1 (P1): a second reading of the keyboard, from
+        // UIKit's keyboard layout guide in a full-window view, merged with
+        // the notifications' (`TypePanelModel.keyboardGuideChanged`), so a
+        // keyboard the notifications lost (iPad portrait, when Live's
+        // field took focus) still keeps the panel above it.
+        .background {
+            KeyboardGuideReader { reading, inset in
+                model.keyboardGuideChanged(reading, bottomInset: inset)
+            }
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
         // Build 25 bug 1: a keyboard frame reported mid-rotation is read
         // again against the turned window, so the free room ends above the
         // keyboard in the new orientation and the panel (and its close
