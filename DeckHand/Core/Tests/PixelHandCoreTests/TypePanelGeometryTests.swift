@@ -149,8 +149,11 @@ struct TypePanelGeometryTests {
         #expect(phone.frame(for: up, height: 160).minY == 67)
         let backDown = phone.placement(droppedAt: 8, 330, size: (386, 160), keeping: up)
         #expect(backDown.y == 1)
-        // Dragging sideways does nothing: docked panels stay centred.
-        #expect(phone.clamped(origin: 100, 200, size: (300, 160)).midX == phone.room.midX)
+        // Build 30 bug 3: a docked panel narrower than the room follows the
+        // finger sideways (the drop docks it to an edge or the centre); one
+        // spanning the room can't move sideways.
+        #expect(phone.clamped(origin: 100, 200, size: (300, 160)).minX == 94)
+        #expect(phone.clamped(origin: 100, 200, size: (386, 160)).midX == phone.room.midX)
     }
 
     @Test("Docked in landscape: resizable from the centre where there's room")

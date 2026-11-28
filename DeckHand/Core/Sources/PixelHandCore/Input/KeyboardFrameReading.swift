@@ -77,4 +77,48 @@ public enum KeyboardFrameReading {
         guard let frame = pick(candidates, windowWidth: windowWidth, windowHeight: windowHeight) else { return nil }
         return reading(frame, windowHeight: windowHeight)
     }
+
+    // MARK: The keyboard layout guide (build 30 bug 1)
+
+    /// What UIKit's keyboard layout guide says, measured in the window:
+    /// the part of a full-window view the docked keyboard covers (`guide`,
+    /// zero tall when it covers nothing; the guide ignores a floating or
+    /// undocked keyboard). Unlike the notifications it needs no
+    /// conversion between spaces and is laid out again whenever the
+    /// keyboard, the window or the orientation changes, so it can't be
+    /// lost or read turned. `nil` when the guide isn't usable: not a
+    /// number, or the view it was read in doesn't reach the window's
+    /// bottom (then its zero height says nothing about the keyboard).
+    public static func guideReading(_ guide: PanelRect, viewMaxY: Double, windowHeight: Double) -> Reading? {
+        let values = [guide.x, guide.y, guide.width, guide.height, viewMaxY, windowHeight]
+        guard values.allSatisfy(\.isFinite), windowHeight > 0 else { return nil }
+        guard viewMaxY >= windowHeight - 1 else { return nil }
+        guard guide.height >= 0.5 else { return .clear }
+        // Taller than the window is no keyboard (a frame read mid-turn).
+        guard guide.height < windowHeight else { return nil }
+        return reading(guide, windowHeight: windowHeight)
+    }
+
+    /// The keyboard as both sources see it (build 30 bug 1, P1: in iPad
+    /// portrait the notification reading went missing when Live's field
+    /// took focus, and the panel drew under the keyboard). The keyboard
+    /// covers the window when either source says it does, up to the higher
+    /// of their tops, so a reading lost by one source never puts the panel
+    /// under the keyboard; it is clear only when every source that has
+    /// read anything says clear. `nil` when neither has read anything.
+    public static func merged(_ readings: [Reading?]) -> Reading? {
+        var top: Double?
+        var overlap = 0.0
+        var any = false
+        for case let reading? in readings {
+            any = true
+            if case let .covers(t, o) = reading, t.isFinite, o.isFinite {
+                top = min(top ?? t, t)
+                overlap = max(overlap, o)
+            }
+        }
+        guard any else { return nil }
+        guard let top else { return .clear }
+        return .covers(top: top, overlap: overlap)
+    }
 }
