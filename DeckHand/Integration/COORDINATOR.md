@@ -2,7 +2,7 @@
 
 > **Owner: the next Mac pass needs your Mac.** Builds 27 and 28 still owe the walks that type and click on the Mac, the protocol 16 checks and the final QA pass. When you can spare the Mac, unlock it, keep a scratch TextEdit document in front, keep the iPad unlocked on Wi-Fi, and let the Mac build loop run them.
 
-> **Build 30 built with 3 bugs** (P1: in iPad portrait the Type panel goes under the keyboard when the Live field is focused, which blocks live-sync edits; P3: numpad width; P3: iPhone snap) plus walk fixes. My lane **build30-fixes** is running. When it's ready: merge it, then queue build 31 with the Mac walks (`test29`/`test30` exact contents) and the live-sync checklists, which need the owner. Then the review page if there's no P1 or P2.
+> **Build 31 queued** (build 30 plus build30-fixes; protocol 17). No lanes are running. Next: the Mac build, then the walks (`test30` exact contents in iPad portrait) and the live-sync checklists, which need the owner's Mac. Then the review page if there's no P1 or P2. Then live-sync phase 2.
 
 > **Mac builds:** 15, 16, 18 and 19 built (19 with 5 bugs, fixed in build 21). The primary session or the owner's Mac session runs Mac builds.
 
@@ -31,7 +31,6 @@ weekly usage limit is close).
 | Coordinator (cloud, self-waking via `send_later`) | session_01H5HwAUp6YcDNLee7GQSMJp | claude/pixelhand-integration | programme complete |
 | Primary (cloud, owner-facing: the owner sends changes here) | "★ Pixel Hand · PRIMARY" | claude/pixelhand-integration | programme complete |
 | Mac build loop (owner's Mac, Claude Desktop session "DeckHand MAC build loop", `/loop` every 30 min; the only Mac build loop since 2026-11-25) | local_d0e9b529 | claude/pixelhand-integration (worktree `pixelhand-build`) | builds when `STATUS.md` last line is `Status: READY FOR MAC BUILD (build N)` |
-| Build 30 fixes (P1 portrait Type panel under the keyboard; numpad width; iPhone snap; walks) | session_01H5HwAU3mnrBFH46qzRezip | claude/pixelhand-lane-build30-fixes | `LANE-build30-fixes.md` ends `Lane: READY TO MERGE` |
 
 ## Queue (start in order, max 3 running)
 
@@ -297,3 +296,4 @@ tests on Linux, writes `DeckHand/Integration/LANE-<name>.md` ending
   - Mac walks: the joystick, type-on-Mac sync and Save as key pass.
   - test29/test30 fail: in iPad portrait the Type panel goes under the keyboard (P1). Nothing was garbled, but nothing was delivered either.
   - Started build30-fixes (`BRIEF-build30-fixes.md`).
+- 2026-11-28 02:55 UTC: build30-fixes ready. Merged at `57f6418`; Core has 1458 tests, all passing; the type check passes; the UI tests parse and balance. **Build 31 queued.**

@@ -2664,4 +2664,41 @@ garbling didn't recur), but the fix itself is unverified.
 `LANE-live-sync-edits.md` checklists (Notes, Mail, Xcode, latency, a
 secure field, lock) and the joystick by hand.
 
-Status: BUILT (build 30) — 3 bugs
+
+## Build 31 queued (2026-11-28)
+
+Build 31 is build 30 plus `LANE-build30-fixes.md`, merged at `57f6418`:
+
+1. **P1:** in iPad portrait, the Type panel stays above the keyboard when
+   the Live field takes focus. The first tap focuses the field instead of
+   opening iOS's edit menu.
+2. **P3:** the arrows and numpad fill the panel width.
+3. **P3:** the iPhone panel snaps to the leading edge.
+4. **Walks:**
+   - `openSyncedLiveField` switches the panel to Live;
+   - the iPhone `test18` compares frames in one coordinate space;
+   - the iPhone `test05` and `test16` fail instead of stopping early.
+
+Protocol 17, unchanged.
+
+Linux: Core **1458 / 1458 pass** (267 suites); `linux-typecheck/run.sh`
+passes; the UI tests parse and their braces balance.
+
+**Mac should do:**
+1. The build and all tests.
+2. Install on the Mac and the iPad.
+3. With the owner's OK to use the Mac and the scratch TextEdit document
+   reset before each live-sync walk, run the walks on the iPad Pro 11" (in
+   portrait **and** landscape) and the iPhone 17 Pro:
+   - `test18`, `test20`, `test27` to `test30`;
+   - **`test30`, recording the exact TextEdit contents** (this verifies
+     the build 29 edit fix);
+   - the rest of the Mac set.
+4. Then the `LANE-live-sync.md` and `LANE-live-sync-edits.md` checklists
+   (Notes, Mail, Xcode, latency, a secure field, lock) and the joystick by
+   hand.
+
+If there are no P1 or P2 findings, the coordinator publishes the owner's
+review page.
+
+Status: READY FOR MAC BUILD (build 31)
