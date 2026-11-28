@@ -104,7 +104,15 @@ spanning the action column; Compose has no actions there. Wherever the
 panel's frame comes from (the remembered place, a drag in flight, a frame
 from before the keyboard rose or the window turned) it is kept in the free
 room above the keyboard, moved and never resized; the keyboard's frame is
-read in the window as it is now (`KeyboardFrameReading`, build 28 bug 6).
+read in the window as it is now (`KeyboardFrameReading`, build 28 bug 6),
+and also from UIKit's keyboard layout guide; the panel avoids the higher
+of the two tops, so a reading lost by one (iPad portrait, when Live's field
+took focus) never puts it under the keyboard (build 30 bug 1). A tap at
+the caret in Live places the caret and opens no edit menu. A docked panel
+(iPhone) narrower than its room docks to the leading edge, the centre or
+the trailing edge, whichever the drop is nearest, as well as to the top or
+the bottom (build 30 bug 3). `ph.type.card` names the card itself, on an
+element of its own shape; `ph.type.panel` is the `.contain` container.
 The iPhone rail's keyboard circle is its own 62 pt glass outside the tabs'
 glass group, and the rail's spacing tightens (12 → 4) so the whole stack
 fits the window (`CanvasPlan.railSpacing`).
